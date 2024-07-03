@@ -1,33 +1,40 @@
-name: Deploy to GitHub Pages
+name: Publish Docs
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  build:
+  publish-docs:
     runs-on: ubuntu-latest
+    name: Docs builder and publisher
+
+    permissions:
+      contents: write 
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.12.4
+          python-version: 3.12
+          architecture: x64
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
-          pip install sphinx
-          pip install sphinx-rtd-theme
+          pip install sphinx sphinx-rtd-theme
 
-      - name: Build the docs
+      - name: Build docs
         run: sphinx-build docs docs/_build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: docs/_build
+          publish_branch: gh-pages
+          keep_files: false
+          force_orphan: true
