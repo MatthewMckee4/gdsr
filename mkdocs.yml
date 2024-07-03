@@ -2,6 +2,8 @@ site_name: GDSR Docs
 
 nav:
   - Home: index.md
+  - Developer Guide:
+      - Class Diagrams: developer/class_diagrams.md
 
 theme:
   name: material
@@ -22,3 +24,11 @@ theme:
 
 extra_css:
   - styles/extra.css
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
