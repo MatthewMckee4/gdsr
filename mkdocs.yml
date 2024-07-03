@@ -1,0 +1,24 @@
+site_name: GDSR Docs
+
+nav:
+  - Home: index.md
+
+theme:
+  name: material
+  locale: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      primary: custom
+      scheme: default
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: custom
+      scheme: slate
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+extra_css:
+  - styles/extra.css

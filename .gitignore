@@ -76,3 +76,6 @@ docs/_build/
 
 # ruff
 .ruff_cache/
+
+# mkdocs
+/site/

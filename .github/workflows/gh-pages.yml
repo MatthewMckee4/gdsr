@@ -23,16 +23,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install sphinx sphinx-rtd-theme
+          pip install mkdocs mkdocs-material
 
       - name: Build docs
-        run: sphinx-build docs docs/_build
+        run: mkdocs build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/_build
+          publish_dir: site
           publish_branch: gh-pages
           keep_files: false
           force_orphan: true
