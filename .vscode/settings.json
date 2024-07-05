@@ -3,7 +3,10 @@
         "cdylib",
         "clippy",
         "gdsr",
+        "pyclass",
         "pydata",
+        "pymethods",
+        "pymodule",
         "viewcode"
     ]
 }

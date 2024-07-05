@@ -1,14 +1,32 @@
+mod array_reference;
+mod r#box;
+mod cell;
+mod element;
+mod node;
+mod path;
+mod polygon;
+mod reference;
+mod text;
+
+use array_reference::ArrayReference;
+use cell::Cell;
+use node::Node;
+use path::Path;
+use polygon::Polygon;
 use pyo3::prelude::*;
+use r#box::Box;
+use reference::Reference;
+use text::Text;
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
-}
-
-/// A Python module implemented in Rust.
 #[pymodule]
-fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+fn gdsr(py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<Cell>()?;
+    m.add_class::<ArrayReference>()?;
+    m.add_class::<Polygon>()?;
+    m.add_class::<Box>()?;
+    m.add_class::<Node>()?;
+    m.add_class::<Path>()?;
+    m.add_class::<Reference>()?;
+    m.add_class::<Text>()?;
     Ok(())
 }
