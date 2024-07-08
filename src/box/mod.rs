@@ -1,8 +1,7 @@
-use crate::element::Element;
 use pyo3::prelude::*;
 
-#[pyclass]
-#[derive(Clone)]
+#[pyclass(eq, ord)]
+#[derive(PartialEq, PartialOrd, Clone, Debug)]
 pub struct Box {}
 
 #[pymethods]
@@ -11,10 +10,12 @@ impl Box {
     pub fn new() -> Self {
         Box {}
     }
-}
 
-impl Element for Box {
     fn __str__(&self) -> PyResult<String> {
         Ok("Box".to_string())
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        self.__str__()
     }
 }

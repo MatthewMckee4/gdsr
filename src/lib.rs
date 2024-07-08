@@ -1,7 +1,6 @@
 mod array_reference;
 mod r#box;
 mod cell;
-mod element;
 mod node;
 mod path;
 mod polygon;
@@ -19,7 +18,7 @@ use reference::Reference;
 use text::Text;
 
 #[pymodule]
-fn gdsr(py: Python, m: &PyModule) -> PyResult<()> {
+fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Cell>()?;
     m.add_class::<ArrayReference>()?;
     m.add_class::<Polygon>()?;

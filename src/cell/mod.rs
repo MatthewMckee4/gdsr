@@ -12,6 +12,9 @@ use crate::text::Text;
 #[pyclass]
 #[derive(Clone)]
 pub struct Cell {
+    #[pyo3(get, set)]
+    pub name: String,
+
     #[pyo3(get)]
     pub array_references: Vec<ArrayReference>,
     #[pyo3(get)]
@@ -31,8 +34,9 @@ pub struct Cell {
 #[pymethods]
 impl Cell {
     #[new]
-    pub fn new() -> Self {
+    pub fn new(name: String) -> Self {
         Cell {
+            name,
             array_references: Vec::new(),
             polygons: Vec::new(),
             boxes: Vec::new(),
@@ -43,7 +47,15 @@ impl Cell {
         }
     }
 
-    pub fn add(&mut self, element: &PyAny) -> PyResult<()> {
+    fn __str__(&self) -> PyResult<String> {
+        Ok("Cell".to_string())
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        self.__str__()
+    }
+
+    pub fn add(&mut self, element: &Bound<'_, PyAny>) -> PyResult<()> {
         if let Ok(array_reference) = element.extract::<ArrayReference>() {
             self.array_references.push(array_reference);
         } else if let Ok(polygon) = element.extract::<Polygon>() {
@@ -59,9 +71,7 @@ impl Cell {
         } else if let Ok(text) = element.extract::<Text>() {
             self.texts.push(text);
         } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "Invalid element type",
-            ));
+            return Err(pyo3::exceptions::PyTypeError::new_err("Invalid element"));
         }
         Ok(())
     }
