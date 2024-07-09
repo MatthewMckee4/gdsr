@@ -8,6 +8,8 @@ nav:
     - user-guide/installation.md
   - Python Api:
     - python-api/index.md
+    - Elements:
+      - python-api/elements/polygon.md
   - Development:
     - development/index.md
     - development/class_diagrams.md

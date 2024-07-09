@@ -17,6 +17,7 @@ class Path:
     def __init__(self) -> None: ...
 
 class Polygon:
+    """Polygon element."""
     @property
     def points(self) -> OutputPointsLike: ...
     @points.setter
