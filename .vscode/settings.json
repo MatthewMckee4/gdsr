@@ -9,5 +9,6 @@
         "pymodule",
         "repr",
         "viewcode"
-    ]
+    ],
+    "editor.defaultFormatter": "charliermarsh.ruff"
 }

@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyTuple};
 
 use crate::array_reference::ArrayReference;
 use crate::node::Node;
@@ -14,7 +14,6 @@ use crate::text::Text;
 pub struct Cell {
     #[pyo3(get, set)]
     pub name: String,
-
     #[pyo3(get)]
     pub array_references: Vec<ArrayReference>,
     #[pyo3(get)]
@@ -29,6 +28,29 @@ pub struct Cell {
     pub references: Vec<Reference>,
     #[pyo3(get)]
     pub texts: Vec<Text>,
+}
+
+impl Cell {
+    pub fn add_element(&mut self, element: &Bound<'_, PyAny>) -> PyResult<()> {
+        if let Ok(array_reference) = element.extract::<ArrayReference>() {
+            self.array_references.push(array_reference);
+        } else if let Ok(polygon) = element.extract::<Polygon>() {
+            self.polygons.push(polygon);
+        } else if let Ok(r#box) = element.extract::<Box>() {
+            self.boxes.push(r#box);
+        } else if let Ok(node) = element.extract::<Node>() {
+            self.nodes.push(node);
+        } else if let Ok(path) = element.extract::<Path>() {
+            self.paths.push(path);
+        } else if let Ok(reference) = element.extract::<Reference>() {
+            self.references.push(reference);
+        } else if let Ok(text) = element.extract::<Text>() {
+            self.texts.push(text);
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err("Invalid element"));
+        }
+        Ok(())
+    }
 }
 
 #[pymethods]
@@ -47,31 +69,18 @@ impl Cell {
         }
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Cell".to_string())
+    pub fn __str__(&self) -> PyResult<String> {
+        Ok(self.__repr__().unwrap())
     }
 
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+    pub fn __repr__(&self) -> PyResult<String> {
+        Ok(self.name.to_string())
     }
 
-    pub fn add(&mut self, element: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let Ok(array_reference) = element.extract::<ArrayReference>() {
-            self.array_references.push(array_reference);
-        } else if let Ok(polygon) = element.extract::<Polygon>() {
-            self.polygons.push(polygon);
-        } else if let Ok(r#box) = element.extract::<Box>() {
-            self.boxes.push(r#box);
-        } else if let Ok(node) = element.extract::<Node>() {
-            self.nodes.push(node);
-        } else if let Ok(path) = element.extract::<Path>() {
-            self.paths.push(path);
-        } else if let Ok(reference) = element.extract::<Reference>() {
-            self.references.push(reference);
-        } else if let Ok(text) = element.extract::<Text>() {
-            self.texts.push(text);
-        } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err("Invalid element"));
+    #[pyo3(signature=(*elements))]
+    pub fn add(&mut self, elements: &Bound<'_, PyTuple>) -> PyResult<()> {
+        for item in elements.iter() {
+            self.add_element(&item)?;
         }
         Ok(())
     }

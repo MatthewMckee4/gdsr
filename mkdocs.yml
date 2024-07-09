@@ -1,29 +1,34 @@
-site_name: GDSR Docs
+site_name: GDSR
+repo_url: https://github.com/gdsr/gdsr
 
 nav:
-  - Home: index.md
-  - Developer Guide:
-      - Class Diagrams: developer/class_diagrams.md
+  - User guide:
+    - index.md
+    - user-guide/getting-started.md
+    - user-guide/installation.md
+  - Python Api:
+    - python-api/index.md
+  - Development:
+    - development/index.md
+    - development/class_diagrams.md
 
 theme:
   name: material
   locale: en
   palette:
-    - media: "(prefers-color-scheme: light)"
-      primary: custom
-      scheme: default
-      toggle:
-        icon: material/weather-sunny
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      primary: custom
       scheme: slate
-      toggle:
-        icon: material/weather-night
-        name: Switch to light mode
+      primary: teal
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.footer
+    - navigation.indexes
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
 
 extra_css:
-  - styles/extra.css
+  - stylesheets/extra.css
 
 markdown_extensions:
   - pymdownx.superfences:
