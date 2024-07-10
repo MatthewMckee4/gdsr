@@ -8,8 +8,11 @@ nav:
     - user-guide/installation.md
   - Python Api:
     - python-api/index.md
+    - python-api/typing.md
     - Elements:
+      - python-api/elements/box.md
       - python-api/elements/polygon.md
+      - python-api/elements/path.md
   - Development:
     - development/index.md
     - development/class_diagrams.md
@@ -39,3 +42,12 @@ markdown_extensions:
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
 
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: sphinx 
+            show_source: false
+            find_stubs_package: true
+            show_submodules: true

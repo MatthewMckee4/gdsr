@@ -1,0 +1,3 @@
+class Path:
+    """Path object"""
+    def __init__(self) -> None: ...

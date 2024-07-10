@@ -1,6 +1,6 @@
 import pytest
-from gdsr import Polygon
-from gdsr.types import InputPointsLike
+from gdsr.polygon import Polygon
+from gdsr.typing import InputPointsLike
 
 
 @pytest.fixture

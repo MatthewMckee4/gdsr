@@ -1,5 +1,7 @@
-from typing import Union, Sequence, List
-from .typing import PointLike, InputPointsLike, OutputPointsLike
+from typing import Union, List
+
+from .path import Path
+from .polygon import Polygon
 
 class ArrayReference:
     def __init__(self) -> None: ...
@@ -12,21 +14,6 @@ class Box:
 
 class Node:
     def __init__(self) -> None: ...
-
-class Path:
-    def __init__(self) -> None: ...
-
-class Polygon:
-    """Polygon element."""
-    @property
-    def points(self) -> OutputPointsLike: ...
-    @points.setter
-    def points(self, points: InputPointsLike) -> None: ...
-    layer: int
-    data_type: int
-    def __init__(
-        self, points: Sequence[PointLike], layer: int = 0, data_type: int = 0
-    ) -> None: ...
 
 class Text:
     def __init__(self) -> None: ...
@@ -51,3 +38,14 @@ class Cell:
     def texts(self) -> List[Text]: ...
     def __init__(self, name: str) -> None: ...
     def add(self, *elements: Element) -> None: ...
+
+__all__ = [
+    "ArrayReference",
+    "Reference",
+    "Polygon",
+    "Box",
+    "Node",
+    "Path",
+    "Text",
+    "Cell",
+]

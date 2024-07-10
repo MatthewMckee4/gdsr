@@ -19,6 +19,10 @@ PointLike = Union[
     Sequence[float],
     Mapping[int, float],
 ]
+"""Object that is indexable at 0 and 1"""
 
 InputPointsLike = Sequence[PointLike]
+"""Sequence of objects that are indexable at 0 and 1"""
+
 OutputPointsLike = List[Tuple[float, float]]
+"""List of tuples of floats"""
