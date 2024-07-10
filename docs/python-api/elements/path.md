@@ -1,3 +1,3 @@
 # Path
 
-::: gdsr.path.Path
+::: gdsr.Path

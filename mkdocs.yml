@@ -10,9 +10,13 @@ nav:
     - python-api/index.md
     - python-api/typing.md
     - Elements:
+      - python-api/elements/array_reference.md
       - python-api/elements/box.md
-      - python-api/elements/polygon.md
+      - python-api/elements/node.md
       - python-api/elements/path.md
+      - python-api/elements/polygon.md
+      - python-api/elements/reference.md
+      - python-api/elements/text.md
   - Development:
     - development/index.md
     - development/class_diagrams.md

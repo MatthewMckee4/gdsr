@@ -1,4 +1,4 @@
 # Polygon
 
-::: gdsr.polygon.Polygon
+::: gdsr.Polygon
     

@@ -1,5 +1,8 @@
-use crate::utils::points::to_points;
-use pyo3::{prelude::*, types::PyList};
+use crate::utils::{
+    geometry::bounding_box,
+    points::{check_vec_not_empty, to_points, to_required_input_points_format},
+};
+use pyo3::{prelude::*, types::PySequence};
 
 #[pyclass(eq, ord)]
 #[derive(PartialEq, PartialOrd, Clone, Debug)]
@@ -17,18 +20,12 @@ impl Polygon {
     #[new]
     #[pyo3(signature = (points, layer=0, data_type=0))]
     pub fn new(
-        points: &Bound<'_, PyAny>,
+        points: &Bound<'_, PySequence>,
         layer: Option<i32>,
         data_type: Option<i32>,
     ) -> PyResult<Self> {
-        let points_list = points.downcast::<PyList>()?;
+        let points_list = to_required_input_points_format(points)?;
         let points_vec = to_points(points_list)?;
-
-        if points_vec.is_empty() {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "Points list cannot be empty",
-            ));
-        }
 
         let layer = layer.unwrap_or(0);
         let data_type = data_type.unwrap_or(0);
@@ -40,38 +37,35 @@ impl Polygon {
     }
 
     #[setter]
-    fn set_points(&mut self, points: &Bound<'_, PyAny>) -> PyResult<()> {
-        let points_list = points.downcast::<PyList>()?;
-        let points_vec = to_points(points_list)?;
-        if points_vec.is_empty() {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "Points list cannot be empty",
-            ));
-        }
-
-        self.points = points_vec;
-
+    fn set_points(&mut self, points: &Bound<'_, PySequence>) -> PyResult<()> {
+        let points_list = to_required_input_points_format(points)?;
+        self.points = to_points(points_list)?;
         Ok(())
     }
 
+    #[getter]
+    fn get_points(&self) -> PyResult<Vec<(f64, f64)>> {
+        check_vec_not_empty(&self.points)?;
+        Ok(self.points.clone())
+    }
+
+    #[getter]
+    fn bounding_box(&self) -> PyResult<((f64, f64), (f64, f64))> {
+        Ok(bounding_box(&self.points)?)
+    }
+
     fn __str__(&self) -> PyResult<String> {
-        if self.points.is_empty() {
-            Ok(format!("Polygon with 0 points on layer {}", self.layer))
-        } else {
-            Ok(format!(
-                "Polygon with {} points, starting at ({}, {}) on layer {}",
-                self.points.len(),
-                self.points[0].0,
-                self.points[0].1,
-                self.layer
-            ))
-        }
+        Ok(format!(
+            "Polygon with {} points, starting at ({}, {}) on layer {}",
+            self.points.len(),
+            self.points[0].0,
+            self.points[0].1,
+            self.layer
+        ))
     }
 
     fn __repr__(&self) -> PyResult<String> {
-        let points_summary = if self.points.is_empty() {
-            "[]".to_string()
-        } else if self.points.len() <= 2 {
+        let points_summary = if self.points.len() <= 2 {
             format!("{:?}", self.points)
         } else {
             format!(
