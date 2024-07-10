@@ -25,3 +25,19 @@ pub fn bounding_box(points: &Vec<(f64, f64)>) -> PyResult<((f64, f64), (f64, f64
 
     Ok(((min_x, min_y), (max_x, max_y)))
 }
+
+pub fn area(points: &Vec<(f64, f64)>) -> PyResult<f64> {
+    check_vec_not_empty(points)?;
+
+    let mut area = 0.0;
+    let n = points.len();
+
+    for i in 0..n {
+        let j = (i + 1) % n;
+        let (x_i, y_i) = points[i];
+        let (x_j, y_j) = points[j];
+        area += x_i * y_j - y_i * x_j;
+    }
+
+    Ok(area.abs() / 2.0)
+}

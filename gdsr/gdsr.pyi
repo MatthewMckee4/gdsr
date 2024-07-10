@@ -46,6 +46,11 @@ class Polygon:
         """Returns the bounding box of the polygon."""
         ...
 
+    @property
+    def area(self) -> float:
+        """Returns the area of the polygon."""
+        ...
+
 class Node:
     def __init__(self) -> None: ...
 

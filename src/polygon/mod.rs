@@ -1,5 +1,5 @@
 use crate::utils::{
-    geometry::bounding_box,
+    geometry::{area, bounding_box},
     points::{check_vec_not_empty, to_points, to_required_input_points_format},
 };
 use pyo3::{prelude::*, types::PySequence};
@@ -52,6 +52,11 @@ impl Polygon {
     #[getter]
     fn bounding_box(&self) -> PyResult<((f64, f64), (f64, f64))> {
         Ok(bounding_box(&self.points)?)
+    }
+
+    #[getter]
+    fn area(&self) -> PyResult<f64> {
+        Ok(area(&self.points)?)
     }
 
     fn __str__(&self) -> PyResult<String> {

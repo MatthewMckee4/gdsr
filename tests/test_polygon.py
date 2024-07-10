@@ -1,3 +1,4 @@
+import sys
 import pytest
 from gdsr import Polygon
 from gdsr.typing import InputPointsLike
@@ -103,3 +104,44 @@ def test_bounding_box_complex_polygon():
     points = [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0), (1.5, -1.0), (0.5, -1.0)]
     polygon = Polygon(points, layer=0, data_type=0)
     assert polygon.bounding_box == ((0.0, -1.0), (2.0, 1.0))
+
+
+def test_area_single_point():
+    polygon = Polygon([(0.0, 0.0)], layer=0, data_type=0)
+    assert polygon.area == 0.0
+
+
+def test_area_square():
+    points = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 1.0
+
+
+def test_area_triangle():
+    points = [(0.0, 0.0), (2.0, 0.0), (1.0, 1.0)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 1.0
+
+
+def test_area_complex_polygon():
+    points = [(0.0, 0.0), (3.0, 0.0), (2.0, 1.0), (1.0, 3.0), (-1.0, 2.0)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 6.5
+
+
+def test_area_negative_coordinates():
+    points = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 4.0
+
+
+def test_area_minimal_coordinates():
+    points = [(0.0, 0.0), (sys.float_info.min, sys.float_info.min)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 0.0
+
+
+def test_area_maximal_coordinates():
+    points = [(0.0, 0.0), (sys.float_info.max, sys.float_info.max)]
+    polygon = Polygon(points, layer=0, data_type=0)
+    assert polygon.area == 0.0
