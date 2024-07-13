@@ -11,17 +11,26 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
-dependencies = [
+[project.optional-dependencies]
+dev = [     
+    "maturin",
     "mkdocs",
     "mkdocstrings-python",
+    "pytest",
 ]
+
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
 
-[tool.ruff]
+[tool.isort]
+profile = "black"
 
-# Exclude a variety of commonly ignored directories.
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.ruff]
 exclude = [
     ".bzr",
     ".direnv",
@@ -58,9 +67,7 @@ indent-width = 4
 # Assume Python 3.8
 target-version = "py38"
 
-lint.per-file-ignores = {"*/__init__.py" = ["F401", "F403"]}
-
-[ruff.lint]
+[tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 select = ["E", "W", "I", "N"]
 ignore = []
@@ -72,7 +79,9 @@ unfixable = []
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[format]
+per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"]}
+
+[tool.ruff.format]
 # Like Black, use double quotes for strings.
 quote-style = "double"
 
@@ -87,3 +96,10 @@ line-ending = "auto"
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["gdsr"]
+include = ["*/gdsr/*.pyi"]
+
+[tool.coverage.report]
+show_missing = true

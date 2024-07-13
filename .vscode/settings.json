@@ -2,13 +2,31 @@
     "cSpell.words": [
         "cdylib",
         "clippy",
+        "dunder",
+        "floordiv",
         "gdsr",
+        "getitem",
+        "ifloor",
+        "ndigits",
+        "powi",
         "pyclass",
         "pydata",
+        "pylist",
         "pymethods",
         "pymodule",
+        "radd",
         "repr",
+        "richcmp",
+        "rmul",
+        "rsub",
+        "truediv",
         "viewcode"
     ],
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestPath": "pytest"
 }

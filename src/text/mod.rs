@@ -4,11 +4,17 @@ use pyo3::prelude::*;
 #[derive(PartialEq, PartialOrd, Clone, Debug)]
 pub struct Text {}
 
+impl Default for Text {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[pymethods]
 impl Text {
     #[new]
     pub fn new() -> Self {
-        Text {}
+        Self {}
     }
 
     fn __str__(&self) -> PyResult<String> {

@@ -7,6 +7,7 @@ mod r#box;
 mod cell;
 mod node;
 mod path;
+mod point;
 mod polygon;
 mod reference;
 mod text;
@@ -15,6 +16,7 @@ use array_reference::ArrayReference;
 use cell::Cell;
 use node::Node;
 use path::Path;
+use point::{Point, PointIterator};
 use polygon::Polygon;
 use r#box::Box;
 use reference::Reference;
@@ -31,5 +33,7 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Path>()?;
     m.add_class::<Reference>()?;
     m.add_class::<Text>()?;
+    m.add_class::<Point>()?;
+    m.add_class::<PointIterator>()?;
     Ok(())
 }
