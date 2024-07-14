@@ -23,7 +23,7 @@ def setup_logger(name: str = __file__) -> None:
 
     console_handler = logging.StreamHandler()
     formatter = ColouredFormatter(
-        fmt="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+        fmt="gdsr - %(asctime)s - %(message)s", datefmt="%H:%M:%S"
     )
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)

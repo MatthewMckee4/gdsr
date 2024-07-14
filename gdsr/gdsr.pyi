@@ -29,13 +29,22 @@ class Point:
     def copy(self) -> Point:
         """Returns a copy of the point."""
 
-    def rotate(self, angle: float, center: PointLike = (0, 0)) -> Point:
+    def rotate(self, angle: float, center: PointLike = Point(0, 0)) -> Point:
         """Rotates the point by an angle around a center point.
 
         :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike center: Center point of rotation, defaults to (0, 0).
+        :param PointLike center: Center point of rotation, defaults to Point(0, 0).
 
         :return: Rotated point.
+        """
+
+    def scale(self, factor: float, center: PointLike = Point(0, 0)) -> Point:
+        """Scales the point by a factor around a center point.
+
+        :param float factor: Scaling factor.
+        :param PointLike center: Center point of scaling, defaults to Point(0, 0).
+
+        :return: Scaled point.
         """
 
     def __getitem__(self, index: Literal[0, 1]) -> float: ...
@@ -192,7 +201,27 @@ class Cell:
     @property
     def texts(self) -> List[Text]: ...
     def __init__(self, name: str) -> None: ...
-    def add(self, *elements: Element) -> None: ...
+    def add(self, *elements: Element) -> None:
+        """Adds elements to the cell."""
+
+class Library:
+    name: str
+    @property
+    def cells(self) -> List[Cell]:
+        """Returns the cells in the library."""
+    def add(self, *cells: Cell) -> None:
+        """Adds cells to the library."""
+    def __init__(self, name: str) -> None:
+        """Initializes the Library with a name, units, and precision.
+
+        :param str name: Library name
+        """
+
+    def to_gds(self, filename: str, units: float, precision: float) -> None:
+        """Writes the library to a GDS file.
+
+        :param str filename: Output GDS file name.
+        """
 
 __all__ = [
     "PointIterator",
@@ -205,6 +234,5 @@ __all__ = [
     "Path",
     "Text",
     "Cell",
-    "PointLike",
-    "InputPointsLike",
+    "Library",
 ]

@@ -1,7 +1,16 @@
+use std::fs::File;
+use std::io::Write;
+
 use crate::{
-    point::{py_any_to_point, Point},
-    utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+    config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    point::{points_to_bytes, py_any_to_point, Point},
+    utils::{
+        gds_format::{i32_array_to_big_endian, write_u16_array_to_file},
+        geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+    },
 };
+use bytemuck::cast_slice;
+use log::warn;
 use pyo3::{
     exceptions::PyValueError,
     prelude::*,
@@ -15,6 +24,65 @@ use super::{
     },
     Polygon,
 };
+
+impl Polygon {
+    pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
+        if self.points.len() > 8190 {
+            warn!(
+                "{} has more than 8190 points, This may cause errors in the future.",
+                self
+            );
+        }
+
+        let mut polygon_head = [
+            4,
+            combine_record_and_data_type(GDSRecord::Boundary, GDSDataType::NoData),
+            6,
+            combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
+            self.layer as u16,
+            6,
+            combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
+            self.data_type as u16,
+        ];
+
+        write_u16_array_to_file(&mut polygon_head, &mut file)?;
+
+        let xy_head =
+            combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger);
+
+        let mut scaled_points: Vec<i32> = Vec::with_capacity(self.points.len() * 2);
+        for point in &self.points {
+            let scaled_point = point.scale(scale, Point { x: 0.0, y: 0.0 })?;
+            scaled_points.push(scaled_point.x.round() as i32);
+            scaled_points.push(scaled_point.y.round() as i32);
+        }
+
+        i32_array_to_big_endian(&mut scaled_points);
+
+        let mut i0 = 0;
+        let points_length = self.points.len();
+
+        while i0 < points_length {
+            let i1 = (i0 + 8190).min(points_length);
+            let mut current_xy_head = [(4 + 8 * (i1 - i0)) as u16, xy_head];
+
+            write_u16_array_to_file(&mut current_xy_head, &mut file)?;
+
+            file.write_all(cast_slice(&scaled_points[i0 * 2..i1 * 2]))?;
+
+            i0 = i1;
+        }
+
+        let mut polygon_tail = [
+            4,
+            combine_record_and_data_type(GDSRecord::EndEl, GDSDataType::NoData),
+        ];
+
+        write_u16_array_to_file(&mut polygon_tail, &mut file)?;
+
+        Ok(file)
+    }
+}
 
 #[pymethods]
 impl Polygon {

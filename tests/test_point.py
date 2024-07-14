@@ -619,3 +619,54 @@ def test_point_rotate_large_negative():
     p = Point(1, 0)
     p2 = p.rotate(-720)
     assert p2 == (1, 0)
+
+
+# Scale
+
+
+def test_point_scale():
+    p = Point(1, 2)
+    p2 = p.scale(2)
+    assert p2 == (2, 4)
+
+
+def test_point_scale_negative():
+    p = Point(1, 2)
+    p2 = p.scale(-2)
+    assert p2 == (-2, -4)
+
+
+def test_point_scale_zero():
+    p = Point(1, 2)
+    p2 = p.scale(0)
+    assert p2 == (0, 0)
+
+
+def test_point_scale_center():
+    p = Point(1, 2)
+    p2 = p.scale(2, Point(1, 1))
+    assert p2 == (1, 3)
+
+
+def test_point_scale_center_negative():
+    p = Point(1, 2)
+    p2 = p.scale(-2, Point(1, 1))
+    assert p2 == (1, -1)
+
+
+def test_point_scale_center_zero():
+    p = Point(1, 2)
+    p2 = p.scale(0, Point(1, 1))
+    assert p2 == (1, 1)
+
+
+def test_point_scale_invalid_operand():
+    p = Point(1, 2)
+    with pytest.raises(TypeError):
+        p.scale("invalid operand", Point(1, 1))  # type: ignore
+
+
+def test_point_scale_invalid_center():
+    p = Point(1, 2)
+    with pytest.raises(TypeError):
+        p.scale(2, "invalid center")  # type: ignore

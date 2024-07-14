@@ -14,6 +14,7 @@ pub use utils::*;
 
 #[pyclass(frozen, get_all)]
 #[derive(Clone, Copy)]
+
 pub struct Point {
     pub x: f64,
     pub y: f64,

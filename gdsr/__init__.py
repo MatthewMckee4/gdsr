@@ -6,6 +6,7 @@ from .gdsr import (
     ArrayReference,
     Box,
     Cell,
+    Library,
     Node,
     Path,
     Point,
@@ -27,6 +28,7 @@ __all__ = [
     "Path",
     "Text",
     "Cell",
+    "Library",
     "PointLike",
     "InputPointsLike",
 ]

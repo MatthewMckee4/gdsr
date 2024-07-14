@@ -1,13 +1,18 @@
 {
     "cSpell.words": [
         "cdylib",
+        "chrono",
         "clippy",
         "dunder",
+        "Endlib",
+        "fexp",
         "floordiv",
+        "Gdsii",
         "gdsr",
         "getitem",
         "ifloor",
         "ndigits",
+        "powf",
         "powi",
         "pyclass",
         "pydata",

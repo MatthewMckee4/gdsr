@@ -10,6 +10,20 @@ use super::iterator::PointIterator;
 use super::utils::*;
 use super::Point;
 
+impl Point {
+    pub fn to_bytes(&self) -> [u8; 16] {
+        let mut bytes = [0; 16];
+        let x_bytes = self.x.to_be_bytes();
+        let y_bytes = self.y.to_be_bytes();
+        bytes[..8].copy_from_slice(&x_bytes);
+        bytes[8..].copy_from_slice(&y_bytes);
+        bytes
+    }
+    pub fn to_u16(&self) -> (u16, u16) {
+        (self.x as u16, self.y as u16)
+    }
+}
+
 #[pymethods]
 impl Point {
     #[new]
@@ -52,6 +66,18 @@ impl Point {
             x: rounded_x,
             y: rounded_y,
         })
+    }
+
+    #[pyo3(signature = (factor, center=Point { x: 0.0, y: 0.0 }))]
+    pub fn scale(
+        &self,
+        factor: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] center: Point,
+    ) -> PyResult<Self> {
+        let x = (self.x - center.x) * factor + center.x;
+        let y = (self.y - center.y) * factor + center.y;
+
+        Ok(Point { x, y })
     }
 
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
