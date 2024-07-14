@@ -217,7 +217,9 @@ class Library:
         :param str name: Library name
         """
 
-    def to_gds(self, filename: str, units: float, precision: float) -> None:
+    def to_gds(
+        self, filename: str, units: float = 1e-6, precision: float = 1e-10
+    ) -> None:
         """Writes the library to a GDS file.
 
         :param str filename: Output GDS file name.

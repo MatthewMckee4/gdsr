@@ -3,13 +3,12 @@ use std::io::Write;
 
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
-    point::{points_to_bytes, py_any_to_point, Point},
+    point::{py_any_to_point, Point},
     utils::{
-        gds_format::{i32_array_to_big_endian, write_u16_array_to_file},
+        gds_format::write_u16_array_to_file,
         geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
     },
 };
-use bytemuck::cast_slice;
 use log::warn;
 use pyo3::{
     exceptions::PyValueError,
@@ -49,26 +48,31 @@ impl Polygon {
 
         let xy_head =
             combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger);
-
-        let mut scaled_points: Vec<i32> = Vec::with_capacity(self.points.len() * 2);
-        for point in &self.points {
-            let scaled_point = point.scale(scale, Point { x: 0.0, y: 0.0 })?;
-            scaled_points.push(scaled_point.x.round() as i32);
-            scaled_points.push(scaled_point.y.round() as i32);
-        }
-
-        i32_array_to_big_endian(&mut scaled_points);
-
-        let mut i0 = 0;
         let points_length = self.points.len();
+        let mut i0 = 0;
+
+        let mut xy_header_buffer = vec![0u8; 4];
+        let mut points_buffer = Vec::with_capacity(8 * 8190);
 
         while i0 < points_length {
             let i1 = (i0 + 8190).min(points_length);
-            let mut current_xy_head = [(4 + 8 * (i1 - i0)) as u16, xy_head];
+            let record_length = 4 + 8 * (i1 - i0);
 
-            write_u16_array_to_file(&mut current_xy_head, &mut file)?;
+            xy_header_buffer[0..2].copy_from_slice(&(record_length as u16).to_be_bytes());
+            xy_header_buffer[2..4].copy_from_slice(&xy_head.to_be_bytes());
 
-            file.write_all(cast_slice(&scaled_points[i0 * 2..i1 * 2]))?;
+            file.write_all(&xy_header_buffer)?;
+
+            points_buffer.clear();
+            for point in &self.points[i0..i1] {
+                let scaled_x = (point.x * scale).round() as i32;
+                let scaled_y = (point.y * scale).round() as i32;
+
+                points_buffer.extend_from_slice(&scaled_x.to_be_bytes());
+                points_buffer.extend_from_slice(&scaled_y.to_be_bytes());
+            }
+
+            file.write_all(&points_buffer)?;
 
             i0 = i1;
         }

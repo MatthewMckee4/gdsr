@@ -1,6 +1,5 @@
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
-use log::info;
 use pyo3::prelude::*;
 use std::fs::File;
 use std::io::Write;
@@ -50,12 +49,6 @@ pub fn eight_byte_real(value: f64) -> [u8; 8] {
 }
 
 pub fn u16_array_to_big_endian(array: &mut [u16]) {
-    for value in array.iter_mut() {
-        *value = value.to_be();
-    }
-}
-
-pub fn i32_array_to_big_endian(array: &mut [i32]) {
     for value in array.iter_mut() {
         *value = value.to_be();
     }

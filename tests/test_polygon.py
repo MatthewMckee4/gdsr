@@ -95,7 +95,7 @@ def test_polygon_setter_empty_tuple():
 
 def test_polygon_setter_non_iterable():
     polygon = Polygon([(0.0, 0.0)])
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         polygon.points = None  # type: ignore
 
 

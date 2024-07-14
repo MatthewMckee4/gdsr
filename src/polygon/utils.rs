@@ -1,7 +1,11 @@
 use log::info;
-use pyo3::{exceptions::PyValueError, prelude::*, types::PySequence};
+use pyo3::{
+    exceptions::{PyTypeError, PyValueError},
+    prelude::*,
+    types::PySequence,
+};
 
-use crate::point::{py_list_to_points, py_sequence_to_py_list, Point};
+use crate::point::{check_vec_not_empty, py_any_to_point, Point};
 
 use super::Polygon;
 
@@ -18,10 +22,15 @@ pub fn check_data_type_valid(_: i32) -> PyResult<()> {
 
 pub fn input_polygon_points_to_correct_format(points: &Bound<'_, PyAny>) -> PyResult<Vec<Point>> {
     if let Ok(points) = points.downcast::<PySequence>() {
-        let points_vec = py_list_to_points(&py_sequence_to_py_list(points)?)?;
-        Ok(polygon_points_to_correct_format(points_vec))
+        let mut points_list = Vec::new();
+        for item in points.iter()? {
+            let point = py_any_to_point(&item?)?;
+            points_list.push(point);
+        }
+        check_vec_not_empty(&points_list)?;
+        Ok(polygon_points_to_correct_format(points_list))
     } else {
-        Err(PyValueError::new_err(
+        Err(PyTypeError::new_err(
             "Invalid points format: not a sequence",
         ))
     }
