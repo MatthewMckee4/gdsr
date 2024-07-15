@@ -1,21 +1,19 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
 pub struct Path {}
 
-#[pymethods]
-impl Path {
-    #[new]
-    pub fn new() -> Self {
-        Path {}
+impl std::fmt::Display for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Path")
     }
+}
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Path".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Pa")
     }
 }

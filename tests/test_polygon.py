@@ -146,22 +146,22 @@ def test_str_two_points():
 
 def test_repr_one_point():
     polygon = Polygon([(0, 0)], layer=0, data_type=0)
-    assert repr(polygon) == "P((0, 0), n=1, l=0, d=0)"
+    assert repr(polygon) == "Po((0, 0), n=1, l=0, d=0)"
 
 
 def test_repr_two_points():
     polygon = Polygon([(0, 0), (1, 1)], layer=0, data_type=0)
-    assert repr(polygon) == "P((0, 0), n=3, l=0, d=0)"
+    assert repr(polygon) == "Po((0, 0), n=3, l=0, d=0)"
 
 
 def test_repr_three_points():
     polygon = Polygon([(0, 0), (1, 1), (2, 2)], layer=0, data_type=0)
-    assert repr(polygon) == "P((0, 0), n=4, l=0, d=0)"
+    assert repr(polygon) == "Po((0, 0), n=4, l=0, d=0)"
 
 
 def test_repr_four_points():
     polygon = Polygon([(0, 0), (1, 1), (2, 2), (3, 3)], layer=0, data_type=0)
-    assert repr(polygon) == "P((0, 0), n=5, l=0, d=0)"
+    assert repr(polygon) == "Po((0, 0), n=5, l=0, d=0)"
 
 
 # Bounding box

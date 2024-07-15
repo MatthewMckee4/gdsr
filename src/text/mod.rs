@@ -1,27 +1,19 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
 pub struct Text {}
 
-impl Default for Text {
-    fn default() -> Self {
-        Self::new()
+impl std::fmt::Display for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Text")
     }
 }
 
-#[pymethods]
-impl Text {
-    #[new]
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Text".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "T")
     }
 }

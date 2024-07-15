@@ -17,11 +17,14 @@ dev = [
     "mkdocs",
     "mkdocstrings-python",
     "pytest",
+    "pytest-mock",
 ]
 
 
-[tool.maturin]
-features = ["pyo3/extension-module"]
+# [tool.maturin]
+# features = ["pyo3/extension-module, pyo3/multiple-pymethods"]
+# all-features = true
+
 
 [tool.isort]
 profile = "black"

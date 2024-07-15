@@ -54,24 +54,3 @@ pub fn close_points(points: &[Point]) -> Vec<Point> {
 pub fn polygon_points_to_correct_format(points: Vec<Point>) -> Vec<Point> {
     close_points(&points)
 }
-
-pub fn polygon_str(polygon: &Polygon) -> String {
-    format!(
-        "Polygon with {} point(s), starting at ({}, {}) on layer {}, data type {}",
-        polygon.points.len(),
-        polygon.points[0].x,
-        polygon.points[0].y,
-        polygon.layer,
-        polygon.data_type
-    )
-}
-
-pub fn polygon_repr(polygon: &Polygon) -> String {
-    format!(
-        "P({:?}, n={}, l={}, d={})",
-        polygon.points[0],
-        polygon.points.len(),
-        polygon.layer,
-        polygon.data_type
-    )
-}

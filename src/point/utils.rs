@@ -19,20 +19,10 @@ pub fn py_any_to_point(point: &Bound<'_, PyAny>) -> PyResult<Point> {
     }
 }
 
-const EMPTY_LIST_ERROR: &str = "Points cannot be empty";
-
 pub fn check_vec_not_empty(vec: &[Point]) -> PyResult<()> {
     if vec.is_empty() {
-        Err(PyTypeError::new_err(EMPTY_LIST_ERROR))
+        Err(PyTypeError::new_err("Points cannot be empty"))
     } else {
         Ok(())
     }
-}
-
-pub fn point_str(point: &Point) -> String {
-    format!("Point({}, {})", point.x, point.y)
-}
-
-pub fn point_repr(point: &Point) -> String {
-    format!("({}, {})", point.x, point.y)
 }

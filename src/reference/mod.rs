@@ -1,21 +1,23 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
-pub struct Reference {}
+use crate::cell::Cell;
 
-#[pymethods]
-impl Reference {
-    #[new]
-    pub fn new() -> Self {
-        Reference {}
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
+pub struct Reference {
+    cell: Cell,
+}
+
+impl std::fmt::Display for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Reference of {:?}", self.cell)
     }
+}
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Reference".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "R({:?})", self.cell)
     }
 }

@@ -9,9 +9,10 @@ use crate::reference::Reference;
 use crate::text::Text;
 
 mod general;
+mod io;
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Cell {
     #[pyo3(get, set)]
     pub name: String,
@@ -29,4 +30,16 @@ pub struct Cell {
     pub references: Vec<Reference>,
     #[pyo3(get)]
     pub texts: Vec<Text>,
+}
+
+impl std::fmt::Display for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Cell: {}", self.name)
+    }
+}
+
+impl std::fmt::Debug for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }

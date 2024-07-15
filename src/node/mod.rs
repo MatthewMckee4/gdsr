@@ -1,21 +1,19 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
 pub struct Node {}
 
-#[pymethods]
-impl Node {
-    #[new]
-    pub fn new() -> Self {
-        Node {}
+impl std::fmt::Display for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Node")
     }
+}
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Node".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "N")
     }
 }

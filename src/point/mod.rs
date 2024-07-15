@@ -13,7 +13,7 @@ pub use iterator::PointIterator;
 pub use utils::*;
 
 #[pyclass(frozen, get_all)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 
 pub struct Point {
     pub x: f64,
@@ -24,12 +24,6 @@ impl Hash for Point {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.x.to_bits().hash(state);
         self.y.to_bits().hash(state);
-    }
-}
-
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
     }
 }
 
@@ -44,12 +38,12 @@ impl PartialOrd for Point {
 
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", point_str(self))
+        write!(f, "Point({}, {})", self.x, self.y)
     }
 }
 
 impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", point_repr(self))
+        write!(f, "({}, {})", self.x, self.y)
     }
 }

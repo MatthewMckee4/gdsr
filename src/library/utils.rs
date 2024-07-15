@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
@@ -10,11 +11,11 @@ pub fn input_cells_to_correct_format(cells: &Bound<'_, PyAny>) -> PyResult<Vec<C
             if let Ok(cell) = cell.extract::<Cell>() {
                 result.push(cell);
             } else {
-                return Err(pyo3::exceptions::PyTypeError::new_err("Invalid element"));
+                return Err(PyTypeError::new_err("Invalid cell format: not a Cell"));
             }
         }
     } else {
-        return Err(pyo3::exceptions::PyTypeError::new_err("Invalid elements"));
+        return Err(PyTypeError::new_err("Invalid cells format: not a tuple"));
     }
     Ok(result)
 }

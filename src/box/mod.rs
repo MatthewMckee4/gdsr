@@ -1,21 +1,19 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
 pub struct Box {}
 
-#[pymethods]
-impl Box {
-    #[new]
-    pub fn new() -> Self {
-        Box {}
+impl std::fmt::Display for Box {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Box")
     }
+}
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("Box".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for Box {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "B")
     }
 }

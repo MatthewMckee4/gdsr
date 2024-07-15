@@ -10,20 +10,6 @@ use super::iterator::PointIterator;
 use super::utils::*;
 use super::Point;
 
-impl Point {
-    pub fn to_bytes(&self) -> [u8; 16] {
-        let mut bytes = [0; 16];
-        let x_bytes = self.x.to_be_bytes();
-        let y_bytes = self.y.to_be_bytes();
-        bytes[..8].copy_from_slice(&x_bytes);
-        bytes[8..].copy_from_slice(&y_bytes);
-        bytes
-    }
-    pub fn to_u16(&self) -> (u16, u16) {
-        (self.x as u16, self.y as u16)
-    }
-}
-
 #[pymethods]
 impl Point {
     #[new]
@@ -92,12 +78,12 @@ impl Point {
         Ok(self.x != 0.0 || self.y != 0.0)
     }
 
-    pub fn __repr__(&self) -> PyResult<String> {
-        Ok(point_repr(self))
+    pub fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{}", self))
     }
 
-    pub fn __str__(&self) -> PyResult<String> {
-        Ok(point_str(self))
+    pub fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
     }
 
     pub fn __add__(

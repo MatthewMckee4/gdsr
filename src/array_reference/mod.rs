@@ -1,21 +1,23 @@
 use pyo3::prelude::*;
 
-#[pyclass(eq, ord)]
-#[derive(PartialEq, PartialOrd, Clone, Debug)]
-pub struct ArrayReference {}
+use crate::cell::Cell;
 
-#[pymethods]
-impl ArrayReference {
-    #[new]
-    pub fn new() -> Self {
-        ArrayReference {}
+mod general;
+
+#[pyclass(eq)]
+#[derive(Clone, PartialEq)]
+pub struct ArrayReference {
+    cell: Cell,
+}
+
+impl std::fmt::Display for ArrayReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "ArrayReference of {:?}", self.cell)
     }
+}
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok("ArrayReference".to_string())
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        self.__str__()
+impl std::fmt::Debug for ArrayReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "AR({:?})", self.cell)
     }
 }
