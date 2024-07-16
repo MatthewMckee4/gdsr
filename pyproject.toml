@@ -10,20 +10,24 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+keywords = ["gdsr", "rust", "python", "pyo3", "GDSII", "CAD"]
 dynamic = ["version"]
+license = {file = "LICENSE"}
+dependencies = [
+    "typing_extensions; python_version < '3.11'"
+]
+
 [project.optional-dependencies]
 dev = [     
     "maturin",
-    "mkdocs",
-    "mkdocstrings-python",
     "pytest",
-    "pytest-mock",
 ]
 
-
-# [tool.maturin]
-# features = ["pyo3/extension-module, pyo3/multiple-pymethods"]
-# all-features = true
+docs = [
+    "mkdocs",
+    "mkdocstrings-python",
+    "mkdocs-material",
+]
 
 
 [tool.isort]
@@ -63,46 +67,30 @@ exclude = [
     "venv",
 ]
 
-# Same as Black.
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.8
 target-version = "py38"
 
 [tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 select = ["E", "W", "I", "N"]
 ignore = []
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []
 
-# Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"]}
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
 quote-style = "double"
 
-# Like Black, indent with spaces, rather than tabs.
 indent-style = "space"
 
-# Like Black, respect magic trailing commas.
 skip-magic-trailing-comma = false
 
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
 [tool.mypy]
 ignore_missing_imports = true
-
-[tool.coverage.run]
-source = ["gdsr"]
-include = ["*/gdsr/*.pyi"]
-
-[tool.coverage.report]
-show_missing = true

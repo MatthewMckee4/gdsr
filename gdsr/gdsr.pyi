@@ -43,8 +43,6 @@ class Point:
 
         :param float angle: Counter-clockwise rotation angle in degrees.
         :param PointLike center: Center point of rotation, defaults to Point(0, 0).
-
-        :return: Rotated point.
         """
 
     def scale(self, factor: float, center: PointLike = Point(0, 0)) -> Self:
@@ -52,8 +50,6 @@ class Point:
 
         :param float factor: Scaling factor.
         :param PointLike center: Center point of scaling, defaults to Point(0, 0).
-
-        :return: Scaled point.
         """
 
     def __getitem__(self, index: Literal[0, 1]) -> float: ...
@@ -79,13 +75,60 @@ class Point:
     def __hash__(self) -> int: ...
     def __iter__(self) -> PointIterator: ...
 
-class ArrayReference:
+class Grid:
+    @property
+    def origin(self) -> Point:
+        """Returns the origin of the grid."""
+
+    @origin.setter
+    def origin(self, origin: PointLike) -> None:
+        """Sets the origin of the grid."""
+
+    columns: int
+    """Number of columns in the grid."""
+
+    rows: int
+    """Number of rows in the grid."""
+
+    @property
+    def spacing_x(self) -> Point:
+        """Returns the spacing in the x direction."""
+
+    @spacing_x.setter
+    def spacing_x(self, spacing: PointLike) -> None:
+        """Sets the spacing in the x direction."""
+
+    @property
+    def spacing_y(self) -> Point:
+        """Returns the spacing in the y direction."""
+
+    @spacing_y.setter
+    def spacing_y(self, spacing: PointLike) -> None:
+        """Sets the spacing in the y direction."""
+
+    def __init__(
+        self,
+        origin: PointLike = Point(0, 0),
+        columns: int = 1,
+        rows: int = 1,
+        spacing_x: PointLike = Point(0, 0),
+        spacing_y: PointLike = Point(0, 0),
+    ) -> None: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def copy(self) -> Self: ...
+
+class ElementReference:
+    element: Element
+    grid: Grid
     def __init__(self) -> None: ...
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def copy(self) -> Self: ...
 
-class Reference:
+class CellReference:
+    cell: Cell
+    grid: Grid
     def __init__(self) -> None: ...
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
@@ -209,12 +252,17 @@ class Text:
     def __repr__(self) -> str: ...
     def copy(self) -> Self: ...
 
-Element = Union[ArrayReference, Reference, Box, Node, Path, Polygon, Text]
+Element = Union[CellReference, Box, Node, Path, Polygon, Text, ElementReference]
+"""Element type
+
+This type is used to represent elements in a Cell.
+
+Element = Union[CellReference, Box, Node, Path, Polygon, Text, ElementReference]
+
+"""
 
 class Cell:
     name: str
-    @property
-    def array_references(self) -> List[ArrayReference]: ...
     @property
     def polygons(self) -> List[Polygon]: ...
     @property
@@ -224,7 +272,9 @@ class Cell:
     @property
     def paths(self) -> List[Path]: ...
     @property
-    def references(self) -> List[Reference]: ...
+    def cell_references(self) -> List[CellReference]: ...
+    @property
+    def element_references(self) -> List[ElementReference]: ...
     @property
     def texts(self) -> List[Text]: ...
     def __init__(self, name: str) -> None:
@@ -275,8 +325,9 @@ class Library:
 __all__ = [
     "PointIterator",
     "Point",
-    "ArrayReference",
-    "Reference",
+    "Element",
+    "ElementReference",
+    "CellReference",
     "Polygon",
     "Box",
     "Node",

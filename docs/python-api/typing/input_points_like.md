@@ -1,0 +1,3 @@
+# InputPointsLike
+
+::: gdsr.typing.InputPointsLike

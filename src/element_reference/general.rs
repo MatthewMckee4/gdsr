@@ -1,14 +1,16 @@
 use pyo3::prelude::*;
 
-use crate::cell::Cell;
+use crate::{element::Element, grid::Grid};
 
-use super::ArrayReference;
+use super::ElementReference;
 
 #[pymethods]
-impl ArrayReference {
+impl ElementReference {
     #[new]
-    pub fn new(cell: Cell) -> Self {
-        ArrayReference { cell }
+    #[pyo3(signature=(element, grid=None))]
+    pub fn new(element: Element, grid: Option<Grid>) -> Self {
+        let grid = grid.unwrap_or_default();
+        ElementReference { element, grid }
     }
 
     fn copy(&self) -> PyResult<Self> {

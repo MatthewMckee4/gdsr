@@ -8,14 +8,20 @@ nav:
     - user-guide/installation.md
   - Python Api:
     - python-api/index.md
-    - python-api/typing.md
+    - python-api/point.md
+    - python-api/cell.md
+    - python-api/library.md
+    - Typing:
+      - python-api/typing/point_like.md
+      - python-api/typing/input_points_like.md
     - Elements:
-      - python-api/elements/array_reference.md
+      - python-api/elements/index.md
       - python-api/elements/box.md
+      - python-api/elements/cell_reference.md
+      - python-api/elements/element_reference.md
       - python-api/elements/node.md
       - python-api/elements/path.md
       - python-api/elements/polygon.md
-      - python-api/elements/reference.md
       - python-api/elements/text.md
   - Development:
     - development/index.md
@@ -51,7 +57,12 @@ plugins:
       handlers:
         python:
           options:
-            docstring_style: sphinx 
-            show_source: false
+            docstring_style: sphinx
+            docstring_section_style: list
+            show_source: true
             find_stubs_package: true
             show_submodules: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            annotations_path: source

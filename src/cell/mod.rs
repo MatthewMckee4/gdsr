@@ -1,11 +1,11 @@
 use pyo3::prelude::*;
 
-use crate::array_reference::ArrayReference;
+use crate::cell_reference::CellReference;
+use crate::element_reference::ElementReference;
 use crate::node::Node;
 use crate::path::Path;
 use crate::polygon::Polygon;
 use crate::r#box::Box;
-use crate::reference::Reference;
 use crate::text::Text;
 
 mod general;
@@ -17,8 +17,6 @@ pub struct Cell {
     #[pyo3(get, set)]
     pub name: String,
     #[pyo3(get)]
-    pub array_references: Vec<ArrayReference>,
-    #[pyo3(get)]
     pub polygons: Vec<Polygon>,
     #[pyo3(get)]
     pub boxes: Vec<Box>,
@@ -27,7 +25,9 @@ pub struct Cell {
     #[pyo3(get)]
     pub paths: Vec<Path>,
     #[pyo3(get)]
-    pub references: Vec<Reference>,
+    pub cell_references: Vec<CellReference>,
+    #[pyo3(get)]
+    pub element_references: Vec<ElementReference>,
     #[pyo3(get)]
     pub texts: Vec<Text>,
 }

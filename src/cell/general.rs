@@ -1,14 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
-use crate::array_reference::ArrayReference;
 use crate::element::Element;
-use crate::node::Node;
-use crate::path::Path;
-use crate::polygon::Polygon;
-use crate::r#box::Box;
-use crate::reference::Reference;
-use crate::text::Text;
 
 use super::Cell;
 
@@ -18,12 +11,12 @@ impl Cell {
     pub fn new(name: String) -> Self {
         Cell {
             name,
-            array_references: Vec::new(),
             polygons: Vec::new(),
             boxes: Vec::new(),
             nodes: Vec::new(),
             paths: Vec::new(),
-            references: Vec::new(),
+            cell_references: Vec::new(),
+            element_references: Vec::new(),
             texts: Vec::new(),
         }
     }
@@ -34,26 +27,26 @@ impl Cell {
             let element: Element = element.extract()?;
 
             match element {
-                Element::ArrayReference(array_reference) => {
-                    self.array_references.push(array_reference.clone());
-                }
                 Element::Polygon(polygon) => {
-                    self.polygons.push(polygon.clone());
+                    self.polygons.push(polygon);
                 }
                 Element::Box(r#box) => {
-                    self.boxes.push(r#box.clone());
+                    self.boxes.push(r#box);
                 }
                 Element::Node(node) => {
-                    self.nodes.push(node.clone());
+                    self.nodes.push(node);
                 }
                 Element::Path(path) => {
-                    self.paths.push(path.clone());
+                    self.paths.push(path);
                 }
-                Element::Reference(reference) => {
-                    self.references.push(reference.clone());
+                Element::CellReference(reference) => {
+                    self.cell_references.push(reference);
                 }
                 Element::Text(text) => {
-                    self.texts.push(text.clone());
+                    self.texts.push(text);
+                }
+                Element::ElementReference(element_reference) => {
+                    self.element_references.push(*element_reference);
                 }
             }
         }
@@ -66,9 +59,6 @@ impl Cell {
             let element: Element = element.extract()?;
 
             match element {
-                Element::ArrayReference(array_reference) => {
-                    self.array_references.retain(|x| x != &array_reference);
-                }
                 Element::Polygon(polygon) => {
                     self.polygons.retain(|x| x != &polygon);
                 }
@@ -81,11 +71,14 @@ impl Cell {
                 Element::Path(path) => {
                     self.paths.retain(|x| x != &path);
                 }
-                Element::Reference(reference) => {
-                    self.references.retain(|x| x != &reference);
+                Element::CellReference(reference) => {
+                    self.cell_references.retain(|x| x != &reference);
                 }
                 Element::Text(text) => {
                     self.texts.retain(|x| x != &text);
+                }
+                Element::ElementReference(element_reference) => {
+                    self.element_references.retain(|x| x != &*element_reference);
                 }
             }
         }

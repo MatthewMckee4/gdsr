@@ -1,3 +1,0 @@
-# Array Reference
-
-::: gdsr.ArrayReference
