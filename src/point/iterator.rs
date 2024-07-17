@@ -1,7 +1,7 @@
 use crate::point::Point;
 use pyo3::prelude::*;
 
-#[pyclass]
+#[pyclass(subclass)]
 pub struct PointIterator {
     pub point: Point,
     pub index: usize,

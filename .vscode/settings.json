@@ -1,5 +1,7 @@
 {
     "cSpell.words": [
+        "axhline",
+        "axvline",
         "cdylib",
         "chrono",
         "clippy",
@@ -7,6 +9,7 @@
         "Endlib",
         "fexp",
         "floordiv",
+        "fontsize",
         "Gdsii",
         "gdsr",
         "getitem",
@@ -25,7 +28,9 @@
         "rmul",
         "rsub",
         "truediv",
-        "viewcode"
+        "viewcode",
+        "xlim",
+        "ylim"
     ],
     "editor.defaultFormatter": "charliermarsh.ruff",
     "python.testing.pytestEnabled": true,

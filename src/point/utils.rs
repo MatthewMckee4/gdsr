@@ -18,11 +18,3 @@ pub fn py_any_to_point(point: &Bound<'_, PyAny>) -> PyResult<Point> {
         ))
     }
 }
-
-pub fn check_vec_not_empty(vec: &[Point]) -> PyResult<()> {
-    if vec.is_empty() {
-        Err(PyTypeError::new_err("Points cannot be empty"))
-    } else {
-        Ok(())
-    }
-}

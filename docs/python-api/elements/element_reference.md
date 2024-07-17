@@ -1,3 +1,4 @@
 # Element Reference
 
-::: gdsr.ElementReference
+::: gdsr._gdsr.ElementReference
+::: gdsr.gdsr.ElementReference

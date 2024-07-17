@@ -4,13 +4,11 @@ use pyo3::{
     types::{PySequence, PyTuple},
 };
 
-use super::{
-    utils::{check_data_type_valid, check_layer_valid, input_polygon_points_to_correct_format},
-    Polygon,
-};
+use super::{utils::input_polygon_points_to_correct_format, Polygon};
 use crate::{
     point::{py_any_to_point, Point},
     utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+    validation::input::{check_data_type_valid, check_layer_valid},
 };
 
 #[pymethods]
@@ -19,12 +17,9 @@ impl Polygon {
     #[pyo3(signature = (points, layer=0, data_type=0))]
     pub fn new(
         #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
-        layer: Option<i32>,
-        data_type: Option<i32>,
+        layer: i32,
+        data_type: i32,
     ) -> PyResult<Self> {
-        let layer = layer.unwrap_or(0);
-        let data_type = data_type.unwrap_or(0);
-
         check_layer_valid(layer)?;
         check_data_type_valid(data_type)?;
 

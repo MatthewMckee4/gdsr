@@ -1,3 +1,0 @@
-# Element
-
-::: gdsr.Element

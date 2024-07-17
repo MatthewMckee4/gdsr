@@ -17,6 +17,9 @@ dependencies = [
     "typing_extensions; python_version < '3.11'"
 ]
 
+[tool.maturin]
+module-name = "gdsr._gdsr"
+
 [project.optional-dependencies]
 dev = [     
     "maturin",

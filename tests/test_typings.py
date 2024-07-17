@@ -1,4 +1,4 @@
-from gdsr.typing import PointLike
+from gdsr.typings import PointLike
 
 
 def test_point_dict():

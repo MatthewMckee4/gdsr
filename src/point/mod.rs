@@ -12,7 +12,7 @@ pub mod utils;
 pub use iterator::PointIterator;
 pub use utils::*;
 
-#[pyclass(frozen, get_all)]
+#[pyclass(subclass, frozen, get_all)]
 #[derive(Clone, Copy, PartialEq)]
 
 pub struct Point {

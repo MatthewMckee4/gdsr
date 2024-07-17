@@ -4,7 +4,7 @@ use crate::{cell::Cell, grid::Grid};
 
 mod general;
 
-#[pyclass(eq)]
+#[pyclass(subclass, eq)]
 #[derive(Clone, PartialEq)]
 pub struct CellReference {
     cell: Cell,

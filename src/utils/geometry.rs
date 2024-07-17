@@ -1,9 +1,11 @@
 use pyo3::prelude::*;
 
-use crate::point::{check_vec_not_empty, Point};
+use crate::point::Point;
+
+use super::general::check_points_vec_not_empty;
 
 pub fn bounding_box(points: &Vec<Point>) -> PyResult<(Point, Point)> {
-    check_vec_not_empty(points)?;
+    check_points_vec_not_empty(points)?;
 
     let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
     let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
@@ -28,7 +30,7 @@ pub fn bounding_box(points: &Vec<Point>) -> PyResult<(Point, Point)> {
 }
 
 pub fn area(points: &[Point]) -> PyResult<f64> {
-    check_vec_not_empty(points)?;
+    check_points_vec_not_empty(points)?;
 
     let mut area = 0.0;
     let length = points.len();
@@ -42,7 +44,7 @@ pub fn area(points: &[Point]) -> PyResult<f64> {
 }
 
 pub fn perimeter(points: &[Point]) -> PyResult<f64> {
-    check_vec_not_empty(points)?;
+    check_points_vec_not_empty(points)?;
 
     let mut perimeter = 0.0;
     let length = points.len();

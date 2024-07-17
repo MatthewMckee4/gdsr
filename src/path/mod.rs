@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 mod general;
 
-#[pyclass(eq)]
+#[pyclass(subclass, eq)]
 #[derive(Clone, PartialEq)]
 pub struct Path {}
 

@@ -4,7 +4,7 @@ use crate::point::Point;
 
 mod general;
 
-#[pyclass]
+#[pyclass(subclass)]
 #[derive(Clone, PartialEq)]
 pub struct Grid {
     #[pyo3(get, set)]

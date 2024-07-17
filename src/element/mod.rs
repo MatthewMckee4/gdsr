@@ -10,7 +10,6 @@ use crate::text::Text;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Element {
-    Box(crate::r#box::Box),
     Node(Node),
     Path(Path),
     Polygon(Polygon),
@@ -21,9 +20,7 @@ pub enum Element {
 
 impl FromPyObject<'_> for Element {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if let Ok(element) = ob.extract::<crate::r#box::Box>() {
-            Ok(Element::Box(element))
-        } else if let Ok(element) = ob.extract::<Node>() {
+        if let Ok(element) = ob.extract::<Node>() {
             Ok(Element::Node(element))
         } else if let Ok(element) = ob.extract::<Path>() {
             Ok(Element::Path(element))
@@ -46,7 +43,6 @@ impl FromPyObject<'_> for Element {
 impl IntoPy<PyObject> for Element {
     fn into_py(self, py: Python<'_>) -> PyObject {
         match self {
-            Element::Box(element) => element.into_py(py),
             Element::Node(element) => element.into_py(py),
             Element::Path(element) => element.into_py(py),
             Element::Polygon(element) => element.into_py(py),

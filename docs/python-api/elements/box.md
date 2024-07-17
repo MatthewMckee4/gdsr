@@ -1,3 +1,0 @@
-# Box
-
-::: gdsr.Box

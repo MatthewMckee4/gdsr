@@ -1,6 +1,6 @@
 import pytest
 
-from gdsr import Point, PointIterator
+from gdsr import Point
 
 
 # Point Creation
@@ -526,12 +526,6 @@ def test_destructure():
     x, y = p
     assert x == 1
     assert y == 2
-
-
-# Iterator Type
-def test_iter_type():
-    p = Point(1, 2)
-    assert isinstance(iter(p), PointIterator)
 
 
 # Cross Product

@@ -17,13 +17,10 @@ class ColouredFormatter(logging.Formatter):
         return f"{color}{message}{self.RESET}"
 
 
-def setup_logger(name: str = __file__) -> None:
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+def setup_logger() -> None:
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
 
-    console_handler = logging.StreamHandler()
-    formatter = ColouredFormatter(
-        fmt="gdsr - %(asctime)s - %(message)s", datefmt="%H:%M:%S"
-    )
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
+    handler = logging.StreamHandler()
+    handler.setFormatter(ColouredFormatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)

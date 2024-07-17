@@ -4,6 +4,7 @@ use pyo3::types::PyTuple;
 
 use crate::cell::Cell;
 
+#[allow(unused)]
 pub fn input_cells_to_correct_format(cells: &Bound<'_, PyAny>) -> PyResult<Vec<Cell>> {
     let mut result = Vec::new();
     if let Ok(cells) = cells.downcast::<PyTuple>() {

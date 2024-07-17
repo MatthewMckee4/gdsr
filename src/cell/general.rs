@@ -12,7 +12,6 @@ impl Cell {
         Cell {
             name,
             polygons: Vec::new(),
-            boxes: Vec::new(),
             nodes: Vec::new(),
             paths: Vec::new(),
             cell_references: Vec::new(),
@@ -29,9 +28,6 @@ impl Cell {
             match element {
                 Element::Polygon(polygon) => {
                     self.polygons.push(polygon);
-                }
-                Element::Box(r#box) => {
-                    self.boxes.push(r#box);
                 }
                 Element::Node(node) => {
                     self.nodes.push(node);
@@ -61,9 +57,6 @@ impl Cell {
             match element {
                 Element::Polygon(polygon) => {
                     self.polygons.retain(|x| x != &polygon);
-                }
-                Element::Box(r#box) => {
-                    self.boxes.retain(|x| x != &r#box);
                 }
                 Element::Node(node) => {
                     self.nodes.retain(|x| x != &node);

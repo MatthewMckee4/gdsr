@@ -1,11 +1,11 @@
-use crate::{element::Element, point::Point};
+use crate::point::Point;
 use pyo3::prelude::*;
 
 mod general;
 mod io;
 mod utils;
 
-#[pyclass(eq)]
+#[pyclass(subclass, eq)]
 #[derive(Clone, PartialEq)]
 pub struct Polygon {
     #[pyo3(get)]

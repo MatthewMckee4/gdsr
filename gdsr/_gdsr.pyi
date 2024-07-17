@@ -1,4 +1,5 @@
 import sys
+from enum import Enum
 from typing import Iterator, List, Sequence, Tuple, Union, overload
 
 if sys.version_info >= (3, 8):
@@ -11,7 +12,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-from .typing import InputPointsLike, Layer, PointLike
+from .typings import InputPointsLike, Layer, PointLike
 
 class PointIterator(Iterator[float]):
     def __next__(self) -> float: ...
@@ -134,13 +135,6 @@ class CellReference:
     def __repr__(self) -> str: ...
     def copy(self) -> Self: ...
 
-class Box:
-    """Box object"""
-    def __init__(self) -> None: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def copy(self) -> Self: ...
-
 class Path:
     """Path object"""
     def __init__(self) -> None: ...
@@ -246,27 +240,49 @@ class Node:
     def __repr__(self) -> str: ...
     def copy(self) -> Self: ...
 
+class VerticalPresentation(Enum):
+    Top = 0
+    Middle = 1
+    Bottom = 2
+
+class HorizontalPresentation(Enum):
+    Left = 0
+    Centre = 1
+    Right = 2
+
 class Text:
-    def __init__(self) -> None: ...
+    text: str
+    @property
+    def origin(self) -> Point: ...
+    @origin.setter
+    def origin(self, origin: PointLike) -> None: ...
+    layer: Layer
+    magnification: float
+    angle: float
+    x_reflection: bool
+    vertical_presentation: VerticalPresentation
+    horizontal_presentation: HorizontalPresentation
+    def __init__(
+        self,
+        text: str,
+        origin: PointLike = Point(0, 0),
+        layer: Layer = 0,
+        magnification: float = 1.0,
+        angle: float = 0.0,
+        x_reflection: bool = False,
+        vertical_presentation: VerticalPresentation = VerticalPresentation.Middle,
+        horizontal_presentation: HorizontalPresentation = HorizontalPresentation.Centre,
+    ) -> None: ...
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def copy(self) -> Self: ...
 
-Element = Union[CellReference, Box, Node, Path, Polygon, Text, ElementReference]
-"""Element type
-
-This type is used to represent elements in a Cell.
-
-Element = Union[CellReference, Box, Node, Path, Polygon, Text, ElementReference]
-
-"""
+Element = Union[CellReference, Node, Path, Polygon, Text, ElementReference]
 
 class Cell:
     name: str
     @property
     def polygons(self) -> List[Polygon]: ...
-    @property
-    def boxes(self) -> List[Box]: ...
     @property
     def nodes(self) -> List[Node]: ...
     @property
@@ -323,16 +339,17 @@ class Library:
         """
 
 __all__ = [
-    "PointIterator",
-    "Point",
-    "Element",
-    "ElementReference",
+    "Cell",
     "CellReference",
-    "Polygon",
-    "Box",
+    "ElementReference",
+    "Grid",
+    "HorizontalPresentation",
+    "Library",
     "Node",
     "Path",
+    "Point",
+    "PointIterator",
+    "Polygon",
     "Text",
-    "Cell",
-    "Library",
+    "VerticalPresentation",
 ]

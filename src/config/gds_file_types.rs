@@ -1,5 +1,6 @@
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum GDSRecord {
     Header = 0x00,
     BgnLib = 0x01,
@@ -46,8 +47,6 @@ pub enum GDSRecord {
     NodeType = 0x2A,
     PropAttr = 0x2B,
     PropValue = 0x2C,
-    Box = 0x2D,
-    BoxType = 0x2E,
     Plex = 0x2F,
     BgnExtn = 0x30,
     EndExtn = 0x31,
@@ -67,6 +66,7 @@ pub enum GDSRecord {
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum GDSDataType {
     NoData = 0,
     BitArray = 1,
