@@ -17,7 +17,6 @@ nav:
     - Elements:
       - python-api/elements/cell_reference.md
       - python-api/elements/element_reference.md
-      - python-api/elements/node.md
       - python-api/elements/path.md
       - python-api/elements/polygon.md
       - python-api/elements/text.md

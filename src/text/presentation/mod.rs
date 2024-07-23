@@ -1,11 +1,23 @@
 use pyo3::{exceptions::PyValueError, prelude::*};
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VerticalPresentation {
     Top = 0,
     Middle = 1,
     Bottom = 2,
+}
+
+impl std::fmt::Display for VerticalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Vertical {:?}", self.name())
+    }
+}
+
+impl std::fmt::Debug for VerticalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.name())
+    }
 }
 
 #[pymethods]
@@ -39,10 +51,18 @@ impl VerticalPresentation {
             VerticalPresentation::Bottom => Ok(2),
         }
     }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
 }
 
 #[pyclass(eq, eq_int)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum HorizontalPresentation {
     Left = 0,
     Centre = 1,
@@ -79,5 +99,25 @@ impl HorizontalPresentation {
             HorizontalPresentation::Centre => Ok(1),
             HorizontalPresentation::Right => Ok(2),
         }
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
+    }
+}
+
+impl std::fmt::Display for HorizontalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Horizontal {:?}", self.name())
+    }
+}
+
+impl std::fmt::Debug for HorizontalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.name())
     }
 }

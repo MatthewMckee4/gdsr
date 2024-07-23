@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 
 use crate::cell_reference::CellReference;
 use crate::element_reference::ElementReference;
-use crate::node::Node;
 use crate::path::Path;
 use crate::polygon::Polygon;
 use crate::text::Text;
@@ -17,8 +16,6 @@ pub struct Cell {
     pub name: String,
     #[pyo3(get)]
     pub polygons: Vec<Polygon>,
-    #[pyo3(get)]
-    pub nodes: Vec<Node>,
     #[pyo3(get)]
     pub paths: Vec<Path>,
     #[pyo3(get)]

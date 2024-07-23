@@ -8,8 +8,6 @@ def test_cell_initialization():
     assert cell.polygons == []
     assert isinstance(cell.cell_references, list)
     assert cell.cell_references == []
-    assert isinstance(cell.nodes, list)
-    assert cell.nodes == []
     assert isinstance(cell.paths, list)
     assert cell.paths == []
     assert isinstance(cell.element_references, list)

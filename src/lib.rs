@@ -9,7 +9,6 @@ mod element;
 mod element_reference;
 mod grid;
 mod library;
-mod node;
 mod path;
 mod point;
 mod polygon;
@@ -21,8 +20,7 @@ use cell_reference::CellReference;
 use element_reference::ElementReference;
 use grid::Grid;
 use library::Library;
-use node::Node;
-use path::Path;
+use path::{path_type::PathType, Path};
 use point::{Point, PointIterator};
 use polygon::Polygon;
 use text::{presentation::HorizontalPresentation, presentation::VerticalPresentation, Text};
@@ -33,7 +31,6 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pyo3_log::init();
     m.add_class::<Cell>()?;
     m.add_class::<Polygon>()?;
-    m.add_class::<Node>()?;
     m.add_class::<Path>()?;
     m.add_class::<CellReference>()?;
     m.add_class::<Text>()?;
@@ -44,5 +41,6 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ElementReference>()?;
     m.add_class::<VerticalPresentation>()?;
     m.add_class::<HorizontalPresentation>()?;
+    m.add_class::<PathType>()?;
     Ok(())
 }

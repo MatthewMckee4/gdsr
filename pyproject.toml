@@ -69,6 +69,7 @@ exclude = [
     "site-packages",
     "venv",
 ]
+include = ["*.py", "*.pyi"]
 
 line-length = 88
 indent-width = 4
@@ -76,15 +77,15 @@ indent-width = 4
 target-version = "py38"
 
 [tool.ruff.lint]
-select = ["E", "W", "I", "N"]
-ignore = []
+select = ["E", "W", "I", "N", "D", "UP", "RUF", "FURB", "PERF", "ERA", "PTH"]
+ignore = ["D203", "D213"]
 
 fixable = ["ALL"]
 unfixable = []
 
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"]}
+per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"], "**/*.pyi" = ["D418"], "tests/*.py" = ["D"]}
 
 [tool.ruff.format]
 quote-style = "double"

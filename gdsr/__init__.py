@@ -1,3 +1,5 @@
+"""GDSR: GDSII Reader and Writer for Python."""
+
 from .logging import setup_logger
 
 setup_logger()
@@ -9,7 +11,6 @@ from ._gdsr import (
     Grid,
     HorizontalPresentation,
     Library,
-    Node,
     Path,
     Point,
     PointIterator,
@@ -26,14 +27,13 @@ __all__ = [
     "Grid",
     "HorizontalPresentation",
     "Library",
-    "Node",
     "Path",
     "Point",
     "PointIterator",
     "Polygon",
     "Text",
     "VerticalPresentation",
-    # typing
+    # typings
     "InputPointsLike",
     "PointLike",
 ]

@@ -1,17 +1,13 @@
-import sys
-from typing import Iterable, runtime_checkable
+"""Type hints for the gdsr package."""
 
-if sys.version_info >= (3, 8):
-    from typing import Literal, Protocol
-else:
-    from typing_extensions import Literal, Protocol
+from typing import Iterable, Literal, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class Indexable(Protocol):
     """Object that is indexable at 0 and 1."""
 
-    def __getitem__(self, __v: Literal[0, 1]) -> float: ...
+    def __getitem__(self, __v: Literal[0, 1]) -> float: ...  # noqa: D105
 
 
 PointLike = Indexable
@@ -58,7 +54,9 @@ Examples:
 
 @runtime_checkable
 class PointIterable(Protocol):
-    def __iter__(self) -> Iterable[PointLike]: ...
+    """An iterable of PointLike objects."""
+
+    def __iter__(self) -> Iterable[PointLike]: ...  # noqa: D105
 
 
 InputPointsLike = PointIterable

@@ -13,7 +13,6 @@ classDiagram
     class Cell {
       +List~ElementReference~ element_references
       +List~Polygon~ polygons
-      +List~Node~ nodes
       +List~Path~ paths
       +List~CellReference~ cell_references
       +List~Text~ texts
@@ -28,7 +27,6 @@ classDiagram
         +int data_type
         +List~Point~ points
     }
-    class Node
     class Path
     class CellReference {
         +Cell cell
@@ -43,7 +41,6 @@ classDiagram
 
     Cell "1" *-- "many" ElementReference : contains
     Cell "1" *-- "many" Polygon : contains
-    Cell "1" *-- "many" Node : contains
     Cell "1" *-- "many" Path : contains
     Cell "1" *-- "many" CellReference : contains
     Cell "1" *-- "many" Text : contains

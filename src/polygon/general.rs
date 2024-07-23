@@ -1,4 +1,4 @@
-use plotly::layout::{Axis, Margin};
+use plotly::layout::Margin;
 use plotly::plot::Plot;
 use plotly::Layout;
 use plotly::{common::Mode, Scatter};
