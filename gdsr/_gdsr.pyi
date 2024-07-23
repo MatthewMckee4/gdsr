@@ -225,6 +225,9 @@ class Polygon:
         :return: Rotated polygon.
         """
 
+    def visualize(self) -> None:
+        """Visualises the polygon in your default web browser."""
+
     def copy(self) -> Self:
         """Returns a copy of the polygon."""
 

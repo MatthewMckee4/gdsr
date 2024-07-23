@@ -1,3 +1,8 @@
+use plotly::layout::{Axis, Margin};
+use plotly::plot::Plot;
+use plotly::Layout;
+use plotly::{common::Mode, Scatter};
+
 use pyo3::{
     exceptions::PyValueError,
     prelude::*,
@@ -177,5 +182,23 @@ impl Polygon {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
+    }
+
+    fn visualize(&self) -> PyResult<()> {
+        let x: Vec<f64> = self.points.iter().map(|p| p.x).collect();
+        let y: Vec<f64> = self.points.iter().map(|p| p.y).collect();
+
+        let trace = Scatter::new(x, y).mode(Mode::Lines).name("Polygon");
+
+        let layout = Layout::new()
+            .margin(Margin::new().left(200).right(200).bottom(200).top(200))
+            .title(String::from("Polygon Visualization"));
+
+        let mut plot = Plot::new();
+        plot.add_trace(trace);
+        plot.set_layout(layout);
+        plot.show();
+
+        Ok(())
     }
 }

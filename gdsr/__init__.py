@@ -2,7 +2,7 @@ from .logging import setup_logger
 
 setup_logger()
 
-from .gdsr import (
+from ._gdsr import (
     Cell,
     CellReference,
     ElementReference,
