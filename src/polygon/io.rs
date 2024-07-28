@@ -29,7 +29,7 @@ impl Polygon {
             self.data_type as u16,
         ];
 
-        write_u16_array_to_file(&mut polygon_head, &mut file)?;
+        file = write_u16_array_to_file(file, &mut polygon_head)?;
 
         file = write_points_to_file(file, &self.points, scale)?;
 

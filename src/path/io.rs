@@ -1,5 +1,4 @@
-use log::warn;
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyValueError, prelude::*};
 use std::fs::File;
 
 use crate::{
@@ -12,13 +11,7 @@ use super::{path_type::PathType, Path};
 impl Path {
     pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
         if self.points.len() < 2 {
-            warn!(
-                "{} has less than 2 points, which is invalid for a path.",
-                self
-            );
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                "Path must have at least 2 points",
-            ));
+            return Err(PyValueError::new_err("Path must have at least 2 points"));
         }
 
         let path_type_value = self.path_type.unwrap_or(PathType::Square).value()? as u16;
@@ -42,7 +35,7 @@ impl Path {
             (width_value & 0xFFFF) as u16,
         ];
 
-        write_u16_array_to_file(&mut path_head, &mut file)?;
+        file = write_u16_array_to_file(file, &mut path_head)?;
 
         file = write_points_to_file(file, &self.points, scale)?;
 

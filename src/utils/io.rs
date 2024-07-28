@@ -1,10 +1,11 @@
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyIOError, prelude::*};
 use std::fs::File;
 use std::io::Write;
 
 use crate::{
+    cell::Cell,
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
     point::Point,
 };
@@ -19,8 +20,6 @@ pub fn write_gds_head_to_file(
 ) -> PyResult<File> {
     let now = Local::now();
     let timestamp = now.naive_utc();
-
-    let len = library_name.len() + if library_name.len() % 2 != 0 { 1 } else { 0 };
 
     let mut head_start = [
         6,
@@ -40,27 +39,20 @@ pub fn write_gds_head_to_file(
         timestamp.hour() as u16,
         timestamp.minute() as u16,
         timestamp.second() as u16,
-        (4 + len) as u16,
-        combine_record_and_data_type(GDSRecord::LibName, GDSDataType::AsciiString),
     ];
 
-    write_u16_array_to_file(&mut head_start, &mut file)?;
-    file.write_all(library_name.as_bytes())?;
+    file = write_u16_array_to_file(file, &mut head_start)?;
+
+    file = write_string_with_record_to_file(file, GDSRecord::LibName, library_name)?;
 
     let mut head_units = [
         20,
         combine_record_and_data_type(GDSRecord::Units, GDSDataType::EightByteReal),
     ];
-    write_u16_array_to_file(&mut head_units, &mut file)?;
+    file = write_u16_array_to_file(file, &mut head_units)?;
 
-    let units = [
-        eight_byte_real(precision / units),
-        eight_byte_real(precision),
-    ];
-
-    for unit in &units {
-        file.write_all(unit)?;
-    }
+    file = write_eight_byte_real_to_file(file, precision / units)?;
+    file = write_eight_byte_real_to_file(file, precision)?;
 
     Ok(file)
 }
@@ -70,16 +62,23 @@ pub fn write_gds_tail_to_file(mut file: File) -> PyResult<File> {
         4,
         combine_record_and_data_type(GDSRecord::EndLib, GDSDataType::NoData),
     ];
-    write_u16_array_to_file(&mut tail, &mut file)?;
+    file = write_u16_array_to_file(file, &mut tail)?;
 
     Ok(file)
 }
 
-pub fn write_u16_array_to_file(array: &mut [u16], file: &mut File) -> PyResult<()> {
+pub fn write_u16_array_to_file(mut file: File, array: &mut [u16]) -> PyResult<File> {
     u16_array_to_big_endian(array);
     file.write_all(cast_slice(array))?;
 
-    Ok(())
+    Ok(file)
+}
+
+pub fn write_eight_byte_real_to_file(mut file: File, value: f64) -> PyResult<File> {
+    let value = eight_byte_real(value);
+    file.write_all(&value)?;
+
+    Ok(file)
 }
 
 pub fn write_points_to_file(mut file: File, points: &[Point], scale: f64) -> PyResult<File> {
@@ -121,7 +120,56 @@ pub fn write_element_tail_to_file(mut file: File) -> PyResult<File> {
         4,
         combine_record_and_data_type(GDSRecord::EndEl, GDSDataType::NoData),
     ];
-    write_u16_array_to_file(&mut tail, &mut file)?;
+    file = write_u16_array_to_file(file, &mut tail)?;
 
     Ok(file)
+}
+
+pub fn write_string_with_record_to_file(
+    mut file: File,
+    record: GDSRecord,
+    string: &str,
+) -> PyResult<File> {
+    let mut len = string.len();
+    if len % 2 != 0 {
+        len += 1;
+    }
+
+    let mut lib_name_bytes = string.as_bytes().to_vec();
+    if string.len() % 2 != 0 {
+        lib_name_bytes.push(0);
+    }
+    let mut string_start = [
+        (4 + len) as u16,
+        combine_record_and_data_type(record, GDSDataType::AsciiString),
+    ];
+
+    file = write_u16_array_to_file(file, &mut string_start)?;
+
+    file.write_all(&lib_name_bytes)?;
+
+    Ok(file)
+}
+
+pub fn write_gds(
+    file_name: &str,
+    library_name: &str,
+    units: f64,
+    precision: f64,
+    cells: Vec<Cell>,
+) -> PyResult<()> {
+    let mut file = File::create(file_name)
+        .map_err(|_| PyIOError::new_err("Could not open file for writing"))?;
+
+    file = write_gds_head_to_file(library_name, units, precision, file)?;
+
+    for cell in &cells {
+        file = cell._to_gds(file, units, precision)?;
+    }
+
+    file = write_gds_tail_to_file(file)?;
+
+    file.flush()?;
+
+    Ok(())
 }

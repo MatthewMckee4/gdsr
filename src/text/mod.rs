@@ -3,7 +3,9 @@ use pyo3::prelude::*;
 use crate::point::Point;
 
 mod general;
+mod io;
 pub mod presentation;
+mod utils;
 
 #[pyclass(eq)]
 #[derive(Clone, PartialEq)]

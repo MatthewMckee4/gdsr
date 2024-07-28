@@ -44,7 +44,7 @@ impl VerticalPresentation {
     }
 
     #[getter]
-    fn value(&self) -> PyResult<i32> {
+    pub fn value(&self) -> PyResult<i32> {
         match self {
             VerticalPresentation::Top => Ok(0),
             VerticalPresentation::Middle => Ok(1),
@@ -105,7 +105,7 @@ impl HorizontalPresentation {
     }
 
     #[getter]
-    fn value(&self) -> PyResult<i32> {
+    pub fn value(&self) -> PyResult<i32> {
         match self {
             HorizontalPresentation::Left => Ok(0),
             HorizontalPresentation::Centre => Ok(1),
