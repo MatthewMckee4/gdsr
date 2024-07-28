@@ -4,13 +4,14 @@ use std::fs::File;
 
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
 
 use super::Polygon;
 
-impl Polygon {
-    pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
+impl ToGds for Polygon {
+    fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
         if self.points.len() > 8190 {
             warn!(
                 "{} has more than 8190 points, This may cause errors in the future.",

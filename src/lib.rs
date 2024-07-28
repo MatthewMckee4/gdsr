@@ -13,6 +13,7 @@ mod path;
 mod point;
 mod polygon;
 mod text;
+mod traits;
 mod validation;
 
 use cell::Cell;

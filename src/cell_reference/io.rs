@@ -3,6 +3,7 @@ use std::fs::File;
 
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    traits::ToGds,
     utils::io::{
         write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
         write_transformation_to_file, write_u16_array_to_file,
@@ -11,8 +12,8 @@ use crate::{
 
 use super::CellReference;
 
-impl CellReference {
-    pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
+impl ToGds for CellReference {
+    fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
         let mut buffer_start = [
             4,
             combine_record_and_data_type(GDSRecord::ARef, GDSDataType::NoData),

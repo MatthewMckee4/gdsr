@@ -1,4 +1,4 @@
-use crate::point::Point;
+use crate::{point::Point, traits::Movable};
 use pyo3::prelude::*;
 
 mod general;
@@ -40,5 +40,18 @@ impl std::fmt::Debug for Polygon {
             self.layer,
             self.data_type
         )
+    }
+}
+
+impl Movable for Polygon {
+    fn move_by(&mut self, delta: Point) {
+        for point in &mut self.points {
+            *point += delta;
+        }
+    }
+
+    fn move_to(&mut self, target: Point) {
+        let delta = target - self.points[0];
+        self.move_by(delta);
     }
 }

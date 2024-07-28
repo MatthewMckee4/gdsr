@@ -1,7 +1,7 @@
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    ops::{Add, Mul},
+    ops::{Add, AddAssign, Mul, Sub},
 };
 
 use pyo3::prelude::*;
@@ -73,6 +73,26 @@ impl Add for Point {
         Point {
             x: self.x + other.x,
             y: self.y + other.y,
+        }
+    }
+}
+
+impl AddAssign for Point {
+    fn add_assign(&mut self, other: Self) {
+        *self = Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        };
+    }
+}
+
+impl Sub for Point {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Point {
+            x: self.x - other.x,
+            y: self.y - other.y,
         }
     }
 }

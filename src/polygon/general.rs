@@ -10,6 +10,7 @@ use pyo3::{
 };
 
 use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
+use crate::traits::Movable;
 use crate::{
     point::{py_any_to_point, Point},
     utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
@@ -176,14 +177,6 @@ impl Polygon {
         Ok(self.clone())
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{}", self))
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
-    }
-
     fn visualize(&self) -> PyResult<()> {
         let x: Vec<f64> = self.points.iter().map(|p| p.x).collect();
         let y: Vec<f64> = self.points.iter().map(|p| p.y).collect();
@@ -200,5 +193,29 @@ impl Polygon {
         plot.show();
 
         Ok(())
+    }
+
+    fn move_to(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] point: Point,
+    ) -> PyResult<Self> {
+        Movable::move_to(self, point);
+        Ok(self.clone())
+    }
+
+    fn move_by(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
+    ) -> PyResult<Self> {
+        Movable::move_by(self, vector);
+        Ok(self.clone())
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
     }
 }

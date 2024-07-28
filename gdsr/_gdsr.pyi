@@ -116,12 +116,6 @@ class Grid:
         :param PointLike spacing_y: The spacing in the y direction, defaults to
         Point(0, 0)
         """
-    def __str__(self) -> str:
-        """Return a string representation of the grid."""
-    def __repr__(self) -> str:
-        """Return a string representation of the grid."""
-    def copy(self) -> Self:
-        """Return a copy of the grid."""
     @property
     def width(self) -> float:
         """Return the total width of the grid."""
@@ -131,6 +125,26 @@ class Grid:
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the grid."""
+    def copy(self) -> Self:
+        """Return a copy of the grid."""
+    def move_to(self, point: PointLike) -> Self:
+        """Move the grid to a point.
+
+        This method modifies the grid in place and returns itself.
+
+        :param PointLike point: Point to move the grid to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the grid by a vector.
+
+        This method modifies the grid in place and returns itself.
+
+        :param PointLike vector: Vector to move the grid by.
+        """
+    def __str__(self) -> str:
+        """Return a string representation of the grid."""
+    def __repr__(self) -> str:
+        """Return a string representation of the grid."""
 
 class ElementReference:
     element: Element
@@ -141,12 +155,26 @@ class ElementReference:
         :param Element element: The element to reference.
         :param Grid grid: The grid to reference the element.
         """
+    def copy(self) -> Self:
+        """Return a copy of the element reference."""
+    def move_to(self, point: PointLike) -> Self:
+        """Move the element reference to a point.
+
+        This method modifies the element reference in place and returns itself.
+
+        :param PointLike point: Point to move the element reference to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the element reference by a vector.
+
+        This method modifies the element reference in place and returns itself.
+
+        :param PointLike vector: Vector to move the element reference by.
+        """
     def __str__(self) -> str:
         """Return a string representation of the element reference."""
     def __repr__(self) -> str:
         """Return a string representation of the element reference."""
-    def copy(self) -> Self:
-        """Return a copy of the element reference."""
 
 class CellReference:
     cell: Cell
@@ -157,12 +185,27 @@ class CellReference:
         :param Cell cell: The cell to reference.
         :param Grid grid: The grid to reference the cell.
         """
+    def move_to(self, point: PointLike) -> Self:
+        """Move the cell reference to a point.
+
+        This method modifies the cell reference in place and returns itself.
+
+        :param PointLike point: Point to move the cell reference to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the cell reference by a vector.
+
+        This method modifies the cell reference in place and returns itself.
+
+        :param PointLike vector: Vector to move the cell reference by.
+        """
+
+    def copy(self) -> Self:
+        """Return a copy of the cell reference."""
     def __str__(self) -> str:
         """Return a string representation of the cell reference."""
     def __repr__(self) -> str:
         """Return a string representation of the cell reference."""
-    def copy(self) -> Self:
-        """Return a copy of the cell reference."""
 
 class PathType(Enum):
     Square = 0
@@ -188,15 +231,29 @@ class Path:
         path_type: PathType | None = None,
         width: float | None = None,
     ) -> None: ...
+    @property
+    def length(self) -> float:
+        """Return the length of the path."""
     def copy(self) -> Self:
         """Return a copy of the path."""
+    def move_to(self, point: PointLike) -> Self:
+        """Move the path to a point.
+
+        This method modifies the path in place and returns itself.
+
+        :param PointLike point: Point to move the path to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the path by a vector.
+
+        This method modifies the path in place and returns itself.
+
+        :param PointLike vector: Vector to move the path by.
+        """
     def __str__(self) -> str:
         """Return a string representation of the path."""
     def __repr__(self) -> str:
         """Return a string representation of the path."""
-    @property
-    def length(self) -> float:
-        """Return the length of the path."""
 
 class Polygon:
     """Polygon object."""
@@ -265,6 +322,8 @@ class Polygon:
     def rotate(self, angle: float, center: PointLike = (0, 0)) -> Self:
         """Rotates the polygon by an angle around a center point.
 
+        This method modifies the polygon in place and returns itself.
+
         :param float angle: Counter-clockwise rotation angle in degrees.
         :param PointLike center: Center point of rotation, defaults to (0, 0).
 
@@ -274,6 +333,20 @@ class Polygon:
         """Visualises the polygon in your default web browser."""
     def copy(self) -> Self:
         """Return a copy of the polygon."""
+    def move_to(self, point: PointLike) -> Self:
+        """Move the polygon to a point.
+
+        This method modifies the polygon in place and returns itself.
+
+        :param PointLike point: Point to move the polygon to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the polygon by a vector.
+
+        This method modifies the polygon in place and returns itself.
+
+        :param PointLike vector: Vector to move the polygon by.
+        """
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
     def __repr__(self) -> str:
@@ -311,10 +384,40 @@ class Text:
         x_reflection: bool = False,
         vertical_presentation: VerticalPresentation = VerticalPresentation.Middle,
         horizontal_presentation: HorizontalPresentation = HorizontalPresentation.Centre,
-    ) -> None: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def copy(self) -> Self: ...
+    ) -> None:
+        """Initialize the Text with text and origin.
+
+        :param str text: Text content.
+        :param PointLike origin: Text origin, defaults to Point(0, 0).
+        :param Layer layer: Text layer, defaults to 0.
+        :param float magnification: Text magnification, defaults to 1.0.
+        :param float angle: Text angle in degrees, defaults to 0.0.
+        :param bool x_reflection: Text x reflection, defaults to False.
+        :param VerticalPresentation vertical_presentation: Text vertical presentation,
+        defaults to VerticalPresentation.Middle.
+        :param HorizontalPresentation horizontal_presentation: Text horizontal
+        presentation, defaults to HorizontalPresentation.Centre.
+        """
+    def move_to(self, point: PointLike) -> Self:
+        """Move the text to a point.
+
+        This method modifies the text in place and returns itself.
+
+        :param PointLike point: Point to move the text to.
+        """
+    def move_by(self, vector: PointLike) -> Self:
+        """Move the text by a vector.
+
+        This method modifies the text in place and returns itself.
+
+        :param PointLike vector: Vector to move the text by.
+        """
+    def copy(self) -> Self:
+        """Return a copy of the text."""
+    def __str__(self) -> str:
+        """Return a string representation of the text."""
+    def __repr__(self) -> str:
+        """Return a string representation of the text."""
 
 Element = CellReference | Path | Polygon | Text | ElementReference
 

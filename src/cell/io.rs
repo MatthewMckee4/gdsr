@@ -6,6 +6,7 @@ use chrono::{Datelike, Local, Timelike};
 use pyo3::prelude::*;
 
 use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
+use crate::traits::ToGds;
 use crate::utils::io::{write_gds, write_string_with_record_to_file, write_u16_array_to_file};
 
 use super::*;

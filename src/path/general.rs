@@ -1,8 +1,12 @@
 use pyo3::prelude::*;
 
+use crate::traits::Movable;
 use crate::utils::geometry::perimeter;
 use crate::validation::input::{check_data_type_valid, py_any_to_points_vec};
-use crate::{point::Point, validation::input::check_layer_valid};
+use crate::{
+    point::{py_any_to_point, Point},
+    validation::input::check_layer_valid,
+};
 
 use super::{path_type::PathType, Path};
 
@@ -58,6 +62,22 @@ impl Path {
     }
 
     fn copy(&self) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
+    fn move_to(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] point: Point,
+    ) -> PyResult<Self> {
+        Movable::move_to(self, point);
+        Ok(self.clone())
+    }
+
+    fn move_by(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
+    ) -> PyResult<Self> {
+        Movable::move_by(self, vector);
         Ok(self.clone())
     }
 

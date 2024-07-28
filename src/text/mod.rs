@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 
-use crate::point::Point;
+use crate::{point::Point, traits::Movable};
 
 mod general;
 mod io;
@@ -41,5 +41,15 @@ impl std::fmt::Display for Text {
 impl std::fmt::Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "T({})", self.text)
+    }
+}
+
+impl Movable for Text {
+    fn move_by(&mut self, delta: Point) {
+        self.origin += delta;
+    }
+
+    fn move_to(&mut self, target: Point) {
+        self.origin = target;
     }
 }

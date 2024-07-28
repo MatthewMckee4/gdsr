@@ -3,13 +3,14 @@ use std::fs::File;
 
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
 
 use super::{path_type::PathType, Path};
 
-impl Path {
-    pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
+impl ToGds for Path {
+    fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
         if self.points.len() < 2 {
             return Err(PyValueError::new_err("Path must have at least 2 points"));
         }

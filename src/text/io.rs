@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use std::fs::File;
 
+use crate::traits::ToGds;
 use crate::utils::io::{write_string_with_record_to_file, write_transformation_to_file};
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
@@ -10,8 +11,8 @@ use crate::{
 use super::utils::get_presentation_value;
 use super::Text;
 
-impl Text {
-    pub fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
+impl ToGds for Text {
+    fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
         let mut buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),

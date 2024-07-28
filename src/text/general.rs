@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use crate::{
     point::Point,
     text::presentation::{HorizontalPresentation, VerticalPresentation},
+    traits::Movable,
     validation::input::check_layer_valid,
 };
 
@@ -65,6 +66,22 @@ impl Text {
     }
 
     fn copy(&self) -> PyResult<Self> {
+        Ok(self.clone())
+    }
+
+    fn move_to(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] point: Point,
+    ) -> PyResult<Self> {
+        Movable::move_to(self, point);
+        Ok(self.clone())
+    }
+
+    fn move_by(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
+    ) -> PyResult<Self> {
+        Movable::move_by(self, vector);
         Ok(self.clone())
     }
 
