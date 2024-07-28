@@ -7,9 +7,8 @@ use super::CellReference;
 #[pymethods]
 impl CellReference {
     #[new]
-    #[pyo3(signature=(cell, grid=None))]
-    pub fn new(cell: Cell, grid: Option<Grid>) -> Self {
-        let grid = grid.unwrap_or(Grid::default());
+    #[pyo3(signature=(cell, grid=Grid::default()))]
+    pub fn new(cell: Cell, grid: Grid) -> Self {
         CellReference { cell, grid }
     }
 

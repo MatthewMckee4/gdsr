@@ -7,9 +7,8 @@ use super::ElementReference;
 #[pymethods]
 impl ElementReference {
     #[new]
-    #[pyo3(signature=(element, grid=None))]
-    pub fn new(element: Element, grid: Option<Grid>) -> Self {
-        let grid = grid.unwrap_or_default();
+    #[pyo3(signature=(element, grid=Grid::default()))]
+    pub fn new(element: Element, grid: Grid) -> Self {
         ElementReference { element, grid }
     }
 

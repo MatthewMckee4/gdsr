@@ -90,10 +90,7 @@ impl Point {
         &self,
         #[pyo3(from_py_with = "py_any_to_point")] other: Point,
     ) -> PyResult<Self> {
-        Ok(Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        })
+        Ok(*self + other)
     }
 
     pub fn __radd__(
@@ -121,10 +118,7 @@ impl Point {
     }
 
     pub fn __mul__(&self, other: f64) -> PyResult<Self> {
-        Ok(Self {
-            x: self.x * other,
-            y: self.y * other,
-        })
+        Ok(*self * other)
     }
 
     pub fn __rmul__(&self, other: f64) -> PyResult<Self> {

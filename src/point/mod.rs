@@ -1,6 +1,7 @@
 use std::{
     fmt,
     hash::{Hash, Hasher},
+    ops::{Add, Mul},
 };
 
 use pyo3::prelude::*;
@@ -18,6 +19,12 @@ pub use utils::*;
 pub struct Point {
     pub x: f64,
     pub y: f64,
+}
+
+impl Default for Point {
+    fn default() -> Self {
+        Point { x: 0.0, y: 0.0 }
+    }
 }
 
 impl Hash for Point {
@@ -45,5 +52,27 @@ impl fmt::Display for Point {
 impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl Mul<f64> for Point {
+    type Output = Self;
+
+    fn mul(self, factor: f64) -> Self::Output {
+        Point {
+            x: self.x * factor,
+            y: self.y * factor,
+        }
+    }
+}
+
+impl Add for Point {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
     }
 }

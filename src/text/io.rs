@@ -1,13 +1,10 @@
 use pyo3::prelude::*;
 use std::fs::File;
 
-use crate::utils::io::write_string_with_record_to_file;
+use crate::utils::io::{write_string_with_record_to_file, write_transformation_to_file};
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
-    utils::io::{
-        write_eight_byte_real_to_file, write_element_tail_to_file, write_points_to_file,
-        write_u16_array_to_file,
-    },
+    utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
 
 use super::utils::get_presentation_value;
@@ -31,34 +28,8 @@ impl Text {
 
         file = write_u16_array_to_file(file, &mut buffer_start)?;
 
-        let transform_applied = self.angle != 0.0 || self.magnification != 1.0 || self.x_reflection;
-        if transform_applied {
-            let mut buffer_flags = [
-                6,
-                combine_record_and_data_type(GDSRecord::STrans, GDSDataType::BitArray),
-                if self.x_reflection { 0x8000 } else { 0x0000 },
-            ];
-
-            file = write_u16_array_to_file(file, &mut buffer_flags)?;
-
-            if self.magnification != 1.0 {
-                let mut buffer_mag = [
-                    12,
-                    combine_record_and_data_type(GDSRecord::Mag, GDSDataType::EightByteReal),
-                ];
-                file = write_u16_array_to_file(file, &mut buffer_mag)?;
-                file = write_eight_byte_real_to_file(file, self.magnification)?;
-            }
-
-            if self.angle != 0.0 {
-                let mut buffer_rot = [
-                    12,
-                    combine_record_and_data_type(GDSRecord::Angle, GDSDataType::EightByteReal),
-                ];
-                file = write_u16_array_to_file(file, &mut buffer_rot)?;
-                file = write_eight_byte_real_to_file(file, self.angle)?;
-            }
-        }
+        file =
+            write_transformation_to_file(file, self.angle, self.magnification, self.x_reflection)?;
 
         file = write_points_to_file(file, &[self.origin], scale)?;
 

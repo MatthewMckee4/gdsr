@@ -89,6 +89,12 @@ class Grid:
     @spacing_y.setter
     def spacing_y(self, spacing: PointLike) -> None:
         """Set the spacing in the y direction."""
+    angle: float
+    """Angle of the grid."""
+    magnification: float
+    """Magnification of the grid."""
+    x_reflection: bool
+    """X reflection of the grid."""
     def __init__(
         self,
         origin: PointLike = Point(0, 0),
@@ -96,6 +102,9 @@ class Grid:
         rows: int = 1,
         spacing_x: PointLike = Point(0, 0),
         spacing_y: PointLike = Point(0, 0),
+        angle: float = 0.0,
+        magnification: float = 1.0,
+        x_reflection: bool = False,
     ) -> None:
         """Initialize the Grid with origin, columns, rows and spacing.
 
@@ -126,7 +135,7 @@ class Grid:
 class ElementReference:
     element: Element
     grid: Grid
-    def __init__(self, element: Element, grid: Grid) -> None:
+    def __init__(self, element: Element, grid: Grid = Grid()) -> None:
         """Initialize the ElementReference with an element and a grid.
 
         :param Element element: The element to reference.
@@ -142,10 +151,18 @@ class ElementReference:
 class CellReference:
     cell: Cell
     grid: Grid
-    def __init__(self) -> None: ...
-    def __str__(self) -> str: ...
-    def __repr__(self) -> str: ...
-    def copy(self) -> Self: ...
+    def __init__(self, cell: Cell, grid: Grid = Grid()) -> None:
+        """Initialize the CellReference with a cell and a grid.
+
+        :param Cell cell: The cell to reference.
+        :param Grid grid: The grid to reference the cell.
+        """
+    def __str__(self) -> str:
+        """Return a string representation of the cell reference."""
+    def __repr__(self) -> str:
+        """Return a string representation of the cell reference."""
+    def copy(self) -> Self:
+        """Return a copy of the cell reference."""
 
 class PathType(Enum):
     Square = 0

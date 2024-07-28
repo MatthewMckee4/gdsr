@@ -7,26 +7,35 @@ mod general;
 #[pyclass]
 #[derive(Clone, PartialEq)]
 pub struct Grid {
+    #[pyo3(get)]
+    pub origin: Point,
     #[pyo3(get, set)]
-    origin: Point,
+    pub columns: usize,
     #[pyo3(get, set)]
-    columns: usize,
+    pub rows: usize,
+    #[pyo3(get)]
+    pub spacing_x: Point,
+    #[pyo3(get)]
+    pub spacing_y: Point,
     #[pyo3(get, set)]
-    rows: usize,
+    pub magnification: f64,
     #[pyo3(get, set)]
-    spacing_x: Point,
+    pub angle: f64,
     #[pyo3(get, set)]
-    spacing_y: Point,
+    pub x_reflection: bool,
 }
 
 impl Default for Grid {
     fn default() -> Self {
         Grid {
-            origin: Point { x: 0.0, y: 0.0 },
+            origin: Point::default(),
             columns: 1,
             rows: 1,
-            spacing_x: Point { x: 0.0, y: 0.0 },
-            spacing_y: Point { x: 0.0, y: 0.0 },
+            spacing_x: Point::default(),
+            spacing_y: Point::default(),
+            magnification: 1.0,
+            angle: 0.0,
+            x_reflection: false,
         }
     }
 }

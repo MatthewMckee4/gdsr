@@ -173,3 +173,41 @@ pub fn write_gds(
 
     Ok(())
 }
+
+pub fn write_transformation_to_file(
+    mut file: File,
+    angle: f64,
+    magnification: f64,
+    x_reflection: bool,
+) -> PyResult<File> {
+    let transform_applied = angle != 0.0 || magnification != 1.0 || x_reflection;
+    if transform_applied {
+        let mut buffer_flags = [
+            6,
+            combine_record_and_data_type(GDSRecord::STrans, GDSDataType::BitArray),
+            if x_reflection { 0x8000 } else { 0x0000 },
+        ];
+
+        file = write_u16_array_to_file(file, &mut buffer_flags)?;
+
+        if magnification != 1.0 {
+            let mut buffer_mag = [
+                12,
+                combine_record_and_data_type(GDSRecord::Mag, GDSDataType::EightByteReal),
+            ];
+            file = write_u16_array_to_file(file, &mut buffer_mag)?;
+            file = write_eight_byte_real_to_file(file, magnification)?;
+        }
+
+        if angle != 0.0 {
+            let mut buffer_rot = [
+                12,
+                combine_record_and_data_type(GDSRecord::Angle, GDSDataType::EightByteReal),
+            ];
+            file = write_u16_array_to_file(file, &mut buffer_rot)?;
+            file = write_eight_byte_real_to_file(file, angle)?;
+        }
+    }
+
+    Ok(file)
+}

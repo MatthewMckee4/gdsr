@@ -48,6 +48,10 @@ impl Cell {
             file = text._to_gds(file, units / precision)?;
         }
 
+        for cell_reference in &self.cell_references {
+            file = cell_reference._to_gds(file, units / precision)?;
+        }
+
         let mut cell_tail = [
             4,
             combine_record_and_data_type(GDSRecord::EndStr, GDSDataType::NoData),

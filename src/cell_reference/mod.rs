@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use crate::{cell::Cell, grid::Grid};
 
 mod general;
+mod io;
 
 #[pyclass(eq)]
 #[derive(Clone, PartialEq)]
