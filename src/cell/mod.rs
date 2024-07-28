@@ -9,7 +9,7 @@ use crate::text::Text;
 mod general;
 mod io;
 
-#[pyclass(subclass)]
+#[pyclass]
 #[derive(Clone, PartialEq)]
 pub struct Cell {
     #[pyo3(get, set)]

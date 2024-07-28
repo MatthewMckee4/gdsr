@@ -7,9 +7,7 @@ use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
 
 use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
-use crate::utils::gds_format::{
-    write_gds_head_to_file, write_gds_tail_to_file, write_u16_array_to_file,
-};
+use crate::utils::io::{write_gds_head_to_file, write_gds_tail_to_file, write_u16_array_to_file};
 
 use super::*;
 
@@ -40,7 +38,12 @@ impl Cell {
         ];
 
         write_u16_array_to_file(&mut cell_head, &mut file)?;
+
         file.write_all(self.name.as_bytes())?;
+
+        for path in &self.paths {
+            file = path._to_gds(file, units / precision)?;
+        }
 
         for polygon in &self.polygons {
             file = polygon._to_gds(file, units / precision)?;
@@ -50,6 +53,7 @@ impl Cell {
             4,
             combine_record_and_data_type(GDSRecord::EndStr, GDSDataType::NoData),
         ];
+
         write_u16_array_to_file(&mut cell_tail, &mut file)?;
 
         Ok(file)

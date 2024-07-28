@@ -20,7 +20,7 @@ pub fn check_data_type_valid(_: i32) -> PyResult<()> {
     Ok(())
 }
 
-pub fn input_points_like_to_points_vec(points: &Bound<'_, PyAny>) -> PyResult<Vec<Point>> {
+pub fn py_any_to_points_vec(points: &Bound<'_, PyAny>) -> PyResult<Vec<Point>> {
     if let Ok(points) = points.downcast::<PySequence>() {
         let mut points_list = Vec::new();
         for item in points.iter()? {

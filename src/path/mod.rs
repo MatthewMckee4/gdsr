@@ -4,9 +4,10 @@ use pyo3::prelude::*;
 use crate::point::Point;
 
 mod general;
+mod io;
 pub mod path_type;
 
-#[pyclass(subclass, eq)]
+#[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct Path {
     #[pyo3(get)]
@@ -18,7 +19,7 @@ pub struct Path {
     #[pyo3(get, set)]
     path_type: Option<PathType>,
     #[pyo3(get, set)]
-    width: Option<i32>,
+    width: Option<f64>,
 }
 
 impl std::fmt::Display for Path {

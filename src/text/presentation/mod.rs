@@ -10,13 +10,13 @@ pub enum VerticalPresentation {
 
 impl std::fmt::Display for VerticalPresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Vertical {:?}", self.name().unwrap())
+        write!(f, "Vertical {}", self.name().unwrap())
     }
 }
 
 impl std::fmt::Debug for VerticalPresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.name().unwrap())
+        write!(f, "{}", self.name().unwrap())
     }
 }
 
@@ -69,6 +69,18 @@ pub enum HorizontalPresentation {
     Right = 2,
 }
 
+impl std::fmt::Display for HorizontalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Horizontal {}", self.name().unwrap())
+    }
+}
+
+impl std::fmt::Debug for HorizontalPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name().unwrap())
+    }
+}
+
 #[pymethods]
 impl HorizontalPresentation {
     #[new]
@@ -107,17 +119,5 @@ impl HorizontalPresentation {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
-    }
-}
-
-impl std::fmt::Display for HorizontalPresentation {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Horizontal {:?}", self.name())
-    }
-}
-
-impl std::fmt::Debug for HorizontalPresentation {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.name())
     }
 }

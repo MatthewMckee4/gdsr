@@ -162,14 +162,14 @@ class Path:
     layer: int
     data_type: int
     path_type: PathType | None
-    width: int | None
+    width: float | None
     def __init__(
         self,
         points: InputPointsLike,
         layer: int = 0,
         data_type: int = 0,
         path_type: PathType | None = None,
-        width: int | None = None,
+        width: float | None = None,
     ) -> None: ...
     def copy(self) -> Self:
         """Return a copy of the path."""
@@ -349,7 +349,7 @@ class Library:
     @property
     def cells(self) -> list[Cell]:
         """Return the cells in the library."""
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str = "library") -> None:
         """Initialize the Library with a name.
 
         :param str name: Library name

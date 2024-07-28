@@ -4,7 +4,7 @@ use std::io::Write;
 use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
 
-use crate::utils::gds_format::{write_gds_head_to_file, write_gds_tail_to_file};
+use crate::utils::io::{write_gds_head_to_file, write_gds_tail_to_file};
 
 use super::Library;
 

@@ -4,7 +4,7 @@ use crate::{element::Element, grid::Grid};
 
 mod general;
 
-#[pyclass(subclass, eq)]
+#[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct ElementReference {
     #[pyo3(get, set)]

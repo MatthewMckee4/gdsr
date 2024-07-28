@@ -24,6 +24,9 @@ module-name = "gdsr._gdsr"
 dev = [     
     "maturin",
     "pytest",
+    "ruff",
+    "mypy",
+    "isort",
 ]
 
 docs = [
@@ -85,7 +88,7 @@ unfixable = []
 
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"], "**/*.pyi" = ["D418"], "tests/*.py" = ["D"]}
+per-file-ignores = {"*/__init__.py" = ["F401", "F403" ,"E402"], "**/*.pyi" = ["D418"], "tests/*.py" = ["D"], "**/*.py" = ["D100"]}
 
 [tool.ruff.format]
 quote-style = "double"

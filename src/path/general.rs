@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 use crate::utils::geometry::perimeter;
-use crate::validation::input::{check_data_type_valid, input_points_like_to_points_vec};
+use crate::validation::input::{check_data_type_valid, py_any_to_points_vec};
 use crate::{point::Point, validation::input::check_layer_valid};
 
 use super::{path_type::PathType, Path};
@@ -11,25 +11,28 @@ impl Path {
     #[new]
     #[pyo3(signature = (points, layer=0, data_type=0, path_type=None, width=None))]
     pub fn new(
-        #[pyo3(from_py_with = "input_points_like_to_points_vec")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
         layer: i32,
         data_type: i32,
         path_type: Option<PathType>,
-        width: Option<i32>,
-    ) -> Self {
-        Path {
+        width: Option<f64>,
+    ) -> PyResult<Self> {
+        check_layer_valid(layer)?;
+        check_data_type_valid(data_type)?;
+
+        Ok(Self {
             points,
             layer,
             data_type,
             path_type,
             width,
-        }
+        })
     }
 
     #[setter]
     fn set_points(
         &mut self,
-        #[pyo3(from_py_with = "input_points_like_to_points_vec")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> PyResult<()> {
         self.points = points;
         Ok(())

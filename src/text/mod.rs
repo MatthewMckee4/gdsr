@@ -5,7 +5,7 @@ use crate::point::Point;
 mod general;
 pub mod presentation;
 
-#[pyclass(subclass, eq)]
+#[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct Text {
     #[pyo3(get, set)]

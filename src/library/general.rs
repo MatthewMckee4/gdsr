@@ -6,6 +6,7 @@ use crate::cell::Cell;
 #[pymethods]
 impl Library {
     #[new]
+    #[pyo3(signature = (name=String::from("Library")))]
     pub fn new(name: String) -> Self {
         Library {
             name,

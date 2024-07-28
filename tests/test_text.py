@@ -173,4 +173,3 @@ def test_vertical_presentation_equality():
     vertical_presentation1 = VerticalPresentation.Top
     vertical_presentation2 = VerticalPresentation.Top
     assert vertical_presentation1 == vertical_presentation2
-    assert vertical_presentation1 is not vertical_presentation2

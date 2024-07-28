@@ -30,7 +30,7 @@ impl PathType {
     }
 
     #[getter]
-    fn value(&self) -> PyResult<i32> {
+    pub fn value(&self) -> PyResult<i32> {
         Ok(*self as i32)
     }
 

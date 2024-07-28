@@ -9,7 +9,7 @@ use pyo3::{
     types::{PySequence, PyTuple},
 };
 
-use super::{utils::input_polygon_points_to_correct_format, Polygon};
+use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
 use crate::{
     point::{py_any_to_point, Point},
     utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
@@ -21,7 +21,7 @@ impl Polygon {
     #[new]
     #[pyo3(signature = (points, layer=0, data_type=0))]
     pub fn new(
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
         layer: i32,
         data_type: i32,
     ) -> PyResult<Self> {
@@ -38,7 +38,7 @@ impl Polygon {
     #[setter]
     fn set_points(
         &mut self,
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
     ) -> PyResult<()> {
         self.points = points;
         Ok(())
@@ -95,7 +95,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn contains_all(
         &self,
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
     ) -> bool {
         points.iter().all(|p| is_point_inside(p, &self.points))
     }
@@ -103,7 +103,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn contains_any(
         &self,
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
     ) -> bool {
         points.iter().any(|p| is_point_inside(p, &self.points))
     }
@@ -130,7 +130,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn on_edge_all(
         &self,
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
     ) -> bool {
         points.iter().all(|p| is_point_on_edge(p, &self.points))
     }
@@ -138,7 +138,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn on_edge_any(
         &self,
-        #[pyo3(from_py_with = "input_polygon_points_to_correct_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
     ) -> bool {
         points.iter().any(|p| is_point_on_edge(p, &self.points))
     }

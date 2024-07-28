@@ -5,7 +5,7 @@ mod general;
 mod io;
 mod utils;
 
-#[pyclass(subclass, eq)]
+#[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct Polygon {
     #[pyo3(get)]
