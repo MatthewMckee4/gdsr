@@ -374,6 +374,7 @@ __all__ = [
     "HorizontalPresentation",
     "Library",
     "Path",
+    "PathType",
     "Point",
     "PointIterator",
     "Polygon",

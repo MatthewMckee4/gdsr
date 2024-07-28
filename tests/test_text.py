@@ -149,3 +149,28 @@ def test_text_copy_immutability():
     text_copy.vertical_presentation = VerticalPresentation.Bottom
     assert text.vertical_presentation == VerticalPresentation.Top
     assert text_copy.vertical_presentation == VerticalPresentation.Bottom
+
+
+# test vertical presentation
+
+
+def test_vertical_presentation_init():
+    vertical_presentation = VerticalPresentation.Top
+    assert vertical_presentation == VerticalPresentation.Top
+
+
+def test_vertical_presentation_str():
+    vertical_presentation = VerticalPresentation.Top
+    assert str(vertical_presentation) == "Vertical Top"
+
+
+def test_vertical_presentation_repr():
+    vertical_presentation = VerticalPresentation.Top
+    assert repr(vertical_presentation) == "Top"
+
+
+def test_vertical_presentation_equality():
+    vertical_presentation1 = VerticalPresentation.Top
+    vertical_presentation2 = VerticalPresentation.Top
+    assert vertical_presentation1 == vertical_presentation2
+    assert vertical_presentation1 is not vertical_presentation2

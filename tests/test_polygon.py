@@ -8,7 +8,7 @@ from gdsr import InputPointsLike, Point, Polygon
 
 @pytest.fixture
 def sample_points() -> InputPointsLike:
-    return [(0.0, 0.0), [1.0, 1.0], {0: 2.0, 1: 2.0}, (0, 0)]
+    return [(0.0, 0.0), [1.0, 1.0], {0: 2.0, 1: 2.0}, Point(0, 0)]
 
 
 # Polygon init
@@ -428,7 +428,12 @@ def test_contains_on_edge(square_polygon: Polygon):
 
 def test_contains_on_edge_multiple_points(square_polygon: Polygon):
     results = square_polygon.contains(
-        [Point(0, 0), Point(0, 2), Point(2, 2), Point(2, 0)]
+        [
+            Point(0, 0),
+            Point(0, 2),
+            Point(2, 2),
+            Point(2, 0),
+        ]
     )
     assert results == (True, True, True, True)
 

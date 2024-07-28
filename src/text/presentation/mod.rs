@@ -10,13 +10,13 @@ pub enum VerticalPresentation {
 
 impl std::fmt::Display for VerticalPresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Vertical {:?}", self.name())
+        write!(f, "Vertical {:?}", self.name().unwrap())
     }
 }
 
 impl std::fmt::Debug for VerticalPresentation {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.name())
+        write!(f, "{:?}", self.name().unwrap())
     }
 }
 
