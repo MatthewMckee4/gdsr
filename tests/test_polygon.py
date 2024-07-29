@@ -678,3 +678,20 @@ def test_rotate_invalid_angle():
 
     with pytest.raises(TypeError):
         polygon.rotate("not_a_number")  # type: ignore
+
+
+# Polygon move
+def test_move_to_returns_self():
+    polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+    new_polygon = polygon.move_to((1, 1))
+    assert polygon is new_polygon
+    assert polygon == new_polygon
+    assert polygon.points[0] == (1, 1)
+
+
+def test_move_by_returns_self():
+    polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+    new_polygon = polygon.move_by((1, 1))
+    assert polygon is new_polygon
+    assert polygon == new_polygon
+    assert polygon.points[0]

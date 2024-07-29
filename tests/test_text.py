@@ -173,3 +173,22 @@ def test_vertical_presentation_equality():
     vertical_presentation1 = VerticalPresentation.Top
     vertical_presentation2 = VerticalPresentation.Top
     assert vertical_presentation1 == vertical_presentation2
+
+
+# Text move
+
+
+def test_move_to_returns_self():
+    text = Text("Hello, World!")
+    new_text = text.move_to((1, 1))
+    assert text is new_text
+    assert text == new_text
+    assert text.origin == (1, 1)
+
+
+def test_move_by_returns_self():
+    text = Text("Hello, World!")
+    new_text = text.move_by((1, 1))
+    assert text is new_text
+    assert text == new_text
+    assert text.origin == (1, 1)

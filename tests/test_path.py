@@ -58,3 +58,22 @@ def test_path_tuple_points_type():
         Path(invalid_point_data_type)
     except:  # noqa: E722
         pytest.fail("Path should accept tuple points")
+
+
+# Path move
+
+
+def test_move_to_returns_self():
+    path = Path([(0, 0), (1, 0), (1, 1)], layer=5, data_type=10, width=0.5)
+    new_path = path.move_to((1, 1))
+    assert path is new_path
+    assert path == new_path
+    assert path.points == [(1, 1), (2, 1), (2, 2)]
+
+
+def test_move_by_returns_self():
+    path = Path([(0, 0), (1, 0), (1, 1)], layer=5, data_type=10, width=0.5)
+    new_path = path.move_by((1, 1))
+    assert path is new_path
+    assert path == new_path
+    assert path.points == [(1, 1), (2, 1), (2, 2)]

@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use pyo3::prelude::*;
 
 use crate::{
@@ -70,19 +72,19 @@ impl Text {
     }
 
     fn move_to(
-        &mut self,
+        mut slf: PyRefMut<'_, Self>,
         #[pyo3(from_py_with = "py_any_to_point")] point: Point,
-    ) -> PyResult<Self> {
-        Movable::move_to(self, point);
-        Ok(self.clone())
+    ) -> PyRefMut<'_, Self> {
+        Movable::move_to(slf.deref_mut(), point);
+        slf
     }
 
     fn move_by(
-        &mut self,
+        mut slf: PyRefMut<'_, Self>,
         #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
-    ) -> PyResult<Self> {
-        Movable::move_by(self, vector);
-        Ok(self.clone())
+    ) -> PyRefMut<'_, Self> {
+        Movable::move_by(slf.deref_mut(), vector);
+        slf
     }
 
     fn __str__(&self) -> PyResult<String> {
