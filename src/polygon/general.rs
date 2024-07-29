@@ -12,7 +12,7 @@ use pyo3::{
 };
 
 use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
-use crate::traits::Movable;
+use crate::traits::{Movable, Rotatable, Scalable};
 use crate::{
     point::{py_any_to_point, Point},
     utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
@@ -156,29 +156,6 @@ impl Polygon {
                 .any(|p| is_point_inside(p, &self.points))
     }
 
-    #[pyo3(signature = (angle, center=Point { x: 0.0, y: 0.0 }))]
-    fn rotate(
-        &self,
-        angle: f64,
-        #[pyo3(from_py_with = "py_any_to_point")] center: Point,
-    ) -> PyResult<Self> {
-        let points = self
-            .points
-            .iter()
-            .map(|p| p.rotate(angle, center))
-            .collect::<PyResult<Vec<Point>>>()?;
-
-        Ok(Self {
-            points,
-            layer: self.layer,
-            data_type: self.data_type,
-        })
-    }
-
-    fn copy(&self) -> PyResult<Self> {
-        Ok(self.clone())
-    }
-
     fn visualize(&self) -> PyResult<()> {
         let x: Vec<f64> = self.points.iter().map(|p| p.x).collect();
         let y: Vec<f64> = self.points.iter().map(|p| p.y).collect();
@@ -196,6 +173,9 @@ impl Polygon {
 
         Ok(())
     }
+    pub fn copy(&self) -> Self {
+        self.clone()
+    }
 
     fn move_to(
         mut slf: PyRefMut<'_, Self>,
@@ -210,6 +190,26 @@ impl Polygon {
         #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
     ) -> PyRefMut<'_, Self> {
         Movable::move_by(slf.deref_mut(), vector);
+        slf
+    }
+
+    #[pyo3(signature = (angle, centre=Point::default()))]
+    fn rotate(
+        mut slf: PyRefMut<'_, Self>,
+        angle: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> PyRefMut<'_, Self> {
+        Rotatable::rotate(slf.deref_mut(), angle, centre);
+        slf
+    }
+
+    #[pyo3(signature = (factor, centre=Point::default()))]
+    fn scale(
+        mut slf: PyRefMut<'_, Self>,
+        factor: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> PyRefMut<'_, Self> {
+        Scalable::scale(slf.deref_mut(), factor, centre);
         slf
     }
 

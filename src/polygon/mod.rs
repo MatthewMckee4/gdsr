@@ -1,4 +1,7 @@
-use crate::{point::Point, traits::Movable};
+use crate::{
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+};
 use pyo3::prelude::*;
 
 mod general;
@@ -44,14 +47,32 @@ impl std::fmt::Debug for Polygon {
 }
 
 impl Movable for Polygon {
-    fn move_by(&mut self, delta: Point) {
-        for point in &mut self.points {
-            *point += delta;
-        }
+    fn move_by(&mut self, delta: Point) -> &mut Self {
+        let new_points = self.points.iter().map(|point| *point + delta).collect();
+        self.points = new_points;
+        self
     }
 
-    fn move_to(&mut self, target: Point) {
+    fn move_to(&mut self, target: Point) -> &mut Self {
         let delta = target - self.points[0];
-        self.move_by(delta);
+        self.move_by(delta)
+    }
+}
+
+impl Rotatable for Polygon {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        for point in &mut self.points {
+            *point = point.rotate(angle, centre);
+        }
+        self
+    }
+}
+
+impl Scalable for Polygon {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        for point in &mut self.points {
+            *point = point.scale(factor, centre);
+        }
+        self
     }
 }

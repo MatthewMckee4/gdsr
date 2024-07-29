@@ -39,15 +39,18 @@ impl ToGds for CellReference {
 
         file = write_u16_array_to_file(file, &mut buffer_array)?;
 
-        file = write_points_to_file(
-            file,
-            &[
-                self.grid.origin,
-                self.grid.origin + self.grid.spacing_x * self.grid.columns as f64,
-                self.grid.origin + self.grid.spacing_y * self.grid.rows as f64,
-            ],
-            scale,
-        )?;
+        let origin = self.grid.origin;
+        let point2 = self.grid.origin + self.grid.spacing_x * self.grid.columns as f64;
+        let point3 = self.grid.origin + self.grid.spacing_y * self.grid.rows as f64;
+
+        let mut points = vec![origin, point2, point3];
+
+        points = points
+            .iter()
+            .map(|&p| p.rotate(self.grid.angle, origin))
+            .collect();
+
+        file = write_points_to_file(file, &points, scale)?;
 
         file = write_element_tail_to_file(file)?;
 

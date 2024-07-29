@@ -8,6 +8,14 @@ pub trait ToGds {
 }
 
 pub trait Movable {
-    fn move_to(&mut self, point: Point);
-    fn move_by(&mut self, vector: Point);
+    fn move_to(&mut self, point: Point) -> &mut Self;
+    fn move_by(&mut self, vector: Point) -> &mut Self;
+}
+
+pub trait Rotatable {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self;
+}
+
+pub trait Scalable {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self;
 }

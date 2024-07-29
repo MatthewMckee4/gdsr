@@ -1,6 +1,9 @@
 use pyo3::prelude::*;
 
-use crate::point::Point;
+use crate::{
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+};
 
 mod general;
 
@@ -57,5 +60,35 @@ impl std::fmt::Debug for Grid {
             "G({}, {}, {}, {}, {})",
             self.origin, self.columns, self.rows, self.spacing_x, self.spacing_y
         )
+    }
+}
+
+impl Movable for Grid {
+    fn move_to(&mut self, point: Point) -> &mut Self {
+        self.origin = point;
+        self
+    }
+
+    fn move_by(&mut self, vector: Point) -> &mut Self {
+        self.origin += vector;
+        self
+    }
+}
+
+impl Rotatable for Grid {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        self.origin = self.origin.rotate(angle, centre);
+        self.angle += angle;
+        self
+    }
+}
+
+impl Scalable for Grid {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        self.origin = self.origin.scale(factor, centre);
+        self.spacing_x = self.spacing_x * factor;
+        self.spacing_y = self.spacing_y * factor;
+        self.magnification *= factor;
+        self
     }
 }

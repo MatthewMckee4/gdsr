@@ -624,27 +624,27 @@ def test_rotate_270_degrees():
     assert rotated_polygon.points == expected_points
 
 
-def test_rotate_with_center():
+def test_rotate_with_centre():
     points = [(1, 1), (1, 2), (2, 2), (2, 1), (1, 1)]
     polygon = Polygon(points)
 
-    rotated_polygon = polygon.rotate(90, center=(1, 1))
+    rotated_polygon = polygon.rotate(90, centre=(1, 1))
 
     expected_points = [(1, 1), (0, 1), (0, 2), (1, 2), (1, 1)]
     assert rotated_polygon.points == expected_points
 
 
-def test_rotate_with_center_and_negative_angle():
+def test_rotate_with_centre_and_negative_angle():
     points = [(1, 1), (1, 2), (2, 2), (2, 1), (1, 1)]
     polygon = Polygon(points)
 
-    rotated_polygon = polygon.rotate(-90, center=(1, 1))
+    rotated_polygon = polygon.rotate(-90, centre=(1, 1))
 
     expected_points = [(1, 1), (2, 1), (2, 0), (1, 0), (1, 1)]
     assert rotated_polygon.points == expected_points
 
 
-def test_rotate_with_center_and_large_angle():
+def test_rotate_with_centre_and_large_angle():
     points = [(1, 1), (1, 2), (2, 2), (2, 1), (1, 1)]
     polygon = Polygon(points)
 

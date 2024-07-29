@@ -32,38 +32,38 @@ impl Point {
         Ok(*self)
     }
 
-    #[pyo3(signature = (angle, center=Point { x: 0.0, y: 0.0 }))]
+    #[pyo3(signature = (angle, centre=Point::default()))]
     pub fn rotate(
         &self,
         angle: f64,
-        #[pyo3(from_py_with = "py_any_to_point")] center: Point,
-    ) -> PyResult<Self> {
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> Self {
         let (sin, cos) = angle.to_radians().sin_cos();
-        let x = self.x - center.x;
-        let y = self.y - center.y;
+        let x = self.x - centre.x;
+        let y = self.y - centre.y;
 
-        let new_x = center.x + x * cos - y * sin;
-        let new_y = center.y + x * sin + y * cos;
+        let new_x = centre.x + x * cos - y * sin;
+        let new_y = centre.y + x * sin + y * cos;
 
         let rounded_x = (new_x * 1e10).round() / 1e10;
         let rounded_y = (new_y * 1e10).round() / 1e10;
 
-        Ok(Point {
+        Point {
             x: rounded_x,
             y: rounded_y,
-        })
+        }
     }
 
-    #[pyo3(signature = (factor, center=Point { x: 0.0, y: 0.0 }))]
+    #[pyo3(signature = (factor, centre=Point::default()))]
     pub fn scale(
         &self,
         factor: f64,
-        #[pyo3(from_py_with = "py_any_to_point")] center: Point,
-    ) -> PyResult<Self> {
-        let x = (self.x - center.x) * factor + center.x;
-        let y = (self.y - center.y) * factor + center.y;
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> Self {
+        let x = (self.x - centre.x) * factor + centre.x;
+        let y = (self.y - centre.y) * factor + centre.y;
 
-        Ok(Point { x, y })
+        Point { x, y }
     }
 
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {

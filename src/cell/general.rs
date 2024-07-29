@@ -71,8 +71,8 @@ impl Cell {
         Ok(())
     }
 
-    fn copy(&self) -> PyResult<Self> {
-        Ok(self.clone())
+    pub fn copy(&self) -> Self {
+        self.clone()
     }
 
     fn __str__(&self) -> PyResult<String> {

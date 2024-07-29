@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use pyo3::prelude::*;
 
 use super::Library;
@@ -10,7 +12,7 @@ impl Library {
     pub fn new(name: String) -> Self {
         Library {
             name,
-            cells: Vec::new(),
+            cells: HashMap::new(),
         }
     }
 
@@ -32,7 +34,7 @@ impl Library {
         #[pyo3(from_py_with = "input_cells_to_correct_format")] cells: Vec<Cell>,
     ) -> PyResult<()> {
         for cell in cells {
-            self.cells.push(cell);
+            self.cells.insert(cell.name.clone(), cell);
         }
         Ok(())
     }
@@ -43,7 +45,7 @@ impl Library {
         #[pyo3(from_py_with = "input_cells_to_correct_format")] cells: Vec<Cell>,
     ) -> PyResult<()> {
         for cell in cells {
-            self.cells.retain(|x| x != &cell);
+            self.cells.remove(&cell.name);
         }
         Ok(())
     }

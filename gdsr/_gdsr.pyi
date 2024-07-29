@@ -31,17 +31,17 @@ class Point:
         """Return the cross product with another point."""
     def copy(self) -> Self:
         """Return a copy of the point."""
-    def rotate(self, angle: float, center: PointLike = Point(0, 0)) -> Self:
-        """Rotates the point by an angle around a center point.
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotates the point by an angle around a centre point.
 
         :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike center: Center point of rotation, defaults to Point(0, 0).
+        :param PointLike centre: Centre point of rotation, defaults to Point(0, 0).
         """
-    def scale(self, factor: float, center: PointLike = Point(0, 0)) -> Self:
-        """Scales the point by a factor around a center point.
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scales the point by a factor around a centre point.
 
         :param float factor: Scaling factor.
-        :param PointLike center: Center point of scaling, defaults to Point(0, 0).
+        :param PointLike centre: Centre point of scaling, defaults to Point(0, 0).
         """
     def __getitem__(self, index: Literal[0, 1]) -> float: ...
     def __bool__(self) -> bool: ...
@@ -141,6 +141,22 @@ class Grid:
 
         :param PointLike vector: Vector to move the grid by.
         """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the grid by an angle around a centre point.
+
+        This method modifies the grid in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the grid by a factor around a centre point.
+
+        This method modifies the grid in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
+        """
     def __str__(self) -> str:
         """Return a string representation of the grid."""
     def __repr__(self) -> str:
@@ -171,6 +187,22 @@ class ElementReference:
 
         :param PointLike vector: Vector to move the element reference by.
         """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the element reference by an angle around a centre point.
+
+        This method modifies the element reference in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the element reference by a factor around a centre point.
+
+        This method modifies the element reference in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
+        """
     def __str__(self) -> str:
         """Return a string representation of the element reference."""
     def __repr__(self) -> str:
@@ -185,6 +217,8 @@ class CellReference:
         :param Cell cell: The cell to reference.
         :param Grid grid: The grid to reference the cell.
         """
+    def copy(self) -> Self:
+        """Return a copy of the cell reference."""
     def move_to(self, point: PointLike) -> Self:
         """Move the cell reference to a point.
 
@@ -199,9 +233,22 @@ class CellReference:
 
         :param PointLike vector: Vector to move the cell reference by.
         """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the cell reference by an angle around a centre point.
 
-    def copy(self) -> Self:
-        """Return a copy of the cell reference."""
+        This method modifies the cell reference in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the cell reference by a factor around a centre point.
+
+        This method modifies the cell reference in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
+        """
     def __str__(self) -> str:
         """Return a string representation of the cell reference."""
     def __repr__(self) -> str:
@@ -249,6 +296,22 @@ class Path:
         This method modifies the path in place and returns itself.
 
         :param PointLike vector: Vector to move the path by.
+        """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the path by an angle around a centre point.
+
+        This method modifies the path in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the path by a factor around a centre point.
+
+        This method modifies the path in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
     def __str__(self) -> str:
         """Return a string representation of the path."""
@@ -319,16 +382,6 @@ class Polygon:
         """Return True if any of the points are on the edge of the polygon."""
     def intersects(self, other: Polygon) -> bool:
         """Return True if the polygon intersects with another polygon."""
-    def rotate(self, angle: float, center: PointLike = (0, 0)) -> Self:
-        """Rotates the polygon by an angle around a center point.
-
-        This method modifies the polygon in place and returns itself.
-
-        :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike center: Center point of rotation, defaults to (0, 0).
-
-        :return: Rotated polygon.
-        """
     def visualize(self) -> None:
         """Visualises the polygon in your default web browser."""
     def copy(self) -> Self:
@@ -346,6 +399,22 @@ class Polygon:
         This method modifies the polygon in place and returns itself.
 
         :param PointLike vector: Vector to move the polygon by.
+        """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the polygon by an angle around a centre point.
+
+        This method modifies the polygon in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the polygon by a factor around a centre point.
+
+        This method modifies the polygon in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
@@ -398,6 +467,8 @@ class Text:
         :param HorizontalPresentation horizontal_presentation: Text horizontal
         presentation, defaults to HorizontalPresentation.Centre.
         """
+    def copy(self) -> Self:
+        """Return a copy of the text."""
     def move_to(self, point: PointLike) -> Self:
         """Move the text to a point.
 
@@ -412,8 +483,22 @@ class Text:
 
         :param PointLike vector: Vector to move the text by.
         """
-    def copy(self) -> Self:
-        """Return a copy of the text."""
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate the text by an angle around a centre point.
+
+        This method modifies the text in place and returns itself.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale the text by a factor around a centre point.
+
+        This method modifies the text in place and returns itself.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
+        """
     def __str__(self) -> str:
         """Return a string representation of the text."""
     def __repr__(self) -> str:

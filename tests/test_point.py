@@ -636,19 +636,19 @@ def test_point_scale_zero():
     assert p2 == (0, 0)
 
 
-def test_point_scale_center():
+def test_point_scale_centre():
     p = Point(1, 2)
     p2 = p.scale(2, Point(1, 1))
     assert p2 == (1, 3)
 
 
-def test_point_scale_center_negative():
+def test_point_scale_centre_negative():
     p = Point(1, 2)
     p2 = p.scale(-2, Point(1, 1))
     assert p2 == (1, -1)
 
 
-def test_point_scale_center_zero():
+def test_point_scale_centre_zero():
     p = Point(1, 2)
     p2 = p.scale(0, Point(1, 1))
     assert p2 == (1, 1)
@@ -660,7 +660,7 @@ def test_point_scale_invalid_operand():
         p.scale("invalid operand", Point(1, 1))  # type: ignore
 
 
-def test_point_scale_invalid_center():
+def test_point_scale_invalid_centre():
     p = Point(1, 2)
     with pytest.raises(TypeError):
-        p.scale(2, "invalid center")  # type: ignore
+        p.scale(2, "invalid centre")  # type: ignore

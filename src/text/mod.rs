@@ -1,6 +1,9 @@
 use pyo3::prelude::*;
 
-use crate::{point::Point, traits::Movable};
+use crate::{
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+};
 
 mod general;
 mod io;
@@ -45,11 +48,29 @@ impl std::fmt::Debug for Text {
 }
 
 impl Movable for Text {
-    fn move_by(&mut self, delta: Point) {
+    fn move_by(&mut self, delta: Point) -> &mut Self {
         self.origin += delta;
+        self
     }
 
-    fn move_to(&mut self, target: Point) {
+    fn move_to(&mut self, target: Point) -> &mut Self {
         self.origin = target;
+        self
+    }
+}
+
+impl Rotatable for Text {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        self.origin = self.origin.rotate(angle, centre);
+        self.angle += angle;
+        self
+    }
+}
+
+impl Scalable for Text {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        self.origin = self.origin.scale(factor, centre);
+        self.magnification *= factor;
+        self
     }
 }

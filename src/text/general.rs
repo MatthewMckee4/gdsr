@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::{
     point::Point,
     text::presentation::{HorizontalPresentation, VerticalPresentation},
-    traits::Movable,
+    traits::{Movable, Rotatable, Scalable},
     validation::input::check_layer_valid,
 };
 
@@ -18,7 +18,7 @@ impl Text {
     #[new]
     #[pyo3(signature = (
         text,
-        origin=Point { x: 0.0, y: 0.0 },
+        origin=Point::default(),
         layer=0,
         magnification=1.0,
         angle=0.0,
@@ -67,8 +67,8 @@ impl Text {
         Ok(())
     }
 
-    fn copy(&self) -> PyResult<Self> {
-        Ok(self.clone())
+    pub fn copy(&self) -> Self {
+        self.clone()
     }
 
     fn move_to(
@@ -84,6 +84,26 @@ impl Text {
         #[pyo3(from_py_with = "py_any_to_point")] vector: Point,
     ) -> PyRefMut<'_, Self> {
         Movable::move_by(slf.deref_mut(), vector);
+        slf
+    }
+
+    #[pyo3(signature = (angle, centre=Point::default()))]
+    fn rotate(
+        mut slf: PyRefMut<'_, Self>,
+        angle: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> PyRefMut<'_, Self> {
+        Rotatable::rotate(slf.deref_mut(), angle, centre);
+        slf
+    }
+
+    #[pyo3(signature = (factor, centre=Point::default()))]
+    fn scale(
+        mut slf: PyRefMut<'_, Self>,
+        factor: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> PyRefMut<'_, Self> {
+        Scalable::scale(slf.deref_mut(), factor, centre);
         slf
     }
 

@@ -1,5 +1,5 @@
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::vec;
 
 use chrono::{Datelike, Local, Timelike};
 
@@ -12,9 +12,17 @@ use crate::utils::io::{write_gds, write_string_with_record_to_file, write_u16_ar
 use super::*;
 
 impl Cell {
-    pub fn _to_gds(&self, mut file: File, units: f64, precision: f64) -> PyResult<File> {
+    pub fn _to_gds(
+        &self,
+        mut file: File,
+        units: f64,
+        precision: f64,
+        written_cell_names: &mut HashSet<String>,
+    ) -> PyResult<File> {
         let now = Local::now();
         let timestamp = now.naive_utc();
+
+        let mut cells_to_write: Vec<Cell> = Vec::new();
 
         let mut cell_head = [
             28,
@@ -50,7 +58,15 @@ impl Cell {
         }
 
         for cell_reference in &self.cell_references {
+            if !written_cell_names.contains(&cell_reference.cell.name) {
+                written_cell_names.insert(cell_reference.cell.name.clone());
+                cells_to_write.push(cell_reference.cell.clone());
+            }
             file = cell_reference._to_gds(file, units / precision)?;
+        }
+
+        for element_reference in &self.element_references {
+            file = element_reference._to_gds(file, units / precision)?;
         }
 
         let mut cell_tail = [
@@ -60,6 +76,10 @@ impl Cell {
 
         file = write_u16_array_to_file(file, &mut cell_tail)?;
 
+        for cell in cells_to_write {
+            file = cell._to_gds(file, units, precision, written_cell_names)?;
+        }
+
         Ok(file)
     }
 }
@@ -68,6 +88,12 @@ impl Cell {
 impl Cell {
     #[pyo3(signature=(file_name, units=1e-6, precision=1e-10))]
     pub fn to_gds(&self, file_name: &str, units: f64, precision: f64) -> PyResult<()> {
-        write_gds(file_name, "library", units, precision, vec![self.clone()])
+        write_gds(
+            file_name,
+            "library",
+            units,
+            precision,
+            HashMap::from([(self.name.clone(), self.clone())]),
+        )
     }
 }

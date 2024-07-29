@@ -1,6 +1,11 @@
 use pyo3::prelude::*;
 
-use crate::{cell::Cell, grid::Grid, point::Point, traits::Movable};
+use crate::{
+    cell::Cell,
+    grid::Grid,
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+};
 
 mod general;
 mod io;
@@ -8,8 +13,8 @@ mod io;
 #[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct CellReference {
-    cell: Cell,
-    grid: Grid,
+    pub cell: Cell,
+    pub grid: Grid,
 }
 
 impl std::fmt::Display for CellReference {
@@ -25,11 +30,27 @@ impl std::fmt::Debug for CellReference {
 }
 
 impl Movable for CellReference {
-    fn move_to(&mut self, point: Point) {
-        self.grid.origin = point;
+    fn move_to(&mut self, point: Point) -> &mut Self {
+        self.grid.move_to(point);
+        self
     }
 
-    fn move_by(&mut self, vector: Point) {
-        self.grid.origin += vector;
+    fn move_by(&mut self, vector: Point) -> &mut Self {
+        self.grid.move_by(vector);
+        self
+    }
+}
+
+impl Rotatable for CellReference {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        self.grid.rotate(angle, centre);
+        self
+    }
+}
+
+impl Scalable for CellReference {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        self.grid.scale(factor, centre);
+        self
     }
 }

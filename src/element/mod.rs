@@ -8,7 +8,7 @@ use crate::path::Path;
 use crate::point::Point;
 use crate::polygon::Polygon;
 use crate::text::Text;
-use crate::traits::{Movable, ToGds};
+use crate::traits::{Movable, Rotatable, Scalable, ToGds};
 
 #[derive(Clone, PartialEq, Debug)]
 #[allow(clippy::enum_variant_names)]
@@ -65,23 +65,117 @@ impl ToGds for Element {
 }
 
 impl Movable for Element {
-    fn move_to(&mut self, point: Point) {
+    fn move_to(&mut self, point: Point) -> &mut Self {
         match self {
-            Element::Path(element) => element.move_to(point),
-            Element::Polygon(element) => element.move_to(point),
-            Element::CellReference(element) => element.move_to(point),
-            Element::Text(element) => element.move_to(point),
-            Element::ElementReference(element) => element.move_to(point),
+            Element::Path(element) => {
+                element.move_to(point);
+            }
+            Element::Polygon(element) => {
+                element.move_to(point);
+            }
+            Element::CellReference(element) => {
+                element.move_to(point);
+            }
+            Element::Text(element) => {
+                element.move_to(point);
+            }
+            Element::ElementReference(element) => {
+                element.move_to(point);
+            }
         }
+        self
     }
 
-    fn move_by(&mut self, vector: Point) {
+    fn move_by(&mut self, vector: Point) -> &mut Self {
         match self {
-            Element::Path(element) => element.move_by(vector),
-            Element::Polygon(element) => element.move_by(vector),
-            Element::CellReference(element) => element.move_by(vector),
-            Element::Text(element) => element.move_by(vector),
-            Element::ElementReference(element) => element.move_by(vector),
+            Element::Path(element) => {
+                element.move_by(vector);
+            }
+            Element::Polygon(element) => {
+                element.move_by(vector);
+            }
+            Element::CellReference(element) => {
+                element.move_by(vector);
+            }
+            Element::Text(element) => {
+                element.move_by(vector);
+            }
+            Element::ElementReference(element) => {
+                element.move_by(vector);
+            }
+        }
+        self
+    }
+}
+
+impl Element {
+    pub fn copy(&self) -> Self {
+        match self {
+            Element::Path(element) => Element::Path(element.copy()),
+            Element::Polygon(element) => Element::Polygon(element.copy()),
+            Element::CellReference(element) => Element::CellReference(element.copy()),
+            Element::Text(element) => Element::Text(element.clone()),
+            Element::ElementReference(element) => {
+                Element::ElementReference(Box::new(element.copy()))
+            }
+        }
+    }
+}
+
+impl Rotatable for Element {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        match self {
+            Element::Path(element) => {
+                element.rotate(angle, centre);
+            }
+            Element::Polygon(element) => {
+                element.rotate(angle, centre);
+            }
+            Element::CellReference(element) => {
+                element.rotate(angle, centre);
+            }
+            Element::Text(element) => {
+                element.rotate(angle, centre);
+            }
+            Element::ElementReference(element) => {
+                element.rotate(angle, centre);
+            }
+        }
+        self
+    }
+}
+
+impl Scalable for Element {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        match self {
+            Element::Path(element) => {
+                element.scale(factor, centre);
+            }
+            Element::Polygon(element) => {
+                element.scale(factor, centre);
+            }
+            Element::CellReference(element) => {
+                element.scale(factor, centre);
+            }
+            Element::Text(element) => {
+                element.scale(factor, centre);
+            }
+            Element::ElementReference(element) => {
+                element.scale(factor, centre);
+            }
+        }
+        self
+    }
+}
+
+impl std::fmt::Display for Element {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Element::Path(element) => write!(f, "{}", element),
+            Element::Polygon(element) => write!(f, "{}", element),
+            Element::CellReference(element) => write!(f, "{}", element),
+            Element::Text(element) => write!(f, "{}", element),
+            Element::ElementReference(element) => write!(f, "{}", element),
         }
     }
 }

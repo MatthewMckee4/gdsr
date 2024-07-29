@@ -1,8 +1,11 @@
+use std::collections::{HashMap, HashSet};
+
+use std::fs::File;
+use std::io::Write;
+
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 use pyo3::{exceptions::PyIOError, prelude::*};
-use std::fs::File;
-use std::io::Write;
 
 use crate::{
     cell::Cell,
@@ -156,15 +159,20 @@ pub fn write_gds(
     library_name: &str,
     units: f64,
     precision: f64,
-    cells: Vec<Cell>,
+    cells: HashMap<String, Cell>,
 ) -> PyResult<()> {
     let mut file = File::create(file_name)
         .map_err(|_| PyIOError::new_err("Could not open file for writing"))?;
 
     file = write_gds_head_to_file(library_name, units, precision, file)?;
 
-    for cell in &cells {
-        file = cell._to_gds(file, units, precision)?;
+    let mut written_cell_names: HashSet<String> = HashSet::new();
+
+    for (cell_name, cell) in &cells {
+        if !written_cell_names.contains(cell_name) {
+            written_cell_names.insert(cell_name.clone());
+            file = cell._to_gds(file, units, precision, &mut written_cell_names)?;
+        }
     }
 
     file = write_gds_tail_to_file(file)?;
