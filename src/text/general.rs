@@ -6,12 +6,11 @@ use crate::{
     point::Point,
     text::presentation::{HorizontalPresentation, VerticalPresentation},
     traits::{Movable, Rotatable, Scalable},
+    utils::transformations::py_any_to_point,
     validation::input::check_layer_valid,
 };
 
 use super::Text;
-
-use crate::point::utils::*;
 
 #[pymethods]
 impl Text {

@@ -6,9 +6,9 @@ use crate::cell::Cell;
 
 mod general;
 mod io;
-mod utils;
 
-#[pyclass]
+#[pyclass(eq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Library {
     #[pyo3(get, set)]
     pub name: String,

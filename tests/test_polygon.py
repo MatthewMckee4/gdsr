@@ -146,22 +146,22 @@ def test_str_two_points():
 
 def test_repr_one_point():
     polygon = Polygon([(0, 0)], layer=0, data_type=0)
-    assert repr(polygon) == "Po((0, 0), n=1, l=0, d=0)"
+    assert repr(polygon) == "Polygon([(0, 0), ..., (0, 0)], 0, 0)"
 
 
 def test_repr_two_points():
     polygon = Polygon([(0, 0), (1, 1)], layer=0, data_type=0)
-    assert repr(polygon) == "Po((0, 0), n=3, l=0, d=0)"
+    assert repr(polygon) == "Polygon([(0, 0), ..., (1, 1)], 0, 0)"
 
 
 def test_repr_three_points():
     polygon = Polygon([(0, 0), (1, 1), (2, 2)], layer=0, data_type=0)
-    assert repr(polygon) == "Po((0, 0), n=4, l=0, d=0)"
+    assert repr(polygon) == "Polygon([(0, 0), ..., (2, 2)], 0, 0)"
 
 
 def test_repr_four_points():
     polygon = Polygon([(0, 0), (1, 1), (2, 2), (3, 3)], layer=0, data_type=0)
-    assert repr(polygon) == "Po((0, 0), n=5, l=0, d=0)"
+    assert repr(polygon) == "Polygon([(0, 0), ..., (3, 3)], 0, 0)"
 
 
 # Bounding box
@@ -427,14 +427,7 @@ def test_contains_on_edge(square_polygon: Polygon):
 
 
 def test_contains_on_edge_multiple_points(square_polygon: Polygon):
-    results = square_polygon.contains(
-        [
-            Point(0, 0),
-            Point(0, 2),
-            Point(2, 2),
-            Point(2, 0),
-        ]
-    )
+    results = square_polygon.contains([(0, 0), (0, 2), (2, 2), (2, 0)])
     assert results == (True, True, True, True)
 
 

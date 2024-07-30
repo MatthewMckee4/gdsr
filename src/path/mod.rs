@@ -43,9 +43,13 @@ impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Path([{:?}, ..., {:?}])",
+            "Path([{:?}, ..., {:?}], {}, {}, {:?}, {:?})",
             self.points.first(),
-            self.points.last()
+            self.points.last(),
+            self.layer,
+            self.data_type,
+            self.path_type,
+            self.width
         )
     }
 }

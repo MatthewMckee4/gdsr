@@ -9,9 +9,9 @@ use chrono::{Datelike, Local, Timelike};
 
 use log::{debug, info};
 use pyo3::{exceptions::PyIOError, prelude::*};
+use tempfile::Builder;
 
 use crate::cell::Cell;
-use crate::cell_reference::CellReference;
 use crate::config::gds_file_types::GDSRecordData;
 use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
 use crate::library::Library;
@@ -19,6 +19,7 @@ use crate::path::path_type::PathType;
 use crate::path::Path;
 use crate::point::{get_points_from_i32_vec, Point};
 use crate::polygon::Polygon;
+use crate::reference::{Reference, ReferenceInstance};
 use crate::text::utils::get_presentations_from_value;
 use crate::text::Text;
 
@@ -164,13 +165,13 @@ pub fn write_string_with_record_to_file(
 }
 
 pub fn write_gds(
-    file_name: &str,
+    file_name: String,
     library_name: &str,
     units: f64,
     precision: f64,
     cells: HashMap<String, Cell>,
-) -> PyResult<()> {
-    let mut file = File::create(file_name)
+) -> PyResult<String> {
+    let mut file = File::create(file_name.clone())
         .map_err(|_| PyIOError::new_err("Could not open file for writing"))?;
 
     file = write_gds_head_to_file(library_name, units, precision, file)?;
@@ -188,7 +189,7 @@ pub fn write_gds(
 
     file.flush()?;
 
-    Ok(())
+    Ok(file_name)
 }
 
 pub fn write_transformation_to_file(
@@ -229,7 +230,7 @@ pub fn write_transformation_to_file(
     Ok(file)
 }
 
-pub fn from_gds(file_name: &str) -> PyResult<Library> {
+pub fn from_gds(file_name: String) -> PyResult<Library> {
     let mut library = Library::new("Library".to_string());
 
     let file = File::open(file_name)?;
@@ -239,7 +240,7 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
     let mut path: Option<Path> = None;
     let mut polygon: Option<Polygon> = None;
     let mut text: Option<Text> = None;
-    let mut cell_reference: Option<CellReference> = None;
+    let mut reference: Option<Reference> = None;
 
     let mut scale = 1.0;
     let mut rounding_digits = 0;
@@ -264,7 +265,7 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                     continue;
                 }
                 GDSRecord::EndLib => {
-                    update_cell_references(&mut library);
+                    update_references(&mut library);
                     continue;
                 }
                 GDSRecord::BgnStr => {
@@ -301,7 +302,7 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {
                     debug!("ARef {:?}", data);
-                    cell_reference = Some(CellReference::default());
+                    reference = Some(Reference::default());
                     continue;
                 }
                 GDSRecord::Text => {
@@ -354,23 +355,23 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                             polygon.points = points;
                         } else if let Some(path) = &mut path {
                             path.points = points;
-                        } else if let Some(cell_reference) = &mut cell_reference {
+                        } else if let Some(reference) = &mut reference {
                             if points.len() == 1 {
-                                cell_reference.grid.origin = points[0];
+                                reference.grid.origin = points[0];
                             } else if points.len() == 3 {
                                 let points: Vec<Point> = points
                                     .iter()
-                                    .map(|&p| p.rotate(-cell_reference.grid.angle, points[0]))
+                                    .map(|&p| p.rotate(-reference.grid.angle, points[0]))
                                     .collect();
-                                cell_reference.grid.origin = points[0];
-                                cell_reference.grid.spacing_x = if cell_reference.grid.columns > 0 {
-                                    ((points[1] - points[0]) / cell_reference.grid.columns as f64)
+                                reference.grid.origin = points[0];
+                                reference.grid.spacing_x = if reference.grid.columns > 0 {
+                                    ((points[1] - points[0]) / reference.grid.columns as f64)
                                         .round(rounding_digits)
                                 } else {
                                     Point::default()
                                 };
-                                cell_reference.grid.spacing_y = if cell_reference.grid.rows > 0 {
-                                    ((points[2] - points[0]) / cell_reference.grid.rows as f64)
+                                reference.grid.spacing_y = if reference.grid.rows > 0 {
+                                    ((points[2] - points[0]) / reference.grid.rows as f64)
                                         .round(rounding_digits)
                                 } else {
                                     Point::default()
@@ -391,21 +392,26 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                             cell.paths.push(path.clone());
                         } else if let Some(text) = &mut text {
                             cell.texts.push(text.clone());
-                        } else if let Some(cell_reference) = &mut cell_reference {
-                            cell.cell_references.push(cell_reference.clone());
+                        } else if let Some(reference) = &mut reference {
+                            cell.references.push(reference.clone());
                         }
                         polygon = None;
                         path = None;
                         text = None;
-                        cell_reference = None;
+                        reference = None;
                     };
                     continue;
                 }
                 GDSRecord::SName => {
                     debug!("SName {:?}", data);
                     if let GDSRecordData::Str(cell_name) = data {
-                        if let Some(cell_reference) = &mut cell_reference {
-                            cell_reference.cell.name = cell_name;
+                        if let Some(reference) = &mut reference {
+                            match &mut reference.instance {
+                                ReferenceInstance::Cell(cell) => {
+                                    cell.name = cell_name;
+                                }
+                                ReferenceInstance::Element(_) => {}
+                            }
                         }
                     };
                     continue;
@@ -413,9 +419,9 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                 GDSRecord::ColRow => {
                     debug!("ColRow {:?}", data);
                     if let GDSRecordData::I16(col_row) = data {
-                        if let Some(cell_reference) = &mut cell_reference {
-                            cell_reference.grid.columns = col_row[0] as usize;
-                            cell_reference.grid.rows = col_row[1] as usize;
+                        if let Some(reference) = &mut reference {
+                            reference.grid.columns = col_row[0] as usize;
+                            reference.grid.rows = col_row[1] as usize;
                         }
                     };
                     continue;
@@ -462,8 +468,8 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.x_reflection = x_reflection;
                         }
-                        if let Some(cell_reference) = &mut cell_reference {
-                            cell_reference.grid.x_reflection = x_reflection;
+                        if let Some(reference) = &mut reference {
+                            reference.grid.x_reflection = x_reflection;
                         }
                     };
                     continue;
@@ -473,8 +479,8 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                     if let GDSRecordData::F64(magnification) = data {
                         if let Some(text) = &mut text {
                             text.magnification = magnification[0];
-                        } else if let Some(cell_reference) = &mut cell_reference {
-                            cell_reference.grid.magnification = magnification[0];
+                        } else if let Some(reference) = &mut reference {
+                            reference.grid.magnification = magnification[0];
                         }
                     };
                     continue;
@@ -484,8 +490,8 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
                     if let GDSRecordData::F64(angle) = data {
                         if let Some(text) = &mut text {
                             text.angle = angle[0];
-                        } else if let Some(cell_reference) = &mut cell_reference {
-                            cell_reference.grid.angle = angle[0];
+                        } else if let Some(reference) = &mut reference {
+                            reference.grid.angle = angle[0];
                         }
                     };
                     continue;
@@ -623,15 +629,20 @@ pub fn from_gds(file_name: &str) -> PyResult<Library> {
     Ok(library)
 }
 
-fn update_cell_references(library: &mut Library) {
+fn update_references(library: &mut Library) {
     let cells = &mut library.cells;
     let cells_cloned = cells.clone();
     for cell in cells.values_mut() {
-        for cell_reference in cell.cell_references.iter_mut() {
-            if let Some(referenced_cell) = cells_cloned.get(&cell_reference.cell.name) {
-                cell_reference.cell = referenced_cell.clone();
-            } else {
-                info!("Cell {} not found", cell_reference.cell.name);
+        for reference in cell.references.iter_mut() {
+            match &reference.instance {
+                ReferenceInstance::Cell(cell) => {
+                    if let Some(referenced_cell) = cells_cloned.get(&cell.name) {
+                        reference.instance = ReferenceInstance::Cell(referenced_cell.clone());
+                    } else {
+                        info!("Cell {} not found", cell.name);
+                    }
+                }
+                ReferenceInstance::Element(_) => {}
             }
         }
     }
@@ -771,4 +782,10 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     } else {
         mantissa * 16.0_f64.powi(exponent)
     }
+}
+
+pub fn create_temp_file() -> PyResult<String> {
+    let temp_file = Builder::new().suffix(".gds").tempfile()?;
+    let temp_path = temp_file.path().to_string_lossy().to_string();
+    Ok(temp_path)
 }

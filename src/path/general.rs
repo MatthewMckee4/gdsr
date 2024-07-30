@@ -2,12 +2,14 @@ use std::ops::DerefMut;
 
 use pyo3::prelude::*;
 
-use crate::traits::{Movable, Rotatable, Scalable};
-use crate::utils::geometry::perimeter;
-use crate::validation::input::{check_data_type_valid, py_any_to_points_vec};
 use crate::{
-    point::{py_any_to_point, Point},
-    validation::input::check_layer_valid,
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+    utils::{
+        geometry::perimeter,
+        transformations::{py_any_to_point, py_any_to_points_vec},
+    },
+    validation::input::{check_data_type_valid, check_layer_valid},
 };
 
 use super::{path_type::PathType, Path};

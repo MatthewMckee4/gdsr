@@ -41,7 +41,18 @@ impl std::fmt::Display for Text {
 
 impl std::fmt::Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "T({})", self.text)
+        write!(
+            f,
+            "Text({}, {:?}, {:?}, {:?}, {}, {}, {:?}, {:?})",
+            self.text,
+            self.origin,
+            self.layer,
+            self.magnification,
+            self.angle,
+            self.x_reflection,
+            self.vertical_presentation,
+            self.horizontal_presentation
+        )
     }
 }
 

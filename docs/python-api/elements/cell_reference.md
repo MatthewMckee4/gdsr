@@ -1,4 +1,4 @@
 # Cell Reference
 
-::: gdsr._gdsr.CellReference
-::: gdsr.gdsr.CellReference
+::: gdsr._gdsr.Reference
+::: gdsr.gdsr.Reference

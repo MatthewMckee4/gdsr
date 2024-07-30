@@ -7,7 +7,7 @@ use crate::{
 
 mod general;
 
-#[pyclass]
+#[pyclass(eq)]
 #[derive(Clone, PartialEq)]
 pub struct Grid {
     #[pyo3(get)]
@@ -47,8 +47,8 @@ impl std::fmt::Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Grid at ({}, {}) with {} columns and {} rows, spacing ({}, {})",
-            self.origin.x, self.origin.y, self.columns, self.rows, self.spacing_x, self.spacing_y
+            "Grid at {:?} with {} columns and {} rows, spacing ({}, {}), magnification {:?}, angle {:?}, x_reflection {}",
+            self.origin, self.columns, self.rows, self.spacing_x, self.spacing_y, self.magnification, self.angle, self.x_reflection,
         )
     }
 }
@@ -57,8 +57,15 @@ impl std::fmt::Debug for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "G({}, {}, {}, {}, {})",
-            self.origin, self.columns, self.rows, self.spacing_x, self.spacing_y
+            "Grid({}, {}, {}, {}, {}, {}, {}, {})",
+            self.origin,
+            self.columns,
+            self.rows,
+            self.spacing_x,
+            self.spacing_y,
+            self.magnification,
+            self.angle,
+            self.x_reflection,
         )
     }
 }
@@ -78,7 +85,7 @@ impl Movable for Grid {
 impl Rotatable for Grid {
     fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
         self.origin = self.origin.rotate(angle, centre);
-        self.angle += angle;
+        self.angle = (self.angle + angle) % 360.0;
         self
     }
 }

@@ -26,9 +26,6 @@ def test_text_init_with_presentation():
     assert text.horizontal_presentation == HorizontalPresentation.Left
 
 
-# Angle and Magnification
-
-
 def test_text_init_with_angle():
     text = Text("Hello, World!", angle=45.0)
     assert text.angle == 45.0
@@ -39,15 +36,9 @@ def test_text_init_with_magnification():
     assert text.magnification == 2.0
 
 
-# X Reflection Tests
-
-
 def test_text_init_with_x_reflection():
     text = Text("Hello, World!", x_reflection=True)
     assert text.x_reflection is True
-
-
-# Full Parameter Initialization Test
 
 
 def test_text_init_with_all_parameters():
@@ -70,7 +61,7 @@ def test_text_init_with_all_parameters():
     assert text.horizontal_presentation == HorizontalPresentation.Right
 
 
-# Origin Setter Tests
+# Text setters
 
 
 def test_text_origin_setter():
@@ -85,7 +76,7 @@ def test_text_origin_setter_invalid():
         text.origin = None  # type: ignore
 
 
-# String Representation Tests
+# Text str
 
 
 def test_text_str_with_different_states():
@@ -101,12 +92,15 @@ def test_text_str_with_different_states():
     )
 
 
+# Text repr
+
+
 def test_text_repr_with_different_states():
-    text = Text("Hello, World!", magnification=2.0)
-    assert repr(text) == "T(Hello, World!)"
+    text = Text("Hello, World!", magnification=2)
+    assert repr(text) == "Text(Hello, World!, (0, 0), 0, 2.0, 0, false, Middle, Centre)"
 
 
-# Equality Tests
+# Text eq
 
 
 def test_text_equality():
@@ -122,7 +116,7 @@ def test_text_inequality():
     assert text1 != text2
 
 
-# Copy Functionality Tests
+# Text copy
 
 
 def test_text_copy():
@@ -130,9 +124,6 @@ def test_text_copy():
     text_copy = text.copy()
     assert text == text_copy
     assert text is not text_copy
-    assert text.text == text_copy.text
-    assert text.vertical_presentation == text_copy.vertical_presentation
-    assert text.horizontal_presentation == text_copy.horizontal_presentation
 
 
 def test_text_copy_with_different_states():
@@ -151,7 +142,7 @@ def test_text_copy_immutability():
     assert text_copy.vertical_presentation == VerticalPresentation.Bottom
 
 
-# test vertical presentation
+# Text vertical presentation
 
 
 def test_vertical_presentation_init():
@@ -175,7 +166,7 @@ def test_vertical_presentation_equality():
     assert vertical_presentation1 == vertical_presentation2
 
 
-# Text move
+# Text move to
 
 
 def test_move_to_returns_self():
@@ -184,6 +175,9 @@ def test_move_to_returns_self():
     assert text is new_text
     assert text == new_text
     assert text.origin == (1, 1)
+
+
+# Text move by
 
 
 def test_move_by_returns_self():

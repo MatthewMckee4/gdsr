@@ -1,7 +1,7 @@
 use log::info;
 use pyo3::prelude::*;
 
-use crate::{point::Point, validation::input::py_any_to_points_vec};
+use crate::{point::Point, utils::transformations::py_any_to_points_vec};
 
 fn are_points_closed(points: &[Point]) -> bool {
     points.first() == points.last()

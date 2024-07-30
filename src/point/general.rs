@@ -4,10 +4,12 @@ use pyo3::exceptions::{PyIndexError, PyZeroDivisionError};
 
 use pyo3::prelude::*;
 
-use crate::utils::geometry::{distance_between_points, round_to_decimals};
+use crate::utils::{
+    geometry::{distance_between_points, round_to_decimals},
+    transformations::py_any_to_point,
+};
 
 use super::iterator::PointIterator;
-use super::utils::*;
 use super::Point;
 
 #[pymethods]

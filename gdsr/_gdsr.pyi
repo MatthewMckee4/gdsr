@@ -7,7 +7,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-from .typings import InputPointsLike, Layer, PointLike
+from .typings import InputPointsLike, Layer, PathLike, PointLike
 
 class PointIterator(Iterator[float]):
     def __next__(self) -> float: ...
@@ -167,97 +167,55 @@ class Grid:
     def __repr__(self) -> str:
         """Return a string representation of the grid."""
 
-class ElementReference:
-    element: Element
+Instance = Cell | Element
+
+class Reference:
+    instance: Instance
     grid: Grid
-    def __init__(self, element: Element, grid: Grid = Grid()) -> None:
-        """Initialize the ElementReference with an element and a grid.
+    def __init__(self, instance: Instance, grid: Grid = Grid()) -> None:
+        """Initialize the Reference with an instance and a grid.
 
-        :param Element element: The element to reference.
-        :param Grid grid: The grid to reference the element.
-        """
-    def copy(self) -> Self:
-        """Return a copy of the element reference."""
-    def move_to(self, point: PointLike) -> Self:
-        """Move the element reference to a point.
-
-        This method modifies the element reference in place and returns itself.
-
-        :param PointLike point: Point to move the element reference to.
-        """
-    def move_by(self, vector: PointLike) -> Self:
-        """Move the element reference by a vector.
-
-        This method modifies the element reference in place and returns itself.
-
-        :param PointLike vector: Vector to move the element reference by.
-        """
-    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
-        """Rotate the element reference by an angle around a centre point.
-
-        This method modifies the element reference in place and returns itself.
-
-        :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
-        """
-    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
-        """Scale the element reference by a factor around a centre point.
-
-        This method modifies the element reference in place and returns itself.
-
-        :param float factor: Scaling factor.
-        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
-        """
-    def __str__(self) -> str:
-        """Return a string representation of the element reference."""
-    def __repr__(self) -> str:
-        """Return a string representation of the element reference."""
-
-class CellReference:
-    cell: Cell
-    grid: Grid
-    def __init__(self, cell: Cell, grid: Grid = Grid()) -> None:
-        """Initialize the CellReference with a cell and a grid.
-
-        :param Cell cell: The cell to reference.
+        :param Instance instance: The instance to reference.
         :param Grid grid: The grid to reference the cell.
         """
     def copy(self) -> Self:
-        """Return a copy of the cell reference."""
+        """Return a copy of the reference."""
     def move_to(self, point: PointLike) -> Self:
-        """Move the cell reference to a point.
+        """Move the reference to a point.
 
-        This method modifies the cell reference in place and returns itself.
+        This method modifies the reference in place and returns itself.
 
-        :param PointLike point: Point to move the cell reference to.
+        :param PointLike point: Point to move the reference to.
         """
     def move_by(self, vector: PointLike) -> Self:
-        """Move the cell reference by a vector.
+        """Move the reference by a vector.
 
-        This method modifies the cell reference in place and returns itself.
+        This method modifies the reference in place and returns itself.
 
-        :param PointLike vector: Vector to move the cell reference by.
+        :param PointLike vector: Vector to move the reference by.
         """
     def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
-        """Rotate the cell reference by an angle around a centre point.
+        """Rotate the reference by an angle around a centre point.
 
-        This method modifies the cell reference in place and returns itself.
+        This method modifies the reference in place and returns itself.
 
         :param float angle: Counter-clockwise rotation angle in degrees.
         :param PointLike centre: Centre point of rotation, defaults to (0, 0).
         """
     def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
-        """Scale the cell reference by a factor around a centre point.
+        """Scale the reference by a factor around a centre point.
 
-        This method modifies the cell reference in place and returns itself.
+        This method modifies the reference in place and returns itself.
 
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
     def __str__(self) -> str:
-        """Return a string representation of the cell reference."""
+        """Return a string representation of the reference."""
     def __repr__(self) -> str:
-        """Return a string representation of the cell reference."""
+        """Return a string representation of the reference."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the reference is equal to another object."""
 
 class PathType(Enum):
     Square = 0
@@ -509,7 +467,7 @@ class Text:
     def __repr__(self) -> str:
         """Return a string representation of the text."""
 
-Element = CellReference | Path | Polygon | Text | ElementReference
+Element = Reference | Path | Polygon | Text
 
 class Cell:
     name: str
@@ -518,9 +476,7 @@ class Cell:
     @property
     def paths(self) -> list[Path]: ...
     @property
-    def cell_references(self) -> list[CellReference]: ...
-    @property
-    def element_references(self) -> list[ElementReference]: ...
+    def references(self) -> list[Reference]: ...
     @property
     def texts(self) -> list[Text]: ...
     def __init__(self, name: str) -> None:
@@ -545,13 +501,17 @@ class Cell:
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the cell."""
     def to_gds(
-        self, file_name: str, units: float = 1e-6, precision: float = 1e-10
-    ) -> None:
+        self,
+        file_name: PathLike | None = None,
+        units: float = 1e-6,
+        precision: float = 1e-10,
+    ) -> str:
         """Write the Cell to a GDS file.
 
-        :param str file_name: Output GDS file name.
+        :param PathLike file_name: Output GDS file name.
         :param float units: GDS file units in meters, defaults to 1e-6.
         :param float precision: GDS file precision, defaults to 1e-10.
+        :return: GDS file name
         """
 
 class Library:
@@ -569,24 +529,28 @@ class Library:
     def remove(self, *cells: Cell) -> None:
         """Remove cells from the library."""
     def to_gds(
-        self, file_name: str, units: float = 1e-6, precision: float = 1e-10
-    ) -> None:
+        self,
+        file_name: PathLike | None = None,
+        units: float = 1e-6,
+        precision: float = 1e-10,
+    ) -> str:
         """Write the Library to a GDS file.
 
-        :param str file_name: Output GDS file name.
+        :param PathLike file_name: Output GDS file name.
+        :param float units: GDS file units in meters, defaults to 1e-6.
+        :param float precision: GDS file precision, defaults to 1e-10.
+        :return: GDS file name
         """
     @staticmethod
-    def from_gds(file_name: str) -> Library:
+    def from_gds(file_name: PathLike) -> Library:
         """Read a Library from a GDS file.
 
-        :param str file_name: Input GDS file name.
+        :param PathLike file_name: Input GDS file name.
         :return: Library
         """
 
 __all__ = [
     "Cell",
-    "CellReference",
-    "ElementReference",
     "Grid",
     "HorizontalPresentation",
     "Library",
@@ -595,6 +559,7 @@ __all__ = [
     "Point",
     "PointIterator",
     "Polygon",
+    "Reference",
     "Text",
     "VerticalPresentation",
 ]

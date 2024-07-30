@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use pyo3::prelude::*;
 
-use super::Library;
 use crate::cell::Cell;
+
+use super::Library;
 
 #[pymethods]
 impl Library {

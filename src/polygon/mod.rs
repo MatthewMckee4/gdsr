@@ -23,10 +23,9 @@ impl std::fmt::Display for Polygon {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Polygon with {} point(s), starting at ({}, {}) on layer {}, data type {}",
+            "Polygon with {} point(s), starting at {:?} on layer {}, data type {}",
             self.points.len(),
-            self.points[0].x,
-            self.points[0].y,
+            self.points[0],
             self.layer,
             self.data_type
         )
@@ -35,14 +34,26 @@ impl std::fmt::Display for Polygon {
 
 impl std::fmt::Debug for Polygon {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Po({:?}, n={}, l={}, d={})",
-            self.points[0],
-            self.points.len(),
-            self.layer,
-            self.data_type
-        )
+        match self.points.as_slice() {
+            [] => {
+                write!(f, "Polygon([], {}, {})", self.layer, self.data_type)
+            }
+            [first_point] => write!(
+                f,
+                "Polygon([{:?}, ..., {:?}], {}, {})",
+                first_point, first_point, self.layer, self.data_type
+            ),
+            [first_point, _] => write!(
+                f,
+                "Polygon([{:?}, ..., {:?}], {}, {})",
+                first_point, first_point, self.layer, self.data_type
+            ),
+            [first_point, .., second_last_point, _] => write!(
+                f,
+                "Polygon([{:?}, ..., {:?}], {}, {})",
+                first_point, second_last_point, self.layer, self.data_type
+            ),
+        }
     }
 }
 

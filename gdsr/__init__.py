@@ -6,8 +6,6 @@ setup_logger()
 
 from ._gdsr import (
     Cell,
-    CellReference,
-    ElementReference,
     Grid,
     HorizontalPresentation,
     Library,
@@ -16,18 +14,22 @@ from ._gdsr import (
     Point,
     PointIterator,
     Polygon,
+    Reference,
     Text,
     VerticalPresentation,
 )
 from .typings import InputPointsLike, PointLike
 
+Element = Reference | Polygon | Path | Text
+Instance = Cell | Element
+
 __all__ = [
     "Cell",
-    "CellReference",
-    "ElementReference",
+    "Element",
     "Grid",
     "HorizontalPresentation",
     "InputPointsLike",
+    "Instance",
     "Library",
     "Path",
     "PathType",
@@ -35,6 +37,7 @@ __all__ = [
     "PointIterator",
     "PointLike",
     "Polygon",
+    "Reference",
     "Text",
     "VerticalPresentation",
 ]

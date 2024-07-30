@@ -14,17 +14,11 @@ pub use iterator::PointIterator;
 pub use utils::*;
 
 #[pyclass(frozen, get_all)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Default)]
 
 pub struct Point {
     pub x: f64,
     pub y: f64,
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Point { x: 0.0, y: 0.0 }
-    }
 }
 
 impl Hash for Point {

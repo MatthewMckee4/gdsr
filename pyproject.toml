@@ -24,6 +24,7 @@ module-name = "gdsr._gdsr"
 dev = [     
     "maturin",
     "pytest",
+    "pytest-lazy-fixture",
     "ruff",
     "mypy",
     "isort",

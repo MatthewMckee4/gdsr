@@ -13,8 +13,7 @@ impl Cell {
             name,
             polygons: Vec::new(),
             paths: Vec::new(),
-            cell_references: Vec::new(),
-            element_references: Vec::new(),
+            references: Vec::new(),
             texts: Vec::new(),
         }
     }
@@ -31,14 +30,11 @@ impl Cell {
                 Element::Path(path) => {
                     self.paths.push(path);
                 }
-                Element::CellReference(reference) => {
-                    self.cell_references.push(reference);
+                Element::Reference(reference) => {
+                    self.references.push(*reference);
                 }
                 Element::Text(text) => {
                     self.texts.push(text);
-                }
-                Element::ElementReference(element_reference) => {
-                    self.element_references.push(*element_reference);
                 }
             }
         }
@@ -57,14 +53,11 @@ impl Cell {
                 Element::Path(path) => {
                     self.paths.retain(|x| x != &path);
                 }
-                Element::CellReference(reference) => {
-                    self.cell_references.retain(|x| x != &reference);
+                Element::Reference(reference) => {
+                    self.references.retain(|x| x != &*reference);
                 }
                 Element::Text(text) => {
                     self.texts.retain(|x| x != &text);
-                }
-                Element::ElementReference(element_reference) => {
-                    self.element_references.retain(|x| x != &*element_reference);
                 }
             }
         }

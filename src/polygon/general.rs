@@ -1,9 +1,6 @@
 use std::ops::DerefMut;
 
-use plotly::layout::Margin;
-use plotly::plot::Plot;
-use plotly::Layout;
-use plotly::{common::Mode, Scatter};
+use plotly::{common::Mode, layout::Margin, plot::Plot, Layout, Scatter};
 
 use pyo3::{
     exceptions::PyValueError,
@@ -11,13 +8,17 @@ use pyo3::{
     types::{PySequence, PyTuple},
 };
 
-use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
-use crate::traits::{Movable, Rotatable, Scalable};
 use crate::{
-    point::{py_any_to_point, Point},
-    utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+    point::Point,
+    traits::{Movable, Rotatable, Scalable},
+    utils::{
+        geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+        transformations::py_any_to_point,
+    },
     validation::input::{check_data_type_valid, check_layer_valid},
 };
+
+use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
 
 #[pymethods]
 impl Polygon {

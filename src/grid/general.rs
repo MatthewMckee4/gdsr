@@ -3,8 +3,9 @@ use std::ops::DerefMut;
 use pyo3::prelude::*;
 
 use super::Grid;
+use crate::utils::transformations::py_any_to_point;
 use crate::{
-    point::{py_any_to_point, Point},
+    point::Point,
     traits::{Movable, Rotatable, Scalable},
 };
 

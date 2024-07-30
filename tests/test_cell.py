@@ -6,12 +6,10 @@ def test_cell_initialization():
     assert cell.name == "test_cell"
     assert isinstance(cell.polygons, list)
     assert cell.polygons == []
-    assert isinstance(cell.cell_references, list)
-    assert cell.cell_references == []
+    assert isinstance(cell.references, list)
+    assert cell.references == []
     assert isinstance(cell.paths, list)
     assert cell.paths == []
-    assert isinstance(cell.element_references, list)
-    assert cell.element_references == []
     assert isinstance(cell.texts, list)
     assert cell.texts == []
 
@@ -40,9 +38,12 @@ def test_remove_polygon():
 
 def test_str():
     cell = Cell("test_cell")
-    assert str(cell) == "Cell: test_cell"
+    assert (
+        str(cell)
+        == "Cell: test_cell with 0 polygons, 0 paths, 0 references, and 0 texts"
+    )
 
 
 def test_repr():
     cell = Cell("test_cell")
-    assert repr(cell) == "test_cell"
+    assert repr(cell) == "Cell(test_cell)"

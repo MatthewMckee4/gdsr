@@ -5,9 +5,17 @@ use chrono::{Datelike, Local, Timelike};
 
 use pyo3::prelude::*;
 
-use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
-use crate::traits::ToGds;
-use crate::utils::io::{write_gds, write_string_with_record_to_file, write_u16_array_to_file};
+use crate::element::Element;
+use crate::utils::io::create_temp_file;
+use crate::{
+    config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    reference::ReferenceInstance,
+    traits::ToGds,
+    utils::{
+        io::{write_gds, write_string_with_record_to_file, write_u16_array_to_file},
+        transformations::py_any_path_to_string_or_temp_name,
+    },
+};
 
 use super::*;
 
@@ -57,16 +65,9 @@ impl Cell {
             file = text._to_gds(file, units / precision)?;
         }
 
-        for cell_reference in &self.cell_references {
-            if !written_cell_names.contains(&cell_reference.cell.name) {
-                written_cell_names.insert(cell_reference.cell.name.clone());
-                cells_to_write.push(cell_reference.cell.clone());
-            }
-            file = cell_reference._to_gds(file, units / precision)?;
-        }
-
-        for element_reference in &self.element_references {
-            file = element_reference._to_gds(file, units / precision)?;
+        for reference in &self.references {
+            get_child_cells(reference, &mut cells_to_write, written_cell_names);
+            file = reference._to_gds(file, units / precision)?;
         }
 
         let mut cell_tail = [
@@ -84,12 +85,38 @@ impl Cell {
     }
 }
 
+fn get_child_cells(
+    reference: &Reference,
+    child_cells: &mut Vec<Cell>,
+    written_cell_names: &mut HashSet<String>,
+) {
+    match &reference.instance {
+        ReferenceInstance::Cell(child_cell) => {
+            if !written_cell_names.contains(&child_cell.name) {
+                written_cell_names.insert(child_cell.name.clone());
+                child_cells.push(child_cell.clone());
+            }
+        }
+        ReferenceInstance::Element(element) => match element {
+            Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {}
+            Element::Reference(reference) => {
+                get_child_cells(reference, child_cells, written_cell_names)
+            }
+        },
+    }
+}
+
 #[pymethods]
 impl Cell {
-    #[pyo3(signature=(file_name, units=1e-6, precision=1e-10))]
-    pub fn to_gds(&self, file_name: &str, units: f64, precision: f64) -> PyResult<()> {
+    #[pyo3(signature=(file_name=None, units=1e-6, precision=1e-10))]
+    pub fn to_gds(
+        &self,
+        #[pyo3(from_py_with = "py_any_path_to_string_or_temp_name")] file_name: Option<String>,
+        units: f64,
+        precision: f64,
+    ) -> PyResult<String> {
         write_gds(
-            file_name,
+            file_name.unwrap_or(create_temp_file()?),
             "library",
             units,
             precision,

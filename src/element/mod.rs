@@ -2,22 +2,20 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::fs::File;
 
-use crate::cell_reference::CellReference;
-use crate::element_reference::ElementReference;
 use crate::path::Path;
 use crate::point::Point;
 use crate::polygon::Polygon;
+use crate::reference::Reference;
 use crate::text::Text;
 use crate::traits::{Movable, Rotatable, Scalable, ToGds};
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 #[allow(clippy::enum_variant_names)]
 pub enum Element {
     Path(Path),
     Polygon(Polygon),
-    CellReference(CellReference),
+    Reference(Box<Reference>),
     Text(Text),
-    ElementReference(Box<ElementReference>),
 }
 
 impl FromPyObject<'_> for Element {
@@ -26,40 +24,35 @@ impl FromPyObject<'_> for Element {
             Ok(Element::Path(element))
         } else if let Ok(element) = ob.extract::<Polygon>() {
             Ok(Element::Polygon(element))
-        } else if let Ok(element) = ob.extract::<CellReference>() {
-            Ok(Element::CellReference(element))
+        } else if let Ok(element) = ob.extract::<Reference>() {
+            Ok(Element::Reference(Box::new(element)))
         } else if let Ok(element) = ob.extract::<Text>() {
             Ok(Element::Text(element))
-        } else if let Ok(element) = ob.extract::<ElementReference>() {
-            Ok(Element::ElementReference(Box::new(element)))
         } else {
             Err(PyTypeError::new_err(
-                "Element must be a Path, Polygon, CellReference, Text, or ElementReference",
+                "Element must be a Path, Polygon, Reference, Text, or ElementReference",
             ))
         }
     }
 }
 
 impl IntoPy<PyObject> for Element {
-    fn into_py(self, py: Python<'_>) -> PyObject {
+    fn into_py(self, py: Python) -> PyObject {
         match self {
-            Element::Path(element) => element.into_py(py),
-            Element::Polygon(element) => element.into_py(py),
-            Element::CellReference(element) => element.into_py(py),
-            Element::Text(element) => element.into_py(py),
-            Element::ElementReference(element) => element.into_py(py),
+            Element::Path(path) => path.into_py(py),
+            Element::Polygon(polygon) => polygon.into_py(py),
+            Element::Reference(reference) => reference.into_py(py),
+            Element::Text(text) => text.into_py(py),
         }
     }
 }
-
 impl ToGds for Element {
     fn _to_gds(&self, file: File, scale: f64) -> PyResult<File> {
         match self {
             Element::Path(element) => element._to_gds(file, scale),
             Element::Polygon(element) => element._to_gds(file, scale),
-            Element::CellReference(element) => element._to_gds(file, scale),
+            Element::Reference(element) => element._to_gds(file, scale),
             Element::Text(element) => element._to_gds(file, scale),
-            Element::ElementReference(element) => element._to_gds(file, scale),
         }
     }
 }
@@ -73,13 +66,10 @@ impl Movable for Element {
             Element::Polygon(element) => {
                 element.move_to(point);
             }
-            Element::CellReference(element) => {
+            Element::Reference(element) => {
                 element.move_to(point);
             }
             Element::Text(element) => {
-                element.move_to(point);
-            }
-            Element::ElementReference(element) => {
                 element.move_to(point);
             }
         }
@@ -94,13 +84,10 @@ impl Movable for Element {
             Element::Polygon(element) => {
                 element.move_by(vector);
             }
-            Element::CellReference(element) => {
+            Element::Reference(element) => {
                 element.move_by(vector);
             }
             Element::Text(element) => {
-                element.move_by(vector);
-            }
-            Element::ElementReference(element) => {
                 element.move_by(vector);
             }
         }
@@ -113,11 +100,8 @@ impl Element {
         match self {
             Element::Path(element) => Element::Path(element.copy()),
             Element::Polygon(element) => Element::Polygon(element.copy()),
-            Element::CellReference(element) => Element::CellReference(element.copy()),
+            Element::Reference(element) => Element::Reference(Box::new(element.copy())),
             Element::Text(element) => Element::Text(element.clone()),
-            Element::ElementReference(element) => {
-                Element::ElementReference(Box::new(element.copy()))
-            }
         }
     }
 }
@@ -131,13 +115,10 @@ impl Rotatable for Element {
             Element::Polygon(element) => {
                 element.rotate(angle, centre);
             }
-            Element::CellReference(element) => {
+            Element::Reference(element) => {
                 element.rotate(angle, centre);
             }
             Element::Text(element) => {
-                element.rotate(angle, centre);
-            }
-            Element::ElementReference(element) => {
                 element.rotate(angle, centre);
             }
         }
@@ -154,13 +135,10 @@ impl Scalable for Element {
             Element::Polygon(element) => {
                 element.scale(factor, centre);
             }
-            Element::CellReference(element) => {
+            Element::Reference(element) => {
                 element.scale(factor, centre);
             }
             Element::Text(element) => {
-                element.scale(factor, centre);
-            }
-            Element::ElementReference(element) => {
                 element.scale(factor, centre);
             }
         }
@@ -173,9 +151,19 @@ impl std::fmt::Display for Element {
         match self {
             Element::Path(element) => write!(f, "{}", element),
             Element::Polygon(element) => write!(f, "{}", element),
-            Element::CellReference(element) => write!(f, "{}", element),
+            Element::Reference(element) => write!(f, "{}", element),
             Element::Text(element) => write!(f, "{}", element),
-            Element::ElementReference(element) => write!(f, "{}", element),
+        }
+    }
+}
+
+impl std::fmt::Debug for Element {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Element::Path(element) => write!(f, "{:?}", element),
+            Element::Polygon(element) => write!(f, "{:?}", element),
+            Element::Reference(element) => write!(f, "{:?}", element),
+            Element::Text(element) => write!(f, "{:?}", element),
         }
     }
 }

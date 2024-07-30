@@ -3,20 +3,20 @@ use std::ops::DerefMut;
 use pyo3::prelude::*;
 
 use crate::{
-    element::Element,
     grid::Grid,
-    point::{py_any_to_point, Point},
+    point::Point,
     traits::{Movable, Rotatable, Scalable},
+    utils::transformations::py_any_to_point,
 };
 
-use super::ElementReference;
+use super::{Reference, ReferenceInstance};
 
 #[pymethods]
-impl ElementReference {
+impl Reference {
     #[new]
-    #[pyo3(signature=(element, grid=Grid::default()))]
-    pub fn new(element: Element, grid: Grid) -> Self {
-        ElementReference { element, grid }
+    #[pyo3(signature=(instance, grid=Grid::default()))]
+    pub fn new(instance: ReferenceInstance, grid: Grid) -> Self {
+        Reference { instance, grid }
     }
 
     pub fn copy(&self) -> Self {

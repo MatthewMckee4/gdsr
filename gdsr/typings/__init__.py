@@ -1,5 +1,6 @@
 """Type hints for the gdsr package."""
 
+from pathlib import Path
 from typing import Iterable, Literal, Protocol, runtime_checkable
 
 
@@ -107,3 +108,4 @@ Examples:
 """
 
 Layer = int
+PathLike = Path | str

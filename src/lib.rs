@@ -3,27 +3,25 @@ use pyo3::prelude::*;
 mod utils;
 
 mod cell;
-mod cell_reference;
 mod config;
 mod element;
-mod element_reference;
 mod grid;
 mod library;
 mod path;
 mod point;
 mod polygon;
+mod reference;
 mod text;
 mod traits;
 mod validation;
 
 use cell::Cell;
-use cell_reference::CellReference;
-use element_reference::ElementReference;
 use grid::Grid;
 use library::Library;
 use path::{path_type::PathType, Path};
 use point::{Point, PointIterator};
 use polygon::Polygon;
+use reference::Reference;
 use text::{presentation::HorizontalPresentation, presentation::VerticalPresentation, Text};
 
 #[pymodule]
@@ -33,13 +31,12 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Cell>()?;
     m.add_class::<Polygon>()?;
     m.add_class::<Path>()?;
-    m.add_class::<CellReference>()?;
+    m.add_class::<Reference>()?;
     m.add_class::<Text>()?;
     m.add_class::<Point>()?;
     m.add_class::<PointIterator>()?;
     m.add_class::<Library>()?;
     m.add_class::<Grid>()?;
-    m.add_class::<ElementReference>()?;
     m.add_class::<VerticalPresentation>()?;
     m.add_class::<HorizontalPresentation>()?;
     m.add_class::<PathType>()?;
