@@ -2,11 +2,7 @@ use std::ops::DerefMut;
 
 use plotly::{common::Mode, layout::Margin, plot::Plot, Layout, Scatter};
 
-use pyo3::{
-    exceptions::PyValueError,
-    prelude::*,
-    types::{PySequence, PyTuple},
-};
+use pyo3::prelude::*;
 
 use crate::{
     point::Point,
@@ -77,23 +73,8 @@ impl Polygon {
         perimeter(&self.points)
     }
 
-    fn contains(&self, obj: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            if let Ok(point) = obj.extract::<Point>() {
-                Ok(is_point_inside(&point, &self.points).into_py(py))
-            } else if let Ok(seq) = obj.downcast::<PySequence>() {
-                let mut results = Vec::new();
-                for item in seq.iter()? {
-                    let point: Point = item?.extract()?;
-                    results.push(is_point_inside(&point, &self.points));
-                }
-                Ok(PyTuple::new_bound(py, results).into_py(py))
-            } else {
-                Err(PyValueError::new_err(
-                    "Invalid input: expected a Point or a sequence of Points",
-                ))
-            }
-        })
+    fn contains(&self, #[pyo3(from_py_with = "py_any_to_point")] point: Point) -> bool {
+        is_point_inside(&point, &self.points)
     }
 
     #[pyo3(signature = (*points))]
@@ -112,23 +93,8 @@ impl Polygon {
         points.iter().any(|p| is_point_inside(p, &self.points))
     }
 
-    fn on_edge(&self, obj: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            if let Ok(point) = obj.extract::<Point>() {
-                Ok(is_point_on_edge(&point, &self.points).into_py(py))
-            } else if let Ok(seq) = obj.downcast::<PySequence>() {
-                let mut results = Vec::new();
-                for item in seq.iter()? {
-                    let point: Point = item?.extract()?;
-                    results.push(is_point_on_edge(&point, &self.points));
-                }
-                Ok(PyTuple::new_bound(py, results).into_py(py))
-            } else {
-                Err(PyValueError::new_err(
-                    "Invalid input: expected a Point or a sequence of Points",
-                ))
-            }
-        })
+    fn on_edge(&self, #[pyo3(from_py_with = "py_any_to_point")] point: Point) -> bool {
+        is_point_on_edge(&point, &self.points)
     }
 
     #[pyo3(signature = (*points))]

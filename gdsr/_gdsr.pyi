@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Iterator, Literal, Sequence, overload
+from typing import Iterator, Literal
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -316,29 +316,14 @@ class Polygon:
     @property
     def perimeter(self) -> float:
         """Return the perimeter of the polygon."""
-    @overload
     def contains(self, point: PointLike) -> bool:
         """Return True if the polygon contains the point."""
-    @overload
-    def contains(self, points: Sequence[PointLike]) -> tuple[bool, ...]:
-        """Return a tuple of booleans.
-
-        Each boolean indicates if the polygon contains the corresponding point.
-        """
     def contains_all(self, *points: PointLike) -> bool:
         """Return True if the polygon contains all of the points."""
     def contains_any(self, *points: PointLike) -> bool:
         """Return True if the polygon contains any of the points."""
-    @overload
     def on_edge(self, point: PointLike) -> bool:
         """Return True if the point is on the edge of the polygon."""
-
-    @overload
-    def on_edge(self, points: Sequence[PointLike]) -> tuple[bool, ...]:
-        """Return a tuple of booleans.
-
-        Each boolean indicates if the corresponding point is on the edge of the polygon.
-        """
     def on_edge_all(self, *points: PointLike) -> bool:
         """Return True if all of the points are on the edge of the polygon."""
     def on_edge_any(self, *points: PointLike) -> bool:

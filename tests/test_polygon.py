@@ -375,21 +375,6 @@ def test_contains_single_point_outside(square_polygon: Polygon):
     assert not square_polygon.contains(Point(3, 3))
 
 
-def test_contains_multiple_points_all_inside(square_polygon: Polygon):
-    points = [Point(1, 1), Point(1, 0.5)]
-    assert square_polygon.contains(points) == (True, True)
-
-
-def test_contains_multiple_points_one_outside(square_polygon: Polygon):
-    points = [Point(1, 1), Point(3, 1)]
-    assert square_polygon.contains(points) == (True, False)
-
-
-def test_contains_multiple_points_all_outside(square_polygon: Polygon):
-    points = [Point(3, 3), Point(4, 4)]
-    assert square_polygon.contains(points) == (False, False)
-
-
 def test_contains_all_points_inside(square_polygon: Polygon):
     points = [Point(1, 1), Point(1, 0.5)]
     assert square_polygon.contains_all(*points)
@@ -426,11 +411,6 @@ def test_contains_on_edge(square_polygon: Polygon):
     assert square_polygon.contains(Point(2, 0))
 
 
-def test_contains_on_edge_multiple_points(square_polygon: Polygon):
-    results = square_polygon.contains([(0, 0), (0, 2), (2, 2), (2, 0)])
-    assert results == (True, True, True, True)
-
-
 # On edge
 
 
@@ -451,12 +431,6 @@ def test_on_edge_single_point_outside():
     polygon = Polygon([Point(0, 0), Point(0, 5), Point(5, 5), Point(5, 0)])
     assert not polygon.on_edge(Point(6, 6))
     assert not polygon.on_edge(Point(-1, -1))
-
-
-def test_on_edge_multiple_points_mixed():
-    polygon = Polygon([Point(0, 0), Point(0, 5), Point(5, 5), Point(5, 0)])
-    results = polygon.on_edge([Point(0, 0), Point(2, 2), Point(5, 5), Point(6, 6)])
-    assert results == (True, False, True, False)
 
 
 def test_on_edge_all_true():
@@ -482,7 +456,6 @@ def test_on_edge_any_false():
 
 def test_on_edge_single_point_with_empty_list():
     polygon = Polygon([Point(0, 0), Point(1, 1)])
-    assert polygon.on_edge([]) == ()
     assert polygon.on_edge(Point(0, 0))
     assert polygon.on_edge(Point(1, 1))
     assert polygon.on_edge(Point(0.5, 0.5))
