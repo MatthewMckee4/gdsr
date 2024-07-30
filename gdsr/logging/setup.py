@@ -6,11 +6,11 @@ from typing import ClassVar
 
 class ColouredFormatter(logging.Formatter):  # noqa: D101
     COLOURS: ClassVar[dict[str, str]] = {
-        "DEBUG": "\033[34m",  # Blue
-        "INFO": "\033[32m",  # Green
-        "WARNING": "\033[33m",  # Yellow
-        "ERROR": "\033[31m",  # Red
-        "CRITICAL": "\033[35m",  # Magenta
+        "DEBUG": "\033[94m",  # Blue
+        "INFO": "\033[92m",  # Green
+        "WARNING": "\033[93m",  # Yellow
+        "ERROR": "\033[91m",  # Red
+        "CRITICAL": "\033[41m",  # White
     }
     RESET = "\033[0m"
 
@@ -22,7 +22,7 @@ class ColouredFormatter(logging.Formatter):  # noqa: D101
 
 def setup_logger() -> None:  # noqa: D103
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     handler = logging.StreamHandler()
     handler.setFormatter(ColouredFormatter("%(levelname)s: %(message)s"))

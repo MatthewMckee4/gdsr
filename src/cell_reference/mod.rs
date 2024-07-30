@@ -11,7 +11,7 @@ mod general;
 mod io;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct CellReference {
     pub cell: Cell,
     pub grid: Grid,
@@ -19,7 +19,11 @@ pub struct CellReference {
 
 impl std::fmt::Display for CellReference {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Cell Reference of {:?}", self.cell)
+        write!(
+            f,
+            "Cell Reference of {:?} with grid {}",
+            self.cell, self.grid
+        )
     }
 }
 

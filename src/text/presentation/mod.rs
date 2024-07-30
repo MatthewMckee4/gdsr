@@ -1,9 +1,10 @@
 use pyo3::{exceptions::PyValueError, prelude::*};
 
 #[pyclass(eq, eq_int)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum VerticalPresentation {
     Top = 0,
+    #[default]
     Middle = 1,
     Bottom = 2,
 }
@@ -23,7 +24,7 @@ impl std::fmt::Debug for VerticalPresentation {
 #[pymethods]
 impl VerticalPresentation {
     #[new]
-    fn new(value: i32) -> PyResult<Self> {
+    pub fn new(value: i32) -> PyResult<Self> {
         match value {
             0 => Ok(VerticalPresentation::Top),
             1 => Ok(VerticalPresentation::Middle),
@@ -62,9 +63,10 @@ impl VerticalPresentation {
 }
 
 #[pyclass(eq, eq_int)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum HorizontalPresentation {
     Left = 0,
+    #[default]
     Centre = 1,
     Right = 2,
 }
@@ -84,7 +86,7 @@ impl std::fmt::Debug for HorizontalPresentation {
 #[pymethods]
 impl HorizontalPresentation {
     #[new]
-    fn new(value: i32) -> PyResult<Self> {
+    pub fn new(value: i32) -> PyResult<Self> {
         match value {
             0 => Ok(HorizontalPresentation::Left),
             1 => Ok(HorizontalPresentation::Centre),

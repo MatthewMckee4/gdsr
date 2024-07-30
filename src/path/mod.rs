@@ -11,29 +11,42 @@ mod io;
 pub mod path_type;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Path {
     #[pyo3(get)]
-    points: Vec<Point>,
+    pub points: Vec<Point>,
     #[pyo3(get)]
-    layer: i32,
+    pub layer: i32,
     #[pyo3(get)]
-    data_type: i32,
+    pub data_type: i32,
     #[pyo3(get, set)]
-    path_type: Option<PathType>,
+    pub path_type: Option<PathType>,
     #[pyo3(get, set)]
-    width: Option<f64>,
+    pub width: Option<f64>,
 }
 
 impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Path")
+        write!(
+            f,
+            "Path with {} points on layer {} and data type {}. PathType: {:?} with width {:?}",
+            self.points.len(),
+            self.layer,
+            self.data_type,
+            self.path_type.unwrap_or_default(),
+            self.width.unwrap_or_default()
+        )
     }
 }
 
 impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Pa")
+        write!(
+            f,
+            "Path([{:?}, ..., {:?}])",
+            self.points.first(),
+            self.points.last()
+        )
     }
 }
 

@@ -1,17 +1,26 @@
 use std::collections::{HashMap, HashSet};
-
+use std::convert::TryFrom;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, BufReader, Read, Write};
 
 use bytemuck::cast_slice;
+use byteorder::{BigEndian, ByteOrder};
 use chrono::{Datelike, Local, Timelike};
+
+use log::{debug, info};
 use pyo3::{exceptions::PyIOError, prelude::*};
 
-use crate::{
-    cell::Cell,
-    config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
-    point::Point,
-};
+use crate::cell::Cell;
+use crate::cell_reference::CellReference;
+use crate::config::gds_file_types::GDSRecordData;
+use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
+use crate::library::Library;
+use crate::path::path_type::PathType;
+use crate::path::Path;
+use crate::point::{get_points_from_i32_vec, Point};
+use crate::polygon::Polygon;
+use crate::text::utils::get_presentations_from_value;
+use crate::text::Text;
 
 use super::gds_format::{eight_byte_real, u16_array_to_big_endian};
 
@@ -54,8 +63,8 @@ pub fn write_gds_head_to_file(
     ];
     file = write_u16_array_to_file(file, &mut head_units)?;
 
-    file = write_eight_byte_real_to_file(file, precision / units)?;
-    file = write_eight_byte_real_to_file(file, precision)?;
+    file = write_float_to_eight_byte_real_to_file(file, precision / units)?;
+    file = write_float_to_eight_byte_real_to_file(file, precision)?;
 
     Ok(file)
 }
@@ -77,7 +86,7 @@ pub fn write_u16_array_to_file(mut file: File, array: &mut [u16]) -> PyResult<Fi
     Ok(file)
 }
 
-pub fn write_eight_byte_real_to_file(mut file: File, value: f64) -> PyResult<File> {
+pub fn write_float_to_eight_byte_real_to_file(mut file: File, value: f64) -> PyResult<File> {
     let value = eight_byte_real(value);
     file.write_all(&value)?;
 
@@ -204,7 +213,7 @@ pub fn write_transformation_to_file(
                 combine_record_and_data_type(GDSRecord::Mag, GDSDataType::EightByteReal),
             ];
             file = write_u16_array_to_file(file, &mut buffer_mag)?;
-            file = write_eight_byte_real_to_file(file, magnification)?;
+            file = write_float_to_eight_byte_real_to_file(file, magnification)?;
         }
 
         if angle != 0.0 {
@@ -213,9 +222,553 @@ pub fn write_transformation_to_file(
                 combine_record_and_data_type(GDSRecord::Angle, GDSDataType::EightByteReal),
             ];
             file = write_u16_array_to_file(file, &mut buffer_rot)?;
-            file = write_eight_byte_real_to_file(file, angle)?;
+            file = write_float_to_eight_byte_real_to_file(file, angle)?;
         }
     }
 
     Ok(file)
+}
+
+pub fn from_gds(file_name: &str) -> PyResult<Library> {
+    let mut library = Library::new("Library".to_string());
+
+    let file = File::open(file_name)?;
+    let reader = RecordReader::new(BufReader::new(file));
+
+    let mut cell: Option<Cell> = None;
+    let mut path: Option<Path> = None;
+    let mut polygon: Option<Polygon> = None;
+    let mut text: Option<Text> = None;
+    let mut cell_reference: Option<CellReference> = None;
+
+    let mut scale = 1.0;
+    let mut rounding_digits = 0;
+
+    for record in reader {
+        match record {
+            Ok((record_type, data)) => match record_type {
+                GDSRecord::Header | GDSRecord::BgnLib => {}
+                GDSRecord::LibName => {
+                    debug!("LibName {:?}", data);
+                    if let GDSRecordData::Str(name) = data {
+                        library.name = name;
+                    };
+                    continue;
+                }
+                GDSRecord::Units => {
+                    debug!("Units {:?}", data);
+                    if let GDSRecordData::F64(units) = data {
+                        scale = units[0];
+                        rounding_digits = -(units[1] / units[0]).log10() as u32 - 1;
+                    };
+                    continue;
+                }
+                GDSRecord::EndLib => {
+                    update_cell_references(&mut library);
+                    continue;
+                }
+                GDSRecord::BgnStr => {
+                    debug!("BgnStr {:?}", data);
+                    cell = Some(Cell::default());
+                    continue;
+                }
+                GDSRecord::StrName => {
+                    debug!("StrName {:?}", data);
+                    if let GDSRecordData::Str(cell_name) = data {
+                        if let Some(cell) = &mut cell {
+                            cell.name = cell_name;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::EndStr => {
+                    debug!("EndStr {:?}", data);
+                    if let Some(cell) = &mut cell {
+                        library.cells.insert(cell.name.clone(), cell.clone());
+                    }
+                    cell = None;
+                    continue;
+                }
+                GDSRecord::Boundary | GDSRecord::Box => {
+                    debug!("Boundary {:?}", data);
+                    polygon = Some(Polygon::default());
+                    continue;
+                }
+                GDSRecord::Path | GDSRecord::RaithMbmsPath => {
+                    debug!("Path {:?}", data);
+                    path = Some(Path::default());
+                    continue;
+                }
+                GDSRecord::ARef | GDSRecord::SRef => {
+                    debug!("ARef {:?}", data);
+                    cell_reference = Some(CellReference::default());
+                    continue;
+                }
+                GDSRecord::Text => {
+                    debug!("Text {:?}", data);
+                    text = Some(Text::default());
+                    continue;
+                }
+                GDSRecord::Layer => {
+                    debug!("Layer {:?}", data);
+                    if let GDSRecordData::I16(layer) = data {
+                        if let Some(polygon) = &mut polygon {
+                            polygon.layer = layer[0] as i32;
+                        } else if let Some(path) = &mut path {
+                            path.layer = layer[0] as i32;
+                        } else if let Some(text) = &mut text {
+                            text.layer = layer[0] as i32;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::DataType | GDSRecord::BoxType => {
+                    debug!("DataType {:?}", data);
+                    if let GDSRecordData::I16(data_type) = data {
+                        if let Some(polygon) = &mut polygon {
+                            polygon.data_type = data_type[0] as i32;
+                        } else if let Some(path) = &mut path {
+                            path.data_type = data_type[0] as i32;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::Width => {
+                    debug!("Width {:?}", data);
+                    if let GDSRecordData::I32(width) = data {
+                        if let Some(path) = &mut path {
+                            path.width = Some(width[0] as f64 * scale);
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::XY => {
+                    debug!("XY {:?}", data);
+                    if let GDSRecordData::I32(xy) = data {
+                        let points = get_points_from_i32_vec(xy);
+                        let points = points
+                            .iter()
+                            .map(|p| p.scale(scale, Point::default()))
+                            .collect();
+                        if let Some(polygon) = &mut polygon {
+                            polygon.points = points;
+                        } else if let Some(path) = &mut path {
+                            path.points = points;
+                        } else if let Some(cell_reference) = &mut cell_reference {
+                            if points.len() == 1 {
+                                cell_reference.grid.origin = points[0];
+                            } else if points.len() == 3 {
+                                let points: Vec<Point> = points
+                                    .iter()
+                                    .map(|&p| p.rotate(-cell_reference.grid.angle, points[0]))
+                                    .collect();
+                                cell_reference.grid.origin = points[0];
+                                cell_reference.grid.spacing_x = if cell_reference.grid.columns > 0 {
+                                    ((points[1] - points[0]) / cell_reference.grid.columns as f64)
+                                        .round(rounding_digits)
+                                } else {
+                                    Point::default()
+                                };
+                                cell_reference.grid.spacing_y = if cell_reference.grid.rows > 0 {
+                                    ((points[2] - points[0]) / cell_reference.grid.rows as f64)
+                                        .round(rounding_digits)
+                                } else {
+                                    Point::default()
+                                };
+                            }
+                        } else if let Some(text) = &mut text {
+                            text.origin = points[0];
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::EndEl => {
+                    debug!("EndEl {:?}", data);
+                    if let Some(cell) = &mut cell {
+                        if let Some(polygon) = &mut polygon {
+                            cell.polygons.push(polygon.clone());
+                        } else if let Some(path) = &mut path {
+                            cell.paths.push(path.clone());
+                        } else if let Some(text) = &mut text {
+                            cell.texts.push(text.clone());
+                        } else if let Some(cell_reference) = &mut cell_reference {
+                            cell.cell_references.push(cell_reference.clone());
+                        }
+                        polygon = None;
+                        path = None;
+                        text = None;
+                        cell_reference = None;
+                    };
+                    continue;
+                }
+                GDSRecord::SName => {
+                    debug!("SName {:?}", data);
+                    if let GDSRecordData::Str(cell_name) = data {
+                        if let Some(cell_reference) = &mut cell_reference {
+                            cell_reference.cell.name = cell_name;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::ColRow => {
+                    debug!("ColRow {:?}", data);
+                    if let GDSRecordData::I16(col_row) = data {
+                        if let Some(cell_reference) = &mut cell_reference {
+                            cell_reference.grid.columns = col_row[0] as usize;
+                            cell_reference.grid.rows = col_row[1] as usize;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::TextNode => {
+                    debug!("TextNode {}", data);
+                    continue;
+                }
+                GDSRecord::Node => {
+                    debug!("Node {}", data);
+                    continue;
+                }
+                GDSRecord::TextType => {
+                    debug!("TextType {:?}", data);
+                    continue;
+                }
+                GDSRecord::Presentation => {
+                    debug!("Presentation {:?}", data);
+                    if let GDSRecordData::U16(flags) = data {
+                        if let Some(text) = &mut text {
+                            (text.vertical_presentation, text.horizontal_presentation) =
+                                get_presentations_from_value(flags[0])?;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::Spacing => {
+                    debug!("Spacing {}", data);
+                    continue;
+                }
+                GDSRecord::String => {
+                    debug!("String {:?}", data);
+                    if let GDSRecordData::Str(string) = data {
+                        if let Some(text) = &mut text {
+                            text.text = string;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::STrans => {
+                    debug!("STrans {:?}", data);
+                    if let GDSRecordData::U16(flags) = data {
+                        let x_reflection = flags[0] & 0x8000 != 0;
+                        if let Some(text) = &mut text {
+                            text.x_reflection = x_reflection;
+                        }
+                        if let Some(cell_reference) = &mut cell_reference {
+                            cell_reference.grid.x_reflection = x_reflection;
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::Mag => {
+                    debug!("Mag {:?}", data);
+                    if let GDSRecordData::F64(magnification) = data {
+                        if let Some(text) = &mut text {
+                            text.magnification = magnification[0];
+                        } else if let Some(cell_reference) = &mut cell_reference {
+                            cell_reference.grid.magnification = magnification[0];
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::Angle => {
+                    debug!("Angle {:?}", data);
+                    if let GDSRecordData::F64(angle) = data {
+                        if let Some(text) = &mut text {
+                            text.angle = angle[0];
+                        } else if let Some(cell_reference) = &mut cell_reference {
+                            cell_reference.grid.angle = angle[0];
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::UInteger => {
+                    debug!("UInteger {}", data);
+                    continue;
+                }
+                GDSRecord::UString => {
+                    debug!("UString {}", data);
+                    continue;
+                }
+                GDSRecord::RefLibs => {
+                    debug!("RefLibs {}", data);
+                    continue;
+                }
+                GDSRecord::Fonts => {
+                    debug!("Fonts {}", data);
+                    continue;
+                }
+                GDSRecord::PathType => {
+                    debug!("PathType {:?}", data);
+                    if let GDSRecordData::I16(path_type) = data {
+                        if let Some(path) = &mut path {
+                            path.path_type = Some(PathType::new(path_type[0] as i32)?);
+                        }
+                    };
+                    continue;
+                }
+                GDSRecord::Generations => {
+                    debug!("Generations {}", data);
+                    continue;
+                }
+                GDSRecord::AttrTable => {
+                    debug!("AttrTable {}", data);
+                    continue;
+                }
+                GDSRecord::StyTable => {
+                    debug!("StyTable {}", data);
+                    continue;
+                }
+                GDSRecord::StrType => {
+                    debug!("StrType {}", data);
+                    continue;
+                }
+                GDSRecord::ElFlags => {
+                    debug!("ElFlags {}", data);
+                    continue;
+                }
+                GDSRecord::ElKey => {
+                    debug!("ElKey {}", data);
+                    continue;
+                }
+                GDSRecord::LinkType => {
+                    debug!("LinkType {}", data);
+                    continue;
+                }
+                GDSRecord::LinkKeys => {
+                    debug!("LinkKeys {}", data);
+                    continue;
+                }
+                GDSRecord::NodeType => {
+                    debug!("NodeType {}", data);
+                    continue;
+                }
+                GDSRecord::PropAttr => {
+                    debug!("PropAttr {}", data);
+                    continue;
+                }
+                GDSRecord::PropValue => {
+                    debug!("PropValue {}", data);
+                    continue;
+                }
+                GDSRecord::Plex => {
+                    debug!("Plex {}", data);
+                    continue;
+                }
+                GDSRecord::BgnExtn => {
+                    debug!("BgnExtn {}", data);
+                    continue;
+                }
+                GDSRecord::EndExtn => {
+                    debug!("EndExtn {}", data);
+                    continue;
+                }
+                GDSRecord::TapeNum => {
+                    debug!("TapeNum {}", data);
+                    continue;
+                }
+                GDSRecord::TapeCode => {
+                    debug!("TapeCode {}", data);
+                    continue;
+                }
+                GDSRecord::StrClass => {
+                    debug!("StrClass {}", data);
+                    continue;
+                }
+                GDSRecord::Reserved => {
+                    debug!("Reserved {}", data);
+                    continue;
+                }
+                GDSRecord::Format => {
+                    debug!("Format {}", data);
+                    continue;
+                }
+                GDSRecord::Mask => {
+                    debug!("Mask {}", data);
+                    continue;
+                }
+                GDSRecord::EndMasks => {
+                    debug!("EndMasks {}", data);
+                    continue;
+                }
+                GDSRecord::LibDirSize => {
+                    debug!("LibDirSize {}", data);
+                    continue;
+                }
+                GDSRecord::SrfName => {
+                    debug!("SrfName {}", data);
+                    continue;
+                }
+                GDSRecord::LibSecur => {
+                    debug!("LibSecur {}", data);
+                    continue;
+                }
+                GDSRecord::RaithPxxData => {
+                    debug!("RaithPxxData {}", data);
+                    continue;
+                }
+            },
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(library)
+}
+
+fn update_cell_references(library: &mut Library) {
+    let cells = &mut library.cells;
+    let cells_cloned = cells.clone();
+    for cell in cells.values_mut() {
+        for cell_reference in cell.cell_references.iter_mut() {
+            if let Some(referenced_cell) = cells_cloned.get(&cell_reference.cell.name) {
+                cell_reference.cell = referenced_cell.clone();
+            } else {
+                info!("Cell {} not found", cell_reference.cell.name);
+            }
+        }
+    }
+}
+
+pub struct RecordReader<R: Read> {
+    reader: BufReader<R>,
+}
+
+impl<R: Read> RecordReader<R> {
+    pub fn new(reader: BufReader<R>) -> Self {
+        RecordReader { reader }
+    }
+}
+
+impl<R: Read> Iterator for RecordReader<R> {
+    type Item = PyResult<(GDSRecord, GDSRecordData)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut header = [0u8; 4];
+        if let Err(e) = self.reader.read_exact(&mut header) {
+            if e.kind() == io::ErrorKind::UnexpectedEof {
+                return None;
+            } else {
+                return Some(Err(PyErr::from(e)));
+            }
+        }
+
+        let size = u16::from_be_bytes([header[0], header[1]]) as usize;
+        let record_type = header[2];
+        let data_type = header[3];
+
+        let data = if size > 4 {
+            match GDSDataType::try_from(data_type) {
+                Ok(data_type) => match data_type {
+                    GDSDataType::BitArray => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        let mut result = Vec::with_capacity(buf.len() / 2);
+                        for chunk in buf.chunks_exact(2) {
+                            let value = BigEndian::read_u16(chunk);
+                            result.push(value);
+                        }
+                        GDSRecordData::U16(result)
+                    }
+                    GDSDataType::TwoByteSignedInteger => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        let mut result = Vec::with_capacity(buf.len() / 2);
+                        for chunk in buf.chunks_exact(2) {
+                            let value = BigEndian::read_i16(chunk);
+                            result.push(value);
+                        }
+                        GDSRecordData::I16(result)
+                    }
+                    GDSDataType::FourByteSignedInteger => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        let mut result = Vec::with_capacity(buf.len() / 4);
+                        for chunk in buf.chunks_exact(4) {
+                            let value = BigEndian::read_i32(chunk);
+                            result.push(value);
+                        }
+                        GDSRecordData::I32(result)
+                    }
+                    GDSDataType::EightByteReal => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        let mut result = Vec::with_capacity(buf.len() / 8);
+                        for chunk in buf.chunks_exact(8) {
+                            let value = eight_byte_real_to_float(BigEndian::read_u64(chunk));
+                            result.push(value);
+                        }
+                        GDSRecordData::F64(result)
+                    }
+                    GDSDataType::AsciiString => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        let data = if buf.last() == Some(&0) {
+                            buf.pop();
+                            String::from_utf8_lossy(&buf).into_owned()
+                        } else {
+                            String::from_utf8_lossy(&buf).into_owned()
+                        };
+                        GDSRecordData::Str(data)
+                    }
+                    _ => {
+                        let mut buf = vec![0u8; size - 4];
+                        if let Err(e) = self.reader.read_exact(&mut buf) {
+                            return Some(Err(PyErr::from(e)));
+                        }
+                        GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned())
+                    }
+                },
+                Err(_) => GDSRecordData::None,
+            }
+        } else {
+            GDSRecordData::None
+        };
+
+        let record = match GDSRecord::try_from(record_type) {
+            Ok(record) => record,
+            Err(_) => {
+                return Some(Err(PyIOError::new_err(format!(
+                    "Invalid record type: {}",
+                    record_type
+                ))));
+            }
+        };
+
+        Some(Ok((record, data)))
+    }
+}
+
+fn eight_byte_real_to_float(bytes: u64) -> f64 {
+    let short1 = (bytes >> 48) as u16;
+    let short2 = ((bytes >> 32) & 0xFFFF) as u16;
+    let long3 = (bytes & 0xFFFFFFFF) as u32;
+
+    let exponent = ((short1 & 0x7F00) >> 8) as i32 - 64;
+    let mantissa = (((short1 & 0x00FF) as u64 * 65536 + short2 as u64) * 4294967296 + long3 as u64)
+        as f64
+        / 72057594037927936.0;
+
+    if short1 & 0x8000 != 0 {
+        -mantissa * 16.0_f64.powi(exponent)
+    } else {
+        mantissa * 16.0_f64.powi(exponent)
+    }
 }

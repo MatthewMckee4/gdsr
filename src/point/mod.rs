@@ -1,7 +1,7 @@
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    ops::{Add, AddAssign, Mul, Sub},
+    ops::{Add, AddAssign, Div, Mul, Sub},
 };
 
 use pyo3::prelude::*;
@@ -93,6 +93,20 @@ impl Sub for Point {
         Point {
             x: self.x - other.x,
             y: self.y - other.y,
+        }
+    }
+}
+
+impl Div<f64> for Point {
+    type Output = Self;
+
+    fn div(self, divisor: f64) -> Self::Output {
+        if divisor == 0.0 {
+            panic!("Division by zero");
+        }
+        Point {
+            x: self.x / divisor,
+            y: self.y / divisor,
         }
     }
 }

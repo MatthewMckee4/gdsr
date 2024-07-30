@@ -9,14 +9,14 @@ mod io;
 mod utils;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Polygon {
     #[pyo3(get)]
-    points: Vec<Point>,
+    pub points: Vec<Point>,
     #[pyo3(get)]
-    layer: i32,
+    pub layer: i32,
     #[pyo3(get)]
-    data_type: i32,
+    pub data_type: i32,
 }
 
 impl std::fmt::Display for Polygon {

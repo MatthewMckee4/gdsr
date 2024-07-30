@@ -121,3 +121,8 @@ fn is_point_on_line_segment(point: &Point, a: &Point, b: &Point) -> bool {
 
     true
 }
+
+pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
+    let factor = 10f64.powi(ndigits as i32);
+    (value * factor).round() / factor
+}

@@ -1,17 +1,30 @@
 use pyo3::{exceptions::PyValueError, prelude::*};
 
 #[pyclass(eq, eq_int)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum PathType {
+    #[default]
     Square = 0,
     Round = 1,
     Overlap = 2,
 }
 
+impl std::fmt::Display for PathType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PathType {}", self.name().unwrap())
+    }
+}
+
+impl std::fmt::Debug for PathType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name().unwrap())
+    }
+}
+
 #[pymethods]
 impl PathType {
     #[new]
-    fn new(value: i32) -> PyResult<Self> {
+    pub fn new(value: i32) -> PyResult<Self> {
         match value {
             0 => Ok(PathType::Square),
             1 => Ok(PathType::Round),
@@ -40,17 +53,5 @@ impl PathType {
 
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
-    }
-}
-
-impl std::fmt::Display for PathType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.name())
-    }
-}
-
-impl std::fmt::Debug for PathType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.name())
     }
 }

@@ -23,8 +23,8 @@ impl Text {
         magnification=1.0,
         angle=0.0,
         x_reflection=false,
-        vertical_presentation=VerticalPresentation::Middle,
-        horizontal_presentation=HorizontalPresentation::Centre
+        vertical_presentation=VerticalPresentation::default(),
+        horizontal_presentation=HorizontalPresentation::default()
     ))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(

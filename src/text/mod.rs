@@ -1,34 +1,32 @@
 use pyo3::prelude::*;
 
-use crate::{
-    point::Point,
-    traits::{Movable, Rotatable, Scalable},
-};
+use crate::point::Point;
+use crate::traits::{Movable, Rotatable, Scalable};
 
 mod general;
 mod io;
 pub mod presentation;
-mod utils;
+pub mod utils;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Text {
     #[pyo3(get, set)]
-    text: String,
+    pub text: String,
     #[pyo3(get)]
-    origin: Point,
+    pub origin: Point,
     #[pyo3(get)]
-    layer: i32,
+    pub layer: i32,
     #[pyo3(get, set)]
-    magnification: f64,
+    pub magnification: f64,
     #[pyo3(get, set)]
-    angle: f64,
+    pub angle: f64,
     #[pyo3(get, set)]
-    x_reflection: bool,
+    pub x_reflection: bool,
     #[pyo3(get, set)]
-    vertical_presentation: presentation::VerticalPresentation,
+    pub vertical_presentation: presentation::VerticalPresentation,
     #[pyo3(get, set)]
-    horizontal_presentation: presentation::HorizontalPresentation,
+    pub horizontal_presentation: presentation::HorizontalPresentation,
 }
 
 impl std::fmt::Display for Text {

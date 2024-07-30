@@ -43,6 +43,11 @@ class Point:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to Point(0, 0).
         """
+    def round(self, digits: int = 0) -> Self:
+        """Return the point with rounded coordinates.
+
+        :param int ndigits: Number of digits to round to, defaults to None.
+        """
     def __getitem__(self, index: Literal[0, 1]) -> float: ...
     def __bool__(self) -> bool: ...
     def __repr__(self) -> str: ...
@@ -540,11 +545,11 @@ class Cell:
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the cell."""
     def to_gds(
-        self, filename: str, units: float = 1e-6, precision: float = 1e-10
+        self, file_name: str, units: float = 1e-6, precision: float = 1e-10
     ) -> None:
         """Write the Cell to a GDS file.
 
-        :param str filename: Output GDS file name.
+        :param str file_name: Output GDS file name.
         :param float units: GDS file units in meters, defaults to 1e-6.
         :param float precision: GDS file precision, defaults to 1e-10.
         """
@@ -552,7 +557,7 @@ class Cell:
 class Library:
     name: str
     @property
-    def cells(self) -> list[Cell]:
+    def cells(self) -> dict[str, Cell]:
         """Return the cells in the library."""
     def __init__(self, name: str = "library") -> None:
         """Initialize the Library with a name.
@@ -564,11 +569,18 @@ class Library:
     def remove(self, *cells: Cell) -> None:
         """Remove cells from the library."""
     def to_gds(
-        self, filename: str, units: float = 1e-6, precision: float = 1e-10
+        self, file_name: str, units: float = 1e-6, precision: float = 1e-10
     ) -> None:
         """Write the Library to a GDS file.
 
-        :param str filename: Output GDS file name.
+        :param str file_name: Output GDS file name.
+        """
+    @staticmethod
+    def from_gds(file_name: str) -> Library:
+        """Read a Library from a GDS file.
+
+        :param str file_name: Input GDS file name.
+        :return: Library
         """
 
 __all__ = [

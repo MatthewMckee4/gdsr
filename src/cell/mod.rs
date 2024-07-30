@@ -10,7 +10,7 @@ mod general;
 mod io;
 
 #[pyclass]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Cell {
     #[pyo3(get, set)]
     pub name: String,

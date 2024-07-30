@@ -4,7 +4,7 @@ use pyo3::exceptions::{PyIndexError, PyZeroDivisionError};
 
 use pyo3::prelude::*;
 
-use crate::utils::geometry::distance_between_points;
+use crate::utils::geometry::{distance_between_points, round_to_decimals};
 
 use super::iterator::PointIterator;
 use super::utils::*;
@@ -64,6 +64,14 @@ impl Point {
         let y = (self.y - centre.y) * factor + centre.y;
 
         Point { x, y }
+    }
+
+    #[pyo3(signature = (digits=0))]
+    pub fn round(&self, digits: u32) -> Self {
+        Point {
+            x: round_to_decimals(self.x, digits),
+            y: round_to_decimals(self.y, digits),
+        }
     }
 
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
