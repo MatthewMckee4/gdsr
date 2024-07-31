@@ -5,7 +5,7 @@ use crate::{
     element::Element,
     grid::Grid,
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
 };
 
 mod general;
@@ -51,6 +51,69 @@ impl std::fmt::Display for ReferenceInstance {
         match self {
             ReferenceInstance::Cell(cell) => write!(f, "{}", cell),
             ReferenceInstance::Element(element) => write!(f, "{}", element),
+        }
+    }
+}
+
+impl Movable for ReferenceInstance {
+    fn move_to(&mut self, point: Point) -> &mut Self {
+        match self {
+            ReferenceInstance::Cell(cell) => {
+                cell.move_to(point);
+            }
+            ReferenceInstance::Element(element) => {
+                element.move_to(point);
+            }
+        }
+        self
+    }
+
+    fn move_by(&mut self, vector: Point) -> &mut Self {
+        match self {
+            ReferenceInstance::Cell(cell) => {
+                cell.move_by(vector);
+            }
+            ReferenceInstance::Element(element) => {
+                element.move_by(vector);
+            }
+        }
+        self
+    }
+}
+
+impl Rotatable for ReferenceInstance {
+    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
+        match self {
+            ReferenceInstance::Cell(cell) => {
+                cell.rotate(angle, centre);
+            }
+            ReferenceInstance::Element(element) => {
+                element.rotate(angle, centre);
+            }
+        }
+        self
+    }
+}
+
+impl Scalable for ReferenceInstance {
+    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
+        match self {
+            ReferenceInstance::Cell(cell) => {
+                cell.scale(factor, centre);
+            }
+            ReferenceInstance::Element(element) => {
+                element.scale(factor, centre);
+            }
+        }
+        self
+    }
+}
+
+impl Dimensions for ReferenceInstance {
+    fn bounding_box(&self) -> (Point, Point) {
+        match self {
+            ReferenceInstance::Cell(cell) => cell.bounding_box(),
+            ReferenceInstance::Element(element) => element.bounding_box(),
         }
     }
 }
@@ -109,5 +172,47 @@ impl Scalable for Reference {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
         self.grid.scale(factor, centre);
         self
+    }
+}
+
+impl Dimensions for Reference {
+    fn bounding_box(&self) -> (Point, Point) {
+        let mut min = Point::new(f64::INFINITY, f64::INFINITY);
+        let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
+
+        let corners = vec![
+            self.grid.origin,
+            self.grid.origin + self.grid.spacing_x * self.grid.columns as f64,
+            self.grid.origin + self.grid.spacing_y * self.grid.rows as f64,
+            self.grid.origin
+                + self.grid.spacing_x * self.grid.columns as f64
+                + self.grid.spacing_y * self.grid.rows as f64,
+        ];
+
+        for corner in corners {
+            let new_element = self
+                .instance
+                .clone()
+                .scale(
+                    if self.grid.x_reflection { -1.0 } else { 1.0 },
+                    self.grid.origin,
+                )
+                .scale(self.grid.magnification, self.grid.origin)
+                .rotate(self.grid.angle, self.grid.origin)
+                .move_by(corner.rotate(self.grid.angle, self.grid.origin).scale(
+                    if self.grid.x_reflection { -1.0 } else { 1.0 },
+                    self.grid.origin,
+                ))
+                .clone();
+
+            let (new_element_min, new_element_max) = new_element.bounding_box();
+
+            min.x = min.x.min(new_element_min.x);
+            min.y = min.y.min(new_element_min.y);
+            max.x = max.x.max(new_element_max.x);
+            max.y = max.y.max(new_element_max.y);
+        }
+
+        (min, max)
     }
 }

@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
 };
 
 mod general;
@@ -83,5 +83,60 @@ impl Scalable for Path {
             *point = point.scale(factor, centre);
         }
         self
+    }
+}
+
+impl Dimensions for Path {
+    fn bounding_box(&self) -> (Point, Point) {
+        let mut min = Point::new(f64::INFINITY, f64::INFINITY);
+        let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
+
+        let width = self.width.unwrap_or(0.0);
+        let half_width = width / 2.0;
+
+        for point in &self.points {
+            min.x = min.x.min(point.x);
+            min.y = min.y.min(point.y);
+            max.x = max.x.max(point.x);
+            max.y = max.y.max(point.y);
+        }
+
+        let angle_from_second_last_to_last = self.points[self.points.len() - 1]
+            .angle_to(
+                *self
+                    .points
+                    .get(self.points.len() - 2)
+                    .unwrap_or(&self.points[0]),
+            )
+            .unwrap()
+            .unwrap_or_default();
+
+        let angle_from_second_to_first = self.points[0]
+            .angle_to(*self.points.get(1).unwrap_or(&self.points[0]))
+            .unwrap()
+            .unwrap_or_default();
+
+        match self.path_type {
+            Some(PathType::Overlap) => {
+                // multiple width by the cos of the angle between the first and second point
+                let (sin, cos) = angle_from_second_to_first.to_radians().sin_cos();
+                min.x -= half_width * cos;
+                min.y -= half_width * sin;
+
+                // multiple width by the cos of the angle between the second last and last point
+                let (sin, cos) = angle_from_second_last_to_last.to_radians().sin_cos();
+                max.x += half_width * cos;
+                max.y += half_width * sin;
+            }
+            Some(PathType::Round) => {
+                min.x -= half_width;
+                min.y -= half_width;
+                max.x += half_width;
+                max.y += half_width;
+            }
+            Some(PathType::Square) | None => {}
+        }
+
+        (min, max)
     }
 }

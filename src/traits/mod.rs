@@ -19,3 +19,7 @@ pub trait Rotatable {
 pub trait Scalable {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self;
 }
+
+pub trait Dimensions {
+    fn bounding_box(&self) -> (Point, Point);
+}

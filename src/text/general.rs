@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::{
     point::Point,
     text::presentation::{HorizontalPresentation, VerticalPresentation},
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
     utils::transformations::py_any_to_point,
     validation::input::check_layer_valid,
 };
@@ -64,6 +64,11 @@ impl Text {
         check_layer_valid(layer)?;
         self.layer = layer;
         Ok(())
+    }
+
+    #[getter]
+    fn bounding_box(&self) -> (Point, Point) {
+        Dimensions::bounding_box(self)
     }
 
     pub fn copy(&self) -> Self {

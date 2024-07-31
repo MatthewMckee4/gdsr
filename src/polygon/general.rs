@@ -6,9 +6,9 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
     utils::{
-        geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
+        geometry::{area, is_point_inside, is_point_on_edge, perimeter},
         transformations::py_any_to_point,
     },
     validation::input::{check_data_type_valid, check_layer_valid},
@@ -59,8 +59,8 @@ impl Polygon {
     }
 
     #[getter]
-    fn bounding_box(&self) -> PyResult<(Point, Point)> {
-        bounding_box(&self.points)
+    fn bounding_box(&self) -> (Point, Point) {
+        Dimensions::bounding_box(self)
     }
 
     #[getter]

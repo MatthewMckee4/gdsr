@@ -1,6 +1,7 @@
 use crate::{
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
+    utils::geometry::bounding_box,
 };
 use pyo3::prelude::*;
 
@@ -85,5 +86,11 @@ impl Scalable for Polygon {
             *point = point.scale(factor, centre);
         }
         self
+    }
+}
+
+impl Dimensions for Polygon {
+    fn bounding_box(&self) -> (Point, Point) {
+        bounding_box(&self.points)
     }
 }

@@ -70,7 +70,7 @@ impl Reference {
 
         file = write_u16_array_to_file(file, &mut buffer_start)?;
 
-        file = write_string_with_record_to_file(file, GDSRecord::SName, &cell_name)?;
+        file = write_string_with_record_to_file(file, GDSRecord::SName, cell_name)?;
 
         file = write_transformation_to_file(
             file,

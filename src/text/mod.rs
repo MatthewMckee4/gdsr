@@ -1,7 +1,8 @@
+use log::warn;
 use pyo3::prelude::*;
 
 use crate::point::Point;
-use crate::traits::{Movable, Rotatable, Scalable};
+use crate::traits::{Dimensions, Movable, Rotatable, Scalable};
 
 mod general;
 mod io;
@@ -81,5 +82,20 @@ impl Scalable for Text {
         self.origin = self.origin.scale(factor, centre);
         self.magnification *= factor;
         self
+    }
+}
+
+impl Dimensions for Text {
+    fn bounding_box(&self) -> (Point, Point) {
+        warn!("Bounding box of text is not implemented yet. Returning a box around the text.");
+        let width = self.text.len() as f64 * self.magnification;
+        let height = self.magnification;
+        let half_width = width / 2.0;
+        let half_height = height / 2.0;
+
+        let lower_left = self.origin - Point::new(half_width, half_height);
+        let upper_right = self.origin + Point::new(half_width, half_height);
+
+        (lower_left, upper_right)
     }
 }

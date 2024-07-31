@@ -76,6 +76,20 @@ impl Point {
         }
     }
 
+    pub fn angle_to(
+        &self,
+        #[pyo3(from_py_with = "py_any_to_point")] other: Point,
+    ) -> PyResult<Option<f64>> {
+        let dx = other.x - self.x;
+        let dy = other.y - self.y;
+
+        if dx == 0.0 && dy == 0.0 {
+            return Ok(None);
+        }
+
+        Ok(Some(dy.atan2(dx).to_degrees()))
+    }
+
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
         match index {
             0 => Ok(self.x),

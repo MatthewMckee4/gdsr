@@ -97,6 +97,17 @@ instance_param = pytest.mark.parametrize(
     ],
 )
 
+element_param = pytest.mark.parametrize(
+    "element",
+    [
+        BASIC_POLYGON,
+        BASIC_PATH,
+        BASIC_TEXT,
+        BASIC_REFERENCE,
+        BASIC_DEEP_REFERENCE,
+    ],
+)
+
 
 unique_instance_pairs_param = pytest.mark.parametrize(
     "instance,other_instance",
@@ -119,5 +130,15 @@ unique_instance_pairs_param = pytest.mark.parametrize(
             BASIC_DEEP_REFERENCE,
         ]
         if inst1 != inst2
+    ],
+)
+
+unique_element_pairs_param = pytest.mark.parametrize(
+    "element,other_element",
+    [
+        (elem1, elem2)
+        for elem1 in [BASIC_POLYGON, BASIC_PATH, BASIC_TEXT, BASIC_REFERENCE]
+        for elem2 in [BASIC_POLYGON, BASIC_PATH, BASIC_TEXT, BASIC_REFERENCE]
+        if elem1 != elem2
     ],
 )

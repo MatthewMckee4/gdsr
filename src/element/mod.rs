@@ -7,7 +7,7 @@ use crate::point::Point;
 use crate::polygon::Polygon;
 use crate::reference::Reference;
 use crate::text::Text;
-use crate::traits::{Movable, Rotatable, Scalable, ToGds};
+use crate::traits::{Dimensions, Movable, Rotatable, Scalable, ToGds};
 
 #[derive(Clone, PartialEq)]
 #[allow(clippy::enum_variant_names)]
@@ -143,6 +143,17 @@ impl Scalable for Element {
             }
         }
         self
+    }
+}
+
+impl Dimensions for Element {
+    fn bounding_box(&self) -> (Point, Point) {
+        match self {
+            Element::Path(element) => element.bounding_box(),
+            Element::Polygon(element) => element.bounding_box(),
+            Element::Reference(element) => element.bounding_box(),
+            Element::Text(element) => element.bounding_box(),
+        }
     }
 }
 

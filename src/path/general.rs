@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
     utils::{
         geometry::perimeter,
         transformations::{py_any_to_point, py_any_to_points_vec},
@@ -104,6 +104,11 @@ impl Path {
     ) -> PyRefMut<'_, Self> {
         Scalable::scale(slf.deref_mut(), factor, centre);
         slf
+    }
+
+    #[getter]
+    fn bounding_box(&self) -> (Point, Point) {
+        Dimensions::bounding_box(self)
     }
 
     fn __str__(&self) -> PyResult<String> {

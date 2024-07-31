@@ -48,6 +48,14 @@ class Point:
 
         :param int ndigits: Number of digits to round to, defaults to None.
         """
+    def angle_to(self, other: PointLike) -> float | None:
+        """Return the angle to another point in degrees.
+
+        Returns None if the points are the same.
+
+        :param PointLike other: The other point.
+        """
+
     def __getitem__(self, index: Literal[0, 1]) -> float: ...
     def __bool__(self) -> bool: ...
     def __repr__(self) -> str: ...
@@ -121,15 +129,6 @@ class Grid:
         :param PointLike spacing_y: The spacing in the y direction, defaults to
         Point(0, 0)
         """
-    @property
-    def width(self) -> float:
-        """Return the total width of the grid."""
-    @property
-    def height(self) -> float:
-        """Return the total height of the grid."""
-    @property
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the grid."""
     def copy(self) -> Self:
         """Return a copy of the grid."""
     def move_to(self, point: PointLike) -> Self:
@@ -178,6 +177,9 @@ class Reference:
         :param Instance instance: The instance to reference.
         :param Grid grid: The grid to reference the cell.
         """
+    @property
+    def bounding_box(self) -> tuple[Point, Point]:
+        """Return the bounding box of the reference."""
     def copy(self) -> Self:
         """Return a copy of the reference."""
     def move_to(self, point: PointLike) -> Self:
@@ -244,6 +246,9 @@ class Path:
     @property
     def length(self) -> float:
         """Return the length of the path."""
+    @property
+    def bounding_box(self) -> tuple[Point, Point]:
+        """Return the bounding box of the path."""
     def copy(self) -> Self:
         """Return a copy of the path."""
     def move_to(self, point: PointLike) -> Self:
@@ -280,6 +285,8 @@ class Path:
         """Return a string representation of the path."""
     def __repr__(self) -> str:
         """Return a string representation of the path."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the path is equal to another object."""
 
 class Polygon:
     """Polygon object."""
@@ -415,6 +422,9 @@ class Text:
         :param HorizontalPresentation horizontal_presentation: Text horizontal
         presentation, defaults to HorizontalPresentation.Centre.
         """
+    @property
+    def bounding_box(self) -> tuple[Point, Point]:
+        """Return the bounding box of the text."""
     def copy(self) -> Self:
         """Return a copy of the text."""
     def move_to(self, point: PointLike) -> Self:
@@ -469,22 +479,42 @@ class Cell:
 
         :param str name: Cell name
         """
+    @property
+    def bounding_box(self) -> tuple[Point, Point]:
+        """Return the bounding box of the cell."""
     def add(self, *elements: Element) -> None:
         """Add elements to the cell."""
     def remove(self, *elements: Element) -> None:
         """Remove elements from the cell."""
-    def __str__(self) -> str:
-        """Return a string representation of the cell."""
-    def __repr__(self) -> str:
-        """Return a string representation of the cell."""
+    def contains(self, element: Element) -> bool:
+        """Return True if the cell contains the element."""
+    def is_empty(self) -> bool:
+        """Return True if the cell has no elements."""
+    def move_to(self, point: PointLike) -> Self:
+        """Move everything in the cell to a point.
+
+        :param PointLike point: Point to move the cell to.
+        """
+
+    def move_by(self, vector: PointLike) -> Self:
+        """Move everything in the cell by a vector.
+
+        :param PointLike vector: Vector to move the cell by.
+        """
+    def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Rotate everything in the cell by an angle around a centre point.
+
+        :param float angle: Counter-clockwise rotation angle in degrees.
+        :param PointLike centre: Centre point of rotation, defaults to Point(0, 0).
+        """
+    def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Scale everything in the cell by a factor around a centre point.
+
+        :param float factor: Scaling factor.
+        :param PointLike centre: Centre point of scaling, defaults to Point(0, 0).
+        """
     def copy(self) -> Self:
         """Return a copy of the cell."""
-    def width(self) -> float:
-        """Return the width of the cell."""
-    def height(self) -> float:
-        """Return the height of the cell."""
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the cell."""
     def to_gds(
         self,
         file_name: PathLike | None = None,
@@ -498,6 +528,12 @@ class Cell:
         :param float precision: GDS file precision, defaults to 1e-10.
         :return: GDS file name
         """
+    def __str__(self) -> str:
+        """Return a string representation of the cell."""
+    def __repr__(self) -> str:
+        """Return a string representation of the cell."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the cell is equal to another object."""
 
 class Library:
     name: str

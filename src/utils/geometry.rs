@@ -4,9 +4,7 @@ use crate::point::Point;
 
 use super::general::check_points_vec_not_empty;
 
-pub fn bounding_box(points: &Vec<Point>) -> PyResult<(Point, Point)> {
-    check_points_vec_not_empty(points)?;
-
+pub fn bounding_box(points: &Vec<Point>) -> (Point, Point) {
     let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
     let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
 
@@ -26,7 +24,7 @@ pub fn bounding_box(points: &Vec<Point>) -> PyResult<(Point, Point)> {
         }
     }
 
-    Ok((Point::new(min_x, min_y), Point::new(max_x, max_y)))
+    (Point::new(min_x, min_y), Point::new(max_x, max_y))
 }
 
 pub fn area(points: &[Point]) -> PyResult<f64> {

@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::{
     grid::Grid,
     point::Point,
-    traits::{Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Rotatable, Scalable},
     utils::transformations::py_any_to_point,
 };
 
@@ -19,16 +19,13 @@ impl Reference {
         Reference { instance, grid }
     }
 
+    #[getter]
+    fn bounding_box(&self) -> (Point, Point) {
+        Dimensions::bounding_box(self)
+    }
+
     pub fn copy(&self) -> Self {
         self.clone()
-    }
-
-    fn __str__(&self) -> PyResult<String> {
-        Ok(format!("{}", self))
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{:?}", self))
     }
 
     fn move_to(
@@ -65,5 +62,13 @@ impl Reference {
     ) -> PyRefMut<'_, Self> {
         Scalable::scale(slf.deref_mut(), factor, centre);
         slf
+    }
+
+    fn __str__(&self) -> PyResult<String> {
+        Ok(format!("{}", self))
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("{:?}", self))
     }
 }
