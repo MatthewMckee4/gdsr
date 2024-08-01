@@ -47,7 +47,7 @@ pub fn perimeter(points: &[Point]) -> PyResult<f64> {
     let mut perimeter = 0.0;
     let length = points.len();
 
-    for index in 0..length {
+    for index in 0..length - 1 {
         let next_index = (index + 1) % length;
         perimeter += points[index].distance_to(points[next_index])?;
     }

@@ -94,47 +94,107 @@ impl Dimensions for Path {
         let width = self.width.unwrap_or(0.0);
         let half_width = width / 2.0;
 
-        for point in &self.points {
+        let mut extended_points = vec![];
+
+        // Clone points and add the extra points at the front and back
+        let mut points = self.points.clone();
+
+        if points.len() >= 2 {
+            // Add extra point at the front
+            let first_point = points[0];
+            let second_point = points[1];
+
+            if let Ok(Some(angle)) = first_point.angle_to(second_point) {
+                let angle = angle.to_radians();
+                let (sin, cos) = angle.sin_cos();
+                let new_point = Point::new(
+                    first_point.x - half_width * cos,
+                    first_point.y - half_width * sin,
+                );
+                points.insert(0, new_point);
+            }
+
+            // Add extra point at the back
+            let last_point = points[points.len() - 1];
+            let second_last_point = points[points.len() - 2];
+
+            if let Ok(Some(angle)) = second_last_point.angle_to(last_point) {
+                let angle = angle.to_radians();
+                let (sin, cos) = angle.sin_cos();
+                let new_point = Point::new(
+                    last_point.x + half_width * cos,
+                    last_point.y + half_width * sin,
+                );
+                points.push(new_point);
+            }
+        }
+
+        for i in 0..points.len() {
+            let point = points[i];
+
+            // For the first and last points, we only consider one segment
+            if i == 0 || i == points.len() - 1 {
+                let next_point = if i == 0 { points[i + 1] } else { points[i - 1] };
+
+                if let Ok(Some(angle)) = point.angle_to(next_point) {
+                    let angle = angle.to_radians();
+                    let (sin, cos) = angle.sin_cos();
+                    let perp_x = -sin;
+                    let perp_y = cos;
+
+                    extended_points.push(Point::new(
+                        point.x + half_width * perp_x,
+                        point.y + half_width * perp_y,
+                    ));
+                    extended_points.push(Point::new(
+                        point.x - half_width * perp_x,
+                        point.y - half_width * perp_y,
+                    ));
+                }
+            } else {
+                // For all other points, consider both segments
+                let prev_point = points[i - 1];
+                let next_point = points[i + 1];
+
+                if let Ok(Some(angle_prev)) = point.angle_to(prev_point) {
+                    let angle_prev = angle_prev.to_radians();
+                    let (sin_prev, cos_prev) = angle_prev.sin_cos();
+                    let perp_x_prev = -sin_prev;
+                    let perp_y_prev = cos_prev;
+
+                    extended_points.push(Point::new(
+                        point.x + half_width * perp_x_prev,
+                        point.y + half_width * perp_y_prev,
+                    ));
+                    extended_points.push(Point::new(
+                        point.x - half_width * perp_x_prev,
+                        point.y - half_width * perp_y_prev,
+                    ));
+                }
+
+                if let Ok(Some(angle_next)) = point.angle_to(next_point) {
+                    let angle_next = angle_next.to_radians();
+                    let (sin_next, cos_next) = angle_next.sin_cos();
+                    let perp_x_next = -sin_next;
+                    let perp_y_next = cos_next;
+
+                    extended_points.push(Point::new(
+                        point.x + half_width * perp_x_next,
+                        point.y + half_width * perp_y_next,
+                    ));
+                    extended_points.push(Point::new(
+                        point.x - half_width * perp_x_next,
+                        point.y - half_width * perp_y_next,
+                    ));
+                }
+            }
+        }
+
+        for point in extended_points {
             min.x = min.x.min(point.x);
             min.y = min.y.min(point.y);
             max.x = max.x.max(point.x);
             max.y = max.y.max(point.y);
-        }
-
-        let angle_from_second_last_to_last = self.points[self.points.len() - 1]
-            .angle_to(
-                *self
-                    .points
-                    .get(self.points.len() - 2)
-                    .unwrap_or(&self.points[0]),
-            )
-            .unwrap()
-            .unwrap_or_default();
-
-        let angle_from_second_to_first = self.points[0]
-            .angle_to(*self.points.get(1).unwrap_or(&self.points[0]))
-            .unwrap()
-            .unwrap_or_default();
-
-        match self.path_type {
-            Some(PathType::Overlap) => {
-                // multiple width by the cos of the angle between the first and second point
-                let (sin, cos) = angle_from_second_to_first.to_radians().sin_cos();
-                min.x -= half_width * cos;
-                min.y -= half_width * sin;
-
-                // multiple width by the cos of the angle between the second last and last point
-                let (sin, cos) = angle_from_second_last_to_last.to_radians().sin_cos();
-                max.x += half_width * cos;
-                max.y += half_width * sin;
-            }
-            Some(PathType::Round) => {
-                min.x -= half_width;
-                min.y -= half_width;
-                max.x += half_width;
-                max.y += half_width;
-            }
-            Some(PathType::Square) | None => {}
         }
 
         (min, max)

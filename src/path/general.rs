@@ -9,7 +9,9 @@ use crate::{
         geometry::perimeter,
         transformations::{py_any_to_point, py_any_to_points_vec},
     },
-    validation::input::{check_data_type_valid, check_layer_valid},
+    validation::input::{
+        check_data_type_valid, check_layer_valid, check_points_vec_has_at_least_two_points,
+    },
 };
 
 use super::{path_type::PathType, Path};
@@ -25,6 +27,7 @@ impl Path {
         path_type: Option<PathType>,
         width: Option<f64>,
     ) -> PyResult<Self> {
+        check_points_vec_has_at_least_two_points(&points)?;
         check_layer_valid(layer)?;
         check_data_type_valid(data_type)?;
 
@@ -42,6 +45,7 @@ impl Path {
         &mut self,
         #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> PyResult<()> {
+        check_points_vec_has_at_least_two_points(&points)?;
         self.points = points;
         Ok(())
     }
@@ -63,6 +67,11 @@ impl Path {
     #[getter]
     fn length(&self) -> PyResult<f64> {
         perimeter(&self.points)
+    }
+
+    #[getter]
+    fn bounding_box(&self) -> (Point, Point) {
+        Dimensions::bounding_box(self)
     }
 
     pub fn copy(&self) -> Self {
@@ -104,11 +113,6 @@ impl Path {
     ) -> PyRefMut<'_, Self> {
         Scalable::scale(slf.deref_mut(), factor, centre);
         slf
-    }
-
-    #[getter]
-    fn bounding_box(&self) -> (Point, Point) {
-        Dimensions::bounding_box(self)
     }
 
     fn __str__(&self) -> PyResult<String> {

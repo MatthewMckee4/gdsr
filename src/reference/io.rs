@@ -20,7 +20,7 @@ impl ToGds for Reference {
                 file = self._to_gds_with_cell(file, scale, &cell.name)?
             }
             ReferenceInstance::Element(element) => {
-                file = self._to_gds_with_element(file, scale, &element)?;
+                file = self._to_gds_with_element(file, scale, element)?;
             }
         }
 
