@@ -59,26 +59,23 @@ pub fn py_any_to_points_vec(points: &Bound<'_, PyAny>) -> PyResult<Vec<Point>> {
 pub fn py_any_path_to_string_or_temp_name(
     file_name: &Bound<'_, PyAny>,
 ) -> PyResult<Option<String>> {
-    if let Ok(py_str) = file_name.extract::<String>() {
-        return Ok(Some(py_str));
+    if file_name.is_none() {
+        return Ok(None);
     }
 
-    if let Ok(py_path) = file_name.getattr("as_posix") {
-        let path_str: String = py_path.extract()?;
-        return Ok(Some(path_str));
-    }
-
-    match create_temp_file() {
-        Ok(temp_file_name) => Ok(Some(temp_file_name)),
-        Err(_) => Err(PyTypeError::new_err("Failed to create a temporary file")),
+    match py_any_path_to_string(file_name) {
+        Ok(file_name) => Ok(Some(file_name)),
+        Err(_) => match create_temp_file() {
+            Ok(temp_file_name) => Ok(Some(temp_file_name)),
+            Err(_) => Err(PyTypeError::new_err("Failed to create a temporary file")),
+        },
     }
 }
 pub fn py_any_path_to_string(file_name: &Bound<'_, PyAny>) -> PyResult<String> {
-    match file_name.str() {
-        Ok(py_str) => match py_str.to_str() {
-            Ok(s) => Ok(s.to_string()),
-            Err(_) => Err(PyTypeError::new_err("Invalid path format: not a string")),
-        },
-        Err(_) => Err(PyTypeError::new_err("Invalid path format: not a string")),
+    match file_name.call_method0("__str__") {
+        Ok(py_str) => py_str
+            .extract()
+            .map_err(|_| PyTypeError::new_err("Failed to convert to string")),
+        Err(_) => Err(PyTypeError::new_err("Invalid path format")),
     }
 }

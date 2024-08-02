@@ -22,7 +22,7 @@ class ColouredFormatter(logging.Formatter):  # noqa: D101
 
 def setup_logger() -> None:  # noqa: D103
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     handler = logging.StreamHandler()
     handler.setFormatter(ColouredFormatter("%(levelname)s: %(message)s"))

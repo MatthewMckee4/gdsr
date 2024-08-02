@@ -109,7 +109,6 @@ impl Rotatable for Cell {
     }
 }
 
-// Implementing the Scalable trait for Cell
 impl Scalable for Cell {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
         for polygon in &mut self.polygons {
