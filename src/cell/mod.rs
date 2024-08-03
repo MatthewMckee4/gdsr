@@ -1,11 +1,13 @@
 use pyo3::prelude::*;
 
-use crate::path::Path;
-use crate::point::Point;
-use crate::polygon::Polygon;
-use crate::reference::Reference;
-use crate::text::Text;
-use crate::traits::{Dimensions, Movable, Rotatable, Scalable};
+use crate::{
+    path::Path,
+    point::Point,
+    polygon::Polygon,
+    reference::Reference,
+    text::Text,
+    traits::{Dimensions, Movable, Rotatable, Scalable},
+};
 
 mod general;
 mod io;

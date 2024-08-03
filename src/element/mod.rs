@@ -1,13 +1,15 @@
-use pyo3::exceptions::PyTypeError;
-use pyo3::prelude::*;
 use std::fs::File;
 
-use crate::path::Path;
-use crate::point::Point;
-use crate::polygon::Polygon;
-use crate::reference::Reference;
-use crate::text::Text;
-use crate::traits::{Dimensions, Movable, Rotatable, Scalable, ToGds};
+use pyo3::{exceptions::PyTypeError, prelude::*};
+
+use crate::{
+    path::Path,
+    point::Point,
+    polygon::Polygon,
+    reference::Reference,
+    text::Text,
+    traits::{Dimensions, Movable, Rotatable, Scalable, ToGds},
+};
 
 #[derive(Clone, PartialEq)]
 #[allow(clippy::enum_variant_names)]

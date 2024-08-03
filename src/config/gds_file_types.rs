@@ -170,7 +170,6 @@ impl TryFrom<u8> for GDSDataType {
 
 #[derive(Debug)]
 pub enum GDSRecordData {
-    U16(Vec<u16>),
     I16(Vec<i16>),
     I32(Vec<i32>),
     F64(Vec<f64>),
@@ -181,7 +180,6 @@ pub enum GDSRecordData {
 impl std::fmt::Display for GDSRecordData {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            GDSRecordData::U16(data) => write!(f, "U16 {:?}", data),
             GDSRecordData::I16(data) => write!(f, "I16 {:?}", data),
             GDSRecordData::I32(data) => write!(f, "I32 {:?}", data),
             GDSRecordData::F64(data) => write!(f, "F64 {:?}", data),

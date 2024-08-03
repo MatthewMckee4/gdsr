@@ -28,7 +28,7 @@ pub fn get_presentation_value(
 }
 
 pub fn get_presentations_from_value(
-    value: u16,
+    value: i16,
 ) -> PyResult<(VerticalPresentation, HorizontalPresentation)> {
     let (vertical_value, horizontal_value) = match value {
         0 => (0, 0),

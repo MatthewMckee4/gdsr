@@ -4,9 +4,7 @@ use std::fs::File;
 use std::io::{self, BufReader, Read, Write};
 
 use bytemuck::cast_slice;
-use byteorder::{BigEndian, ByteOrder};
 use chrono::{Datelike, Local, Timelike};
-
 use pyo3::{exceptions::PyIOError, prelude::*};
 use tempfile::Builder;
 
@@ -250,22 +248,26 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                 GDSRecord::LibName => {
                     if let GDSRecordData::Str(name) = data {
                         library.name = name;
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::Units => {
                     if let GDSRecordData::F64(units) = data {
                         scale = units[0];
                         rounding_digits = -(units[1] / units[0]).log10() as u32 - 1;
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::EndLib => {
                     update_references(&mut library);
+
                     continue;
                 }
                 GDSRecord::BgnStr => {
                     cell = Some(Cell::default());
+
                     continue;
                 }
                 GDSRecord::StrName => {
@@ -273,30 +275,35 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         if let Some(cell) = &mut cell {
                             cell.name = cell_name;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::EndStr => {
-                    if let Some(cell) = cell {
+                    if let Some(cell) = cell.take() {
                         library.cells.insert(cell.name.clone(), cell);
                     }
-                    cell = None;
+
                     continue;
                 }
                 GDSRecord::Boundary | GDSRecord::Box => {
                     polygon = Some(Polygon::default());
+
                     continue;
                 }
                 GDSRecord::Path | GDSRecord::RaithMbmsPath => {
                     path = Some(Path::default());
+
                     continue;
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {
                     reference = Some(Reference::default());
+
                     continue;
                 }
                 GDSRecord::Text => {
                     text = Some(Text::default());
+
                     continue;
                 }
                 GDSRecord::Layer => {
@@ -310,6 +317,7 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                             text.layer = layer_value;
                         }
                     }
+
                     continue;
                 }
                 GDSRecord::DataType | GDSRecord::BoxType => {
@@ -320,7 +328,8 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         } else if let Some(path) = &mut path {
                             path.data_type = data_type_val;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::Width => {
@@ -328,7 +337,8 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         if let Some(path) = &mut path {
                             path.width = Some(width[0] as f64 * scale);
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::XY => {
@@ -378,35 +388,37 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                             }
                         }
                     }
+
                     continue;
                 }
                 GDSRecord::EndEl => {
                     if let Some(cell) = &mut cell {
                         match (polygon, path, text, reference) {
-                            (Some(polygon), None, None, None) => cell.polygons.push(polygon),
-                            (None, Some(path), None, None) => cell.paths.push(path),
-                            (None, None, Some(text), None) => cell.texts.push(text),
-                            (None, None, None, Some(reference)) => cell.references.push(reference),
+                            (Some(polygon), _, _, _) => cell.polygons.push(polygon),
+                            (_, Some(path), _, _) => cell.paths.push(path),
+                            (_, _, Some(text), _) => cell.texts.push(text),
+                            (_, _, _, Some(reference)) => cell.references.push(reference),
                             _ => {}
                         }
                     }
+
+                    // Reset all options
                     polygon = None;
                     path = None;
                     text = None;
                     reference = None;
+
                     continue;
                 }
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
-                            match &mut reference.instance {
-                                ReferenceInstance::Cell(cell) => {
-                                    cell.name = cell_name;
-                                }
-                                ReferenceInstance::Element(_) => {}
+                            if let ReferenceInstance::Cell(cell) = &mut reference.instance {
+                                cell.name = cell_name;
                             }
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::ColRow => {
@@ -415,16 +427,18 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                             reference.grid.columns = col_row[0] as usize;
                             reference.grid.rows = col_row[1] as usize;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::Presentation => {
-                    if let GDSRecordData::U16(flags) = data {
+                    if let GDSRecordData::I16(flags) = data {
                         if let Some(text) = &mut text {
                             (text.vertical_presentation, text.horizontal_presentation) =
                                 get_presentations_from_value(flags[0])?;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::String => {
@@ -432,19 +446,21 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.text = string;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::STrans => {
-                    if let GDSRecordData::U16(flags) = data {
-                        let x_reflection = flags[0] & 0x8000 != 0;
+                    if let GDSRecordData::I16(flags) = data {
+                        let x_reflection = flags[0] & 0x8000u16 as i16 != 0;
                         if let Some(text) = &mut text {
                             text.x_reflection = x_reflection;
                         }
                         if let Some(reference) = &mut reference {
                             reference.grid.x_reflection = x_reflection;
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::Mag => {
@@ -454,7 +470,8 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         } else if let Some(reference) = &mut reference {
                             reference.grid.magnification = magnification[0];
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::Angle => {
@@ -464,7 +481,8 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         } else if let Some(reference) = &mut reference {
                             reference.grid.angle = angle[0];
                         }
-                    };
+                    }
+
                     continue;
                 }
                 GDSRecord::PathType => {
@@ -472,7 +490,8 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                         if let Some(path) = &mut path {
                             path.path_type = Some(PathType::new(path_type[0] as i32)?);
                         }
-                    };
+                    }
+
                     continue;
                 }
                 _ => {}
@@ -488,7 +507,7 @@ fn update_references(library: &mut Library) {
     let cell_references: Vec<Reference> = library
         .cells
         .values()
-        .flat_map(|cell| cell.references.iter().cloned())
+        .flat_map(|cell| cell.references.clone())
         .collect();
 
     for mut reference in cell_references {
@@ -535,36 +554,20 @@ impl<R: Read> Iterator for RecordReader<R> {
 
             let result = match GDSDataType::try_from(data_type) {
                 Ok(data_type) => match data_type {
-                    GDSDataType::BitArray => {
-                        let mut result = Vec::with_capacity(buf.len() / 2);
-                        for chunk in buf.chunks_exact(2) {
-                            let value = BigEndian::read_u16(chunk);
-                            result.push(value);
-                        }
-                        GDSRecordData::U16(result)
-                    }
-                    GDSDataType::TwoByteSignedInteger => {
-                        let mut result = Vec::with_capacity(buf.len() / 2);
-                        for chunk in buf.chunks_exact(2) {
-                            let value = BigEndian::read_i16(chunk);
-                            result.push(value);
-                        }
+                    GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
+                        let result = read_i16_be(&buf);
                         GDSRecordData::I16(result)
                     }
-                    GDSDataType::FourByteSignedInteger => {
-                        let mut result = Vec::with_capacity(buf.len() / 4);
-                        for chunk in buf.chunks_exact(4) {
-                            let value = BigEndian::read_i32(chunk);
-                            result.push(value);
-                        }
+                    GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
+                        let result = read_i32_be(&buf);
                         GDSRecordData::I32(result)
                     }
                     GDSDataType::EightByteReal => {
-                        let mut result = Vec::with_capacity(buf.len() / 8);
-                        for chunk in buf.chunks_exact(8) {
-                            let value = eight_byte_real_to_float(BigEndian::read_u64(chunk));
-                            result.push(value);
-                        }
+                        let u64_values = read_u64_be(&buf);
+                        let result: Vec<f64> = u64_values
+                            .into_iter()
+                            .map(eight_byte_real_to_float)
+                            .collect();
                         GDSRecordData::F64(result)
                     }
                     GDSDataType::AsciiString => {
@@ -596,6 +599,58 @@ impl<R: Read> Iterator for RecordReader<R> {
 
         Some(Ok((record, data)))
     }
+}
+
+fn read_i16_be(buf: &[u8]) -> Vec<i16> {
+    let chunk_size = 2;
+    let mut result = Vec::with_capacity(buf.len() / chunk_size);
+    let mut i = 0;
+
+    while i + chunk_size <= buf.len() {
+        let value = ((buf[i] as i16) << 8) | (buf[i + 1] as i16);
+        result.push(value);
+        i += chunk_size;
+    }
+
+    result
+}
+
+fn read_i32_be(buf: &[u8]) -> Vec<i32> {
+    let chunk_size = 4;
+    let mut result = Vec::with_capacity(buf.len() / chunk_size);
+    let mut i = 0;
+
+    while i + chunk_size <= buf.len() {
+        let value = ((buf[i] as i32) << 24)
+            | ((buf[i + 1] as i32) << 16)
+            | ((buf[i + 2] as i32) << 8)
+            | (buf[i + 3] as i32);
+        result.push(value);
+        i += chunk_size;
+    }
+
+    result
+}
+
+fn read_u64_be(buf: &[u8]) -> Vec<u64> {
+    let chunk_size = 8;
+    let mut result = Vec::with_capacity(buf.len() / chunk_size);
+    let mut i = 0;
+
+    while i + chunk_size <= buf.len() {
+        let value = ((buf[i] as u64) << 56)
+            | ((buf[i + 1] as u64) << 48)
+            | ((buf[i + 2] as u64) << 40)
+            | ((buf[i + 3] as u64) << 32)
+            | ((buf[i + 4] as u64) << 24)
+            | ((buf[i + 5] as u64) << 16)
+            | ((buf[i + 6] as u64) << 8)
+            | (buf[i + 7] as u64);
+        result.push(value);
+        i += chunk_size;
+    }
+
+    result
 }
 
 fn eight_byte_real_to_float(bytes: u64) -> f64 {
