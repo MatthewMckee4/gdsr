@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 
 use chrono::{Datelike, Local, Timelike};
@@ -120,7 +120,7 @@ impl Cell {
             "library",
             units,
             precision,
-            HashMap::from([(self.name.clone(), self.clone())]),
+            [self.clone()].to_vec(),
         )
     }
 }

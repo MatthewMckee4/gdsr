@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{self, BufReader, Read, Write};
@@ -166,7 +166,7 @@ pub fn write_gds(
     library_name: &str,
     units: f64,
     precision: f64,
-    cells: HashMap<String, Cell>,
+    cells: Vec<Cell>,
 ) -> PyResult<String> {
     let mut file = File::create(file_name.clone())
         .map_err(|_| PyIOError::new_err("Could not open file for writing"))?;
@@ -175,9 +175,9 @@ pub fn write_gds(
 
     let mut written_cell_names: HashSet<String> = HashSet::new();
 
-    for (cell_name, cell) in &cells {
-        if !written_cell_names.contains(cell_name) {
-            written_cell_names.insert(cell_name.clone());
+    for cell in cells {
+        if !written_cell_names.contains(&cell.name) {
+            written_cell_names.insert(cell.name.clone());
             file = cell._to_gds(file, units, precision, &mut written_cell_names)?;
         }
     }
@@ -227,7 +227,7 @@ pub fn write_transformation_to_file(
     Ok(file)
 }
 
-pub fn from_gds(file_name: String) -> PyResult<Library> {
+pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
     let mut library = Library::new("Library".to_string());
 
     let file = File::open(file_name)?;
@@ -261,7 +261,7 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                     continue;
                 }
                 GDSRecord::EndLib => {
-                    update_references(&mut library);
+                    update_references(py, &mut library);
 
                     continue;
                 }
@@ -281,7 +281,9 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
                 }
                 GDSRecord::EndStr => {
                     if let Some(cell) = cell.take() {
-                        library.cells.insert(cell.name.clone(), cell);
+                        library
+                            .cells
+                            .insert(cell.name.clone(), Py::new(py, cell).unwrap());
                     }
 
                     continue;
@@ -503,17 +505,18 @@ pub fn from_gds(file_name: String) -> PyResult<Library> {
     Ok(library)
 }
 
-fn update_references(library: &mut Library) {
+fn update_references(py: Python, library: &mut Library) {
     let cell_references: Vec<Reference> = library
         .cells
         .values()
-        .flat_map(|cell| cell.references.clone())
+        .flat_map(|cell| cell.borrow_mut(py).references.to_vec())
         .collect();
 
     for mut reference in cell_references {
         if let ReferenceInstance::Cell(ref referenced_name) = reference.instance {
-            if let Some(referenced_cell) = library.cells.get(&referenced_name.name) {
-                reference.instance = ReferenceInstance::Cell(referenced_cell.clone());
+            if let Some(referenced_cell) = library.cells.get(&referenced_name.name.clone()) {
+                reference.instance =
+                    ReferenceInstance::Cell(referenced_cell.borrow_mut(py).clone());
             }
         }
     }

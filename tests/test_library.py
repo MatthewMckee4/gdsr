@@ -60,8 +60,3 @@ lib.add(cell)
 lib.to_gds("test.gds")
 
 lib = Library.from_gds("test.gds")
-main_cell = lib.cells["MAIN_Cell"]
-
-print(main_cell.references[0])
-print(cell.references[0])
-print(main_cell.references == cell.references)

@@ -15,20 +15,25 @@ impl Library {
         #[pyo3(from_py_with = "py_any_path_to_string_or_temp_name")] file_name: Option<String>,
         units: f64,
         precision: f64,
+        py: Python,
     ) -> PyResult<String> {
         write_gds(
             file_name.unwrap_or(create_temp_file()?),
             &self.name,
             units,
             precision,
-            self.cells.clone(),
+            self.cells
+                .values()
+                .map(|cell| cell.borrow(py).clone())
+                .collect(),
         )
     }
 
     #[staticmethod]
     pub fn from_gds(
         #[pyo3(from_py_with = "py_any_path_to_string")] file_name: String,
+        py: Python,
     ) -> PyResult<Library> {
-        from_gds(file_name)
+        from_gds(py, file_name)
     }
 }
