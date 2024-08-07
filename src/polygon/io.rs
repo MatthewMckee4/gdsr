@@ -1,5 +1,4 @@
-use log::warn;
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyValueError, prelude::*};
 use std::fs::File;
 
 use crate::{
@@ -12,11 +11,10 @@ use super::Polygon;
 
 impl ToGds for Polygon {
     fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
-        if self.points.len() > 8190 {
-            warn!(
-                "{} has more than 8190 points, This may cause errors in the future.",
-                self
-            );
+        if self.points.len() > 8191 {
+            Err(PyValueError::new_err(
+                "A polygon can only have a maximum of 8191 points",
+            ))?;
         }
 
         let mut polygon_head = [

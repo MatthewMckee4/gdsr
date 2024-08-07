@@ -23,8 +23,6 @@ module-name = "gdsr._gdsr"
 [project.optional-dependencies]
 dev = [     
     "maturin",
-    "pytest",
-    "pytest-lazy-fixture",
     "ruff",
     "mypy",
     "isort",
@@ -34,6 +32,13 @@ docs = [
     "mkdocs",
     "mkdocstrings-python",
     "mkdocs-material",
+]
+
+tests = [
+    "pytest",
+    "hypothesis",
+    "pytest-randomly",
+    "pytest-xdist"
 ]
 
 

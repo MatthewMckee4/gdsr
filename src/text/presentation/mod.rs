@@ -53,6 +53,15 @@ impl VerticalPresentation {
         }
     }
 
+    #[staticmethod]
+    pub fn values() -> Vec<VerticalPresentation> {
+        vec![
+            VerticalPresentation::Top,
+            VerticalPresentation::Middle,
+            VerticalPresentation::Bottom,
+        ]
+    }
+
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self))
     }
@@ -113,6 +122,15 @@ impl HorizontalPresentation {
             HorizontalPresentation::Centre => Ok(1),
             HorizontalPresentation::Right => Ok(2),
         }
+    }
+
+    #[staticmethod]
+    pub fn values() -> Vec<HorizontalPresentation> {
+        vec![
+            HorizontalPresentation::Left,
+            HorizontalPresentation::Centre,
+            HorizontalPresentation::Right,
+        ]
     }
 
     fn __str__(&self) -> PyResult<String> {

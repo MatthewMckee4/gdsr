@@ -1,8 +1,9 @@
 import pytest
+from hypothesis import assume, given
 
 from gdsr import Cell, Element
 
-from .conftest import element_param, unique_element_pairs_param
+from .conftest import element_param_strategy
 
 # Cell init
 
@@ -57,7 +58,7 @@ def test_set_texts_raises_error():
 # Cell add
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_add_polygon(element: Element):
     cell = Cell("test_cell")
     assert not cell.contains(element)
@@ -68,7 +69,7 @@ def test_add_polygon(element: Element):
 # Cell remove
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_remove_polygon(element: Element):
     cell = Cell("test_cell")
     assert not cell.contains(element)
@@ -81,7 +82,7 @@ def test_remove_polygon(element: Element):
 # Cell contains
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_contains(element: Element):
     cell = Cell("test_cell")
     assert not cell.contains(element)
@@ -96,7 +97,7 @@ def test_contains(element: Element):
 # Cell is_empty
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_is_empty(element: Element):
     cell = Cell("test_cell")
     assert cell.is_empty()
@@ -109,7 +110,7 @@ def test_is_empty(element: Element):
 # Cell copy
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_copy(element: Element):
     cell = Cell("test_cell")
     cell.add(element)
@@ -146,7 +147,7 @@ def test_cell_equal():
     assert cell == new_cell
 
 
-@element_param
+@given(element=element_param_strategy())
 def test_cell_with_element_equal(element: Element):
     cell = Cell("test_cell")
     new_cell = Cell("test_cell")
@@ -155,10 +156,11 @@ def test_cell_with_element_equal(element: Element):
     assert cell == new_cell
 
 
-@unique_element_pairs_param
+@given(element=element_param_strategy(), other_element=element_param_strategy())
 def test_cells_with_different_elements_not_equal(
     element: Element, other_element: Element
 ):
+    assume(element != other_element)
     cell = Cell("test_cell")
     new_cell = Cell("test_cell")
     cell.add(element)

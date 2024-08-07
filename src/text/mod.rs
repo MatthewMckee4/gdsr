@@ -10,7 +10,7 @@ pub mod presentation;
 pub mod utils;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq)]
 pub struct Text {
     #[pyo3(get, set)]
     pub text: String,
@@ -28,6 +28,21 @@ pub struct Text {
     pub vertical_presentation: presentation::VerticalPresentation,
     #[pyo3(get, set)]
     pub horizontal_presentation: presentation::HorizontalPresentation,
+}
+
+impl Default for Text {
+    fn default() -> Self {
+        Self {
+            text: String::from(""),
+            origin: Point::default(),
+            layer: 0,
+            magnification: 1.0,
+            angle: 0.0,
+            x_reflection: false,
+            vertical_presentation: presentation::VerticalPresentation::default(),
+            horizontal_presentation: presentation::HorizontalPresentation::default(),
+        }
+    }
 }
 
 impl std::fmt::Display for Text {

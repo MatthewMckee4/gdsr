@@ -47,6 +47,11 @@ impl PathType {
         Ok(*self as i32)
     }
 
+    #[staticmethod]
+    pub fn values() -> Vec<PathType> {
+        vec![PathType::Square, PathType::Round, PathType::Overlap]
+    }
+
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self))
     }

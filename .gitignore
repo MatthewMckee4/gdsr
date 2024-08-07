@@ -83,3 +83,6 @@ docs/_build/
 # gds
 *.gds
 *.GDS
+
+# hypothesis
+.hypothesis/

@@ -1,10 +1,12 @@
-import pytest
+from hypothesis import strategies as st
 
 from gdsr import (
     Cell,
+    Element,
     Grid,
     HorizontalPresentation,
     Instance,
+    Library,
     Path,
     PathType,
     Point,
@@ -14,131 +16,145 @@ from gdsr import (
     VerticalPresentation,
 )
 
-BASIC_CELL = Cell("test_cell")
-BASIC_GRID = Grid(Point(10, 10), 2, 3, (10, 0), (0, 10), 45, 2, True)
-BASIC_POLYGON = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)], 1, 10)
-BASIC_PATH = Path([Point(0, 0), Point(1, 0), Point(1, 1)], 2, 3, PathType.Round, 5)
-BASIC_TEXT = Text(
-    "test_text",
-    (0, 0),
-    1,
-    5,
-    45,
-    False,
-    VerticalPresentation.Top,
-    HorizontalPresentation.Left,
-)
-BASIC_REFERENCE = Reference(BASIC_CELL)
-BASIC_DEEP_REFERENCE = Reference(Reference(Reference(BASIC_REFERENCE)))
+
+@st.composite
+def point_strategy(draw: st.DrawFn) -> Point:
+    decimal = st.decimals(
+        max_value=214748.3647,
+        min_value=-214748.3648,
+        allow_nan=False,
+        allow_infinity=False,
+        places=4,
+    )
+    return Point(float(draw(decimal)), float(draw(decimal)))
 
 
-@pytest.fixture
-def sample_cell() -> Cell:
-    return BASIC_CELL
+@st.composite
+def layer_strategy(draw: st.DrawFn) -> int:
+    return draw(st.integers(min_value=0, max_value=255))
 
 
-@pytest.fixture
-def sample_grid() -> Grid:
-    return BASIC_GRID
+@st.composite
+def data_type_strategy(draw: st.DrawFn) -> int:
+    return draw(st.integers(min_value=0, max_value=32767))
 
 
-@pytest.fixture
-def sample_polygon() -> Polygon:
-    return BASIC_POLYGON
+@st.composite
+def cell_strategy(draw: st.DrawFn, *, cell_name: str | None = None) -> Cell:
+    if cell_name is not None:
+        return Cell(cell_name)
+    return Cell(draw(st.text(min_size=1)))
 
 
-@pytest.fixture
-def sample_path() -> Path:
-    return BASIC_PATH
+@st.composite
+def library_strategy(draw: st.DrawFn) -> Library:
+    return Library(draw(st.text(min_size=1)))
 
 
-@pytest.fixture
-def sample_text() -> Text:
-    return BASIC_TEXT
+@st.composite
+def grid_strategy(draw: st.DrawFn) -> Grid:
+    return Grid(
+        draw(point_strategy()),
+        draw(st.integers(min_value=1, max_value=200)),
+        draw(st.integers(min_value=1, max_value=200)),
+        draw(point_strategy()),
+        draw(point_strategy()),
+        draw(st.integers()),
+        draw(st.integers(min_value=1)),
+        draw(st.booleans()),
+    )
 
 
-@pytest.fixture
-def sample_reference() -> Reference:
-    return BASIC_REFERENCE
+@st.composite
+def polygon_strategy(draw: st.DrawFn) -> Polygon:
+    points = draw(st.lists(point_strategy(), min_size=4, max_size=8191))
+    if points[0] != points[-1]:
+        points.append(points[0])
+    return Polygon(points, draw(layer_strategy()), draw(data_type_strategy()))
 
 
-@pytest.fixture
-def all_instances(
-    sample_cell: Cell,
-    sample_polygon: Polygon,
-    sample_path: Path,
-    sample_text: Text,
-    sample_reference: Reference,
-) -> list[Instance]:
-    return [sample_cell, sample_polygon, sample_path, sample_text, sample_reference]
+@st.composite
+def path_strategy(draw: st.DrawFn) -> Path:
+    width_from_draw = draw(
+        st.one_of(
+            st.decimals(
+                min_value=1,
+                max_value=65535,
+                allow_infinity=False,
+                allow_nan=False,
+                places=4,
+            ),
+            st.none(),
+        )
+    )
+
+    if width_from_draw is not None:
+        width = float(width_from_draw)
+    else:
+        width = None
+
+    return Path(
+        draw(st.lists(point_strategy(), min_size=2)),
+        draw(layer_strategy()),
+        draw(data_type_strategy()),
+        draw(st.sampled_from(PathType.values()) | st.none()),
+        width,
+    )
 
 
-@pytest.fixture
-def unique_instance_pairs(
-    all_instances: list[Instance],
-) -> list[tuple[Instance, Instance]]:
-    return [
-        (instance, other_instance)
-        for instance in all_instances
-        for other_instance in all_instances
-        if instance != other_instance
-    ]
+@st.composite
+def text_strategy(draw: st.DrawFn) -> Text:
+    return Text(
+        draw(st.text(min_size=1)),
+        draw(point_strategy()),
+        draw(layer_strategy()),
+        draw(st.integers(min_value=1)),
+        draw(st.integers()),
+        draw(st.booleans()),
+        draw(st.sampled_from(VerticalPresentation.values())),
+        draw(st.sampled_from(HorizontalPresentation.values())),
+    )
 
 
-instance_param = pytest.mark.parametrize(
-    "instance",
-    [
-        BASIC_CELL,
-        BASIC_POLYGON,
-        BASIC_PATH,
-        BASIC_TEXT,
-        BASIC_REFERENCE,
-        BASIC_DEEP_REFERENCE,
-    ],
-)
-
-element_param = pytest.mark.parametrize(
-    "element",
-    [
-        BASIC_POLYGON,
-        BASIC_PATH,
-        BASIC_TEXT,
-        BASIC_REFERENCE,
-        BASIC_DEEP_REFERENCE,
-    ],
-)
+@st.composite
+def reference_strategy(draw: st.DrawFn) -> Reference:
+    return Reference(draw(cell_strategy()))
 
 
-unique_instance_pairs_param = pytest.mark.parametrize(
-    "instance,other_instance",
-    [
-        (inst1, inst2)
-        for inst1 in [
-            BASIC_CELL,
-            BASIC_POLYGON,
-            BASIC_PATH,
-            BASIC_TEXT,
-            BASIC_REFERENCE,
-            BASIC_DEEP_REFERENCE,
-        ]
-        for inst2 in [
-            BASIC_CELL,
-            BASIC_POLYGON,
-            BASIC_PATH,
-            BASIC_TEXT,
-            BASIC_REFERENCE,
-            BASIC_DEEP_REFERENCE,
-        ]
-        if inst1 != inst2
-    ],
-)
+@st.composite
+def instance_param_strategy(draw: st.DrawFn) -> Instance:
+    return draw(
+        st.one_of(
+            cell_strategy(),
+            polygon_strategy(),
+            path_strategy(),
+            text_strategy(),
+            reference_strategy(),
+            reference_strategy().map(lambda r: Reference(Reference(r))),
+        )
+    )
 
-unique_element_pairs_param = pytest.mark.parametrize(
-    "element,other_element",
-    [
-        (elem1, elem2)
-        for elem1 in [BASIC_POLYGON, BASIC_PATH, BASIC_TEXT, BASIC_REFERENCE]
-        for elem2 in [BASIC_POLYGON, BASIC_PATH, BASIC_TEXT, BASIC_REFERENCE]
-        if elem1 != elem2
-    ],
-)
+
+@st.composite
+def element_param_strategy(draw: st.DrawFn) -> Element:
+    return draw(
+        st.one_of(
+            polygon_strategy(),
+            path_strategy(),
+            text_strategy(),
+            reference_strategy(),
+        )
+    )
+
+
+def check_references(library: Library, instance: Instance, new_cell: Cell):
+    if isinstance(instance, Cell):
+        assert library.cells[instance.name] == instance
+    elif isinstance(instance, Polygon):
+        assert instance == new_cell.polygons[0]
+    elif isinstance(instance, Path):
+        assert instance == new_cell.paths[0]
+    elif isinstance(instance, Text):
+        assert instance == new_cell.texts[0]
+    else:
+        check_references(library, instance.instance, new_cell)

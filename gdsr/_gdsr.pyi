@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Iterator, Literal
+from typing import Iterator, Literal, Mapping
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -224,6 +224,10 @@ class PathType(Enum):
     Round = 1
     Overlap = 2
 
+    @staticmethod
+    def values() -> list[PathType]:
+        """Return a list of all PathType values."""
+
 class Path:
     @property
     def points(self) -> list[Point]:
@@ -381,10 +385,18 @@ class VerticalPresentation(Enum):
     Middle = 1
     Bottom = 2
 
+    @staticmethod
+    def values() -> list[VerticalPresentation]:
+        """Return a list of all VerticalPresentation values."""
+
 class HorizontalPresentation(Enum):
     Left = 0
     Centre = 1
     Right = 2
+
+    @staticmethod
+    def values() -> list[HorizontalPresentation]:
+        """Return a list of all HorizontalPresentation values."""
 
 class Text:
     text: str
@@ -538,17 +550,56 @@ class Cell:
 class Library:
     name: str
     @property
-    def cells(self) -> dict[str, Cell]:
+    def cells(self) -> Mapping[str, Cell]:
         """Return the cells in the library."""
     def __init__(self, name: str = "library") -> None:
         """Initialize the Library with a name.
 
         :param str name: Library name
         """
-    def add(self, *cells: Cell) -> None:
-        """Add cells to the library."""
+    def add(self, *cells: Cell, replace_pre_existing: bool = False) -> None:
+        """Add cells to the library.
+
+        The cells that are added are not copied and are added by reference.
+        This means that modifying the cells after adding them to the library will
+        also modify the cells in the library.
+
+        If replace_pre_existing is True, this will also look at cells in references and
+        add those to the library as well.
+
+        :param Cell cells: Cells to add to the library.
+        :param bool replace_pre_existing: Replace pre-existing cells with the same name,
+        defaults to False. If this is False and a cell with the same name already exists
+        in the library, a ValueError will be raised.
+
+        ```python
+
+        import gdsr
+
+        lib = gdsr.Library()
+
+        cell = gdsr.Cell("cell")
+
+        lib.add(cell)
+
+        cell_from_lib = lib.cells["cell"]
+
+        cell_from_lib.add(gdsr.Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]))
+
+        assert cell is cell_from_lib
+        ```
+        """
     def remove(self, *cells: Cell) -> None:
         """Remove cells from the library."""
+    def contains(self, cell: Cell) -> bool:
+        """Return True if the library contains the cell."""
+    def __contains__(self, cell: Cell) -> bool:
+        """Return True if the library contains the cell."""
+    def copy(self, deep: bool = False) -> Self:
+        """Return a copy of the library.
+
+        :param bool deep: If True, a deep copy is returned, defaults to False.
+        """
     def to_gds(
         self,
         file_name: PathLike | None = None,
@@ -569,6 +620,12 @@ class Library:
         :param PathLike file_name: Input GDS file name.
         :return: Library
         """
+    def __eq__(self, value: object) -> bool:
+        """Return True if the library is equal to another object."""
+    def __str__(self) -> str:
+        """Return a string representation of the library."""
+    def __repr__(self) -> str:
+        """Return a string representation of the library."""
 
 __all__ = [
     "Cell",

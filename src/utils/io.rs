@@ -21,6 +21,7 @@ use crate::text::utils::get_presentations_from_value;
 use crate::text::Text;
 
 use super::gds_format::{eight_byte_real, u16_array_to_big_endian};
+use super::geometry::round_to_decimals;
 
 pub fn write_gds_head_to_file(
     library_name: &str,
@@ -92,35 +93,30 @@ pub fn write_float_to_eight_byte_real_to_file(mut file: File, value: f64) -> PyR
 }
 
 pub fn write_points_to_file(mut file: File, points: &[Point], scale: f64) -> PyResult<File> {
-    let xy_head = combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger);
-    let points_length = points.len();
-    let mut i0 = 0;
+    const MAX_POINTS: usize = 8191;
+    let points_to_write = points.get(..MAX_POINTS).unwrap_or(points);
 
-    let mut xy_header_buffer = vec![0u8; 4];
-    let mut points_buffer = Vec::with_capacity(8 * 8190);
+    let points_length = points_to_write.len();
+    let record_length = 4 + 8 * points_length;
 
-    while i0 < points_length {
-        let i1 = (i0 + 8190).min(points_length);
-        let record_length = 4 + 8 * (i1 - i0);
+    let mut points_buffer = Vec::with_capacity(8 * points_length);
 
-        xy_header_buffer[0..2].copy_from_slice(&(record_length as u16).to_be_bytes());
-        xy_header_buffer[2..4].copy_from_slice(&xy_head.to_be_bytes());
+    let mut xy_header_buffer = [
+        (record_length as u16),
+        combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
+    ];
 
-        file.write_all(&xy_header_buffer)?;
+    file = write_u16_array_to_file(file, &mut xy_header_buffer)?;
 
-        points_buffer.clear();
-        for point in &points[i0..i1] {
-            let scaled_x = (point.x * scale).round() as i32;
-            let scaled_y = (point.y * scale).round() as i32;
+    for point in points_to_write {
+        let scaled_x = (point.x * scale).round() as i32;
+        let scaled_y = (point.y * scale).round() as i32;
 
-            points_buffer.extend_from_slice(&scaled_x.to_be_bytes());
-            points_buffer.extend_from_slice(&scaled_y.to_be_bytes());
-        }
-
-        file.write_all(&points_buffer)?;
-
-        i0 = i1;
+        points_buffer.extend_from_slice(&scaled_x.to_be_bytes());
+        points_buffer.extend_from_slice(&scaled_y.to_be_bytes());
     }
+
+    file.write_all(&points_buffer)?;
 
     Ok(file)
 }
@@ -319,7 +315,6 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                             text.layer = layer_value;
                         }
                     }
-
                     continue;
                 }
                 GDSRecord::DataType | GDSRecord::BoxType => {
@@ -336,8 +331,10 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 }
                 GDSRecord::Width => {
                     if let GDSRecordData::I32(width) = data {
+                        let path_width =
+                            round_to_decimals(width[0] as f64 * scale, rounding_digits);
                         if let Some(path) = &mut path {
-                            path.width = Some(width[0] as f64 * scale);
+                            path.width = Some(path_width);
                         }
                     }
 
@@ -347,7 +344,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                     if let GDSRecordData::I32(xy) = data {
                         let points = get_points_from_i32_vec(xy)
                             .iter()
-                            .map(|p| p.scale(scale, Point::default()))
+                            .map(|p| p.scale(scale, Point::default()).round(rounding_digits))
                             .collect::<Vec<Point>>();
 
                         if let Some(polygon) = &mut polygon {
@@ -395,16 +392,16 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 }
                 GDSRecord::EndEl => {
                     if let Some(cell) = &mut cell {
-                        match (polygon, path, text, reference) {
-                            (Some(polygon), _, _, _) => cell.polygons.push(polygon),
-                            (_, Some(path), _, _) => cell.paths.push(path),
-                            (_, _, Some(text), _) => cell.texts.push(text),
-                            (_, _, _, Some(reference)) => cell.references.push(reference),
-                            _ => {}
+                        if let Some(polygon) = polygon.take() {
+                            cell.polygons.push(polygon);
+                        } else if let Some(path) = path.take() {
+                            cell.paths.push(path);
+                        } else if let Some(reference) = reference.take() {
+                            cell.references.push(reference);
+                        } else if let Some(text) = text.take() {
+                            cell.texts.push(text);
                         }
                     }
-
-                    // Reset all options
                     polygon = None;
                     path = None;
                     text = None;
@@ -468,7 +465,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 GDSRecord::Mag => {
                     if let GDSRecordData::F64(magnification) = data {
                         if let Some(text) = &mut text {
-                            text.magnification = magnification[0];
+                            text.magnification = magnification[0]
                         } else if let Some(reference) = &mut reference {
                             reference.grid.magnification = magnification[0];
                         }
@@ -662,8 +659,8 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     let long3 = (bytes & 0xFFFFFFFF) as u32;
 
     let exponent = ((short1 & 0x7F00) >> 8) as i32 - 64;
-    let mantissa = (((short1 & 0x00FF) as u64 * 65536 + short2 as u64) * 4294967296 + long3 as u64)
-        as f64
+
+    let mantissa = (((short1 & 0x00FF) as u64) << 48 | (short2 as u64) << 32 | long3 as u64) as f64
         / 72057594037927936.0;
 
     if short1 & 0x8000 != 0 {
