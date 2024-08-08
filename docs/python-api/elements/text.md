@@ -1,4 +1,8 @@
 # Text
 
+## Text
 ::: gdsr._gdsr.Text
-::: gdsr.gdsr.Text
+## VerticalPresentation
+::: gdsr._gdsr.VerticalPresentation
+## HorizontalPresentation
+::: gdsr._gdsr.HorizontalPresentation

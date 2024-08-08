@@ -11,12 +11,9 @@ nav:
     - python-api/point.md
     - python-api/cell.md
     - python-api/library.md
-    - Typings:
-      - python-api/typings/point_like.md
-      - python-api/typings/input_points_like.md
+    - python-api/typings.md
     - Elements:
       - python-api/elements/reference.md
-      - python-api/elements/element_reference.md
       - python-api/elements/path.md
       - python-api/elements/polygon.md
       - python-api/elements/text.md

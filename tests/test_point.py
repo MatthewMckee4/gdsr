@@ -1,15 +1,23 @@
 import pytest
+from hypothesis import assume, given
+from hypothesis import strategies as st
 
 from gdsr import Point
 
+from .conftest import point_strategy
 
-# Point Creation
-def test_point_creation():
-    p = Point(1, 2)
-    assert p.x == 1
-    assert p.y == 2
-    assert p[0] == 1
-    assert p[1] == 2
+# Point init
+
+float_strategy = st.floats(allow_nan=False)
+
+
+@given(x=float_strategy, y=float_strategy)
+def test_point_creation(x: float, y: float):
+    p = Point(x, y)
+    assert p.x == x
+    assert p.y == y
+    assert p[0] == x
+    assert p[1] == y
 
 
 def test_point_invalid_initialization():
@@ -19,52 +27,63 @@ def test_point_invalid_initialization():
         Point(None, None)  # type: ignore
 
 
-# Point Boolean Evaluation
+# Point bool
 def test_point_bool():
     p = Point(0, 0)
     assert not p
-    p = Point(1, 0)
+
+
+@given(x=float_strategy, y=float_strategy)
+def test_point_bool_true(x: float, y: float):
+    assume(x != 0 or y != 0)
+    p = Point(x, y)
     assert p
-    p = Point(0, 1)
-    assert p
-    p = Point(1, 1)
-    assert p
 
 
-# Equality Comparisons
-def test_point_equal_to_point():
-    p1 = Point(1, 2)
-    p2 = Point(1, 2)
-    assert p1 == p2
+# Point eq
 
 
-def test_point_equal_to_tuple():
-    p = Point(1, 2)
-    assert p == (1, 2)
+@given(p=point_strategy())
+def test_point_equal_to_point(p: Point):
+    assert p == p
 
 
-def test_point_equal_to_list():
-    p = Point(1, 2)
-    assert p == [1, 2]
+@given(x=st.floats(allow_nan=False), y=float_strategy)
+def test_point_equal_to_tuple(x: float, y: float):
+    p = Point(x, y)
+    assert p == (x, y)
 
 
-def test_point_not_equal_to_point():
-    p1 = Point(1, 2)
-    p2 = Point(2, 1)
-    assert p1 != p2
+@given(x=float_strategy, y=float_strategy)
+def test_point_equal_to_list(x: float, y: float):
+    p = Point(x, y)
+    assert p == [x, y]
 
 
-def test_point_not_equal_to_tuple():
-    p = Point(1, 2)
-    assert p != (2, 1)
+@given(x=float_strategy, y=float_strategy)
+def test_point_not_equal_to_point(x: float, y: float):
+    p = Point(x, y)
+    assert p != Point(x + 1, y)
+    assert p != Point(x, y + 1)
 
 
-def test_point_not_equal_to_list():
-    p = Point(1, 2)
-    assert p != [2, 1]
+@given(x=float_strategy, y=float_strategy)
+def test_point_not_equal_to_tuple(x: float, y: float):
+    p = Point(x, y)
+    assert p != (x + 1, y)
+    assert p != (x, y + 1)
 
 
-# Comparison Operators
+@given(x=float_strategy, y=float_strategy)
+def test_point_not_equal_to_list(x: float, y: float):
+    p = Point(x, y)
+    assert p != [x + 1, y]
+    assert p != [x, y + 1]
+
+
+# Point comparison
+
+
 def test_point_less_than_point():
     p1 = Point(1, 2)
     p2 = Point(2, 1)
@@ -135,7 +154,7 @@ def test_point_greater_than_or_equal_to_list():
     assert p >= [2, 1]
 
 
-# Addition Operations
+# Point add
 def test_point_add_point():
     p1 = Point(1, 2)
     p2 = Point(3, 4)
@@ -197,7 +216,7 @@ def test_point_add_invalid_operand():
         p + 3  # type: ignore
 
 
-# Subtraction Operations
+# Point sub
 def test_point_sub_point():
     p1 = Point(1, 2)
     p2 = Point(3, 4)
@@ -265,7 +284,7 @@ def test_list_isub_point():
     assert p2 == (2, 2)
 
 
-# Multiplication Operations
+# Point mul
 def test_point_mul():
     p = Point(1, 2)
     p3 = p * 3
@@ -284,7 +303,7 @@ def test_point_imul():
     assert p == (3, 6)
 
 
-# Division Operations
+# Point truediv
 def test_point_truediv():
     p = Point(3, 6)
     p3 = p / 3
@@ -321,10 +340,13 @@ def test_point_floor_div_by_zero():
         _ = p // 0
 
 
-# String Representation
+# Point str
 def test_point_str():
     p = Point(1, 2)
     assert str(p) == "Point(1, 2)"
+
+
+# Point repr
 
 
 def test_point_repr():
@@ -332,14 +354,14 @@ def test_point_repr():
     assert repr(p) == "(1, 2)"
 
 
-# Rounding
+# Point round
 def test_point_round():
     p = Point(1.12, 2.28)
     p3 = round(p, 1)
     assert p3 == (1.1, 2.3)
 
 
-# Negation
+# Point neg
 def test_point_neg():
     p = Point(1, 2)
     p3 = -p
@@ -352,7 +374,7 @@ def test_negative_point_neg():
     assert p3 == (1, 2)
 
 
-# Distance Calculations
+# Point distance_to
 def test_point_distance_to():
     p1 = Point(1, 1)
     p2 = Point(4, 5)
@@ -375,7 +397,7 @@ def test_point_large_values():
     assert p1.distance_to(p2) == 0
 
 
-# Copying Points
+# Point copy
 def test_point_copy():
     p = Point(1, 2)
     p2 = p.copy()
@@ -383,7 +405,7 @@ def test_point_copy():
     assert p is not p2
 
 
-# Immutability Checks
+# Point frozen
 def test_point_is_immutable():
     p = Point(1, 2)
     with pytest.raises(AttributeError):
@@ -396,13 +418,13 @@ def test_point_is_immutable():
         p[1] = 3  # type: ignore
 
 
-# Hashing
+# Point hash
 def test_hash():
     point_dict = {Point(3.0, 4.0): "test"}
     assert point_dict[Point(3.0, 4.0)] == "test"
 
 
-# Initialization Tests
+# Point init with negative values
 def test_point_init_negative():
     p = Point(-1, -2)
     assert p.x == -1

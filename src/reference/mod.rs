@@ -46,17 +46,15 @@ impl IntoPy<PyObject> for ReferenceInstance {
 
 impl FromPyObject<'_> for ReferenceInstance {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Python::with_gil(|py| {
-            if let Ok(cell) = ob.extract::<Cell>() {
-                Ok(ReferenceInstance::Cell(Py::new(py, cell)?))
-            } else if let Ok(element) = ob.extract::<Element>() {
-                Ok(ReferenceInstance::Element(element))
-            } else {
-                Err(PyTypeError::new_err(
-                    "ReferenceInstance must be a Cell or Element",
-                ))
-            }
-        })
+        if let Ok(cell) = ob.extract::<Py<Cell>>() {
+            Ok(ReferenceInstance::Cell(cell))
+        } else if let Ok(element) = ob.extract::<Element>() {
+            Ok(ReferenceInstance::Element(element))
+        } else {
+            Err(PyTypeError::new_err(
+                "ReferenceInstance must be a Cell or Element",
+            ))
+        }
     }
 }
 

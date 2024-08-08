@@ -207,7 +207,7 @@ def test_read_write(instance: Instance):
     check_references(new_library, instance, new_cell)
 
 
-def _get_cell_from_recursive_reference(reference: Reference) -> Cell | None:
+def _get_cell_from_recursive_reference(reference: "Reference[Instance]") -> Cell | None:
     if isinstance(reference.instance, Cell):
         return reference.instance
     elif isinstance(reference.instance, Reference):

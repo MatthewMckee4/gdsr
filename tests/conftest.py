@@ -1,11 +1,11 @@
+from typing import TYPE_CHECKING
+
 from hypothesis import strategies as st
 
 from gdsr import (
     Cell,
-    Element,
     Grid,
     HorizontalPresentation,
-    Instance,
     Library,
     Path,
     PathType,
@@ -15,6 +15,9 @@ from gdsr import (
     Text,
     VerticalPresentation,
 )
+
+if TYPE_CHECKING:
+    from gdsr import Element, Instance
 
 
 @st.composite
@@ -117,12 +120,12 @@ def text_strategy(draw: st.DrawFn) -> Text:
 
 
 @st.composite
-def reference_strategy(draw: st.DrawFn) -> Reference:
+def reference_strategy(draw: st.DrawFn) -> "Reference[Instance]":
     return Reference(draw(cell_strategy()))
 
 
 @st.composite
-def instance_param_strategy(draw: st.DrawFn) -> Instance:
+def instance_param_strategy(draw: st.DrawFn) -> "Instance":
     return draw(
         st.one_of(
             cell_strategy(),
@@ -136,7 +139,7 @@ def instance_param_strategy(draw: st.DrawFn) -> Instance:
 
 
 @st.composite
-def element_param_strategy(draw: st.DrawFn) -> Element:
+def element_param_strategy(draw: st.DrawFn) -> "Element":
     return draw(
         st.one_of(
             polygon_strategy(),
@@ -147,7 +150,7 @@ def element_param_strategy(draw: st.DrawFn) -> Element:
     )
 
 
-def check_references(library: Library, instance: Instance, new_cell: Cell):
+def check_references(library: Library, instance: "Instance", new_cell: Cell):
     if isinstance(instance, Cell):
         assert library.cells[instance.name] == instance
     elif isinstance(instance, Polygon):

@@ -16,7 +16,13 @@ impl Reference {
     #[new]
     #[pyo3(signature=(instance, grid=Grid::default()))]
     pub fn new(instance: ReferenceInstance, grid: Grid) -> Self {
-        Reference { instance, grid }
+        match instance {
+            ReferenceInstance::Cell(cell) => Python::with_gil(|py| Reference {
+                instance: ReferenceInstance::Cell(cell.clone_ref(py)),
+                grid,
+            }),
+            ReferenceInstance::Element(_) => Reference { instance, grid },
+        }
     }
 
     #[getter]
@@ -71,4 +77,7 @@ impl Reference {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
+
+    #[staticmethod]
+    fn __getitem__(_obj: Bound<'_, PyAny>) {}
 }

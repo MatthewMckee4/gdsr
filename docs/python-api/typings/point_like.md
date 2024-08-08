@@ -1,3 +1,0 @@
-# PointLike
-
-::: gdsr.typings.PointLike

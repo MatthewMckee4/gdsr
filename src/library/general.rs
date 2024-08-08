@@ -18,23 +18,20 @@ impl Library {
     }
 
     #[pyo3(signature = (*cells, replace_pre_existing=false))]
-    pub fn add(
-        &mut self,
-        cells: Vec<Py<Cell>>,
-        replace_pre_existing: bool,
-        py: Python,
-    ) -> PyResult<()> {
-        for cell in cells {
-            if !replace_pre_existing && self.cells.contains_key(&cell.borrow(py).name) {
-                return Err(PyValueError::new_err(format!(
-                    "Cell with name {} already exists in library",
-                    cell.borrow(py).name
-                )));
+    pub fn add(&mut self, cells: Vec<Py<Cell>>, replace_pre_existing: bool) -> PyResult<()> {
+        Python::with_gil(|py| {
+            for cell in cells {
+                if !replace_pre_existing && self.cells.contains_key(&cell.borrow(py).name) {
+                    return Err(PyValueError::new_err(format!(
+                        "Cell with name {} already exists in library",
+                        cell.borrow(py).name
+                    )));
+                }
+                self.cells
+                    .insert(cell.borrow(py).name.clone(), cell.clone_ref(py));
             }
-            self.cells
-                .insert(cell.borrow(py).name.clone(), cell.clone_ref(py));
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     #[pyo3(signature = (*cells))]
@@ -55,10 +52,6 @@ impl Library {
         false
     }
 
-    pub fn __contains__(&self, cell: Py<Cell>, py: Python) -> bool {
-        self.contains(cell, py)
-    }
-
     #[pyo3(signature = (deep=false))]
     pub fn copy(&self, deep: bool, py: Python) -> PyResult<Self> {
         let mut cells: HashMap<String, Py<Cell>> = HashMap::new();
@@ -73,6 +66,15 @@ impl Library {
             name: self.name.clone(),
             cells,
         })
+    }
+
+    fn __add__(mut slf: PyRefMut<'_, Self>, cell: Py<Cell>) -> PyRefMut<'_, Self> {
+        let _ = slf.add([cell].to_vec(), true);
+        slf
+    }
+
+    pub fn __contains__(&self, cell: Py<Cell>, py: Python) -> bool {
+        self.contains(cell, py)
     }
 
     pub fn __eq__(&self, other: &Self, py: Python) -> bool {

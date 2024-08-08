@@ -29,24 +29,26 @@ impl Cell {
         Dimensions::bounding_box(self)
     }
 
-    #[pyo3(signature=(*elements))]
+    #[pyo3(signature = (*elements))]
     pub fn add(&mut self, elements: Vec<Element>) -> PyResult<()> {
-        for element in elements {
-            match element {
-                Element::Polygon(polygon) => {
-                    self.polygons.push(polygon);
-                }
-                Element::Path(path) => {
-                    self.paths.push(path);
-                }
-                Element::Reference(reference) => {
-                    self.references.push(reference);
-                }
-                Element::Text(text) => {
-                    self.texts.push(text);
+        Python::with_gil(|py| {
+            for element in elements {
+                match element {
+                    Element::Polygon(polygon) => {
+                        self.polygons.push(polygon.clone_ref(py));
+                    }
+                    Element::Path(path) => {
+                        self.paths.push(path.clone_ref(py));
+                    }
+                    Element::Reference(reference) => {
+                        self.references.push(reference.clone_ref(py));
+                    }
+                    Element::Text(text) => {
+                        self.texts.push(text.clone_ref(py));
+                    }
                 }
             }
-        }
+        });
         Ok(())
     }
 

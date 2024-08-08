@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Iterator, Literal, Mapping
+from typing import Generic, Iterator, Literal, Mapping, TypeAlias, TypeVar
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -46,7 +46,7 @@ class Point:
     def round(self, digits: int = 0) -> Self:
         """Return the point with rounded coordinates.
 
-        :param int ndigits: Number of digits to round to, defaults to None.
+        :param int digits: Number of digits to round to, defaults to None.
         """
     def angle_to(self, other: PointLike) -> float | None:
         """Return the angle to another point in degrees.
@@ -55,29 +55,50 @@ class Point:
 
         :param PointLike other: The other point.
         """
-
-    def __getitem__(self, index: Literal[0, 1]) -> float: ...
-    def __bool__(self) -> bool: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __add__(self, other: PointLike) -> Self: ...
-    def __radd__(self, other: PointLike) -> Self: ...
-    def __sub__(self, other: PointLike) -> Self: ...
-    def __rsub__(self, other: PointLike) -> Self: ...
-    def __mul__(self, value: float) -> Self: ...
-    def __rmul__(self, value: float) -> Self: ...
-    def __truediv__(self, value: float) -> Self: ...
-    def __floordiv__(self, value: float) -> Self: ...
-    def __neg__(self) -> Self: ...
-    def __round__(self, ndigits: int | None) -> Self: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, value: object) -> bool: ...
-    def __lt__(self, other: object) -> bool: ...
-    def __le__(self, other: object) -> bool: ...
-    def __gt__(self, other: object) -> bool: ...
-    def __ge__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-    def __iter__(self) -> PointIterator: ...
+    def __getitem__(self, index: Literal[0, 1]) -> float:
+        """Return the x or y coordinate of the point."""
+    def __bool__(self) -> bool:
+        """Return True if the point is not the origin."""
+    def __repr__(self) -> str:
+        """Return a string representation of the point."""
+    def __str__(self) -> str:
+        """Return a string representation of the point."""
+    def __add__(self, other: PointLike) -> Self:
+        """Return the sum of the point and another point."""
+    def __radd__(self, other: PointLike) -> Self:
+        """Return the sum of the point and another point."""
+    def __sub__(self, other: PointLike) -> Self:
+        """Return the difference of the point and another point."""
+    def __rsub__(self, other: PointLike) -> Self:
+        """Return the difference of the point and another point."""
+    def __mul__(self, value: float) -> Self:
+        """Return the product of the point and a scalar."""
+    def __rmul__(self, value: float) -> Self:
+        """Return the product of the point and a scalar."""
+    def __truediv__(self, value: float) -> Self:
+        """Return the quotient of the point and a scalar."""
+    def __floordiv__(self, value: float) -> Self:
+        """Return the floored quotient of the point and a scalar."""
+    def __neg__(self) -> Self:
+        """Return the negative of the point."""
+    def __round__(self, ndigits: int | None) -> Self:
+        """Return the point with rounded coordinates."""
+    def __eq__(self, other: object) -> bool:
+        """Return True if the point is equal to another object."""
+    def __ne__(self, value: object) -> bool:
+        """Return True if the point is not equal to another object."""
+    def __lt__(self, other: object) -> bool:
+        """Return True if the point is less than another object."""
+    def __le__(self, other: object) -> bool:
+        """Return True if the point is less than or equal to another object."""
+    def __gt__(self, other: object) -> bool:
+        """Return True if the point is greater than another object."""
+    def __ge__(self, other: object) -> bool:
+        """Return True if the point is greater than or equal to another object."""
+    def __hash__(self) -> int:
+        """Return the hash of the point."""
+    def __iter__(self) -> PointIterator:
+        """Return an iterator over the coordinates of the point."""
 
 class Grid:
     @property
@@ -166,12 +187,19 @@ class Grid:
     def __repr__(self) -> str:
         """Return a string representation of the grid."""
 
-Instance = Cell | Element
+Instance: TypeAlias = Cell | Element
 
-class Reference:
-    instance: Instance
+T_Instance = TypeVar("T_Instance", bound=Instance, covariant=True)
+"""Type variable for an instance."""
+
+class Reference(Generic[T_Instance]):
+    """Reference object. Do not subscript this class, use inferred generic types."""
+
+    instance: T_Instance
+    """The instance to reference."""
     grid: Grid
-    def __init__(self, instance: Instance, grid: Grid = Grid()) -> None:
+    """The grid to reference the cell."""
+    def __init__(self, instance: T_Instance, grid: Grid = Grid()) -> None:
         """Initialize the Reference with an instance and a grid.
 
         :param Instance instance: The instance to reference.
@@ -180,7 +208,7 @@ class Reference:
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the reference."""
-    def copy(self) -> Self:
+    def copy(self) -> Reference[T_Instance]:
         """Return a copy of the reference."""
     def move_to(self, point: PointLike) -> Self:
         """Move the reference to a point.
@@ -474,7 +502,7 @@ class Text:
     def __repr__(self) -> str:
         """Return a string representation of the text."""
 
-Element = Reference | Path | Polygon | Text
+Element: TypeAlias = Reference[Instance] | Path | Polygon | Text
 
 class Cell:
     name: str
@@ -483,7 +511,7 @@ class Cell:
     @property
     def paths(self) -> list[Path]: ...
     @property
-    def references(self) -> list[Reference]: ...
+    def references(self) -> list[Reference[Instance]]: ...
     @property
     def texts(self) -> list[Text]: ...
     def __init__(self, name: str) -> None:
@@ -593,8 +621,6 @@ class Library:
         """Remove cells from the library."""
     def contains(self, cell: Cell) -> bool:
         """Return True if the library contains the cell."""
-    def __contains__(self, cell: Cell) -> bool:
-        """Return True if the library contains the cell."""
     def copy(self, deep: bool = False) -> Self:
         """Return a copy of the library.
 
@@ -611,7 +637,7 @@ class Library:
         :param PathLike file_name: Output GDS file name.
         :param float units: GDS file units in meters, defaults to 1e-6.
         :param float precision: GDS file precision, defaults to 1e-10.
-        :return: GDS file name
+        :return: GDS file path
         """
     @staticmethod
     def from_gds(file_name: PathLike) -> Library:
@@ -620,6 +646,31 @@ class Library:
         :param PathLike file_name: Input GDS file name.
         :return: Library
         """
+    def __add__(self, other: Cell) -> Self:
+        """Add a cell to the library.
+
+        This simple calls the add method with the cell as an argument,
+        and replace_pre_existing as True.
+
+        :param Cell other: Cell to add to the library.
+
+        This can be used in the following way:
+        ```python
+        import gdsr
+
+        library = gdsr.Library()
+
+        cell = gdsr.Cell("cell")
+
+        library = library + cell
+        # or
+        library += cell
+        # or
+        library + cell
+        ```
+        """
+    def __contains__(self, cell: Cell) -> bool:
+        """Return True if the library contains the cell."""
     def __eq__(self, value: object) -> bool:
         """Return True if the library is equal to another object."""
     def __str__(self) -> str:

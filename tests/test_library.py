@@ -65,6 +65,24 @@ def test_library_add_cell_replaces_pre_existing_cell(library: Library, cell_name
     assert library.cells[cell_name] is cell2
 
 
+@given(library=library_strategy(), cell=cell_strategy())
+def test_library_add_dunder(library: Library, cell: Cell):
+    library += cell
+    assert library.cells[cell.name] is cell
+
+
+@given(library=library_strategy(), cell_name=st.text())
+def test_library_add_dunder_does_not_raise_error_when_cell_with_same_name_exists(
+    library: Library, cell_name: str
+):
+    cell1 = Cell(cell_name)
+    cell2 = Cell(cell_name)
+    library += cell1
+    assert library.cells[cell_name] is cell1
+    library += cell2
+    assert library.cells[cell_name] is cell2
+
+
 # Library remove
 
 

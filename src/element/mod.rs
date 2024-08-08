@@ -34,21 +34,19 @@ impl Element {
 
 impl FromPyObject<'_> for Element {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Python::with_gil(|py| {
-            if let Ok(element) = ob.extract::<Path>() {
-                Ok(Element::Path(Py::new(py, element)?))
-            } else if let Ok(element) = ob.extract::<Polygon>() {
-                Ok(Element::Polygon(Py::new(py, element)?))
-            } else if let Ok(element) = ob.extract::<Reference>() {
-                Ok(Element::Reference(Py::new(py, element)?))
-            } else if let Ok(element) = ob.extract::<Text>() {
-                Ok(Element::Text(Py::new(py, element)?))
-            } else {
-                Err(PyTypeError::new_err(
-                    "Element must be a Path, Polygon, Reference or Text",
-                ))
-            }
-        })
+        if let Ok(element) = ob.extract::<Py<Path>>() {
+            Ok(Element::Path(element))
+        } else if let Ok(element) = ob.extract::<Py<Polygon>>() {
+            Ok(Element::Polygon(element))
+        } else if let Ok(element) = ob.extract::<Py<Reference>>() {
+            Ok(Element::Reference(element))
+        } else if let Ok(element) = ob.extract::<Py<Text>>() {
+            Ok(Element::Text(element))
+        } else {
+            Err(PyTypeError::new_err(
+                "Element must be a Path, Polygon, Reference or Text",
+            ))
+        }
     }
 }
 
