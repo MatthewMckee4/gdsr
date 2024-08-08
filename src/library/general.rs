@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap};
+use std::collections::HashMap;
 
 use pyo3::{exceptions::PyValueError, prelude::*};
 
@@ -48,7 +48,7 @@ impl Library {
     pub fn contains(&self, cell: Py<Cell>, py: Python) -> bool {
         let cell = cell.borrow(py);
         for c in self.cells.values() {
-            if c.borrow(py).eq(cell.borrow()) {
+            if c.borrow(py).__eq__(&cell) {
                 return true;
             }
         }
@@ -83,7 +83,7 @@ impl Library {
             if !other.cells.contains_key(key)
                 || !value
                     .borrow(py)
-                    .eq(&other.cells.get(key).unwrap().borrow(py))
+                    .__eq__(&other.cells.get(key).unwrap().borrow(py))
             {
                 return false;
             }

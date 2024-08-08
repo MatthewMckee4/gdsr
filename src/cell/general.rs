@@ -1,6 +1,6 @@
 use std::ops::DerefMut;
 
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::prelude::*;
 
 use crate::{
     element::Element,
@@ -30,10 +30,8 @@ impl Cell {
     }
 
     #[pyo3(signature=(*elements))]
-    pub fn add(&mut self, elements: &Bound<'_, PyTuple>) -> PyResult<()> {
-        for element in elements.iter() {
-            let element: Element = element.extract()?;
-
+    pub fn add(&mut self, elements: Vec<Element>) -> PyResult<()> {
+        for element in elements {
             match element {
                 Element::Polygon(polygon) => {
                     self.polygons.push(polygon);
@@ -42,7 +40,7 @@ impl Cell {
                     self.paths.push(path);
                 }
                 Element::Reference(reference) => {
-                    self.references.push(*reference);
+                    self.references.push(reference);
                 }
                 Element::Text(text) => {
                     self.texts.push(text);
@@ -53,35 +51,65 @@ impl Cell {
     }
 
     #[pyo3(signature=(*elements))]
-    pub fn remove(&mut self, elements: &Bound<'_, PyTuple>) -> PyResult<()> {
-        for element in elements.iter() {
-            let element: Element = element.extract()?;
-
-            match element {
-                Element::Polygon(polygon) => {
-                    self.polygons.retain(|x| x != &polygon);
-                }
-                Element::Path(path) => {
-                    self.paths.retain(|x| x != &path);
-                }
-                Element::Reference(reference) => {
-                    self.references.retain(|x| x != &*reference);
-                }
-                Element::Text(text) => {
-                    self.texts.retain(|x| x != &text);
+    pub fn remove(&mut self, elements: Vec<Element>) -> PyResult<()> {
+        Python::with_gil(|py| {
+            for element in elements {
+                match element {
+                    Element::Polygon(polygon) => {
+                        self.polygons
+                            .retain(|x| !x.borrow(py).eq(&polygon.borrow(py)));
+                    }
+                    Element::Path(path) => {
+                        self.paths.retain(|x| !x.borrow(py).eq(&path.borrow(py)));
+                    }
+                    Element::Reference(reference) => {
+                        self.references
+                            .retain(|x| !x.borrow(py).eq(&reference.borrow(py)));
+                    }
+                    Element::Text(text) => {
+                        self.texts.retain(|x| !x.borrow(py).eq(&text.borrow(py)));
+                    }
                 }
             }
-        }
+        });
         Ok(())
     }
 
     pub fn contains(&self, element: Element) -> bool {
-        match element {
-            Element::Polygon(polygon) => self.polygons.contains(&polygon),
-            Element::Path(path) => self.paths.contains(&path),
-            Element::Reference(reference) => self.references.contains(&*reference),
-            Element::Text(text) => self.texts.contains(&text),
-        }
+        Python::with_gil(|py| match element {
+            Element::Polygon(polygon) => {
+                for p in &self.polygons {
+                    if p.borrow(py).eq(&polygon.borrow(py)) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Element::Path(path) => {
+                for p in &self.paths {
+                    if p.borrow(py).eq(&path.borrow(py)) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Element::Reference(reference) => {
+                for r in &self.references {
+                    if r.borrow(py).eq(&reference.borrow(py)) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Element::Text(text) => {
+                for t in &self.texts {
+                    if t.borrow(py).eq(&text.borrow(py)) {
+                        return true;
+                    }
+                }
+                false
+            }
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -129,6 +157,57 @@ impl Cell {
 
     pub fn copy(&self) -> Self {
         self.clone()
+    }
+
+    pub fn __eq__(&self, other: &Self) -> bool {
+        Python::with_gil(|py| {
+            if self.name != other.name {
+                return false;
+            }
+
+            if self.polygons.len() != other.polygons.len() {
+                return false;
+            }
+
+            for (self_polygon, other_polygon) in self.polygons.iter().zip(other.polygons.iter()) {
+                if !self_polygon.borrow(py).eq(&other_polygon.borrow(py)) {
+                    return false;
+                }
+            }
+
+            if self.paths.len() != other.paths.len() {
+                return false;
+            }
+
+            for (self_path, other_path) in self.paths.iter().zip(other.paths.iter()) {
+                if !self_path.borrow(py).eq(&other_path.borrow(py)) {
+                    return false;
+                }
+            }
+
+            if self.references.len() != other.references.len() {
+                return false;
+            }
+
+            for (self_reference, other_reference) in
+                self.references.iter().zip(other.references.iter())
+            {
+                if !self_reference.borrow(py).eq(&other_reference.borrow(py)) {
+                    return false;
+                }
+            }
+
+            if self.texts.len() != other.texts.len() {
+                return false;
+            }
+
+            for (self_text, other_text) in self.texts.iter().zip(other.texts.iter()) {
+                if !self_text.borrow(py).eq(&other_text.borrow(py)) {
+                    return false;
+                }
+            }
+            true
+        })
     }
 
     fn __str__(&self) -> PyResult<String> {

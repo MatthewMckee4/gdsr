@@ -11,30 +11,44 @@ use crate::{
     traits::{Dimensions, Movable, Rotatable, Scalable, ToGds},
 };
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum Element {
-    Path(Path),
-    Polygon(Polygon),
-    Reference(Box<Reference>),
-    Text(Text),
+    Path(Py<Path>),
+    Polygon(Py<Polygon>),
+    Reference(Py<Reference>),
+    Text(Py<Text>),
+}
+
+impl Element {
+    pub fn __eq__(self, py: Python, other: Element) -> bool {
+        match (self, other) {
+            (Element::Path(a), Element::Path(b)) => a.borrow(py).eq(&b.borrow(py)),
+            (Element::Polygon(a), Element::Polygon(b)) => a.borrow(py).eq(&b.borrow(py)),
+            (Element::Reference(a), Element::Reference(b)) => a.borrow(py).eq(&b.borrow(py)),
+            (Element::Text(a), Element::Text(b)) => a.borrow(py).eq(&b.borrow(py)),
+            _ => false,
+        }
+    }
 }
 
 impl FromPyObject<'_> for Element {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if let Ok(element) = ob.extract::<Path>() {
-            Ok(Element::Path(element))
-        } else if let Ok(element) = ob.extract::<Polygon>() {
-            Ok(Element::Polygon(element))
-        } else if let Ok(element) = ob.extract::<Reference>() {
-            Ok(Element::Reference(Box::new(element)))
-        } else if let Ok(element) = ob.extract::<Text>() {
-            Ok(Element::Text(element))
-        } else {
-            Err(PyTypeError::new_err(
-                "Element must be a Path, Polygon, Reference, Text, or ElementReference",
-            ))
-        }
+        Python::with_gil(|py| {
+            if let Ok(element) = ob.extract::<Path>() {
+                Ok(Element::Path(Py::new(py, element)?))
+            } else if let Ok(element) = ob.extract::<Polygon>() {
+                Ok(Element::Polygon(Py::new(py, element)?))
+            } else if let Ok(element) = ob.extract::<Reference>() {
+                Ok(Element::Reference(Py::new(py, element)?))
+            } else if let Ok(element) = ob.extract::<Text>() {
+                Ok(Element::Text(Py::new(py, element)?))
+            } else {
+                Err(PyTypeError::new_err(
+                    "Element must be a Path, Polygon, Reference or Text",
+                ))
+            }
+        })
     }
 }
 
@@ -50,133 +64,139 @@ impl IntoPy<PyObject> for Element {
 }
 impl ToGds for Element {
     fn _to_gds(&self, file: File, scale: f64) -> PyResult<File> {
-        match self {
-            Element::Path(element) => element._to_gds(file, scale),
-            Element::Polygon(element) => element._to_gds(file, scale),
-            Element::Reference(element) => element._to_gds(file, scale),
-            Element::Text(element) => element._to_gds(file, scale),
-        }
+        Python::with_gil(|py| match self {
+            Element::Path(element) => element.borrow(py)._to_gds(file, scale),
+            Element::Polygon(element) => element.borrow(py)._to_gds(file, scale),
+            Element::Reference(element) => element.borrow(py)._to_gds(file, scale),
+            Element::Text(element) => element.borrow(py)._to_gds(file, scale),
+        })
     }
 }
 
 impl Movable for Element {
     fn move_to(&mut self, point: Point) -> &mut Self {
-        match self {
+        Python::with_gil(|py| match self {
             Element::Path(element) => {
-                element.move_to(point);
+                element.borrow_mut(py).move_to(point);
             }
             Element::Polygon(element) => {
-                element.move_to(point);
+                element.borrow_mut(py).move_to(point);
             }
             Element::Reference(element) => {
-                element.move_to(point);
+                element.borrow_mut(py).move_to(point);
             }
             Element::Text(element) => {
-                element.move_to(point);
+                element.borrow_mut(py).move_to(point);
             }
-        }
+        });
         self
     }
 
     fn move_by(&mut self, vector: Point) -> &mut Self {
-        match self {
+        Python::with_gil(|py| match self {
             Element::Path(element) => {
-                element.move_by(vector);
+                element.borrow_mut(py).move_by(vector);
             }
             Element::Polygon(element) => {
-                element.move_by(vector);
+                element.borrow_mut(py).move_by(vector);
             }
             Element::Reference(element) => {
-                element.move_by(vector);
+                element.borrow_mut(py).move_by(vector);
             }
             Element::Text(element) => {
-                element.move_by(vector);
+                element.borrow_mut(py).move_by(vector);
             }
-        }
+        });
         self
     }
 }
 
 impl Element {
-    pub fn copy(&self) -> Self {
-        match self {
-            Element::Path(element) => Element::Path(element.copy()),
-            Element::Polygon(element) => Element::Polygon(element.copy()),
-            Element::Reference(element) => Element::Reference(Box::new(element.copy())),
-            Element::Text(element) => Element::Text(element.clone()),
-        }
+    pub fn copy(&self) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            Ok(match self {
+                Element::Path(element) => Element::Path(Py::new(py, element.borrow(py).clone())?),
+                Element::Polygon(element) => {
+                    Element::Polygon(Py::new(py, element.borrow(py).clone())?)
+                }
+                Element::Reference(element) => {
+                    Element::Reference(Py::new(py, element.borrow(py).clone())?)
+                }
+                Element::Text(element) => Element::Text(Py::new(py, element.borrow(py).clone())?),
+            })
+        })
     }
 }
 
 impl Rotatable for Element {
     fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
-        match self {
+        Python::with_gil(|py| match self {
             Element::Path(element) => {
-                element.rotate(angle, centre);
+                element.borrow_mut(py).rotate(angle, centre);
             }
             Element::Polygon(element) => {
-                element.rotate(angle, centre);
+                element.borrow_mut(py).rotate(angle, centre);
             }
             Element::Reference(element) => {
-                element.rotate(angle, centre);
+                element.borrow_mut(py).rotate(angle, centre);
             }
             Element::Text(element) => {
-                element.rotate(angle, centre);
+                element.borrow_mut(py).rotate(angle, centre);
             }
-        }
+        });
         self
     }
 }
 
 impl Scalable for Element {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
-        match self {
+        Python::with_gil(|py| match self {
             Element::Path(element) => {
-                element.scale(factor, centre);
+                element.borrow_mut(py).scale(factor, centre);
             }
             Element::Polygon(element) => {
-                element.scale(factor, centre);
+                element.borrow_mut(py).scale(factor, centre);
             }
             Element::Reference(element) => {
-                element.scale(factor, centre);
+                element.borrow_mut(py).scale(factor, centre);
             }
             Element::Text(element) => {
-                element.scale(factor, centre);
+                element.borrow_mut(py).scale(factor, centre);
             }
-        }
+        });
         self
     }
 }
 
 impl Dimensions for Element {
     fn bounding_box(&self) -> (Point, Point) {
-        match self {
-            Element::Path(element) => element.bounding_box(),
-            Element::Polygon(element) => element.bounding_box(),
-            Element::Reference(element) => element.bounding_box(),
-            Element::Text(element) => element.bounding_box(),
-        }
+        Python::with_gil(|py| match self {
+            Element::Path(element) => element.borrow(py).bounding_box(),
+            Element::Polygon(element) => element.borrow(py).bounding_box(),
+            Element::Reference(element) => element.borrow(py).bounding_box(),
+            Element::Text(element) => element.borrow(py).bounding_box(),
+        })
     }
 }
 
 impl std::fmt::Display for Element {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Element::Path(element) => write!(f, "{}", element),
-            Element::Polygon(element) => write!(f, "{}", element),
-            Element::Reference(element) => write!(f, "{}", element),
-            Element::Text(element) => write!(f, "{}", element),
-        }
+        Python::with_gil(|py| match self {
+            Element::Path(element) => write!(f, "{}", element.borrow(py).clone()),
+            Element::Polygon(element) => write!(f, "{}", element.borrow(py).clone()),
+            Element::Reference(element) => write!(f, "{}", element.borrow(py).clone()),
+            Element::Text(element) => write!(f, "{}", element.borrow(py).clone()),
+        })
     }
 }
 
 impl std::fmt::Debug for Element {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Element::Path(element) => write!(f, "{:?}", element),
-            Element::Polygon(element) => write!(f, "{:?}", element),
-            Element::Reference(element) => write!(f, "{:?}", element),
-            Element::Text(element) => write!(f, "{:?}", element),
-        }
+        Python::with_gil(|py| match self {
+            Element::Path(element) => write!(f, "{:?}", element.borrow(py).clone()),
+            Element::Polygon(element) => write!(f, "{:?}", element.borrow(py).clone()),
+            Element::Reference(element) => write!(f, "{:?}", element.borrow(py).clone()),
+            Element::Text(element) => write!(f, "{:?}", element.borrow(py).clone()),
+        })
     }
 }

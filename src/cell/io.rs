@@ -5,12 +5,12 @@ use chrono::{Datelike, Local, Timelike};
 
 use pyo3::prelude::*;
 
-use crate::element::Element;
-use crate::utils::io::create_temp_file;
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    element::Element,
     reference::ReferenceInstance,
     traits::ToGds,
+    utils::io::create_temp_file,
     utils::{
         io::{write_gds, write_string_with_record_to_file, write_u16_array_to_file},
         transformations::py_any_path_to_string_or_temp_name,
@@ -53,22 +53,29 @@ impl Cell {
 
         file = write_string_with_record_to_file(file, GDSRecord::StrName, &self.name)?;
 
-        for path in &self.paths {
-            file = path._to_gds(file, units / precision)?;
-        }
+        file = Python::with_gil(|py| {
+            for path in &self.paths {
+                file = path.borrow_mut(py)._to_gds(file, units / precision)?;
+            }
 
-        for polygon in &self.polygons {
-            file = polygon._to_gds(file, units / precision)?;
-        }
+            for polygon in &self.polygons {
+                file = polygon.borrow_mut(py)._to_gds(file, units / precision)?
+            }
 
-        for text in &self.texts {
-            file = text._to_gds(file, units / precision)?;
-        }
+            for text in &self.texts {
+                file = text.borrow_mut(py)._to_gds(file, units / precision)?
+            }
 
-        for reference in &self.references {
-            get_child_cells(reference, &mut cells_to_write, written_cell_names);
-            file = reference._to_gds(file, units / precision)?;
-        }
+            for reference in &self.references {
+                get_child_cells(
+                    &reference.borrow(py),
+                    &mut cells_to_write,
+                    written_cell_names,
+                );
+                file = reference.borrow_mut(py)._to_gds(file, units / precision)?
+            }
+            Ok::<_, PyErr>(file)
+        })?;
 
         let mut cell_tail = [
             4,
@@ -90,20 +97,22 @@ fn get_child_cells(
     child_cells: &mut Vec<Cell>,
     written_cell_names: &mut HashSet<String>,
 ) {
-    match &reference.instance {
+    Python::with_gil(|py| match &reference.instance {
         ReferenceInstance::Cell(child_cell) => {
-            if !written_cell_names.contains(&child_cell.name) {
-                written_cell_names.insert(child_cell.name.clone());
-                child_cells.push(child_cell.clone());
+            let cell = child_cell.borrow(py);
+            if !written_cell_names.contains(&cell.name) {
+                written_cell_names.insert(cell.name.clone());
+                child_cells.push(cell.clone());
             }
         }
         ReferenceInstance::Element(element) => match element {
             Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {}
             Element::Reference(reference) => {
-                get_child_cells(reference, child_cells, written_cell_names)
+                let reference = reference.borrow(py);
+                get_child_cells(&reference, child_cells, written_cell_names)
             }
         },
-    }
+    })
 }
 
 #[pymethods]

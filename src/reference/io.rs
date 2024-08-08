@@ -15,16 +15,17 @@ use super::{Reference, ReferenceInstance};
 
 impl ToGds for Reference {
     fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
-        match &self.instance {
-            ReferenceInstance::Cell(cell) => {
-                file = self._to_gds_with_cell(file, scale, &cell.name)?
+        Python::with_gil(|py| {
+            match &self.instance {
+                ReferenceInstance::Cell(cell) => {
+                    file = self._to_gds_with_cell(file, scale, &cell.borrow(py).name)?;
+                }
+                ReferenceInstance::Element(element) => {
+                    file = self._to_gds_with_element(file, scale, element)?;
+                }
             }
-            ReferenceInstance::Element(element) => {
-                file = self._to_gds_with_element(file, scale, element)?;
-            }
-        }
-
-        Ok(file)
+            Ok(file)
+        })
     }
 }
 
@@ -42,7 +43,7 @@ impl Reference {
                     + self.grid.spacing_y * row_index as f64;
 
                 let new_element = element
-                    .copy()
+                    .copy()?
                     .scale(
                         if self.grid.x_reflection { -1.0 } else { 1.0 },
                         self.grid.origin,
@@ -53,7 +54,7 @@ impl Reference {
                         if self.grid.x_reflection { -1.0 } else { 1.0 },
                         self.grid.origin,
                     ))
-                    .copy();
+                    .copy()?;
 
                 file = new_element._to_gds(file, scale)?;
             }

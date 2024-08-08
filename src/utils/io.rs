@@ -257,8 +257,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                     continue;
                 }
                 GDSRecord::EndLib => {
-                    update_references(py, &mut library);
-
+                    update_references(&mut library);
                     continue;
                 }
                 GDSRecord::BgnStr => {
@@ -391,17 +390,19 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                     continue;
                 }
                 GDSRecord::EndEl => {
-                    if let Some(cell) = &mut cell {
-                        if let Some(polygon) = polygon.take() {
-                            cell.polygons.push(polygon);
-                        } else if let Some(path) = path.take() {
-                            cell.paths.push(path);
-                        } else if let Some(reference) = reference.take() {
-                            cell.references.push(reference);
-                        } else if let Some(text) = text.take() {
-                            cell.texts.push(text);
+                    Python::with_gil(|py| {
+                        if let Some(cell) = &mut cell {
+                            if let Some(polygon) = polygon.take() {
+                                cell.polygons.push(Py::new(py, polygon).unwrap());
+                            } else if let Some(path) = path.take() {
+                                cell.paths.push(Py::new(py, path).unwrap());
+                            } else if let Some(reference) = reference.take() {
+                                cell.references.push(Py::new(py, reference).unwrap());
+                            } else if let Some(text) = text.take() {
+                                cell.texts.push(Py::new(py, text).unwrap());
+                            }
                         }
-                    }
+                    });
                     polygon = None;
                     path = None;
                     text = None;
@@ -412,8 +413,10 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
-                            if let ReferenceInstance::Cell(cell) = &mut reference.instance {
-                                cell.name = cell_name;
+                            if let ReferenceInstance::Cell(cell) = &reference.instance {
+                                Python::with_gil(|py| {
+                                    cell.borrow_mut(py).name = cell_name;
+                                });
                             }
                         }
                     }
@@ -502,21 +505,28 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
     Ok(library)
 }
 
-fn update_references(py: Python, library: &mut Library) {
-    let cell_references: Vec<Reference> = library
-        .cells
-        .values()
-        .flat_map(|cell| cell.borrow_mut(py).references.to_vec())
-        .collect();
+fn update_references(library: &mut Library) {
+    Python::with_gil(|py| {
+        let cell_references: Vec<Reference> = library
+            .cells
+            .values()
+            .flat_map(|cell| {
+                cell.borrow_mut(py)
+                    .references
+                    .clone()
+                    .into_iter()
+                    .map(|r| r.borrow_mut(py).clone())
+            })
+            .collect();
 
-    for mut reference in cell_references {
-        if let ReferenceInstance::Cell(ref referenced_name) = reference.instance {
-            if let Some(referenced_cell) = library.cells.get(&referenced_name.name.clone()) {
-                reference.instance =
-                    ReferenceInstance::Cell(referenced_cell.borrow_mut(py).clone());
+        for mut reference in cell_references {
+            if let ReferenceInstance::Cell(referenced_name) = reference.instance {
+                if let Some(referenced_cell) = library.cells.get(&referenced_name.borrow(py).name) {
+                    reference.instance = ReferenceInstance::Cell(referenced_cell.clone_ref(py));
+                }
             }
         }
-    }
+    });
 }
 
 pub struct RecordReader<R: Read> {

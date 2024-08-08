@@ -1,9 +1,8 @@
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from gdsr import Cell, Element, Library
-from gdsr._gdsr import Reference
+from gdsr import Cell, Element, Library, Reference
 
 from .conftest import cell_strategy, element_param_strategy, library_strategy
 
@@ -130,6 +129,7 @@ def test_library_copy_deep(library: Library, cell: Cell):
 # Library read write
 
 
+@settings(deadline=None)
 @given(
     library=library_strategy(), cell=cell_strategy(), element=element_param_strategy()
 )

@@ -11,10 +11,28 @@ use crate::{
 mod general;
 mod io;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum ReferenceInstance {
-    Cell(Cell),
+    Cell(Py<Cell>),
     Element(Element),
+}
+
+impl ReferenceInstance {
+    pub fn __eq__(self, other: ReferenceInstance) -> bool {
+        Python::with_gil(|py| match (self, other) {
+            (ReferenceInstance::Cell(a), ReferenceInstance::Cell(b)) => {
+                a.borrow(py).__eq__(&b.borrow(py))
+            }
+            (ReferenceInstance::Element(a), ReferenceInstance::Element(b)) => a.__eq__(py, b),
+            _ => false,
+        })
+    }
+}
+
+impl PartialEq for ReferenceInstance {
+    fn eq(&self, other: &Self) -> bool {
+        self.clone().__eq__(other.clone())
+    }
 }
 
 impl IntoPy<PyObject> for ReferenceInstance {
@@ -28,21 +46,23 @@ impl IntoPy<PyObject> for ReferenceInstance {
 
 impl FromPyObject<'_> for ReferenceInstance {
     fn extract_bound(ob: &Bound<'_, PyAny>) -> PyResult<Self> {
-        if let Ok(cell) = ob.extract::<Cell>() {
-            Ok(ReferenceInstance::Cell(cell))
-        } else if let Ok(element) = ob.extract::<Element>() {
-            Ok(ReferenceInstance::Element(element))
-        } else {
-            Err(PyTypeError::new_err(
-                "ReferenceInstance must be a Cell or Element",
-            ))
-        }
+        Python::with_gil(|py| {
+            if let Ok(cell) = ob.extract::<Cell>() {
+                Ok(ReferenceInstance::Cell(Py::new(py, cell)?))
+            } else if let Ok(element) = ob.extract::<Element>() {
+                Ok(ReferenceInstance::Element(element))
+            } else {
+                Err(PyTypeError::new_err(
+                    "ReferenceInstance must be a Cell or Element",
+                ))
+            }
+        })
     }
 }
 
 impl Default for ReferenceInstance {
     fn default() -> Self {
-        ReferenceInstance::Cell(Cell::default())
+        Python::with_gil(|py| ReferenceInstance::Cell(Py::new(py, Cell::default()).unwrap()))
     }
 }
 
@@ -57,64 +77,72 @@ impl std::fmt::Display for ReferenceInstance {
 
 impl Movable for ReferenceInstance {
     fn move_to(&mut self, point: Point) -> &mut Self {
-        match self {
-            ReferenceInstance::Cell(cell) => {
-                cell.move_to(point);
-            }
-            ReferenceInstance::Element(element) => {
-                element.move_to(point);
-            }
-        }
-        self
+        Python::with_gil(|py| {
+            match self {
+                ReferenceInstance::Cell(cell) => {
+                    cell.borrow_mut(py).move_to(point);
+                }
+                ReferenceInstance::Element(element) => {
+                    element.move_to(point);
+                }
+            };
+            self
+        })
     }
 
     fn move_by(&mut self, vector: Point) -> &mut Self {
-        match self {
-            ReferenceInstance::Cell(cell) => {
-                cell.move_by(vector);
-            }
-            ReferenceInstance::Element(element) => {
-                element.move_by(vector);
-            }
-        }
-        self
+        Python::with_gil(|py| {
+            match self {
+                ReferenceInstance::Cell(cell) => {
+                    cell.borrow_mut(py).move_by(vector);
+                }
+                ReferenceInstance::Element(element) => {
+                    element.move_by(vector);
+                }
+            };
+            self
+        })
     }
 }
 
 impl Rotatable for ReferenceInstance {
     fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
-        match self {
-            ReferenceInstance::Cell(cell) => {
-                cell.rotate(angle, centre);
-            }
-            ReferenceInstance::Element(element) => {
-                element.rotate(angle, centre);
-            }
-        }
-        self
+        Python::with_gil(|py| {
+            match self {
+                ReferenceInstance::Cell(cell) => {
+                    cell.borrow_mut(py).rotate(angle, centre);
+                }
+                ReferenceInstance::Element(element) => {
+                    element.rotate(angle, centre);
+                }
+            };
+            self
+        })
     }
 }
 
 impl Scalable for ReferenceInstance {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
-        match self {
-            ReferenceInstance::Cell(cell) => {
-                cell.scale(factor, centre);
-            }
-            ReferenceInstance::Element(element) => {
-                element.scale(factor, centre);
-            }
-        }
-        self
+        Python::with_gil(|py| {
+            match self {
+                ReferenceInstance::Cell(cell) => {
+                    cell.borrow_mut(py).scale(factor, centre);
+                }
+                ReferenceInstance::Element(element) => {
+                    element.scale(factor, centre);
+                }
+            };
+            self
+        })
     }
 }
 
 impl Dimensions for ReferenceInstance {
     fn bounding_box(&self) -> (Point, Point) {
-        match self {
-            ReferenceInstance::Cell(cell) => cell.bounding_box(),
+        Python::with_gil(|py| match self {
+            ReferenceInstance::Cell(cell) => cell.borrow(py).bounding_box(),
             ReferenceInstance::Element(element) => element.bounding_box(),
-        }
+        })
     }
 }
 
@@ -130,9 +158,14 @@ pub struct Reference {
 impl std::fmt::Display for Reference {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self.instance {
-            ReferenceInstance::Cell(cell) => {
-                write!(f, "Reference of {} with {}", cell, self.grid)
-            }
+            ReferenceInstance::Cell(cell) => Python::with_gil(|py| {
+                write!(
+                    f,
+                    "Reference of {} with {}",
+                    cell.borrow(py).clone(),
+                    self.grid
+                )
+            }),
             ReferenceInstance::Element(element) => {
                 write!(f, "Reference of {} with {}", element, self.grid)
             }
@@ -143,7 +176,9 @@ impl std::fmt::Display for Reference {
 impl std::fmt::Debug for Reference {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self.instance {
-            ReferenceInstance::Cell(cell) => write!(f, "Reference({:?})", cell),
+            ReferenceInstance::Cell(cell) => {
+                Python::with_gil(|py| write!(f, "Reference({:?})", cell.borrow(py).clone()))
+            }
             ReferenceInstance::Element(element) => write!(f, "Reference({:?})", element),
         }
     }
