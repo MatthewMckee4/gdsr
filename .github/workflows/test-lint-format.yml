@@ -1,6 +1,6 @@
 name: Test, lint, and format
 
-on: [push, pull_request]
+on: [pull_request, workflow_dispatch]
 
 jobs:
   linux-macos-test:
@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ['3.9', '3.12']
+        python-version: ['3.11', '3.12']
     name: Test for ${{ matrix.python-version }} on ${{ matrix.os }}
     uses: ./.github/workflows/build-test.yml
     with:
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.12']
+        python-version: ['3.11', '3.12']
     name: Test for ${{ matrix.python-version }} on windows-latest
     uses: ./.github/workflows/build-test.yml
     with:

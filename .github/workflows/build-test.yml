@@ -17,21 +17,40 @@ jobs:
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
           cache: 'pip'
+
+      - name: Set up virtual environment
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+
       - name: Install dependencies
         run: |
+          source .venv/bin/activate
           pip install .[dev,tests]
+
       - name: Build the pyo3 extension
-        run: maturin develop
+        run: |
+          source .venv/bin/activate
+          maturin develop
+
       - name: Run linters and formatters
         run: |
+          source .venv/bin/activate
           ruff format gdsr
           ruff check gdsr
           isort gdsr
+
       - name: Type-check with mypy
-        run: mypy gdsr
+        run: |
+          source .venv/bin/activate
+          mypy gdsr
+
       - name: Run tests
-        run: pytest .
+        run: |
+          source .venv/bin/activate
+          pytest .
