@@ -116,7 +116,11 @@ def path_strategy(draw: st.DrawFn) -> Path:
 @st.composite
 def text_strategy(draw: st.DrawFn) -> Text:
     return Text(
-        draw(st.text(min_size=1)),
+        draw(
+            st.text(
+                alphabet=st.characters(codec="ascii"),
+            )
+        ),
         draw(point_strategy()),
         draw(layer_strategy()),
         draw(st.integers(min_value=1)),
