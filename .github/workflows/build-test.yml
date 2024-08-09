@@ -25,57 +25,31 @@ jobs:
 
       - name: Set up virtual environment
         run: |
-          python -m venv .venv
-        shell: bash
-
-      - name: Activate virtual environment and install dependencies
-        run: |
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            .\.venv\Scripts\activate
+          pip install uv
+          uv venv
+          if [[ ${{ runner.os }} == 'windows-latest' ]]; then
+            .venv\Scripts\activate
           else
             source .venv/bin/activate
-          fi
+
+      - name: Install dependencies
+        run: |
           pip install .[dev,tests]
-        shell: bash
 
       - name: Build the pyo3 extension
         run: |
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            .\.venv\Scripts\activate
-          else
-            source .venv/bin/activate
-          fi
           maturin develop
-        shell: bash
 
       - name: Run linters and formatters
         run: |
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            .\.venv\Scripts\activate
-          else
-            source .venv/bin/activate
-          fi
           ruff format gdsr
           ruff check gdsr
           isort gdsr
-        shell: bash
 
       - name: Type-check with mypy
         run: |
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            .\.venv\Scripts\activate
-          else
-            source .venv/bin/activate
-          fi
           mypy gdsr
-        shell: bash
 
       - name: Run tests
         run: |
-          if [[ ${{ runner.os }} == 'Windows' ]]; then
-            .\.venv\Scripts\activate
-          else
-            source .venv/bin/activate
-          fi
           pytest .
-        shell: bash
