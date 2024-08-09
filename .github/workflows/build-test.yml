@@ -1,0 +1,37 @@
+name: Reusable Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: 'Operating system'
+        required: true
+        type: string
+      python-version:
+        description: 'Python version'
+        required: true
+        type: string
+
+jobs:
+  build_and_test:
+    runs-on: ${{ inputs.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          pip install .[dev,tests]
+      - name: Build the pyo3 extension
+        run: maturin develop
+      - name: Run linters and formatters
+        run: |
+          ruff format gdsr
+          ruff check gdsr
+          isort gdsr
+      - name: Type-check with mypy
+        run: mypy gdsr
+      - name: Run tests
+        run: pytest .

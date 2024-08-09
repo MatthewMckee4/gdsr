@@ -4,14 +4,12 @@ from hypothesis import strategies as st
 
 from gdsr import Point
 
-from .conftest import point_strategy
+from .conftest import float_strategy, point_strategy
 
 # Point init
 
-float_strategy = st.floats(allow_nan=False)
 
-
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_creation(x: float, y: float):
     p = Point(x, y)
     assert p.x == x
@@ -33,7 +31,7 @@ def test_point_bool():
     assert not p
 
 
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_bool_true(x: float, y: float):
     assume(x != 0 or y != 0)
     p = Point(x, y)
@@ -48,33 +46,33 @@ def test_point_equal_to_point(p: Point):
     assert p == p
 
 
-@given(x=st.floats(allow_nan=False), y=float_strategy)
+@given(x=st.floats(allow_nan=False), y=float_strategy())
 def test_point_equal_to_tuple(x: float, y: float):
     p = Point(x, y)
     assert p == (x, y)
 
 
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_equal_to_list(x: float, y: float):
     p = Point(x, y)
     assert p == [x, y]
 
 
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_not_equal_to_point(x: float, y: float):
     p = Point(x, y)
     assert p != Point(x + 1, y)
     assert p != Point(x, y + 1)
 
 
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_not_equal_to_tuple(x: float, y: float):
     p = Point(x, y)
     assert p != (x + 1, y)
     assert p != (x, y + 1)
 
 
-@given(x=float_strategy, y=float_strategy)
+@given(x=float_strategy(), y=float_strategy())
 def test_point_not_equal_to_list(x: float, y: float):
     p = Point(x, y)
     assert p != [x + 1, y]

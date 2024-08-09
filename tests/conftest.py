@@ -21,15 +21,23 @@ if TYPE_CHECKING:
 
 
 @st.composite
-def point_strategy(draw: st.DrawFn) -> Point:
-    decimal = st.decimals(
-        max_value=214748.3647,
-        min_value=-214748.3648,
-        allow_nan=False,
-        allow_infinity=False,
-        places=4,
+def float_strategy(draw: st.DrawFn) -> float:
+    return float(
+        draw(
+            st.decimals(
+                min_value=-214748.3648,
+                max_value=214748.3647,
+                allow_nan=False,
+                allow_infinity=False,
+                places=4,
+            )
+        )
     )
-    return Point(float(draw(decimal)), float(draw(decimal)))
+
+
+@st.composite
+def point_strategy(draw: st.DrawFn) -> Point:
+    return Point(draw(float_strategy()), draw(float_strategy()))
 
 
 @st.composite

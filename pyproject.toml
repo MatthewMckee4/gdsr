@@ -7,8 +7,8 @@ name = "gdsr"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+
 ]
 keywords = ["gdsr", "rust", "python", "pyo3", "GDSII", "CAD"]
 dynamic = ["version"]
@@ -16,6 +16,16 @@ license = {file = "LICENSE"}
 dependencies = [
     "typing_extensions; python_version < '3.11'"
 ]
+readme = "README.md"
+authors = [
+    {name = "Matthew Mckee", email = "matthewmckee04@yahoo.co.uk"}
+]
+
+[project.urls]
+Documentation = "https://MatthewMckee4.github.io/gdsr/"
+Repository = "https://github.com/MatthewMckee4/gdsr"
+Issues = "https://github.com/MatthewMckee4/gdsr/issues"
+
 
 [tool.maturin]
 module-name = "gdsr._gdsr"

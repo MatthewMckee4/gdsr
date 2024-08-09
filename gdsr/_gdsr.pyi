@@ -428,16 +428,25 @@ class HorizontalPresentation(Enum):
 
 class Text:
     text: str
+    """Text content."""
     @property
-    def origin(self) -> Point: ...
+    def origin(self) -> Point:
+        """Text origin."""
     @origin.setter
-    def origin(self, origin: PointLike) -> None: ...
+    def origin(self, origin: PointLike) -> None:
+        """Set the text origin."""
     layer: Layer
+    """Text layer."""
     magnification: float
+    """Text magnification."""
     angle: float
+    """Text angle in degrees."""
     x_reflection: bool
+    """Text x reflection."""
     vertical_presentation: VerticalPresentation
+    """Text vertical presentation."""
     horizontal_presentation: HorizontalPresentation
+    """Text horizontal presentation."""
     def __init__(
         self,
         text: str,
