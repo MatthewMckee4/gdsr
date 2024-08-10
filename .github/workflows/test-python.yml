@@ -27,26 +27,26 @@ jobs:
         run: |
           python -m venv .venv
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            .venv\Scripts\activate
+            .venv\Scripts\activate && pip install -r requirements-test.txt maturin
           else
-            source .venv/bin/activate
+            source .venv/bin/activate && pip install -r requirements-test.txt maturin
           fi
-          pip install -r requirements-test.txt maturin
+        shell: bash
 
       - name: Build the gdsr package
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            .venv\Scripts\activate
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            .venv\Scripts\activate && maturin develop
           else
-            source .venv/bin/activate
+            source .venv/bin/activate && maturin develop
           fi
-          maturin develop
+        shell: bash
 
       - name: Run tests
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            .venv\Scripts\activate
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            .venv\Scripts\activate && pytest -n auto
           else
-            source .venv/bin/activate
+            source .venv/bin/activate && pytest -n auto
           fi
-          pytest -n auto
+        shell: bash

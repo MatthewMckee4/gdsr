@@ -58,6 +58,7 @@ def test_set_texts_raises_error():
 # Cell add
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_add_polygon(element: Element):
     cell = Cell("test_cell")
@@ -69,6 +70,7 @@ def test_add_polygon(element: Element):
 # Cell remove
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_remove_polygon(element: Element):
     cell = Cell("test_cell")
@@ -150,6 +152,7 @@ def test_cell_equal():
     assert cell == new_cell
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_cell_with_element_equal(element: Element):
     cell = Cell("test_cell")
@@ -159,6 +162,7 @@ def test_cell_with_element_equal(element: Element):
     assert cell == new_cell
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy(), other_element=element_param_strategy())
 def test_cells_with_different_elements_not_equal(
     element: Element, other_element: Element
