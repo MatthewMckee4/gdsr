@@ -38,10 +38,12 @@ jobs:
           command: develop
 
       - name: Run tests
-        shell: bash
+        shell: pwsh
         run: |
-          if [ '${{ matrix.os }}' == 'windows-latest' ]; then
-            .venv\\Scripts\\activate && pytest -n auto
-          else
-            source .venv/bin/activate && pytest -n auto
-          fi
+            if ($env:OS -eq 'Windows_NT') {
+            .venv\\Scripts\\Activate.ps1
+            pytest -n auto
+            } else {
+            source .venv/bin/activate
+            pytest -n auto
+            }
