@@ -29,8 +29,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install uv
+          .venv/bin/pip install uv
           uv pip install -r requirements-test.txt maturin
+        shell: bash
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -38,12 +39,12 @@ jobs:
           command: develop
 
       - name: Run tests
-        shell: pwsh
         run: |
-            if ($env:OS -eq 'Windows_NT') {
-            .venv\\Scripts\\Activate.ps1
-            pytest -n auto
-            } else {
+          if [ ${{ matrix.os }} == 'windows-latest' ]; then
+            .venv\\Scripts\\activate
+            .venv\\Scripts\\pytest -n auto
+          else
             source .venv/bin/activate
             pytest -n auto
-            }
+          fi
+        shell: bash
