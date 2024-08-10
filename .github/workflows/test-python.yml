@@ -23,16 +23,30 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Create virtual environment
+      - name: Set up virtual environment and install dependencies
         run: |
           python -m venv .venv
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            .venv\Scripts\activate
+          else
+            source .venv/bin/activate
+          fi
+          pip install -r requirements-test.txt maturin
 
-      - name: Install dependencies
+      - name: Build the gdsr package
         run: |
-          uv pip install -r requirements-test.txt maturin
-
-      - name: Build the pyo3 extension
-        run: maturin develop
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            .venv\Scripts\activate
+          else
+            source .venv/bin/activate
+          fi
+          maturin develop
 
       - name: Run tests
-        run: pytest -n auto
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            .venv\Scripts\activate
+          else
+            source .venv/bin/activate
+          fi
+          pytest -n auto
