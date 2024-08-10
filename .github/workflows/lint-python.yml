@@ -36,16 +36,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Create virtual environment
-        run: |
-          pip install uv
-          uv venv
-
       - name: Install dependencies
-        run: uv pip install mypy
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install mypy
 
       - name: Run mypy
-        run: mypy gdsr
+        run: |
+          source .venv/bin/activate
+          mypy gdsr
+
   isort:
     runs-on: ubuntu-latest
     strategy:
@@ -60,13 +61,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Create virtual environment
-        run: |
-          pip install uv
-          uv venv
-
       - name: Install dependencies
-        run: uv pip install isort
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install isort
 
       - name: Run isort
-        run: isort gdsr
+        run: |
+          source .venv/bin/activate
+          isort gdsr
