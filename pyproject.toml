@@ -44,12 +44,19 @@ docs = [
     "mkdocs-material",
 ]
 
-tests = [
+test = [
     "pytest",
     "hypothesis",
     "pytest-randomly",
     "pytest-xdist"
 ]
+
+lint = [
+    "ruff",
+    "mypy",
+    "isort",
+]
+
 
 
 [tool.isort]
