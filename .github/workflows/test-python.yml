@@ -26,8 +26,6 @@ jobs:
       - name: Create virtual environment
         run: |
           python -m venv .venv
-          echo "$GITHUB_WORKSPACE/.venv/$BIN" >> $GITHUB_PATH
-          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
@@ -40,5 +38,10 @@ jobs:
           command: develop
 
       - name: Run tests
+        shell: bash
         run: |
-          pytest -n auto
+          if [ '${{ matrix.os }}' == 'windows-latest' ]; then
+            .venv\\Scripts\\activate && pytest -n auto
+          else
+            source .venv/bin/activate && pytest -n auto
+          fi
