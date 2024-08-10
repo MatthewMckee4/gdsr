@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 from gdsr import Cell, Element, Library, Reference
