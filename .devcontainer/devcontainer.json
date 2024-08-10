@@ -1,0 +1,14 @@
+{
+    "name": "Python Dev Container",
+    "dockerFile": "./Dockerfile.ubuntu",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.pythonPath": "/usr/bin/python3"
+            },
+            "extensions": [
+                "ms-python.python"
+            ]
+        }
+    }
+}
