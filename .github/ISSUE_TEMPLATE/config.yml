@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+- name: ❓ Question
+  url: https://github.com/MatthewMckee4/gdsr/discussions
+  about: Ask a question about gdsr

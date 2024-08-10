@@ -2,9 +2,18 @@ name: Test Python
 
 on:
   pull_request:
+    paths:
+      - 'gdsr/**'
+      - 'src/**'
+      - 'tests/**'
   push:
     branches:
       - main
+    paths:
+      - 'gdsr/**'
+      - 'src/**'
+      - 'tests/**'
+
 
 jobs:
   test-python:
@@ -30,8 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
-          uv pip install -r requirements-test.txt maturin
-        shell: bash
+          uv pip install -r requirements-test.txt 
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
