@@ -79,3 +79,10 @@ docs/_build/
 
 # mkdocs
 /site/
+
+# gds
+*.gds
+*.GDS
+
+# hypothesis
+.hypothesis/
