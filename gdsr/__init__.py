@@ -2,7 +2,7 @@
 
 import sys
 
-if sys.version_info >= (3, 9):
+if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
     from typing_extension import TypeAlias

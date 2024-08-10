@@ -2,4 +2,4 @@ pytest
 hypothesis
 pytest-randomly
 pytest-xdist
-typing_extension
+typing_extensions
