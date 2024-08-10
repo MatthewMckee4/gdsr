@@ -147,7 +147,7 @@ def test_library_copy_deep(library: Library, cell: Cell):
 # Library read write
 
 
-@settings(deadline=None, max_examples=5)
+@settings(deadline=None, max_examples=5, suppress_health_check=[HealthCheck.too_slow])
 @given(
     library=library_strategy(), cell=cell_strategy(), element=element_param_strategy()
 )
