@@ -1,11 +1,16 @@
 import sys
 from enum import Enum
-from typing import Generic, Iterator, Literal, Mapping, TypeAlias, TypeVar
+from typing import Generic, Iterator, Literal, Mapping, TypeVar
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self
+
+if sys.version_info >= (3, 9):
+    from typing import TypeAlias
+else:
+    from typing_extension import TypeAlias
 
 from .typings import InputPointsLike, Layer, PathLike, PointLike
 

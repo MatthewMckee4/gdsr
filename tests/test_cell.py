@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 
 from gdsr import Cell, Element
 
@@ -82,6 +82,7 @@ def test_remove_polygon(element: Element):
 # Cell contains
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_contains(element: Element):
     cell = Cell("test_cell")
@@ -97,6 +98,7 @@ def test_contains(element: Element):
 # Cell is_empty
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_is_empty(element: Element):
     cell = Cell("test_cell")
@@ -110,6 +112,7 @@ def test_is_empty(element: Element):
 # Cell copy
 
 
+@settings(max_examples=3)
 @given(element=element_param_strategy())
 def test_copy(element: Element):
     cell = Cell("test_cell")

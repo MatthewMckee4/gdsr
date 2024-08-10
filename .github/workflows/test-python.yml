@@ -26,7 +26,7 @@ jobs:
       - name: Set up virtual environment and install dependencies
         run: |
           python -m venv .venv
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
             .venv\Scripts\activate
           else
             source .venv/bin/activate
