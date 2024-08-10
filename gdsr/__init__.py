@@ -1,11 +1,6 @@
 """GDSR: GDSII Reader and Writer for Python."""
 
-import sys
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extension import TypeAlias
+from typing import TypeAlias
 
 from .logging import setup_logger
 
