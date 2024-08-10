@@ -34,9 +34,10 @@ jobs:
           pip install uv
           uv pip install -r requirements-test.txt maturin
 
-      - name: Build the gdsr package
-        run: |
-          maturin develop
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          command: develop
 
       - name: Run tests
         run: |
