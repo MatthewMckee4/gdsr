@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 
 from gdsr import Cell, Element
 
@@ -84,7 +84,7 @@ def test_remove_polygon(element: Element):
 # Cell contains
 
 
-@settings(max_examples=3)
+@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_contains(element: Element):
     cell = Cell("test_cell")
