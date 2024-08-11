@@ -19,7 +19,10 @@ nav:
       - python-api/elements/text.md
   - Development:
     - development/index.md
-    - development/class_diagrams.md
+    - Contributing:
+      - development/contributing/index.md
+      - development/contributing/ide-configuration.md
+      - development/contributing/code-style.md
 
 theme:
   name: material

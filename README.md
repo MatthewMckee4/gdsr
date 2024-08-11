@@ -3,7 +3,7 @@ GDSII manipulation, written in rust.
 
 ## Documentation
 
-The documentation for this project is available at [matthewmckee4.github.io/gdsr/](matthewmckee4.github.io/gdsr/).
+The documentation for this project is available at [matthewmckee4.github.io/gdsr/](https://matthewmckee4.github.io/gdsr/).
 
 ## Installation
 

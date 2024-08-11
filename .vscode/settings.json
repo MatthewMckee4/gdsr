@@ -1,4 +1,26 @@
 {
+    // Formatting and linting settings
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "ruff.configuration": "pyproject.toml",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnType": true,
+    "python.analysis.typeCheckingMode": "strict",
+
+
+    // Rust settings
+    "rust-analyzer.check.command": "clippy",
+
+    // Pytest settings
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestPath": "pytest",
+
+
+    // C spell words
     "cSpell.words": [
         "axhline",
         "axvline",
@@ -43,11 +65,4 @@
         "xlim",
         "ylim"
     ],
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": [
-        "."
-    ],
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestPath": "pytest"
 }

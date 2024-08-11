@@ -1,0 +1,16 @@
+{
+    "name": "Linux Python Dev Container",
+    "dockerFile": "./Dockerfile",
+    "context": "../..",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "rust-lang.rust-analyzer",
+                "charliermarsh.ruff",
+                "ms-python.isort",
+                "matangover.mypy" 
+            ]
+        }
+    }
+}
