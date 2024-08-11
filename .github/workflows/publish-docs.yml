@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e .[docs]
+          pip install -r requirements-docs.txt
 
       - name: Build docs
         run: mkdocs build
