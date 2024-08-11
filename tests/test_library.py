@@ -4,7 +4,12 @@ from hypothesis import strategies as st
 
 from gdsr import Cell, Element, Library, Reference
 
-from .conftest import cell_strategy, element_param_strategy, library_strategy
+from .conftest import (
+    cell_strategy,
+    element_param_strategy,
+    get_cell_from_recursive_reference,
+    library_strategy,
+)
 
 # Library init
 
@@ -152,9 +157,11 @@ def test_library_copy_deep(library: Library, cell: Cell):
     library=library_strategy(), cell=cell_strategy(), element=element_param_strategy()
 )
 def test_library_read_write(library: Library, cell: Cell, element: Element):
-    if isinstance(element, Reference) and isinstance(element.instance, Cell):
-        assume(element.instance.name != cell.name)
-        library.add(element.instance)
+    if isinstance(element, Reference):
+        instance_cell = get_cell_from_recursive_reference(element)
+        if instance_cell is not None:
+            assume(instance_cell.name != cell.name)
+            library.add(instance_cell)
     cell.add(element)
     library.add(cell)
     new_library = Library.from_gds(library.to_gds())

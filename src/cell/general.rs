@@ -161,57 +161,6 @@ impl Cell {
         self.clone()
     }
 
-    pub fn __eq__(&self, other: &Self) -> bool {
-        Python::with_gil(|py| {
-            if self.name != other.name {
-                return false;
-            }
-
-            if self.polygons.len() != other.polygons.len() {
-                return false;
-            }
-
-            for (self_polygon, other_polygon) in self.polygons.iter().zip(other.polygons.iter()) {
-                if !self_polygon.borrow(py).eq(&other_polygon.borrow(py)) {
-                    return false;
-                }
-            }
-
-            if self.paths.len() != other.paths.len() {
-                return false;
-            }
-
-            for (self_path, other_path) in self.paths.iter().zip(other.paths.iter()) {
-                if !self_path.borrow(py).eq(&other_path.borrow(py)) {
-                    return false;
-                }
-            }
-
-            if self.references.len() != other.references.len() {
-                return false;
-            }
-
-            for (self_reference, other_reference) in
-                self.references.iter().zip(other.references.iter())
-            {
-                if !self_reference.borrow(py).eq(&other_reference.borrow(py)) {
-                    return false;
-                }
-            }
-
-            if self.texts.len() != other.texts.len() {
-                return false;
-            }
-
-            for (self_text, other_text) in self.texts.iter().zip(other.texts.iter()) {
-                if !self_text.borrow(py).eq(&other_text.borrow(py)) {
-                    return false;
-                }
-            }
-            true
-        })
-    }
-
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self))
     }

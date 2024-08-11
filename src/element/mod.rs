@@ -20,15 +20,15 @@ pub enum Element {
     Text(Py<Text>),
 }
 
-impl Element {
-    pub fn __eq__(self, py: Python, other: Element) -> bool {
-        match (self, other) {
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        Python::with_gil(|py| match (self, other) {
             (Element::Path(a), Element::Path(b)) => a.borrow(py).eq(&b.borrow(py)),
             (Element::Polygon(a), Element::Polygon(b)) => a.borrow(py).eq(&b.borrow(py)),
             (Element::Reference(a), Element::Reference(b)) => a.borrow(py).eq(&b.borrow(py)),
             (Element::Text(a), Element::Text(b)) => a.borrow(py).eq(&b.borrow(py)),
             _ => false,
-        }
+        })
     }
 }
 

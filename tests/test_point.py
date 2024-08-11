@@ -596,43 +596,43 @@ def test_cross_tuple():
 def test_point_rotate():
     p = Point(1, 0)
     p2 = p.rotate(90)
-    assert p2 == (0, 1)
+    assert p2.is_close((0, 1))
 
 
 def test_point_rotate_180():
     p = Point(1, 0)
     p2 = p.rotate(180)
-    assert p2 == (-1, 0)
+    assert p2.is_close((-1, 0))
 
 
 def test_point_rotate_270():
     p = Point(1, 0)
     p2 = p.rotate(270)
-    assert p2 == (0, -1)
+    assert p2.is_close((0, -1))
 
 
 def test_point_rotate_360():
     p = Point(1, 0)
     p2 = p.rotate(360)
-    assert p2 == (1, 0)
+    assert p2.is_close((1, 0))
 
 
 def test_point_rotate_negative():
     p = Point(1, 0)
     p2 = p.rotate(-90)
-    assert p2 == (0, -1)
+    assert p2.is_close((0, -1))
 
 
 def test_point_rotate_large():
     p = Point(1, 0)
     p2 = p.rotate(720)
-    assert p2 == (1, 0)
+    assert p2.is_close((1, 0))
 
 
 def test_point_rotate_large_negative():
     p = Point(1, 0)
     p2 = p.rotate(-720)
-    assert p2 == (1, 0)
+    assert p2.is_close((1, 0))
 
 
 # Scale
@@ -684,3 +684,27 @@ def test_point_scale_invalid_centre():
     p = Point(1, 2)
     with pytest.raises(TypeError):
         p.scale(2, "invalid centre")  # type: ignore
+
+
+# Point is_close
+
+
+@given(point=point_strategy())
+def test_point_is_close(point: Point):
+    assert point.is_close(point)
+
+
+@given(point=point_strategy())
+def test_point_is_close_to_tuple(point: Point):
+    assert point.is_close((point.x, point.y))
+
+
+@given(point=point_strategy())
+def test_point_is_close_to_list(point: Point):
+    assert point.is_close([point.x, point.y])
+
+
+@given(point=point_strategy(), abs=float_strategy())
+def test_point_is_close_to_close_point(point: Point, abs: float):
+    assume(abs > 0)
+    assert point.is_close(Point(point.x + abs, point.y + abs), abs_tol=abs)

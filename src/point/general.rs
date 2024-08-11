@@ -40,20 +40,11 @@ impl Point {
         angle: f64,
         #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
     ) -> Self {
-        let (sin, cos) = angle.to_radians().sin_cos();
-        let x = self.x - centre.x;
-        let y = self.y - centre.y;
+        let angle = angle.to_radians();
+        let x = centre.x + (self.x - centre.x) * angle.cos() - (self.y - centre.y) * angle.sin();
+        let y = centre.y + (self.x - centre.x) * angle.sin() + (self.y - centre.y) * angle.cos();
 
-        let new_x = centre.x + x * cos - y * sin;
-        let new_y = centre.y + x * sin + y * cos;
-
-        let rounded_x = (new_x * 1e10).round() / 1e10;
-        let rounded_y = (new_y * 1e10).round() / 1e10;
-
-        Point {
-            x: rounded_x,
-            y: rounded_y,
-        }
+        Point { x, y }
     }
 
     #[pyo3(signature = (factor, centre=Point::default()))]
@@ -88,6 +79,17 @@ impl Point {
         }
 
         Ok(Some(dy.atan2(dx).to_degrees()))
+    }
+
+    #[pyo3(signature = (other, rel_tol=1e-7, abs_tol=1e-10))]
+    pub fn is_close(
+        &self,
+        #[pyo3(from_py_with = "py_any_to_point")] other: Point,
+        rel_tol: f64,
+        abs_tol: f64,
+    ) -> bool {
+        (self.x - other.x).abs() <= abs_tol + rel_tol * other.x.abs()
+            && (self.y - other.y).abs() <= abs_tol + rel_tol * other.y.abs()
     }
 
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {

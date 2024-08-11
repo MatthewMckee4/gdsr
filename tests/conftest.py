@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from hypothesis import assume
 from hypothesis import strategies as st
 
 from gdsr import (
@@ -36,6 +37,11 @@ def float_strategy(draw: st.DrawFn) -> float:
 
 
 @st.composite
+def row_col_strategy(draw: st.DrawFn) -> int:
+    return draw(st.integers(min_value=1, max_value=32767))
+
+
+@st.composite
 def point_strategy(draw: st.DrawFn) -> Point:
     return Point(draw(float_strategy()), draw(float_strategy()))
 
@@ -64,14 +70,16 @@ def library_strategy(draw: st.DrawFn) -> Library:
 
 @st.composite
 def grid_strategy(draw: st.DrawFn) -> Grid:
+    magnification = draw(float_strategy())
+    assume(magnification != 0)
     return Grid(
         draw(point_strategy()),
-        draw(st.integers(min_value=1, max_value=200)),
-        draw(st.integers(min_value=1, max_value=200)),
+        draw(row_col_strategy()),
+        draw(row_col_strategy()),
         draw(point_strategy()),
         draw(point_strategy()),
-        draw(st.integers()),
-        draw(st.integers(min_value=1)),
+        magnification,
+        draw(float_strategy()),
         draw(st.booleans()),
     )
 
@@ -173,3 +181,11 @@ def check_references(library: Library, instance: "Instance", new_cell: Cell):
         assert instance == new_cell.texts[0]
     else:
         check_references(library, instance.instance, new_cell)
+
+
+def get_cell_from_recursive_reference(reference: "Reference[Instance]") -> Cell | None:
+    if isinstance(reference.instance, Cell):
+        return reference.instance
+    elif isinstance(reference.instance, Reference):
+        return get_cell_from_recursive_reference(reference.instance)
+    return None

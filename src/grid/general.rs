@@ -18,19 +18,19 @@ impl Grid {
         rows=1,
         spacing_x=Point::default(),
         spacing_y=Point::default(),
-        angle=0.0,
         magnification=1.0,
+        angle=0.0,
         x_reflection=false
     ))]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         #[pyo3(from_py_with = "py_any_to_point")] origin: Point,
-        columns: usize,
-        rows: usize,
+        columns: u32,
+        rows: u32,
         #[pyo3(from_py_with = "py_any_to_point")] spacing_x: Point,
         #[pyo3(from_py_with = "py_any_to_point")] spacing_y: Point,
-        angle: f64,
         magnification: f64,
+        angle: f64,
         x_reflection: bool,
     ) -> Self {
         Grid {
@@ -39,8 +39,8 @@ impl Grid {
             rows,
             spacing_x,
             spacing_y,
-            angle,
             magnification,
+            angle,
             x_reflection,
         }
     }

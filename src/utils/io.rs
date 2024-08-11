@@ -16,7 +16,7 @@ use crate::path::path_type::PathType;
 use crate::path::Path;
 use crate::point::{get_points_from_i32_vec, Point};
 use crate::polygon::Polygon;
-use crate::reference::{Reference, ReferenceInstance};
+use crate::reference::{Instance, Reference};
 use crate::text::utils::get_presentations_from_value;
 use crate::text::Text;
 
@@ -351,35 +351,38 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         } else if let Some(path) = &mut path {
                             path.points = points;
                         } else if let Some(reference) = &mut reference {
-                            match points.len() {
-                                1 => {
-                                    reference.grid.origin = points[0];
-                                }
-                                3 => {
-                                    let origin = points[0];
-                                    let rotated_points = points
-                                        .iter()
-                                        .map(|&p| p.rotate(-reference.grid.angle, origin))
-                                        .collect::<Vec<Point>>();
+                            Python::with_gil(|py| {
+                                let mut grid = reference.grid.borrow_mut(py);
+                                match points.len() {
+                                    1 => {
+                                        grid.origin = points[0];
+                                    }
+                                    3 => {
+                                        let origin = points[0];
+                                        let rotated_points = points
+                                            .iter()
+                                            .map(|&p| p.rotate(-grid.angle, origin))
+                                            .collect::<Vec<Point>>();
 
-                                    reference.grid.origin = rotated_points[0];
-                                    reference.grid.spacing_x = if reference.grid.columns > 0 {
-                                        ((rotated_points[1] - rotated_points[0])
-                                            / reference.grid.columns as f64)
-                                            .round(rounding_digits)
-                                    } else {
-                                        Point::default()
-                                    };
-                                    reference.grid.spacing_y = if reference.grid.rows > 0 {
-                                        ((rotated_points[2] - rotated_points[0])
-                                            / reference.grid.rows as f64)
-                                            .round(rounding_digits)
-                                    } else {
-                                        Point::default()
-                                    };
+                                        grid.origin = rotated_points[0];
+                                        grid.spacing_x = if grid.columns > 0 {
+                                            ((rotated_points[1] - rotated_points[0])
+                                                / grid.columns as f64)
+                                                .round(rounding_digits)
+                                        } else {
+                                            Point::default()
+                                        };
+                                        grid.spacing_y = if grid.rows > 0 {
+                                            ((rotated_points[2] - rotated_points[0])
+                                                / grid.rows as f64)
+                                                .round(rounding_digits)
+                                        } else {
+                                            Point::default()
+                                        };
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
-                            }
+                            });
                         } else if let Some(text) = &mut text {
                             if let Some(&first_point) = points.first() {
                                 text.origin = first_point;
@@ -413,7 +416,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
-                            if let ReferenceInstance::Cell(cell) = &reference.instance {
+                            if let Instance::Cell(cell) = &reference.instance {
                                 Python::with_gil(|py| {
                                     cell.borrow_mut(py).name = cell_name;
                                 });
@@ -426,8 +429,11 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 GDSRecord::ColRow => {
                     if let GDSRecordData::I16(col_row) = data {
                         if let Some(reference) = &mut reference {
-                            reference.grid.columns = col_row[0] as usize;
-                            reference.grid.rows = col_row[1] as usize;
+                            Python::with_gil(|py| {
+                                let mut grid = reference.grid.borrow_mut(py);
+                                grid.columns = col_row[0] as u32;
+                                grid.rows = col_row[1] as u32;
+                            });
                         }
                     }
 
@@ -459,7 +465,10 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                             text.x_reflection = x_reflection;
                         }
                         if let Some(reference) = &mut reference {
-                            reference.grid.x_reflection = x_reflection;
+                            Python::with_gil(|py| {
+                                let mut grid = reference.grid.borrow_mut(py);
+                                grid.x_reflection = x_reflection;
+                            });
                         }
                     }
 
@@ -470,7 +479,10 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.magnification = magnification[0]
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.magnification = magnification[0];
+                            Python::with_gil(|py| {
+                                let mut grid = reference.grid.borrow_mut(py);
+                                grid.magnification = magnification[0];
+                            });
                         }
                     }
 
@@ -481,7 +493,10 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.angle = angle[0];
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.angle = angle[0];
+                            Python::with_gil(|py| {
+                                let mut grid = reference.grid.borrow_mut(py);
+                                grid.angle = angle[0];
+                            });
                         }
                     }
 
@@ -520,9 +535,9 @@ fn update_references(library: &mut Library) {
             .collect();
 
         for mut reference in cell_references {
-            if let ReferenceInstance::Cell(referenced_name) = reference.instance {
+            if let Instance::Cell(referenced_name) = reference.instance {
                 if let Some(referenced_cell) = library.cells.get(&referenced_name.borrow(py).name) {
-                    reference.instance = ReferenceInstance::Cell(referenced_cell.clone_ref(py));
+                    reference.instance = Instance::Cell(referenced_cell.clone_ref(py));
                 }
             }
         }

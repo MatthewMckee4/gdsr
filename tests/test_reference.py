@@ -2,7 +2,12 @@ from hypothesis import assume, given
 
 from gdsr import Cell, Grid, Instance, Library, Reference
 
-from .conftest import check_references, grid_strategy, instance_param_strategy
+from .conftest import (
+    check_references,
+    get_cell_from_recursive_reference,
+    grid_strategy,
+    instance_param_strategy,
+)
 
 # Reference init
 
@@ -55,7 +60,7 @@ def test_reference_copy(instance: Instance, grid: Grid):
     assert reference == new_reference
 
 
-# Reference move
+# Reference move_to
 
 
 @given(instance=instance_param_strategy())
@@ -77,10 +82,9 @@ def test_move_to_returns_self(instance: Instance):
     reference = Reference(instance)
     new_reference = reference.move_to((1, 1))
     assert reference is new_reference
-    assert reference == new_reference
 
 
-# Reference move by
+# Reference move_by
 
 
 @given(instance=instance_param_strategy())
@@ -102,7 +106,6 @@ def test_move_by_returns_self(instance: Instance):
     reference = Reference(instance)
     new_reference = reference.move_by((1, 1))
     assert reference is new_reference
-    assert reference == new_reference
 
 
 # Reference rotate
@@ -127,7 +130,6 @@ def test_rotate_returns_self(instance: Instance):
     reference = Reference(instance)
     new_reference = reference.rotate(90)
     assert reference is new_reference
-    assert reference == new_reference
 
 
 # Reference scale
@@ -152,7 +154,6 @@ def test_scale_returns_self(instance: Instance):
     reference = Reference(instance)
     new_reference = reference.scale(2)
     assert reference is new_reference
-    assert reference == new_reference
 
 
 # Reference str
@@ -162,12 +163,7 @@ def test_scale_returns_self(instance: Instance):
 def test_str(instance: Instance):
     reference = Reference(instance)
     grid = reference.grid
-    assert str(reference) == (
-        f"Reference of {instance} with Grid at {grid.origin!r} with {grid.columns} "
-        f"columns and {grid.rows} rows, spacing ({grid.spacing_x}, {grid.spacing_y}), "
-        f"magnification {grid.magnification}, angle {grid.angle}, "
-        f"x_reflection {str(grid.x_reflection).lower()}"
-    )
+    assert str(reference) == f"Reference of {instance} with {grid}"
 
 
 # Reference repr
@@ -197,7 +193,7 @@ def test_read_write(instance: Instance):
     cell = Cell("parent")
     library.add(cell)
     reference = Reference(instance)
-    reference_cell = _get_cell_from_recursive_reference(reference)
+    reference_cell = get_cell_from_recursive_reference(reference)
     cell.add(reference)
     if reference_cell is not None:
         library.add(reference_cell)
@@ -205,11 +201,3 @@ def test_read_write(instance: Instance):
     new_library = Library.from_gds(path)
     new_cell = new_library.cells["parent"]
     check_references(new_library, instance, new_cell)
-
-
-def _get_cell_from_recursive_reference(reference: "Reference[Instance]") -> Cell | None:
-    if isinstance(reference.instance, Cell):
-        return reference.instance
-    elif isinstance(reference.instance, Reference):
-        return _get_cell_from_recursive_reference(reference.instance)
-    return None

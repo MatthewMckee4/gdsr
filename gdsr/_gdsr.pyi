@@ -55,6 +55,15 @@ class Point:
 
         :param PointLike other: The other point.
         """
+    def is_close(
+        self, other: PointLike, rel_tol: float = 1e-7, abs_tol: float = 1e-10
+    ) -> bool:
+        """Return True if the point is close to another point.
+
+        :param PointLike other: The other point.
+        :param float rel_tol: Relative tolerance, defaults to 1e-9.
+        :param float abs_tol: Absolute tolerance, defaults to 0.0.
+        """
     def __getitem__(self, index: Literal[0, 1]) -> float:
         """Return the x or y coordinate of the point."""
     def __bool__(self) -> bool:
@@ -123,10 +132,10 @@ class Grid:
     @spacing_y.setter
     def spacing_y(self, spacing: PointLike) -> None:
         """Set the spacing in the y direction."""
-    angle: float
-    """Angle of the grid."""
     magnification: float
     """Magnification of the grid."""
+    angle: float
+    """Angle of the grid."""
     x_reflection: bool
     """X reflection of the grid."""
     def __init__(
@@ -136,8 +145,8 @@ class Grid:
         rows: int = 1,
         spacing_x: PointLike = Point(0, 0),
         spacing_y: PointLike = Point(0, 0),
-        angle: float = 0.0,
         magnification: float = 1.0,
+        angle: float = 0.0,
         x_reflection: bool = False,
     ) -> None:
         """Initialize the Grid with origin, columns, rows and spacing.
@@ -182,6 +191,8 @@ class Grid:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def __eq__(self, value: object) -> bool:
+        """Return True if the grid is equal to another object."""
     def __str__(self) -> str:
         """Return a string representation of the grid."""
     def __repr__(self) -> str:
@@ -208,7 +219,7 @@ class Reference(Generic[T_Instance]):
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the reference."""
-    def copy(self) -> Reference[T_Instance]:
+    def copy(self) -> Self:
         """Return a copy of the reference."""
     def move_to(self, point: PointLike) -> Self:
         """Move the reference to a point.

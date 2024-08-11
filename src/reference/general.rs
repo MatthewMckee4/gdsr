@@ -9,19 +9,21 @@ use crate::{
     utils::transformations::py_any_to_point,
 };
 
-use super::{Reference, ReferenceInstance};
+use super::{Instance, Reference};
 
 #[pymethods]
 impl Reference {
     #[new]
-    #[pyo3(signature=(instance, grid=Grid::default()))]
-    pub fn new(instance: ReferenceInstance, grid: Grid) -> Self {
+    #[pyo3(signature=(instance, grid=None))]
+    pub fn new(instance: Instance, grid: Option<Py<Grid>>) -> Self {
+        let grid =
+            grid.unwrap_or_else(|| Python::with_gil(|py| Py::new(py, Grid::default()).unwrap()));
         match instance {
-            ReferenceInstance::Cell(cell) => Python::with_gil(|py| Reference {
-                instance: ReferenceInstance::Cell(cell.clone_ref(py)),
+            Instance::Cell(cell) => Python::with_gil(|py| Reference {
+                instance: Instance::Cell(cell.clone_ref(py)),
                 grid,
             }),
-            ReferenceInstance::Element(_) => Reference { instance, grid },
+            Instance::Element(_) => Reference { instance, grid },
         }
     }
 
@@ -77,7 +79,4 @@ impl Reference {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
-
-    #[staticmethod]
-    fn __getitem__(_obj: Bound<'_, PyAny>) {}
 }

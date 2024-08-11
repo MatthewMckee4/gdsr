@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
     element::Element,
-    reference::ReferenceInstance,
+    reference::Instance,
     traits::ToGds,
     utils::io::create_temp_file,
     utils::{
@@ -98,14 +98,14 @@ fn get_child_cells(
     written_cell_names: &mut HashSet<String>,
 ) {
     Python::with_gil(|py| match &reference.instance {
-        ReferenceInstance::Cell(child_cell) => {
+        Instance::Cell(child_cell) => {
             let cell = child_cell.borrow(py);
             if !written_cell_names.contains(&cell.name) {
                 written_cell_names.insert(cell.name.clone());
                 child_cells.push(cell.clone());
             }
         }
-        ReferenceInstance::Element(element) => match element {
+        Instance::Element(element) => match element {
             Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {}
             Element::Reference(reference) => {
                 let reference = reference.borrow(py);

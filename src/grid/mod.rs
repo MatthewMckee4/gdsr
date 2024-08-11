@@ -13,9 +13,9 @@ pub struct Grid {
     #[pyo3(get)]
     pub origin: Point,
     #[pyo3(get, set)]
-    pub columns: usize,
+    pub columns: u32,
     #[pyo3(get, set)]
-    pub rows: usize,
+    pub rows: u32,
     #[pyo3(get)]
     pub spacing_x: Point,
     #[pyo3(get)]
@@ -47,7 +47,7 @@ impl std::fmt::Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Grid at {:?} with {} columns and {} rows, spacing ({}, {}), magnification {:?}, angle {:?}, x_reflection {}",
+            "Grid at {:?} with {} columns and {} rows, spacing ({:?}, {:?}), magnification {:?}, angle {:?}, x_reflection {}",
             self.origin, self.columns, self.rows, self.spacing_x, self.spacing_y, self.magnification, self.angle, self.x_reflection,
         )
     }
@@ -57,7 +57,7 @@ impl std::fmt::Debug for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Grid({}, {}, {}, {}, {}, {}, {}, {})",
+            "Grid({:?}, {}, {}, {:?}, {:?}, {:?}, {:?}, {})",
             self.origin,
             self.columns,
             self.rows,
@@ -85,7 +85,9 @@ impl Movable for Grid {
 impl Rotatable for Grid {
     fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
         self.origin = self.origin.rotate(angle, centre);
-        self.angle = (self.angle + angle) % 360.0;
+        let result = (self.angle + angle) % 360.0;
+        let adjusted_result = if result < 0.0 { result + 360.0 } else { result };
+        self.angle = adjusted_result;
         self
     }
 }
@@ -93,8 +95,8 @@ impl Rotatable for Grid {
 impl Scalable for Grid {
     fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
         self.origin = self.origin.scale(factor, centre);
-        self.spacing_x = self.spacing_x * factor;
-        self.spacing_y = self.spacing_y * factor;
+        self.spacing_x = self.spacing_x.scale(factor, centre);
+        self.spacing_y = self.spacing_y.scale(factor, centre);
         self.magnification *= factor;
         self
     }

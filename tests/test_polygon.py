@@ -567,7 +567,8 @@ def test_rotate_90_degrees():
     rotated_polygon = polygon.rotate(90)
 
     expected_points = [(0, 0), (-1, 0), (-1, 1), (0, 1), (0, 0)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_180_degrees():
@@ -577,7 +578,8 @@ def test_rotate_180_degrees():
     rotated_polygon = polygon.rotate(180)
 
     expected_points = [(0, 0), (0, -1), (-1, -1), (-1, 0), (0, 0)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_270_degrees():
@@ -587,7 +589,8 @@ def test_rotate_270_degrees():
     rotated_polygon = polygon.rotate(270)
 
     expected_points = [(0, 0), (1, 0), (1, -1), (0, -1), (0, 0)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_with_centre():
@@ -597,7 +600,8 @@ def test_rotate_with_centre():
     rotated_polygon = polygon.rotate(90, centre=(1, 1))
 
     expected_points = [(1, 1), (0, 1), (0, 2), (1, 2), (1, 1)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_with_centre_and_negative_angle():
@@ -607,7 +611,8 @@ def test_rotate_with_centre_and_negative_angle():
     rotated_polygon = polygon.rotate(-90, centre=(1, 1))
 
     expected_points = [(1, 1), (2, 1), (2, 0), (1, 0), (1, 1)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_with_centre_and_large_angle():
@@ -617,7 +622,8 @@ def test_rotate_with_centre_and_large_angle():
     rotated_polygon = polygon.rotate(270, (2, 2))
 
     expected_points = [(1, 3), (2, 3), (2, 2), (1, 2), (1, 3)]
-    assert rotated_polygon.points == expected_points
+    for point, expected_point in zip(rotated_polygon.points, expected_points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_no_change():
@@ -626,7 +632,8 @@ def test_rotate_no_change():
 
     rotated_polygon = polygon.rotate(0)
 
-    assert rotated_polygon.points == points
+    for point, expected_point in zip(rotated_polygon.points, points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_full_circle():
@@ -635,7 +642,8 @@ def test_rotate_full_circle():
 
     rotated_polygon = polygon.rotate(360)
 
-    assert rotated_polygon.points == points
+    for point, expected_point in zip(rotated_polygon.points, points):
+        assert point.is_close(expected_point)
 
 
 def test_rotate_invalid_angle():
