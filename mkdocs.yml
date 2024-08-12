@@ -20,6 +20,7 @@ nav:
   - Development:
     - development/index.md
     - Contributing:
+      - development/contributing/git-standards.md
       - development/contributing/index.md
       - development/contributing/ide-configuration.md
       - development/contributing/code-style.md
