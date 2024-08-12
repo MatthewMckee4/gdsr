@@ -13,6 +13,7 @@ body:
         Include a code example if applicable.
     validations:
       required: true
+
   - type: textarea
     id: additional-info
     attributes:
@@ -21,14 +22,15 @@ body:
         Add any other context or screenshots about the feature request here.
     validations:
       required: false
+
   - type: dropdown
     id: type
     attributes:
       label: Type
       description: >
         What type of feature is this?
-    options:
-      - New feature
-      - Enhancement
+      options:
+        - New feature
+        - Enhancement
     validations:
       required: true
