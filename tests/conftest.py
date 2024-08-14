@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from hypothesis import assume
 from hypothesis import strategies as st
 
 from gdsr import (
@@ -22,28 +21,41 @@ if TYPE_CHECKING:
 
 
 @st.composite
-def float_strategy(draw: st.DrawFn) -> float:
+def float_strategy(
+    draw: st.DrawFn,
+    min_value: float = -10000,
+    max_value: float = 10000,
+    places: int = 4,
+) -> float:
     return float(
         draw(
             st.decimals(
-                min_value=-214748.3648,
-                max_value=214748.3647,
+                min_value=min_value,
+                max_value=max_value,
                 allow_nan=False,
                 allow_infinity=False,
-                places=4,
+                places=places,
             )
         )
     )
 
 
 @st.composite
-def row_col_strategy(draw: st.DrawFn) -> int:
-    return draw(st.integers(min_value=1, max_value=32767))
+def row_col_strategy(draw: st.DrawFn, min: int = 1, max: int = 32767) -> int:
+    return draw(st.integers(min_value=min, max_value=max))
 
 
 @st.composite
-def point_strategy(draw: st.DrawFn) -> Point:
-    return Point(draw(float_strategy()), draw(float_strategy()))
+def point_strategy(
+    draw: st.DrawFn,
+    min_value: float = -10000,
+    max_value: float = 10000,
+    places: int = 4,
+) -> Point:
+    return Point(
+        draw(float_strategy(min_value=min_value, max_value=max_value, places=places)),
+        draw(float_strategy(min_value=min_value, max_value=max_value, places=places)),
+    )
 
 
 @st.composite
@@ -59,8 +71,8 @@ def data_type_strategy(draw: st.DrawFn) -> int:
 @st.composite
 def cell_strategy(draw: st.DrawFn, *, cell_name: str | None = None) -> Cell:
     if cell_name is not None:
-        return Cell(cell_name)
-    return Cell(draw(st.text(min_size=1)))
+        return Cell(rf"{cell_name}")
+    return Cell(rf"{draw(st.text(min_size=1))}")
 
 
 @st.composite
@@ -69,17 +81,32 @@ def library_strategy(draw: st.DrawFn) -> Library:
 
 
 @st.composite
-def grid_strategy(draw: st.DrawFn) -> Grid:
-    magnification = draw(float_strategy())
-    assume(magnification != 0)
+def angle_strategy(draw: st.DrawFn) -> float:
+    return draw(st.sampled_from([0, 45, 90, 180, 270, 359]))
+
+
+@st.composite
+def grid_strategy(
+    draw: st.DrawFn, columns_max: int | None = None, rows_max: int | None = None
+) -> Grid:
+    magnification = float(draw(st.decimals(min_value=1, max_value=10, places=0)))
+
+    if columns_max is not None:
+        columns = draw(row_col_strategy(max=columns_max))
+    else:
+        columns = draw(row_col_strategy())
+    if rows_max is not None:
+        rows = draw(row_col_strategy(max=rows_max))
+    else:
+        rows = draw(row_col_strategy())
     return Grid(
-        draw(point_strategy()),
-        draw(row_col_strategy()),
-        draw(row_col_strategy()),
-        draw(point_strategy()),
-        draw(point_strategy()),
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)),
+        columns,
+        rows,
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)).round(2),
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)).round(2),
         magnification,
-        draw(float_strategy()),
+        draw(angle_strategy()),
         draw(st.booleans()),
     )
 

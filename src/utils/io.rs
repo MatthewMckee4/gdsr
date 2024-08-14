@@ -364,7 +364,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                                             .map(|&p| p.rotate(-grid.angle, origin))
                                             .collect::<Vec<Point>>();
 
-                                        grid.origin = rotated_points[0];
+                                        grid.origin = rotated_points[0].round(rounding_digits);
                                         grid.spacing_x = if grid.columns > 0 {
                                             ((rotated_points[1] - rotated_points[0])
                                                 / grid.columns as f64)

@@ -157,8 +157,96 @@ impl Cell {
         slf
     }
 
+    #[pyo3(signature = (*layer_data_types, depth=None))]
+    pub fn flatten(
+        &mut self,
+        layer_data_types: Vec<(i32, i32)>,
+        depth: Option<usize>,
+    ) -> PyResult<()> {
+        let depth = depth.unwrap_or(usize::MAX);
+        if depth == 0 {
+            return Ok(());
+        }
+
+        let mut new_elements: Vec<Element> = Vec::new();
+
+        for reference in &self.references {
+            let reference_elements = Python::with_gil(|py| {
+                reference
+                    .borrow_mut(py)
+                    .flatten(layer_data_types.clone(), Some(depth - 1))
+            });
+            new_elements.extend(reference_elements);
+        }
+
+        self.add(new_elements)?;
+
+        self.references.clear();
+
+        Ok(())
+    }
+
+    #[pyo3(signature = (*layer_data_types, depth=None))]
+    pub fn get_elements(
+        &mut self,
+        layer_data_types: Vec<(i32, i32)>,
+        depth: Option<usize>,
+    ) -> PyResult<Vec<Element>> {
+        let depth = depth.unwrap_or(usize::MAX);
+        let mut elements: Vec<Element> = Vec::new();
+
+        for polygon in &self.polygons {
+            let should_be_selected = Python::with_gil(|py| {
+                layer_data_types.contains(&(polygon.borrow(py).layer, polygon.borrow(py).data_type))
+            });
+            if should_be_selected {
+                elements.push(Element::Polygon(polygon.clone()));
+            }
+        }
+
+        for path in &self.paths {
+            let should_be_selected = Python::with_gil(|py| {
+                layer_data_types.contains(&(path.borrow(py).layer, path.borrow(py).data_type))
+            });
+            if should_be_selected {
+                elements.push(Element::Path(path.clone()));
+            }
+        }
+
+        for text in &self.texts {
+            let should_be_selected = Python::with_gil(|py| {
+                let all_layers = layer_data_types
+                    .iter()
+                    .map(|(layer, _)| *layer)
+                    .collect::<Vec<i32>>();
+                all_layers.contains(&text.borrow(py).layer)
+            });
+            if should_be_selected {
+                elements.push(Element::Text(text.clone()));
+            }
+        }
+
+        if depth == 0 {
+            return Ok(elements);
+        }
+
+        for reference in &self.references {
+            let reference_elements = Python::with_gil(|py| {
+                reference
+                    .borrow_mut(py)
+                    .flatten(layer_data_types.clone(), Some(depth - 1))
+            });
+            elements.extend(reference_elements);
+        }
+        Ok(elements)
+    }
+
     pub fn copy(&self) -> Self {
         self.clone()
+    }
+
+    fn __contains__(&self, element: Element) -> bool {
+        self.contains(element)
     }
 
     fn __str__(&self) -> PyResult<String> {

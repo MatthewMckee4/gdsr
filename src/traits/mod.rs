@@ -23,3 +23,7 @@ pub trait Scalable {
 pub trait Dimensions {
     fn bounding_box(&self) -> (Point, Point);
 }
+
+pub trait Reflect {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self;
+}

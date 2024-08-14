@@ -4,8 +4,7 @@ use std::fs::File;
 use crate::{
     config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
     element::Element,
-    point::Point,
-    traits::{Movable, Rotatable, Scalable, ToGds},
+    traits::ToGds,
     utils::io::{
         write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
         write_transformation_to_file, write_u16_array_to_file,
@@ -37,27 +36,8 @@ impl Reference {
         scale: f64,
         element: &Element,
     ) -> PyResult<File> {
-        let grid = Python::with_gil(|py| self.grid.borrow(py).clone());
-        for column_index in 0..grid.columns {
-            for row_index in 0..grid.rows {
-                let origin = grid.origin
-                    + grid.spacing_x * column_index as f64
-                    + grid.spacing_y * row_index as f64;
-
-                let new_element = element
-                    .copy()?
-                    .scale(if grid.x_reflection { -1.0 } else { 1.0 }, grid.origin)
-                    .scale(grid.magnification, grid.origin)
-                    .rotate(grid.angle, Point::default())
-                    .move_by(
-                        origin
-                            .rotate(grid.angle, grid.origin)
-                            .scale(if grid.x_reflection { -1.0 } else { 1.0 }, grid.origin),
-                    )
-                    .copy()?;
-
-                file = new_element._to_gds(file, scale)?;
-            }
+        for element in self._get_elements_in_grid(element.copy()) {
+            file = element._to_gds(file, scale)?;
         }
 
         Ok(file)

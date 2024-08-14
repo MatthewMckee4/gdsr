@@ -108,4 +108,6 @@ Examples:
 """
 
 Layer = int
+DataType = int
 PathLike = Path | str
+LayerDataType = tuple[Layer, DataType]

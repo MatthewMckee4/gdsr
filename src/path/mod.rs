@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
 };
 
 mod general;
@@ -11,7 +11,7 @@ mod io;
 pub mod path_type;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, Default)]
 pub struct Path {
     #[pyo3(get)]
     pub points: Vec<Point>,
@@ -23,6 +23,25 @@ pub struct Path {
     pub path_type: Option<PathType>,
     #[pyo3(get, set)]
     pub width: Option<f64>,
+}
+
+impl PartialEq for Path {
+    fn eq(&self, other: &Self) -> bool {
+        if self.points.len() != other.points.len() {
+            return false;
+        }
+
+        for (self_point, other_point) in self.points.iter().zip(other.points.iter()) {
+            if !self_point.epsilon_is_close(*other_point) {
+                return false;
+            }
+        }
+
+        self.layer == other.layer
+            && self.data_type == other.data_type
+            && self.path_type == other.path_type
+            && self.width == other.width
+    }
 }
 
 impl std::fmt::Display for Path {
@@ -198,5 +217,14 @@ impl Dimensions for Path {
         }
 
         (min, max)
+    }
+}
+
+impl Reflect for Path {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        for point in &mut self.points {
+            *point = point.reflect(angle, centre);
+        }
+        self
     }
 }

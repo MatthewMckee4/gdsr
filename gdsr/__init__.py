@@ -41,10 +41,14 @@ __all__ = [
     "VerticalPresentation",
 ]
 
+BaseElement: TypeAlias = "Polygon | Path | Text"
+"""Type alias for a base GDSII element."""
+
 
 Instance: TypeAlias = "Cell | Element"
 """Type alias for a GDSII instance."""
 
-
 Element: TypeAlias = "Reference[Instance] | Polygon | Path | Text"
 """Type alias for a GDSII element."""
+
+__version__ = "0.1.0"

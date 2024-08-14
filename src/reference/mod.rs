@@ -4,7 +4,7 @@ use crate::{
     cell::Cell,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
 };
 
 mod general;
@@ -149,5 +149,14 @@ impl Dimensions for Reference {
         }
 
         (min, max)
+    }
+}
+
+impl Reflect for Reference {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        Python::with_gil(|py| {
+            self.grid.borrow_mut(py).reflect(angle, centre);
+        });
+        self
     }
 }

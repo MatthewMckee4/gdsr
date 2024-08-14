@@ -1,6 +1,6 @@
 use crate::{
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
     utils::geometry::bounding_box,
 };
 use pyo3::prelude::*;
@@ -10,7 +10,7 @@ mod io;
 mod utils;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, Default)]
 pub struct Polygon {
     #[pyo3(get)]
     pub points: Vec<Point>,
@@ -18,6 +18,22 @@ pub struct Polygon {
     pub layer: i32,
     #[pyo3(get)]
     pub data_type: i32,
+}
+
+impl PartialEq for Polygon {
+    fn eq(&self, other: &Self) -> bool {
+        if self.points.len() != other.points.len() {
+            return false;
+        }
+
+        for (self_point, other_point) in self.points.iter().zip(other.points.iter()) {
+            if !self_point.epsilon_is_close(*other_point) {
+                return false;
+            }
+        }
+
+        self.layer == other.layer && self.data_type == other.data_type
+    }
 }
 
 impl std::fmt::Display for Polygon {
@@ -92,5 +108,14 @@ impl Scalable for Polygon {
 impl Dimensions for Polygon {
     fn bounding_box(&self) -> (Point, Point) {
         bounding_box(&self.points)
+    }
+}
+
+impl Reflect for Polygon {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        for point in &mut self.points {
+            *point = point.reflect(angle, centre);
+        }
+        self
     }
 }
