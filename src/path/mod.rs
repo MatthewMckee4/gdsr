@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
 };
 
 mod general;
@@ -226,5 +226,11 @@ impl Reflect for Path {
             *point = point.reflect(angle, centre);
         }
         self
+    }
+}
+
+impl LayerDataTypeMatches for Path {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        layer_data_types.contains(&(self.layer, self.data_type)) || layer_data_types.is_empty()
     }
 }

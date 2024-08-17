@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::{
     point::Point,
     text::presentation::{HorizontalPresentation, VerticalPresentation},
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
     utils::transformations::py_any_to_point,
     validation::input::check_layer_valid,
 };
@@ -109,6 +109,11 @@ impl Text {
     ) -> PyRefMut<'_, Self> {
         Scalable::scale(slf.deref_mut(), factor, centre);
         slf
+    }
+
+    #[pyo3(signature = (*layer_data_types))]
+    pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        LayerDataTypeMatches::is_on(self, layer_data_types)
     }
 
     fn __str__(&self) -> PyResult<String> {

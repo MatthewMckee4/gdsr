@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::{
     element::Element,
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
     utils::transformations::py_any_to_point,
 };
 
@@ -30,7 +30,7 @@ impl Cell {
     }
 
     #[pyo3(signature = (*elements))]
-    pub fn add(&mut self, elements: Vec<Element>) -> PyResult<()> {
+    pub fn add(&mut self, elements: Vec<Element>) {
         Python::with_gil(|py| {
             for element in elements {
                 match element {
@@ -49,11 +49,10 @@ impl Cell {
                 }
             }
         });
-        Ok(())
     }
 
     #[pyo3(signature=(*elements))]
-    pub fn remove(&mut self, elements: Vec<Element>) -> PyResult<()> {
+    pub fn remove(&mut self, elements: Vec<Element>) {
         Python::with_gil(|py| {
             for element in elements {
                 match element {
@@ -74,7 +73,6 @@ impl Cell {
                 }
             }
         });
-        Ok(())
     }
 
     pub fn contains(&self, element: Element) -> bool {
@@ -158,32 +156,32 @@ impl Cell {
     }
 
     #[pyo3(signature = (*layer_data_types, depth=None))]
-    pub fn flatten(
-        &mut self,
+    pub fn flatten<'a>(
+        mut slf: PyRefMut<'a, Self>,
         layer_data_types: Vec<(i32, i32)>,
         depth: Option<usize>,
-    ) -> PyResult<()> {
+        py: Python<'a>,
+    ) -> PyRefMut<'a, Self> {
         let depth = depth.unwrap_or(usize::MAX);
         if depth == 0 {
-            return Ok(());
+            return slf;
         }
 
         let mut new_elements: Vec<Element> = Vec::new();
 
-        for reference in &self.references {
-            let reference_elements = Python::with_gil(|py| {
+        for reference in &slf.references {
+            let reference_elements =
                 reference
                     .borrow_mut(py)
-                    .flatten(layer_data_types.clone(), Some(depth - 1))
-            });
+                    .flatten(layer_data_types.clone(), Some(depth), py);
             new_elements.extend(reference_elements);
         }
 
-        self.add(new_elements)?;
+        slf.references.clear();
 
-        self.references.clear();
+        slf.add(new_elements);
 
-        Ok(())
+        slf
     }
 
     #[pyo3(signature = (*layer_data_types, depth=None))]
@@ -191,58 +189,51 @@ impl Cell {
         &mut self,
         layer_data_types: Vec<(i32, i32)>,
         depth: Option<usize>,
-    ) -> PyResult<Vec<Element>> {
+        py: Python,
+    ) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();
 
         for polygon in &self.polygons {
-            let should_be_selected = Python::with_gil(|py| {
-                layer_data_types.contains(&(polygon.borrow(py).layer, polygon.borrow(py).data_type))
-            });
-            if should_be_selected {
+            if polygon.borrow(py).is_on(layer_data_types.clone()) {
                 elements.push(Element::Polygon(polygon.clone()));
             }
         }
 
         for path in &self.paths {
-            let should_be_selected = Python::with_gil(|py| {
-                layer_data_types.contains(&(path.borrow(py).layer, path.borrow(py).data_type))
-            });
-            if should_be_selected {
+            if path.borrow(py).is_on(layer_data_types.clone()) {
                 elements.push(Element::Path(path.clone()));
             }
         }
 
         for text in &self.texts {
-            let should_be_selected = Python::with_gil(|py| {
-                let all_layers = layer_data_types
-                    .iter()
-                    .map(|(layer, _)| *layer)
-                    .collect::<Vec<i32>>();
-                all_layers.contains(&text.borrow(py).layer)
-            });
-            if should_be_selected {
+            if text.borrow(py).is_on(layer_data_types.clone()) {
                 elements.push(Element::Text(text.clone()));
             }
         }
 
-        if depth == 0 {
-            return Ok(elements);
-        }
-
         for reference in &self.references {
-            let reference_elements = Python::with_gil(|py| {
+            let reference_elements =
                 reference
                     .borrow_mut(py)
-                    .flatten(layer_data_types.clone(), Some(depth - 1))
-            });
-            elements.extend(reference_elements);
+                    .flatten(layer_data_types.clone(), Some(depth), py);
+            for referenced_element in reference_elements {
+                if referenced_element.is_on(layer_data_types.clone()) {
+                    elements.push(referenced_element);
+                }
+            }
         }
-        Ok(elements)
+
+        elements
     }
 
     pub fn copy(&self) -> Self {
         self.clone()
+    }
+
+    #[pyo3(signature = (*layer_data_types))]
+    pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        LayerDataTypeMatches::is_on(self, layer_data_types)
     }
 
     fn __contains__(&self, element: Element) -> bool {

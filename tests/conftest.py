@@ -46,6 +46,19 @@ def row_col_strategy(draw: st.DrawFn, min: int = 1, max: int = 32767) -> int:
 
 
 @st.composite
+def string_strategy(draw: st.DrawFn, min_size: int = 1, max_size: int = 100) -> str:
+    return rf"{
+        draw(
+            st.text(
+                alphabet=st.characters(codec="ascii"),
+                min_size=min_size,
+                max_size=max_size,
+            )
+        )!r
+    }"
+
+
+@st.composite
 def point_strategy(
     draw: st.DrawFn,
     min_value: float = -10000,
@@ -72,12 +85,32 @@ def data_type_strategy(draw: st.DrawFn) -> int:
 def cell_strategy(draw: st.DrawFn, *, cell_name: str | None = None) -> Cell:
     if cell_name is not None:
         return Cell(rf"{cell_name}")
-    return Cell(rf"{draw(st.text(min_size=1))}")
+    return Cell(rf"{draw(string_strategy())}")
+
+
+@st.composite
+def randomly_populated_cell_strategy(
+    draw: st.DrawFn, *, cell_name: str | None = None
+) -> Cell:
+    cell = draw(cell_strategy(cell_name=cell_name))
+    num_elements = draw(st.integers(min_value=1, max_value=100))
+
+    for _ in range(num_elements):
+        element = draw(
+            st.one_of(
+                polygon_strategy(),
+                path_strategy(),
+                text_strategy(),
+                reference_strategy(),
+            )
+        )
+        cell.add(element)
+    return cell
 
 
 @st.composite
 def library_strategy(draw: st.DrawFn) -> Library:
-    return Library(draw(st.text(min_size=1)))
+    return Library(rf"{draw(string_strategy())}")
 
 
 @st.composite
@@ -151,11 +184,7 @@ def path_strategy(draw: st.DrawFn) -> Path:
 @st.composite
 def text_strategy(draw: st.DrawFn) -> Text:
     return Text(
-        draw(
-            st.text(
-                alphabet=st.characters(codec="ascii"),
-            )
-        ),
+        rf"{draw(string_strategy())}",
         draw(point_strategy()),
         draw(layer_strategy()),
         draw(st.integers(min_value=1)),

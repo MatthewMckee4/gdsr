@@ -1,9 +1,15 @@
+import hypothesis.strategies as st
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 
-from gdsr import Cell, Element
+from gdsr import Cell, Element, Polygon, Reference
 
-from .conftest import element_param_strategy
+from .conftest import (
+    data_type_strategy,
+    element_param_strategy,
+    layer_strategy,
+    randomly_populated_cell_strategy,
+)
 
 # Cell init
 
@@ -58,7 +64,7 @@ def test_set_texts_raises_error():
 # Cell add
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_add_polygon(element: Element):
     cell = Cell("test_cell")
@@ -70,7 +76,7 @@ def test_add_polygon(element: Element):
 # Cell remove
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_remove_polygon(element: Element):
     cell = Cell("test_cell")
@@ -84,7 +90,7 @@ def test_remove_polygon(element: Element):
 # Cell contains
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_contains(element: Element):
     cell = Cell("test_cell")
@@ -100,7 +106,7 @@ def test_contains(element: Element):
 # Cell is_empty
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_is_empty(element: Element):
     cell = Cell("test_cell")
@@ -111,10 +117,79 @@ def test_is_empty(element: Element):
     assert cell.is_empty()
 
 
+# Cell flatten
+
+
+@given(element=element_param_strategy())
+def test_cell_flatten(element: Element):
+    cell = Cell("test_cell")
+    cell.add(element)
+    cell.flatten()
+    assert cell.references == []
+
+
+@settings(suppress_health_check=[HealthCheck.too_slow])
+@given(cell=randomly_populated_cell_strategy())
+def test_cell_flatten_populated_cell(cell: Cell):
+    cell.flatten()
+    assert cell.references == []
+
+
+@given(element=element_param_strategy())
+def test_cell_flatten_returns_self(element: Element):
+    cell = Cell("test_cell")
+    cell.add(element)
+    assert cell.flatten() is cell
+
+
+@given(layer=layer_strategy(), datatype=data_type_strategy(), depth=st.integers(1, 10))
+def test_cell_flatten_on_layer(layer: int, datatype: int, depth: int):
+    cell = Cell("test_cell")
+    polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)], layer, datatype)
+    reference = Reference(polygon)
+    for _ in range(depth - 1):
+        reference = Reference(reference)  # type: ignore
+    cell.add(reference)
+    cell.flatten((layer, datatype), depth=depth)
+    assert cell.references == []
+    assert cell.polygons == [polygon]
+
+
+@settings(suppress_health_check=[HealthCheck.too_slow])
+@given(cell=randomly_populated_cell_strategy())
+def test_cell_flatten_depth_zero_no_change(cell: Cell):
+    cell_copy = cell.copy()
+    cell.flatten(depth=0)
+    assert cell == cell_copy
+
+
+# Cell get_elements
+
+
+@given(element=element_param_strategy())
+def test_cell_get_elements_single_element(element: Element):
+    cell = Cell("test_cell")
+    cell.add(element)
+    elements = cell.get_elements(depth=0)
+    assert elements == [element]
+
+
+@given(layer=layer_strategy(), datatype=data_type_strategy(), depth=st.integers(1, 10))
+def test_cell_get_elements_on_layer(layer: int, datatype: int, depth: int):
+    cell = Cell("test_cell")
+    polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)], layer, datatype)
+    reference = Reference(polygon)
+    for _ in range(depth - 1):
+        reference = Reference(reference)  # type: ignore
+    cell.add(reference)
+    elements = cell.get_elements((layer, datatype), depth=depth)
+    assert elements == [polygon]
+
+
 # Cell copy
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_copy(element: Element):
     cell = Cell("test_cell")
@@ -152,7 +227,7 @@ def test_cell_equal():
     assert cell == new_cell
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy())
 def test_cell_with_element_equal(element: Element):
     cell = Cell("test_cell")
@@ -162,7 +237,7 @@ def test_cell_with_element_equal(element: Element):
     assert cell == new_cell
 
 
-@settings(max_examples=3, suppress_health_check=[HealthCheck.too_slow])
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(element=element_param_strategy(), other_element=element_param_strategy())
 def test_cells_with_different_elements_not_equal(
     element: Element, other_element: Element

@@ -7,7 +7,7 @@ use crate::{
     element::Element,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
     utils::transformations::py_any_to_point,
 };
 
@@ -87,71 +87,50 @@ impl Reference {
         &mut self,
         layer_data_types: Vec<(i32, i32)>,
         depth: Option<usize>,
+        py: Python,
     ) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let flatten_all = layer_data_types.is_empty();
         let mut elements: Vec<Element> = Vec::new();
         if depth == 0 {
-            return Python::with_gil(|py| {
-                [Element::Reference(Py::new(py, self.copy()).unwrap())].to_vec()
-            });
+            return [Element::Reference(Py::new(py, self.copy()).unwrap())].to_vec();
         }
         match &self.instance {
             Instance::Cell(cell) => {
-                let flattened_cell_elements = Python::with_gil(|py| {
+                let flattened_cell_elements =
                     cell.borrow_mut(py)
-                        .get_elements(layer_data_types, Some(depth - 1))
-                        .unwrap()
-                });
+                        .get_elements(layer_data_types, Some(depth - 1), py);
                 for cell_element in flattened_cell_elements {
                     elements.extend(self._get_elements_in_grid(cell_element));
                 }
             }
             Instance::Element(element) => match element {
                 Element::Path(element) => {
-                    let path = Python::with_gil(|py| element.clone_ref(py));
-
-                    let should_be_selected = Python::with_gil(|py| {
-                        layer_data_types
-                            .contains(&(path.borrow(py).layer, path.borrow(py).data_type))
-                    });
-
-                    if should_be_selected || flatten_all {
-                        elements.extend(self._get_elements_in_grid(Element::Path(path)));
+                    if element.borrow(py).is_on(layer_data_types) || flatten_all {
+                        elements.extend(
+                            self._get_elements_in_grid(Element::Path(element.clone_ref(py))),
+                        );
                     };
                 }
                 Element::Polygon(element) => {
-                    let polygon = Python::with_gil(|py| element.clone_ref(py));
-
-                    let should_be_selected = Python::with_gil(|py| {
-                        layer_data_types
-                            .contains(&(polygon.borrow(py).layer, polygon.borrow(py).data_type))
-                    });
-
-                    if should_be_selected || flatten_all {
-                        elements.extend(self._get_elements_in_grid(Element::Polygon(polygon)));
+                    if element.borrow(py).is_on(layer_data_types) || flatten_all {
+                        elements.extend(
+                            self._get_elements_in_grid(Element::Polygon(element.clone_ref(py))),
+                        );
                     }
                 }
                 Element::Text(element) => {
-                    let text = Python::with_gil(|py| element.clone_ref(py));
-
-                    let should_be_selected = Python::with_gil(|py| {
-                        let all_layers = layer_data_types
-                            .iter()
-                            .map(|(layer, _)| *layer)
-                            .collect::<Vec<i32>>();
-                        all_layers.contains(&text.borrow(py).layer)
-                    });
-
-                    if should_be_selected || flatten_all {
-                        elements.extend(self._get_elements_in_grid(Element::Text(text)));
+                    if element.borrow(py).is_on(layer_data_types) || flatten_all {
+                        elements.extend(
+                            self._get_elements_in_grid(Element::Text(element.clone_ref(py))),
+                        );
                     }
                 }
                 Element::Reference(element) => {
                     let flattened_reference_elements = Python::with_gil(|py| {
                         element
                             .borrow_mut(py)
-                            .flatten(layer_data_types, Some(depth - 1))
+                            .flatten(layer_data_types, Some(depth - 1), py)
                     });
 
                     let flattened_copied_elements = flattened_reference_elements
@@ -167,6 +146,11 @@ impl Reference {
         }
 
         elements
+    }
+
+    #[pyo3(signature = (*layer_data_types))]
+    pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        LayerDataTypeMatches::is_on(self, layer_data_types)
     }
 
     fn __str__(&self) -> PyResult<String> {

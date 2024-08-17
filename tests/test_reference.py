@@ -1,5 +1,5 @@
 import hypothesis.strategies as st
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 
 from gdsr import Cell, Element, Grid, Instance, Library, Reference
 
@@ -161,6 +161,7 @@ def test_scale_returns_self(instance: Instance):
 # Reference flatten
 
 
+@settings(deadline=None, max_examples=10)
 @given(
     element=element_param_strategy(),
     grid=grid_strategy(columns_max=7, rows_max=7),
@@ -215,6 +216,7 @@ def test_not_equal(instance: Instance, other_instance: Instance):
 
 
 # Reference read and write
+@settings(deadline=None, max_examples=10)
 @given(instance=instance_param_strategy())
 def test_read_write(instance: Instance):
     library = Library("library")

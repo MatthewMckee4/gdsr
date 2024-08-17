@@ -2,7 +2,7 @@ use log::warn;
 use pyo3::prelude::*;
 
 use crate::point::Point;
-use crate::traits::{Dimensions, Movable, Reflect, Rotatable, Scalable};
+use crate::traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable};
 
 mod general;
 mod io;
@@ -133,5 +133,15 @@ impl Reflect for Text {
         self.origin = self.origin.reflect(angle, centre);
         self.angle = (self.angle + 2.0 * (angle - self.angle)) % 360.0;
         self
+    }
+}
+
+impl LayerDataTypeMatches for Text {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        let all_layers = layer_data_types
+            .iter()
+            .map(|(layer, _)| *layer)
+            .collect::<Vec<i32>>();
+        all_layers.contains(&self.layer) || layer_data_types.is_empty()
     }
 }

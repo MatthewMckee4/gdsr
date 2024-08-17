@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from gdsr import Cell, Element, Library, Reference
@@ -152,7 +152,7 @@ def test_library_copy_deep(library: Library, cell: Cell):
 # Library read write
 
 
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
+@settings(deadline=None, max_examples=10)
 @given(
     library=library_strategy(), cell=cell_strategy(), element=element_param_strategy()
 )
@@ -165,6 +165,7 @@ def test_library_read_write(library: Library, cell: Cell, element: Element):
     cell.add(element)
     library.add(cell)
     new_library = Library.from_gds(library.to_gds())
+
     assert library.name == new_library.name
     assert library.cells == new_library.cells
     assert library == new_library

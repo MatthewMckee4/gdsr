@@ -6,7 +6,7 @@ use crate::{
     polygon::Polygon,
     reference::Reference,
     text::Text,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
 };
 
 mod general;
@@ -233,6 +233,37 @@ impl Dimensions for Cell {
             }
 
             (min, max)
+        })
+    }
+}
+
+impl LayerDataTypeMatches for Cell {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        Python::with_gil(|py| {
+            for polygon in &self.polygons {
+                if !polygon.borrow_mut(py).is_on(layer_data_types.clone()) {
+                    return false;
+                }
+            }
+
+            for path in &self.paths {
+                if !path.borrow_mut(py).is_on(layer_data_types.clone()) {
+                    return false;
+                }
+            }
+            for reference in &self.references {
+                if !reference.borrow_mut(py).is_on(layer_data_types.clone()) {
+                    return false;
+                }
+            }
+
+            for text in &self.texts {
+                if !text.borrow_mut(py).is_on(layer_data_types.clone()) {
+                    return false;
+                }
+            }
+
+            true
         })
     }
 }

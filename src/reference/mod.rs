@@ -4,7 +4,7 @@ use crate::{
     cell::Cell,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
 };
 
 mod general;
@@ -158,5 +158,14 @@ impl Reflect for Reference {
             self.grid.borrow_mut(py).reflect(angle, centre);
         });
         self
+    }
+}
+
+impl LayerDataTypeMatches for Reference {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        match &self.instance {
+            Instance::Cell(cell) => Python::with_gil(|py| cell.borrow(py).is_on(layer_data_types)),
+            Instance::Element(element) => element.is_on(layer_data_types),
+        }
     }
 }

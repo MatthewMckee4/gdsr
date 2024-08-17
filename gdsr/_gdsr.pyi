@@ -297,6 +297,8 @@ class Reference(Generic[T_Instance]):
         :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
         :param int depth: Depth of the flattening, defaults to None.
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the instance is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the reference."""
     def __repr__(self) -> str:
@@ -370,6 +372,8 @@ class Path:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the path is on any of the specified layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the path."""
     def __repr__(self) -> str:
@@ -460,10 +464,14 @@ class Polygon:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the polygon is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
     def __repr__(self) -> str:
         """Return a string representation of the polygon."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the polygon is equal to another object."""
 
 class VerticalPresentation(Enum):
     Top = 0
@@ -563,10 +571,14 @@ class Text:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the text is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the text."""
     def __repr__(self) -> str:
         """Return a string representation of the text."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the text is equal to another object."""
 
 BaseElement: TypeAlias = Path | Polygon | Text
 Element: TypeAlias = Reference[Instance] | BaseElement
@@ -621,10 +633,17 @@ class Cell:
         """
     def flatten(
         self, *layer_data_types: LayerDataType, depth: int | None = None
-    ) -> None:
+    ) -> Self:
         """Flatten the cell to a certain depth.
 
+        Each reference on the depth is replaced by the elements it references.
+        If the depth is 0, nothing is flattened
+        If the depth is 1, only the first level of references is flattened
+        and so on.
+
         When depth is None, the cell is flattened to the deepest level.
+
+        This method modifies the cell in place and returns itself.
 
         :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
         :param int | None depth: Depth of the flattening, defaults to None.
@@ -633,6 +652,11 @@ class Cell:
         self, *layer_data_types: LayerDataType, depth: int | None = None
     ) -> list[Element]:
         """Return a list of elements in the cell.
+
+        This method does not modify the cell. It simply returns the elements
+        until the specified depth. If a reference is encountered before
+        it reaches the specified depth, the reference is flattened to the
+        level of depth relative to the cell.
 
         When depth is None, the cell is flattened to the deepest level.
 
@@ -653,6 +677,12 @@ class Cell:
         :param float units: GDS file units in meters, defaults to 1e-6.
         :param float precision: GDS file precision, defaults to 1e-10.
         :return: GDS file name
+        """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the cell is on any of the layer, data_type pairs.
+
+        This method returns True if all elements in the cell are on any of the
+        layer, data_type pairs.
         """
     def __contains__(self, element: Element) -> bool:
         """Return True if the cell contains the element."""

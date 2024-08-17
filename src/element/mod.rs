@@ -8,7 +8,7 @@ use crate::{
     polygon::Polygon,
     reference::Reference,
     text::Text,
-    traits::{Dimensions, Movable, Reflect, Rotatable, Scalable, ToGds},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGds},
 };
 
 #[derive(Clone)]
@@ -196,6 +196,17 @@ impl Reflect for Element {
             }
         });
         self
+    }
+}
+
+impl LayerDataTypeMatches for Element {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        Python::with_gil(|py| match self {
+            Element::Path(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Polygon(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Reference(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Text(element) => element.borrow(py).is_on(layer_data_types),
+        })
     }
 }
 
