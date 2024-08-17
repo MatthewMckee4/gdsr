@@ -125,7 +125,7 @@ def test_polygon_properties_after_modification():
     assert polygon.perimeter != original_perimeter
 
 
-# String representation
+# Polygon str
 
 
 def test_str_one_point():
@@ -142,6 +142,9 @@ def test_str_two_points():
         str(polygon)
         == "Polygon with 3 point(s), starting at (0, 0) on layer 0, data type 0"
     )
+
+
+# Polygon repr
 
 
 def test_repr_one_point():

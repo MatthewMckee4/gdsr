@@ -1,9 +1,8 @@
-import math
-
 import pytest
+from hypothesis import given
 
 from gdsr import InputPointsLike, Path, PathType, Point
-from gdsr.typings import PointLike
+from tests.conftest import path_strategy
 
 
 @pytest.fixture
@@ -96,38 +95,33 @@ def test_bounding_box_with_negative_points():
     assert path.bounding_box == ((-1, -1), (1, 1))
 
 
-def assert_almost_equal(point1: PointLike, point2: PointLike, tolerance: float = 1e-9):
-    assert math.isclose(point1[0], point2[0], abs_tol=tolerance)
-    assert math.isclose(point1[1], point2[1], abs_tol=tolerance)
-
-
 def test_bounding_box_with_overlap_type_vertical_path():
     path = Path([(0, 0), (0, 1)], width=0.5, path_type=PathType.Overlap)
     bounding_box = path.bounding_box
-    assert_almost_equal(bounding_box[0], (-0.25, -0.25))
-    assert_almost_equal(bounding_box[1], (0.25, 1.25))
+    assert bounding_box[0].is_close((-0.25, -0.25))
+    assert bounding_box[1].is_close((0.25, 1.25))
 
 
 def test_bounding_box_with_overlap_type_diagonal_path():
     path = Path([(0, 0), (1, 1)], width=0.5, path_type=PathType.Overlap)
     extra = 0.25 * 2**0.5
     bounding_box = path.bounding_box
-    assert_almost_equal(bounding_box[0], (-extra, -extra))
-    assert_almost_equal(bounding_box[1], (1 + extra, 1 + extra))
+    assert bounding_box[0].is_close((-extra, -extra))
+    assert bounding_box[1].is_close((1 + extra, 1 + extra))
 
 
 def test_bounding_box_with_overlap_type_horizontal_path():
     path = Path([(0, 0), (1, 0)], width=0.5, path_type=PathType.Overlap)
     bounding_box = path.bounding_box
-    assert_almost_equal(bounding_box[0], (-0.25, -0.25))
-    assert_almost_equal(bounding_box[1], (1.25, 0.25))
+    assert bounding_box[0].is_close((-0.25, -0.25))
+    assert bounding_box[1].is_close((1.25, 0.25))
 
 
 def test_bounding_box_with_overlap_type_basic_path():
     path = Path([(0, 0), (1, 0), (1, 1)], width=0.5, path_type=PathType.Overlap)
     bounding_box = path.bounding_box
-    assert_almost_equal(bounding_box[0], (-0.25, -0.25))
-    assert_almost_equal(bounding_box[1], (1.25, 1.25))
+    assert bounding_box[0].is_close((-0.25, -0.25))
+    assert bounding_box[1].is_close((1.25, 1.25))
 
 
 def test_bounding_box_with_overlap_type_complex_path():
@@ -137,24 +131,164 @@ def test_bounding_box_with_overlap_type_complex_path():
         path_type=PathType.Overlap,
     )
     bounding_box = path.bounding_box
-    assert_almost_equal(bounding_box[0], (-0.25, -0.25))
-    assert_almost_equal(bounding_box[1], (4.25, 3.25))
+    assert bounding_box[0].is_close((-0.25, -0.25))
+    assert bounding_box[1].is_close((4.25, 3.25))
 
 
-# Path move
+# Path move_to
 
 
-def test_move_to_returns_self():
-    path = Path([(0, 0), (1, 0), (1, 1)], layer=5, data_type=10, width=0.5)
+@given(path=path_strategy())
+def test_path_move_to(path: Path):
+    path_copy = path.copy()
+    new_path = path.move_to((1, 1))
+    new_path_points = list(
+        map(lambda p: p + (1, 1) - path_copy.points[0], path_copy.points)  # noqa: RUF005
+    )
+    for point1, point2 in zip(new_path.points, new_path_points):
+        assert point1.is_close(point2)
+
+
+@given(path=path_strategy())
+def test_move_to_returns_self(path: Path):
     new_path = path.move_to((1, 1))
     assert path is new_path
-    assert path == new_path
-    assert path.points == [(1, 1), (2, 1), (2, 2)]
 
 
-def test_move_by_returns_self():
-    path = Path([(0, 0), (1, 0), (1, 1)], layer=5, data_type=10, width=0.5)
+# Path move_by
+
+
+@given(path=path_strategy())
+def test_path_move_by(path: Path):
+    path_copy = path.copy()
+    new_path = path.move_by((1, 1))
+    assert new_path.points == list(map(lambda p: p + (1, 1), path_copy.points))  # noqa: RUF005
+
+
+@given(path=path_strategy())
+def test_move_by_returns_self(path: Path):
     new_path = path.move_by((1, 1))
     assert path is new_path
-    assert path == new_path
-    assert path.points == [(1, 1), (2, 1), (2, 2)]
+
+
+# Path rotate
+
+
+@given(path=path_strategy())
+def test_path_rotate(path: Path):
+    path_copy = path.copy()
+    new_path = path.rotate(90)
+    new_path_points = list(map(lambda p: p.rotate(90), path_copy.points))
+    for point1, point2 in zip(new_path.points, new_path_points):
+        assert point1.is_close(point2)
+
+
+@given(path=path_strategy())
+def test_rotate_returns_self(path: Path):
+    new_path = path.rotate(90)
+    assert path is new_path
+
+
+# Path scale
+
+
+@given(path=path_strategy())
+def test_path_scale(path: Path):
+    path_copy = path.copy()
+    new_path = path.scale(2)
+    new_path_points = list(map(lambda p: p * 2, path_copy.points))
+    for point1, point2 in zip(new_path.points, new_path_points):
+        assert point1.is_close(point2)
+
+
+@given(path=path_strategy())
+def test_scale_returns_self(path: Path):
+    new_path = path.scale(2)
+    assert path is new_path
+
+
+# Path is_on
+
+
+@given(path=path_strategy())
+def test_path_is_on(path: Path):
+    assert path.is_on((path.layer, path.data_type))
+
+
+@given(path=path_strategy())
+def test_path_is_not_on_with_different_layer(path: Path):
+    assert not path.is_on((path.layer + 1, path.data_type))
+
+
+@given(path=path_strategy())
+def test_path_is_not_on_with_different_data_type(path: Path):
+    assert not path.is_on((path.layer, path.data_type + 1))
+
+
+@given(path=path_strategy())
+def test_path_is_not_on_with_different_layer_and_data_type(path: Path):
+    assert not path.is_on((path.layer + 1, path.data_type + 1))
+
+
+@given(path=path_strategy())
+def test_path_is_on_with_other_pairs(path: Path):
+    assert path.is_on((path.layer, path.data_type), (0, 0), (1, 1))
+
+
+# Path str
+
+
+def test_path_string():
+    path = Path([(0, 0), (1, 1), (2, 2)])
+    assert (
+        str(path)
+        == "Path with 3 points on layer 0 with data type 0, Square Ends and width 0"
+    )
+
+
+# Path repr
+
+
+def test_path_repr_two_points():
+    path = Path([(0, 0), (1, 1)], layer=4)
+    assert repr(path) == "Path([(0, 0), (1, 1)], 4, 0, Square Ends, 0)"
+
+
+def test_path_repr_three_points():
+    path = Path([(0, 0), (1, 1), (2, 2)], width=10)
+    assert repr(path) == "Path([(0, 0), ..., (2, 2)], 0, 0, Square Ends, 10)"
+
+
+def test_path_repr_four_points():
+    path = Path([(0, 0), (1, 1), (2, 2), (3, 3)], path_type=PathType.Overlap)
+    assert repr(path) == "Path([(0, 0), ..., (3, 3)], 0, 0, Overlap Ends, 0)"
+
+
+# Path eq
+
+
+@given(path=path_strategy())
+def test_path_eq(path: Path):
+    assert path == path
+
+
+@given(path=path_strategy())
+def test_path_eq_to_copy(path: Path):
+    assert path == path.copy()
+
+
+@given(path=path_strategy())
+def test_path_eq_to_same_path(path: Path):
+    assert path == Path(
+        path.points,
+        path.layer,
+        path.data_type,
+        path.path_type,
+        path.width,
+    )
+
+
+def test_path_not_eq_to_different_points():
+    path1 = Path([(0, 0), (1, 1)])
+    path2 = Path([(0, 0), (1, 2)])
+    assert path1 != path2

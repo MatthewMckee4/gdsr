@@ -634,7 +634,7 @@ class Cell:
     def flatten(
         self, *layer_data_types: LayerDataType, depth: int | None = None
     ) -> Self:
-        """Flatten the cell to a certain depth.
+        """Flatten the cell to a certain depth on the specified layer, data_type pairs.
 
         Each reference on the depth is replaced by the elements it references.
         If the depth is 0, nothing is flattened

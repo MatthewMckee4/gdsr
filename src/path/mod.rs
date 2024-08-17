@@ -48,7 +48,7 @@ impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Path with {} points on layer {} and data type {}. PathType: {:?} with width {:?}",
+            "Path with {} points on layer {} with data type {}, {:?} and width {}",
             self.points.len(),
             self.layer,
             self.data_type,
@@ -60,16 +60,47 @@ impl std::fmt::Display for Path {
 
 impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Path([{:?}, ..., {:?}], {}, {}, {:?}, {:?})",
-            self.points.first(),
-            self.points.last(),
-            self.layer,
-            self.data_type,
-            self.path_type,
-            self.width
-        )
+        match self.points.as_slice() {
+            [] => {
+                write!(
+                    f,
+                    "Path([], {}, {}, {:?}, {:?})",
+                    self.layer,
+                    self.data_type,
+                    self.path_type.unwrap_or_default(),
+                    self.width.unwrap_or_default()
+                )
+            }
+            [first_point] => write!(
+                f,
+                "Path([{:?}], {}, {}, {:?}, {})",
+                first_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+            [first_point, last_point] => write!(
+                f,
+                "Path([{:?}, {:?}], {}, {}, {:?}, {})",
+                first_point,
+                last_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+            [first_point, .., last_point] => write!(
+                f,
+                "Path([{:?}, ..., {:?}], {}, {}, {:?}, {})",
+                first_point,
+                last_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+        }
     }
 }
 
