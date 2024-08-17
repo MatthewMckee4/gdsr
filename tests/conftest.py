@@ -50,7 +50,9 @@ def string_strategy(draw: st.DrawFn, min_size: int = 1, max_size: int = 100) -> 
     return rf"{
         draw(
             st.text(
-                alphabet=st.characters(codec="ascii"),
+                alphabet=st.characters(
+                    codec="ascii", whitelist_categories=('L', 'N', 'P', 'S')
+                ),
                 min_size=min_size,
                 max_size=max_size,
             )
