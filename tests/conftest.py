@@ -47,17 +47,15 @@ def row_col_strategy(draw: st.DrawFn, min: int = 1, max: int = 32767) -> int:
 
 @st.composite
 def string_strategy(draw: st.DrawFn, min_size: int = 1, max_size: int = 100) -> str:
-    return rf"{
-        draw(
-            st.text(
-                alphabet=st.characters(
-                    codec="ascii", whitelist_categories=('L', 'N', 'P', 'S')
-                ),
-                min_size=min_size,
-                max_size=max_size,
-            )
+    return draw(
+        st.text(
+            alphabet=st.characters(
+                codec="ascii", whitelist_categories=("L", "N", "P", "S")
+            ),
+            min_size=min_size,
+            max_size=max_size,
         )
-    }"
+    )
 
 
 @st.composite
