@@ -165,9 +165,6 @@ def test_library_read_write(library: Library, cell: Cell, element: Element):
     cell.add(element)
     library.add(cell)
     new_library = Library.from_gds(library.to_gds())
-
-    assert library.name == new_library.name
-    assert library.cells == new_library.cells
     assert library == new_library
 
 
