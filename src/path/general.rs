@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
     utils::{
         geometry::perimeter,
         transformations::{py_any_to_point, py_any_to_points_vec},
@@ -113,6 +113,11 @@ impl Path {
     ) -> PyRefMut<'_, Self> {
         Scalable::scale(slf.deref_mut(), factor, centre);
         slf
+    }
+
+    #[pyo3(signature = (*layer_data_types))]
+    pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        LayerDataTypeMatches::is_on(self, layer_data_types)
     }
 
     fn __str__(&self) -> PyResult<String> {

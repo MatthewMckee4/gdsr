@@ -1,9 +1,11 @@
-from hypothesis import assume, given
+import hypothesis.strategies as st
+from hypothesis import assume, given, settings
 
-from gdsr import Cell, Grid, Instance, Library, Reference
+from gdsr import Cell, Element, Grid, Instance, Library, Reference
 
 from .conftest import (
     check_references,
+    element_param_strategy,
     get_cell_from_recursive_reference,
     grid_strategy,
     instance_param_strategy,
@@ -156,6 +158,33 @@ def test_scale_returns_self(instance: Instance):
     assert reference is new_reference
 
 
+# Reference flatten
+
+
+@settings(deadline=None, max_examples=10)
+@given(
+    element=element_param_strategy(),
+    grid=grid_strategy(columns_max=7, rows_max=7),
+    cell_name=st.text(),
+)
+def test_flatten_reference_with_element_depth_one(
+    element: Element, grid: Grid, cell_name: str
+):
+    reference = Reference(element, grid)
+    elements = reference.flatten(depth=1)
+    assert len(elements) == grid.columns * grid.rows
+    assert all(isinstance(new_element, element.__class__) for new_element in elements)
+
+    cell = Cell(repr(cell_name))
+    cell.add(reference)
+
+    library = Library.from_gds(cell.to_gds())
+
+    output_cell = library.cells[repr(cell_name)]
+
+    assert all(element in output_cell for element in elements)
+
+
 # Reference str
 
 
@@ -187,6 +216,9 @@ def test_not_equal(instance: Instance, other_instance: Instance):
 
 
 # Reference read and write
+
+
+@settings(deadline=None, max_examples=10)
 @given(instance=instance_param_strategy())
 def test_read_write(instance: Instance):
     library = Library("library")
@@ -201,3 +233,25 @@ def test_read_write(instance: Instance):
     new_library = Library.from_gds(path)
     new_cell = new_library.cells["parent"]
     check_references(new_library, instance, new_cell)
+
+
+@given(
+    element=element_param_strategy(), grid=grid_strategy(columns_max=10, rows_max=10)
+)
+def test_cell_with_element_same_as_element(element: Element, grid: Grid):
+    cell_name = "parent"
+    cell = Cell("child")
+    cell.add(element)
+
+    cell_reference = Reference(cell, grid)
+    cell_with_cell_reference = Cell(cell_name)
+    cell_with_cell_reference.add(cell_reference)
+
+    element_reference = Reference(element, grid)
+    cell_with_element_reference = Cell(cell_name)
+    cell_with_element_reference.add(element_reference)
+
+    cell_with_cell_reference.flatten()
+    cell_with_element_reference.flatten()
+
+    assert cell_with_cell_reference == cell_with_element_reference

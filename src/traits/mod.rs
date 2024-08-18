@@ -23,3 +23,11 @@ pub trait Scalable {
 pub trait Dimensions {
     fn bounding_box(&self) -> (Point, Point);
 }
+
+pub trait Reflect {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self;
+}
+
+pub trait LayerDataTypeMatches {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool;
+}

@@ -4,6 +4,7 @@ use pyo3::exceptions::{PyIndexError, PyZeroDivisionError};
 
 use pyo3::prelude::*;
 
+use crate::config::epsilon_is_close;
 use crate::utils::{
     geometry::{distance_between_points, round_to_decimals},
     transformations::py_any_to_point,
@@ -30,8 +31,8 @@ impl Point {
         Ok(self.x * other.y - self.y * other.x)
     }
 
-    pub fn copy(&self) -> PyResult<Self> {
-        Ok(*self)
+    pub fn copy(&self) -> Self {
+        *self
     }
 
     #[pyo3(signature = (angle, centre=Point::default()))]
@@ -81,7 +82,7 @@ impl Point {
         Ok(Some(dy.atan2(dx).to_degrees()))
     }
 
-    #[pyo3(signature = (other, rel_tol=1e-7, abs_tol=1e-10))]
+    #[pyo3(signature = (other, rel_tol=1e-6, abs_tol=1e-10))]
     pub fn is_close(
         &self,
         #[pyo3(from_py_with = "py_any_to_point")] other: Point,
@@ -90,6 +91,35 @@ impl Point {
     ) -> bool {
         (self.x - other.x).abs() <= abs_tol + rel_tol * other.x.abs()
             && (self.y - other.y).abs() <= abs_tol + rel_tol * other.y.abs()
+    }
+
+    pub fn epsilon_is_close(&self, #[pyo3(from_py_with = "py_any_to_point")] other: Point) -> bool {
+        epsilon_is_close(self.x, other.x) && epsilon_is_close(self.y, other.y)
+    }
+
+    #[pyo3(signature = (angle, centre=Point::default()))]
+    pub fn reflect(
+        &self,
+        angle: f64,
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+    ) -> Self {
+        let angle_rad = angle.to_radians();
+
+        let translated_x = self.x - centre.x;
+        let translated_y = self.y - centre.y;
+
+        let cos_theta = angle_rad.cos();
+        let sin_theta = angle_rad.sin();
+
+        let x_new = translated_x * (cos_theta * cos_theta - sin_theta * sin_theta)
+            - translated_y * 2.0 * cos_theta * sin_theta;
+        let y_new = translated_x * 2.0 * cos_theta * sin_theta
+            + translated_y * (sin_theta * sin_theta - cos_theta * cos_theta);
+
+        let x = centre.x + x_new;
+        let y = centre.y + y_new;
+
+        Point { x, y }
     }
 
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
@@ -186,13 +216,13 @@ impl Point {
 
     #[pyo3(signature = (ndigits=None))]
     pub fn __round__(&self, ndigits: Option<i32>) -> PyResult<Self> {
-        let factor = match ndigits {
-            Some(d) => 10f64.powi(d),
-            None => 1.0,
+        let ndigits = match ndigits {
+            Some(ndigits) => ndigits as u32,
+            None => 0,
         };
         Ok(Self {
-            x: (self.x * factor).round() / factor,
-            y: (self.y * factor).round() / factor,
+            x: round_to_decimals(self.x, ndigits),
+            y: round_to_decimals(self.y, ndigits),
         })
     }
 

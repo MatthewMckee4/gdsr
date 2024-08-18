@@ -2,7 +2,7 @@ use log::warn;
 use pyo3::prelude::*;
 
 use crate::point::Point;
-use crate::traits::{Dimensions, Movable, Rotatable, Scalable};
+use crate::traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable};
 
 mod general;
 mod io;
@@ -10,7 +10,7 @@ pub mod presentation;
 pub mod utils;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Text {
     #[pyo3(get, set)]
     pub text: String,
@@ -42,6 +42,19 @@ impl Default for Text {
             vertical_presentation: presentation::VerticalPresentation::default(),
             horizontal_presentation: presentation::HorizontalPresentation::default(),
         }
+    }
+}
+
+impl PartialEq for Text {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+            && self.origin.epsilon_is_close(other.origin)
+            && self.layer == other.layer
+            && self.magnification == other.magnification
+            && self.angle == other.angle
+            && self.x_reflection == other.x_reflection
+            && self.vertical_presentation == other.vertical_presentation
+            && self.horizontal_presentation == other.horizontal_presentation
     }
 }
 
@@ -112,5 +125,23 @@ impl Dimensions for Text {
         let upper_right = self.origin + Point::new(half_width, half_height);
 
         (lower_left, upper_right)
+    }
+}
+
+impl Reflect for Text {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        self.origin = self.origin.reflect(angle, centre);
+        self.angle = (self.angle + 2.0 * (angle - self.angle)) % 360.0;
+        self
+    }
+}
+
+impl LayerDataTypeMatches for Text {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        let all_layers = layer_data_types
+            .iter()
+            .map(|(layer, _)| *layer)
+            .collect::<Vec<i32>>();
+        all_layers.contains(&self.layer) || layer_data_types.is_empty()
     }
 }

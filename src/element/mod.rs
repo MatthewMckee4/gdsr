@@ -8,7 +8,7 @@ use crate::{
     polygon::Polygon,
     reference::Reference,
     text::Text,
-    traits::{Dimensions, Movable, Rotatable, Scalable, ToGds},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGds},
 };
 
 #[derive(Clone)]
@@ -110,18 +110,20 @@ impl Movable for Element {
 }
 
 impl Element {
-    pub fn copy(&self) -> PyResult<Self> {
-        Python::with_gil(|py| {
-            Ok(match self {
-                Element::Path(element) => Element::Path(Py::new(py, element.borrow(py).clone())?),
-                Element::Polygon(element) => {
-                    Element::Polygon(Py::new(py, element.borrow(py).clone())?)
-                }
-                Element::Reference(element) => {
-                    Element::Reference(Py::new(py, element.borrow(py).clone())?)
-                }
-                Element::Text(element) => Element::Text(Py::new(py, element.borrow(py).clone())?),
-            })
+    pub fn copy(&self) -> Self {
+        Python::with_gil(|py| match self {
+            Element::Path(element) => {
+                Element::Path(Py::new(py, element.borrow(py).copy()).unwrap())
+            }
+            Element::Polygon(element) => {
+                Element::Polygon(Py::new(py, element.borrow(py).copy()).unwrap())
+            }
+            Element::Reference(element) => {
+                Element::Reference(Py::new(py, element.borrow(py).copy()).unwrap())
+            }
+            Element::Text(element) => {
+                Element::Text(Py::new(py, element.borrow(py).copy()).unwrap())
+            }
         })
     }
 }
@@ -173,6 +175,37 @@ impl Dimensions for Element {
             Element::Polygon(element) => element.borrow(py).bounding_box(),
             Element::Reference(element) => element.borrow(py).bounding_box(),
             Element::Text(element) => element.borrow(py).bounding_box(),
+        })
+    }
+}
+
+impl Reflect for Element {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        Python::with_gil(|py| match self {
+            Element::Path(element) => {
+                element.borrow_mut(py).reflect(angle, centre);
+            }
+            Element::Polygon(element) => {
+                element.borrow_mut(py).reflect(angle, centre);
+            }
+            Element::Reference(element) => {
+                element.borrow_mut(py).reflect(angle, centre);
+            }
+            Element::Text(element) => {
+                element.borrow_mut(py).reflect(angle, centre);
+            }
+        });
+        self
+    }
+}
+
+impl LayerDataTypeMatches for Element {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        Python::with_gil(|py| match self {
+            Element::Path(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Polygon(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Reference(element) => element.borrow(py).is_on(layer_data_types),
+            Element::Text(element) => element.borrow(py).is_on(layer_data_types),
         })
     }
 }

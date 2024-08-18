@@ -1,12 +1,13 @@
-from typing import TYPE_CHECKING
-
-from hypothesis import assume
+import pytest
+from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 
 from gdsr import (
     Cell,
+    Element,
     Grid,
     HorizontalPresentation,
+    Instance,
     Library,
     Path,
     PathType,
@@ -17,33 +18,63 @@ from gdsr import (
     VerticalPresentation,
 )
 
-if TYPE_CHECKING:
-    from gdsr import Element, Instance
+
+def pytest_configure(config: pytest.Config) -> None:
+    settings.register_profile(
+        "default", settings(suppress_health_check=[HealthCheck.too_slow])
+    )
+    settings.load_profile("default")
 
 
 @st.composite
-def float_strategy(draw: st.DrawFn) -> float:
+def float_strategy(
+    draw: st.DrawFn,
+    min_value: float = -10000,
+    max_value: float = 10000,
+    places: int = 4,
+) -> float:
     return float(
         draw(
             st.decimals(
-                min_value=-214748.3648,
-                max_value=214748.3647,
+                min_value=min_value,
+                max_value=max_value,
                 allow_nan=False,
                 allow_infinity=False,
-                places=4,
+                places=places,
             )
         )
     )
 
 
 @st.composite
-def row_col_strategy(draw: st.DrawFn) -> int:
-    return draw(st.integers(min_value=1, max_value=32767))
+def row_col_strategy(draw: st.DrawFn, min: int = 1, max: int = 32767) -> int:
+    return draw(st.integers(min_value=min, max_value=max))
 
 
 @st.composite
-def point_strategy(draw: st.DrawFn) -> Point:
-    return Point(draw(float_strategy()), draw(float_strategy()))
+def string_strategy(draw: st.DrawFn, min_size: int = 1, max_size: int = 100) -> str:
+    return draw(
+        st.text(
+            alphabet=st.characters(
+                codec="ascii", whitelist_categories=("L", "N", "P", "S")
+            ),
+            min_size=min_size,
+            max_size=max_size,
+        )
+    )
+
+
+@st.composite
+def point_strategy(
+    draw: st.DrawFn,
+    min_value: float = -10000,
+    max_value: float = 10000,
+    places: int = 4,
+) -> Point:
+    return Point(
+        draw(float_strategy(min_value=min_value, max_value=max_value, places=places)),
+        draw(float_strategy(min_value=min_value, max_value=max_value, places=places)),
+    )
 
 
 @st.composite
@@ -60,26 +91,61 @@ def data_type_strategy(draw: st.DrawFn) -> int:
 def cell_strategy(draw: st.DrawFn, *, cell_name: str | None = None) -> Cell:
     if cell_name is not None:
         return Cell(cell_name)
-    return Cell(draw(st.text(min_size=1)))
+    return Cell(draw(string_strategy()))
+
+
+@st.composite
+def randomly_populated_cell_strategy(
+    draw: st.DrawFn, *, cell_name: str | None = None
+) -> Cell:
+    cell = draw(cell_strategy(cell_name=cell_name))
+    num_elements = draw(st.integers(min_value=1, max_value=10))
+
+    for _ in range(num_elements):
+        element = draw(
+            st.one_of(
+                polygon_strategy(),
+                path_strategy(),
+                text_strategy(),
+                reference_strategy(),
+            )
+        )
+        cell.add(element)
+    return cell
 
 
 @st.composite
 def library_strategy(draw: st.DrawFn) -> Library:
-    return Library(draw(st.text(min_size=1)))
+    return Library(draw(string_strategy()))
 
 
 @st.composite
-def grid_strategy(draw: st.DrawFn) -> Grid:
-    magnification = draw(float_strategy())
-    assume(magnification != 0)
+def angle_strategy(draw: st.DrawFn) -> float:
+    return draw(st.sampled_from([0, 45, 90, 180, 270, 359]))
+
+
+@st.composite
+def grid_strategy(
+    draw: st.DrawFn, columns_max: int | None = None, rows_max: int | None = None
+) -> Grid:
+    magnification = float(draw(st.decimals(min_value=1, max_value=10, places=0)))
+
+    if columns_max is not None:
+        columns = draw(row_col_strategy(max=columns_max))
+    else:
+        columns = draw(row_col_strategy())
+    if rows_max is not None:
+        rows = draw(row_col_strategy(max=rows_max))
+    else:
+        rows = draw(row_col_strategy())
     return Grid(
-        draw(point_strategy()),
-        draw(row_col_strategy()),
-        draw(row_col_strategy()),
-        draw(point_strategy()),
-        draw(point_strategy()),
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)),
+        columns,
+        rows,
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)).round(2),
+        draw(point_strategy(max_value=1000.0, min_value=-1000.0)).round(2),
         magnification,
-        draw(float_strategy()),
+        draw(angle_strategy()),
         draw(st.booleans()),
     )
 
@@ -124,11 +190,7 @@ def path_strategy(draw: st.DrawFn) -> Path:
 @st.composite
 def text_strategy(draw: st.DrawFn) -> Text:
     return Text(
-        draw(
-            st.text(
-                alphabet=st.characters(codec="ascii"),
-            )
-        ),
+        draw(string_strategy()),
         draw(point_strategy()),
         draw(layer_strategy()),
         draw(st.integers(min_value=1)),

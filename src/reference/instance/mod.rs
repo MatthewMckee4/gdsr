@@ -131,3 +131,12 @@ impl Dimensions for Instance {
         })
     }
 }
+
+impl Instance {
+    pub fn copy(&self) -> Self {
+        Python::with_gil(|py| match self {
+            Instance::Cell(cell) => Instance::Cell(Py::new(py, cell.borrow(py).clone()).unwrap()),
+            Instance::Element(element) => Instance::Element(element.copy()),
+        })
+    }
+}

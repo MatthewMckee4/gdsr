@@ -7,7 +7,30 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-from .typings import InputPointsLike, Layer, PathLike, PointLike
+from .typings import (
+    DataType,
+    InputPointsLike,
+    Layer,
+    LayerDataType,
+    PathLike,
+    PointLike,
+)
+
+def set_epsilon(epsilon: float) -> None:
+    """Set the epsilon used for floating point comparisons.
+
+    When using Cell.to_gds or Library.to_gds this value should match precision/units.
+
+    :param float epsilon: Epsilon value
+    """
+
+def get_epsilon() -> float:
+    """Get the epsilon used for floating point comparisons.
+
+    When using Cell.to_gds or Library.to_gds this value should match precision/units.
+
+    :return: Epsilon value
+    """
 
 class PointIterator(Iterator[float]):
     def __next__(self) -> float: ...
@@ -63,6 +86,19 @@ class Point:
         :param PointLike other: The other point.
         :param float rel_tol: Relative tolerance, defaults to 1e-9.
         :param float abs_tol: Absolute tolerance, defaults to 0.0.
+        """
+    def epsilon_is_close(self, other: PointLike) -> bool:
+        """Return True if the point is close to another point using epsilon.
+
+        This is used in all equality checks in gdsr.
+
+        :param PointLike other: The other point.
+        """
+    def reflect(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
+        """Reflect the point across a line defined by an angle around a centre point.
+
+        :param float angle: Angle of the line in degrees.
+        :param PointLike centre: Centre point of reflection, defaults to Point(0, 0).
         """
     def __getitem__(self, index: Literal[0, 1]) -> float:
         """Return the x or y coordinate of the point."""
@@ -133,7 +169,7 @@ class Grid:
     def spacing_y(self, spacing: PointLike) -> None:
         """Set the spacing in the y direction."""
     magnification: float
-    """Magnification of the grid."""
+    """Magnification of the elements in the grid."""
     angle: float
     """Angle of the grid."""
     x_reflection: bool
@@ -251,6 +287,18 @@ class Reference(Generic[T_Instance]):
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def flatten(
+        self, *layer_data_types: LayerDataType, depth: int | None = None
+    ) -> list[Element]:
+        """Return a list of the elements in the reference.
+
+        When depth is None, the reference is flattened to the deepest level.
+
+        :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
+        :param int depth: Depth of the flattening, defaults to None.
+        """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the instance is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the reference."""
     def __repr__(self) -> str:
@@ -274,15 +322,15 @@ class Path:
     @points.setter
     def points(self, points: InputPointsLike) -> None:
         """Set the points of the path."""
-    layer: int
-    data_type: int
+    layer: Layer
+    data_type: DataType
     path_type: PathType | None
     width: float | None
     def __init__(
         self,
         points: InputPointsLike,
-        layer: int = 0,
-        data_type: int = 0,
+        layer: Layer = 0,
+        data_type: DataType = 0,
         path_type: PathType | None = None,
         width: float | None = None,
     ) -> None: ...
@@ -324,6 +372,8 @@ class Path:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the path is on any of the specified layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the path."""
     def __repr__(self) -> str:
@@ -342,10 +392,10 @@ class Polygon:
         """Set the points of the polygon."""
     layer: Layer
     """The layer of the polygon."""
-    data_type: int
+    data_type: DataType
     """The data type of the polygon."""
     def __init__(
-        self, points: InputPointsLike, layer: Layer = 0, data_type: int = 0
+        self, points: InputPointsLike, layer: Layer = 0, data_type: DataType = 0
     ) -> None:
         """Initialize the Polygon.
 
@@ -355,7 +405,7 @@ class Polygon:
         :param InputPointsLike points: Polygon vertices. Sequence of objects that are
         indexable at 0 and 1. Must not be empty
         :param Layer layer: Polygon layer, defaults to 0
-        :param int data_type: Polygon data_type, defaults to 0
+        :param DataType data_type: Polygon data_type, defaults to 0
         """
     @property
     def bounding_box(self) -> tuple[Point, Point]:
@@ -414,10 +464,14 @@ class Polygon:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the polygon is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
     def __repr__(self) -> str:
         """Return a string representation of the polygon."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the polygon is equal to another object."""
 
 class VerticalPresentation(Enum):
     Top = 0
@@ -517,12 +571,17 @@ class Text:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the text is on any of the layer, data_type pairs."""
     def __str__(self) -> str:
         """Return a string representation of the text."""
     def __repr__(self) -> str:
         """Return a string representation of the text."""
+    def __eq__(self, value: object) -> bool:
+        """Return True if the text is equal to another object."""
 
-Element: TypeAlias = Reference[Instance] | Path | Polygon | Text
+BaseElement: TypeAlias = Path | Polygon | Text
+Element: TypeAlias = Reference[Instance] | BaseElement
 
 class Cell:
     name: str
@@ -555,7 +614,6 @@ class Cell:
 
         :param PointLike point: Point to move the cell to.
         """
-
     def move_by(self, vector: PointLike) -> Self:
         """Move everything in the cell by a vector.
 
@@ -573,6 +631,38 @@ class Cell:
         :param float factor: Scaling factor.
         :param PointLike centre: Centre point of scaling, defaults to Point(0, 0).
         """
+    def flatten(
+        self, *layer_data_types: LayerDataType, depth: int | None = None
+    ) -> Self:
+        """Flatten the cell to a certain depth on the specified layer, data_type pairs.
+
+        Each reference on the depth is replaced by the elements it references.
+        If the depth is 0, nothing is flattened
+        If the depth is 1, only the first level of references is flattened
+        and so on.
+
+        When depth is None, the cell is flattened to the deepest level.
+
+        This method modifies the cell in place and returns itself.
+
+        :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
+        :param int | None depth: Depth of the flattening, defaults to None.
+        """
+    def get_elements(
+        self, *layer_data_types: LayerDataType, depth: int | None = None
+    ) -> list[Element]:
+        """Return a list of elements in the cell.
+
+        This method does not modify the cell. It simply returns the elements
+        until the specified depth. If a reference is encountered before
+        it reaches the specified depth, the reference is flattened to the
+        level of depth relative to the cell.
+
+        When depth is None, the cell is flattened to the deepest level.
+
+        :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
+        :param int | None depth: Depth of the flattening, defaults to None.
+        """
     def copy(self) -> Self:
         """Return a copy of the cell."""
     def to_gds(
@@ -588,6 +678,14 @@ class Cell:
         :param float precision: GDS file precision, defaults to 1e-10.
         :return: GDS file name
         """
+    def is_on(self, *layer_data_types: LayerDataType) -> bool:
+        """Return True if the cell is on any of the layer, data_type pairs.
+
+        This method returns True if all elements in the cell are on any of the
+        layer, data_type pairs.
+        """
+    def __contains__(self, element: Element) -> bool:
+        """Return True if the cell contains the element."""
     def __str__(self) -> str:
         """Return a string representation of the cell."""
     def __repr__(self) -> str:

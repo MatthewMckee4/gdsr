@@ -1,3 +1,4 @@
+use config::{get_epsilon, set_epsilon};
 use pyo3::prelude::*;
 
 mod utils;
@@ -40,5 +41,9 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<VerticalPresentation>()?;
     m.add_class::<HorizontalPresentation>()?;
     m.add_class::<PathType>()?;
+
+    let _ = m.add_function(wrap_pyfunction!(set_epsilon, m)?);
+    let _ = m.add_function(wrap_pyfunction!(get_epsilon, m)?);
+
     Ok(())
 }

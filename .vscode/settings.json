@@ -49,6 +49,7 @@
         "powi",
         "pyclass",
         "pydata",
+        "pyfunction",
         "pylist",
         "pymethods",
         "pymodule",

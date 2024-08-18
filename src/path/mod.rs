@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Dimensions, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
 };
 
 mod general;
@@ -11,7 +11,7 @@ mod io;
 pub mod path_type;
 
 #[pyclass(eq)]
-#[derive(Clone, PartialEq, Default)]
+#[derive(Clone, Default)]
 pub struct Path {
     #[pyo3(get)]
     pub points: Vec<Point>,
@@ -25,11 +25,30 @@ pub struct Path {
     pub width: Option<f64>,
 }
 
+impl PartialEq for Path {
+    fn eq(&self, other: &Self) -> bool {
+        if self.points.len() != other.points.len() {
+            return false;
+        }
+
+        for (self_point, other_point) in self.points.iter().zip(other.points.iter()) {
+            if !self_point.epsilon_is_close(*other_point) {
+                return false;
+            }
+        }
+
+        self.layer == other.layer
+            && self.data_type == other.data_type
+            && self.path_type == other.path_type
+            && self.width == other.width
+    }
+}
+
 impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Path with {} points on layer {} and data type {}. PathType: {:?} with width {:?}",
+            "Path with {} points on layer {} with data type {}, {:?} and width {}",
             self.points.len(),
             self.layer,
             self.data_type,
@@ -41,16 +60,47 @@ impl std::fmt::Display for Path {
 
 impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Path([{:?}, ..., {:?}], {}, {}, {:?}, {:?})",
-            self.points.first(),
-            self.points.last(),
-            self.layer,
-            self.data_type,
-            self.path_type,
-            self.width
-        )
+        match self.points.as_slice() {
+            [] => {
+                write!(
+                    f,
+                    "Path([], {}, {}, {:?}, {:?})",
+                    self.layer,
+                    self.data_type,
+                    self.path_type.unwrap_or_default(),
+                    self.width.unwrap_or_default()
+                )
+            }
+            [first_point] => write!(
+                f,
+                "Path([{:?}], {}, {}, {:?}, {})",
+                first_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+            [first_point, last_point] => write!(
+                f,
+                "Path([{:?}, {:?}], {}, {}, {:?}, {})",
+                first_point,
+                last_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+            [first_point, .., last_point] => write!(
+                f,
+                "Path([{:?}, ..., {:?}], {}, {}, {:?}, {})",
+                first_point,
+                last_point,
+                self.layer,
+                self.data_type,
+                self.path_type.unwrap_or_default(),
+                self.width.unwrap_or_default()
+            ),
+        }
     }
 }
 
@@ -198,5 +248,20 @@ impl Dimensions for Path {
         }
 
         (min, max)
+    }
+}
+
+impl Reflect for Path {
+    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
+        for point in &mut self.points {
+            *point = point.reflect(angle, centre);
+        }
+        self
+    }
+}
+
+impl LayerDataTypeMatches for Path {
+    fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
+        layer_data_types.contains(&(self.layer, self.data_type)) || layer_data_types.is_empty()
     }
 }

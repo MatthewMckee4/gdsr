@@ -708,3 +708,12 @@ def test_point_is_close_to_list(point: Point):
 def test_point_is_close_to_close_point(point: Point, abs: float):
     assume(abs > 0)
     assert point.is_close(Point(point.x + abs, point.y + abs), abs_tol=abs)
+
+
+# Point reflect
+
+
+@given(point=point_strategy())
+def test_point_reflect_x_axis(point: Point):
+    p = point.reflect(0, (1, 0))
+    assert p.is_close((point.x, -point.y))

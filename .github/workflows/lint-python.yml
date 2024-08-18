@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'gdsr/**'
+    types:
+      - opened
+      - synchronize
 
 jobs:
   ruff:

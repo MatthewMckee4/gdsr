@@ -6,6 +6,9 @@ on:
       - 'gdsr/**'
       - 'src/**'
       - 'tests/**'
+    types:
+      - opened
+      - synchronize
 
 jobs:
   test-python:
