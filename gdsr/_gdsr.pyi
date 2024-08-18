@@ -169,7 +169,7 @@ class Grid:
     def spacing_y(self, spacing: PointLike) -> None:
         """Set the spacing in the y direction."""
     magnification: float
-    """Magnification of the grid."""
+    """Magnification of the elements in the grid."""
     angle: float
     """Angle of the grid."""
     x_reflection: bool

@@ -216,6 +216,8 @@ def test_not_equal(instance: Instance, other_instance: Instance):
 
 
 # Reference read and write
+
+
 @settings(deadline=None, max_examples=10)
 @given(instance=instance_param_strategy())
 def test_read_write(instance: Instance):
@@ -231,3 +233,25 @@ def test_read_write(instance: Instance):
     new_library = Library.from_gds(path)
     new_cell = new_library.cells["parent"]
     check_references(new_library, instance, new_cell)
+
+
+@given(
+    element=element_param_strategy(), grid=grid_strategy(columns_max=10, rows_max=10)
+)
+def test_cell_with_element_same_as_element(element: Element, grid: Grid):
+    cell_name = "parent"
+    cell = Cell("child")
+    cell.add(element)
+
+    cell_reference = Reference(cell, grid)
+    cell_with_cell_reference = Cell(cell_name)
+    cell_with_cell_reference.add(cell_reference)
+
+    element_reference = Reference(element, grid)
+    cell_with_element_reference = Cell(cell_name)
+    cell_with_element_reference.add(element_reference)
+
+    cell_with_cell_reference.flatten()
+    cell_with_element_reference.flatten()
+
+    assert cell_with_cell_reference == cell_with_element_reference

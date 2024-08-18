@@ -1,11 +1,13 @@
-from typing import TYPE_CHECKING
-
+import pytest
+from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 
 from gdsr import (
     Cell,
+    Element,
     Grid,
     HorizontalPresentation,
+    Instance,
     Library,
     Path,
     PathType,
@@ -16,8 +18,12 @@ from gdsr import (
     VerticalPresentation,
 )
 
-if TYPE_CHECKING:
-    from gdsr import Element, Instance
+
+def pytest_configure(config: pytest.Config) -> None:
+    settings.register_profile(
+        "default", settings(suppress_health_check=[HealthCheck.too_slow])
+    )
+    settings.load_profile("default")
 
 
 @st.composite
@@ -93,7 +99,7 @@ def randomly_populated_cell_strategy(
     draw: st.DrawFn, *, cell_name: str | None = None
 ) -> Cell:
     cell = draw(cell_strategy(cell_name=cell_name))
-    num_elements = draw(st.integers(min_value=1, max_value=100))
+    num_elements = draw(st.integers(min_value=1, max_value=10))
 
     for _ in range(num_elements):
         element = draw(

@@ -178,12 +178,12 @@ impl Reference {
 
                     let mut new_element = element.copy();
 
-                    new_element.rotate(grid.angle, Point::default());
-                    new_element.scale(grid.magnification, Point::default());
-
                     if grid.x_reflection {
                         new_element.reflect(0.0, Point::new(1.0, 0.0));
                     }
+
+                    new_element.rotate(grid.angle, Point::default());
+                    new_element.scale(grid.magnification, Point::default());
 
                     new_element.move_by(
                         origin
