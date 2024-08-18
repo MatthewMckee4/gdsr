@@ -82,7 +82,7 @@ impl Point {
         Ok(Some(dy.atan2(dx).to_degrees()))
     }
 
-    #[pyo3(signature = (other, rel_tol=1e-7, abs_tol=1e-10))]
+    #[pyo3(signature = (other, rel_tol=1e-6, abs_tol=1e-10))]
     pub fn is_close(
         &self,
         #[pyo3(from_py_with = "py_any_to_point")] other: Point,
@@ -216,13 +216,13 @@ impl Point {
 
     #[pyo3(signature = (ndigits=None))]
     pub fn __round__(&self, ndigits: Option<i32>) -> PyResult<Self> {
-        let factor = match ndigits {
-            Some(d) => 10f64.powi(d),
-            None => 1.0,
+        let ndigits = match ndigits {
+            Some(ndigits) => ndigits as u32,
+            None => 0,
         };
         Ok(Self {
-            x: (self.x * factor).round() / factor,
-            y: (self.y * factor).round() / factor,
+            x: round_to_decimals(self.x, ndigits),
+            y: round_to_decimals(self.y, ndigits),
         })
     }
 

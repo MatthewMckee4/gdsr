@@ -193,7 +193,7 @@ def test_grid_eq_to_copy(grid: Grid):
 
 
 @given(grid=grid_strategy(), point=point_strategy())
-def test_grid_eq_to_different_origin(grid: Grid, point: Point):
+def test_grid_not_eq_to_different_origin(grid: Grid, point: Point):
     assume(grid.origin != point)
     new_grid = grid.copy()
     new_grid.origin = point

@@ -1,5 +1,7 @@
 use pyo3::prelude::*;
 
+use crate::utils::geometry::round_to_decimals;
+
 pub mod gds_file_types;
 
 pub const FLOATING_POINT_INACCURACY_ROUND_DECIMALS: u32 = 10;
@@ -18,5 +20,5 @@ pub fn get_epsilon() -> f64 {
 }
 
 pub fn epsilon_is_close(a: f64, b: f64) -> bool {
-    unsafe { (a - b).abs() < EPSILON }
+    unsafe { round_to_decimals((a - b).abs(), FLOATING_POINT_INACCURACY_ROUND_DECIMALS) < EPSILON }
 }
