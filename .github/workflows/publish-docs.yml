@@ -1,38 +1,38 @@
 name: Publish Docs
 
 on:
-  push:
-    branches: [main]
+    push:
+        branches: [main]
 
 jobs:
-  publish-docs:
-    runs-on: ubuntu-latest
-    name: Docs builder and publisher
+    publish-docs:
+        runs-on: ubuntu-latest
+        name: Docs builder and publisher
 
-    permissions:
-      contents: write 
+        permissions:
+            contents: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.12.4
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with:
+                  python-version: 3.12.4
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-docs.txt
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements-docs.txt
 
-      - name: Build docs
-        run: mkdocs build
+            - name: Build docs
+              run: mkdocs build
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: site
-          publish_branch: gh-pages
-          keep_files: false
-          force_orphan: true
+            - name: Deploy
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: site
+                  publish_branch: gh-pages
+                  keep_files: false
+                  force_orphan: true

@@ -8,3 +8,5 @@
 ::: gdsr.Instance
 ## Element
 ::: gdsr.Element
+## Layer Data Type Pair
+::: gdsr.typings.LayerDataType

@@ -3,50 +3,43 @@ repo_url: https://github.com/gdsr/gdsr
 
 nav:
   - User guide:
-    - index.md
-    - user-guide/getting-started.md
-    - user-guide/installation.md
+      - index.md
+      - user-guide/getting-started.md
+      - user-guide/installation.md
   - Python Api:
-    - python-api/index.md
-    - python-api/point.md
-    - python-api/cell.md
-    - python-api/library.md
-    - python-api/typings.md
-    - Elements:
-      - python-api/elements/reference.md
-      - python-api/elements/path.md
-      - python-api/elements/polygon.md
-      - python-api/elements/text.md
+      - python-api/index.md
+      - python-api/point.md
+      - python-api/cell.md
+      - python-api/library.md
+      - python-api/typings.md
+      - Elements:
+          - python-api/elements/reference.md
+          - python-api/elements/path.md
+          - python-api/elements/polygon.md
+          - python-api/elements/text.md
   - Development:
-    - development/index.md
-    - Contributing:
-      - development/contributing/git-standards.md
-      - development/contributing/index.md
-      - development/contributing/ide-configuration.md
-      - development/contributing/code-style.md
+      - development/index.md
+      - Contributing:
+          - development/contributing/git-standards.md
+          - development/contributing/index.md
+          - development/contributing/ide-configuration.md
+          - development/contributing/code-style.md
 
 theme:
   name: material
   locale: en
   palette:
-      scheme: slate
-      primary: teal
+    scheme: slate
+    primary: teal
   features:
     - navigation.instant
     - navigation.tabs
     - navigation.footer
     - navigation.indexes
     - content.tabs.link
+    - content.code.copy
   icon:
     repo: fontawesome/brands/github
-
-
-markdown_extensions:
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
 
 plugins:
   - mkdocstrings:
@@ -64,3 +57,13 @@ plugins:
             members_order: source
             show_if_no_docstring: true
             show_root_full_path: true
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences

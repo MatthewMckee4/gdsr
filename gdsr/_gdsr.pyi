@@ -691,7 +691,7 @@ class Cell:
         This method modifies the cell in place and returns itself.
 
         :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
-        :param int | None depth: Depth of the flattening, defaults to None.
+        :param int depth: Depth of the flattening, defaults to None.
         """
     def get_elements(
         self, *layer_data_types: LayerDataType, depth: int | None = None
@@ -706,7 +706,7 @@ class Cell:
         When depth is None, the cell is flattened to the deepest level.
 
         :param LayerDataType layer_data_types: the layer, data_type pairs to flatten on
-        :param int | None depth: Depth of the flattening, defaults to None.
+        :param int depth: Depth of the flattening, defaults to None.
         """
     def copy(self) -> Self:
         """Return a copy of the cell."""
