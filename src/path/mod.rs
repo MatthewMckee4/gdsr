@@ -19,9 +19,9 @@ pub struct Path {
     pub layer: i32,
     #[pyo3(get)]
     pub data_type: i32,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub path_type: Option<PathType>,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub width: Option<f64>,
 }
 

@@ -35,27 +35,44 @@ impl Polygon {
         })
     }
 
-    #[setter]
-    fn set_points(
+    #[setter(points)]
+    fn setter_points(
         &mut self,
         #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
-    ) -> PyResult<()> {
+    ) {
         self.points = points;
-        Ok(())
     }
 
-    #[setter]
-    fn set_layer(&mut self, layer: i32) -> PyResult<()> {
+    fn set_points(
+        mut slf: PyRefMut<'_, Self>,
+        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_points(points);
+        slf
+    }
+
+    #[setter(layer)]
+    fn setter_layer(&mut self, layer: i32) -> PyResult<()> {
         check_layer_valid(layer)?;
         self.layer = layer;
         Ok(())
     }
 
-    #[setter]
-    fn set_data_type(&mut self, data_type: i32) -> PyResult<()> {
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
+        slf.setter_layer(layer).unwrap();
+        slf
+    }
+
+    #[setter(data_type)]
+    fn setter_data_type(&mut self, data_type: i32) -> PyResult<()> {
         check_data_type_valid(data_type)?;
         self.data_type = data_type;
         Ok(())
+    }
+
+    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyRefMut<'_, Self> {
+        slf.setter_data_type(data_type).unwrap();
+        slf
     }
 
     #[getter]

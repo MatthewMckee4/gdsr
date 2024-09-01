@@ -50,20 +50,95 @@ impl Text {
         })
     }
 
-    #[setter]
-    fn set_origin(
-        &mut self,
-        #[pyo3(from_py_with = "py_any_to_point")] origin: Point,
-    ) -> PyResult<()> {
-        self.origin = origin;
-        Ok(())
+    #[setter(text)]
+    fn setter_text(&mut self, text: String) {
+        self.text = text;
     }
 
-    #[setter]
-    fn set_layer(&mut self, layer: i32) -> PyResult<()> {
+    fn set_text(mut slf: PyRefMut<'_, Self>, text: String) -> PyRefMut<'_, Self> {
+        slf.setter_text(text);
+        slf
+    }
+
+    #[setter(origin)]
+    fn setter_origin(&mut self, #[pyo3(from_py_with = "py_any_to_point")] origin: Point) {
+        self.origin = origin;
+    }
+
+    fn set_origin(
+        mut slf: PyRefMut<'_, Self>,
+        #[pyo3(from_py_with = "py_any_to_point")] origin: Point,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_origin(origin);
+        slf
+    }
+
+    #[setter(layer)]
+    fn setter_layer(&mut self, layer: i32) -> PyResult<()> {
         check_layer_valid(layer)?;
         self.layer = layer;
         Ok(())
+    }
+
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
+        slf.setter_layer(layer).unwrap();
+        slf
+    }
+
+    #[setter(magnification)]
+    fn setter_magnification(&mut self, magnification: f64) {
+        self.magnification = magnification;
+    }
+
+    fn set_magnification(mut slf: PyRefMut<'_, Self>, magnification: f64) -> PyRefMut<'_, Self> {
+        slf.setter_magnification(magnification);
+        slf
+    }
+
+    #[setter(angle)]
+    fn setter_angle(&mut self, angle: f64) {
+        self.angle = angle;
+    }
+
+    fn set_angle(mut slf: PyRefMut<'_, Self>, angle: f64) -> PyRefMut<'_, Self> {
+        slf.setter_angle(angle);
+        slf
+    }
+
+    #[setter(x_reflection)]
+    fn setter_x_reflection(&mut self, x_reflection: bool) {
+        self.x_reflection = x_reflection;
+    }
+
+    fn set_x_reflection(mut slf: PyRefMut<'_, Self>, x_reflection: bool) -> PyRefMut<'_, Self> {
+        slf.setter_x_reflection(x_reflection);
+        slf
+    }
+
+    #[setter(vertical_presentation)]
+    fn setter_vertical_presentation(&mut self, vertical_presentation: VerticalPresentation) {
+        self.vertical_presentation = vertical_presentation;
+    }
+
+    fn set_vertical_presentation(
+        mut slf: PyRefMut<'_, Self>,
+        vertical_presentation: VerticalPresentation,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_vertical_presentation(vertical_presentation);
+        slf
+    }
+
+    #[setter(horizontal_presentation)]
+    fn setter_horizontal_presentation(&mut self, horizontal_presentation: HorizontalPresentation) {
+        self.horizontal_presentation = horizontal_presentation;
+    }
+
+    fn set_horizontal_presentation(
+        mut slf: PyRefMut<'_, Self>,
+        horizontal_presentation: HorizontalPresentation,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_horizontal_presentation(horizontal_presentation);
+        slf
     }
 
     #[getter]

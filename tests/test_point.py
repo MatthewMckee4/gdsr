@@ -26,6 +26,8 @@ def test_point_invalid_initialization():
 
 
 # Point bool
+
+
 def test_point_bool():
     p = Point(0, 0)
     assert not p

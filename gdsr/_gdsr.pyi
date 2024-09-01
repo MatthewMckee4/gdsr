@@ -340,6 +340,17 @@ class Path:
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the path."""
+    def set_points(self, points: InputPointsLike) -> Self:
+        """Set the points of the path."""
+    def set_layer(self, layer: Layer) -> Self:
+        """Set the layer of the path."""
+    def set_data_type(self, data_type: DataType) -> Self:
+        """Set the data type of the path."""
+    def set_path_type(self, path_type: PathType | None) -> Self:
+        """Set the path type of the path."""
+    def set_width(self, width: float | None) -> Self:
+        """Set the width of the path."""
+
     def copy(self) -> Self:
         """Return a copy of the path."""
     def move_to(self, point: PointLike) -> Self:
@@ -416,6 +427,20 @@ class Polygon:
     @property
     def perimeter(self) -> float:
         """Return the perimeter of the polygon."""
+    def set_points(self, points: InputPointsLike) -> Self:
+        """Set the points of the polygon.
+
+        If the first and last points are not the same,
+        the first point is appended to the end, to ensure that the polygon is closed.
+
+        :param InputPointsLike points: Polygon vertices. Sequence of objects that are
+        indexable at 0 and 1. Must not be empty
+        """
+    def set_layer(self, layer: Layer) -> Self:
+        """Set the layer of the polygon."""
+    def set_data_type(self, data_type: DataType) -> Self:
+        """Set the data type of the polygon."""
+
     def contains(self, point: PointLike) -> bool:
         """Return True if the polygon contains the point."""
     def contains_all(self, *points: PointLike) -> bool:
@@ -539,6 +564,26 @@ class Text:
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the text."""
+    def set_text(self, text: str) -> Self:
+        """Set the text content."""
+    def set_origin(self, origin: PointLike) -> Self:
+        """Set the origin of the text."""
+    def set_layer(self, layer: Layer) -> Self:
+        """Set the layer of the text."""
+    def set_magnification(self, magnification: float) -> Self:
+        """Set the magnification of the text."""
+    def set_angle(self, angle: float) -> Self:
+        """Set the angle of the text."""
+    def set_x_reflection(self, x_reflection: bool) -> Self:
+        """Set the x reflection of the text."""
+    def set_vertical_presentation(
+        self, vertical_presentation: VerticalPresentation
+    ) -> Self:
+        """Set the vertical presentation of the text."""
+    def set_horizontal_presentation(
+        self, horizontal_presentation: HorizontalPresentation
+    ) -> Self:
+        """Set the horizontal presentation of the text."""
     def copy(self) -> Self:
         """Return a copy of the text."""
     def move_to(self, point: PointLike) -> Self:

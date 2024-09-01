@@ -59,11 +59,27 @@ def test_text_text_setter(text: str):
     assert text_obj.text == text
 
 
+@given(text=st.text())
+def test_text_text_setter_method(text: str):
+    text_obj = Text("Hello, World!")
+    new_text_obj = text_obj.set_text(text)
+    assert text_obj.text == text
+    assert new_text_obj is text_obj
+
+
 @given(origin=point_strategy())
 def test_text_origin_setter(origin: Point):
     text = Text("Hello, World!")
     text.origin = origin
     assert text.origin == origin
+
+
+@given(origin=point_strategy())
+def test_text_origin_setter_method(origin: Point):
+    text = Text("Hello, World!")
+    new_text = text.set_origin(origin)
+    assert text.origin == origin
+    assert new_text is text
 
 
 def test_text_origin_setter_invalid():
@@ -79,11 +95,27 @@ def test_text_layer_setter(layer: int):
     assert text.layer == layer
 
 
+@given(layer=layer_strategy())
+def test_text_layer_setter_method(layer: int):
+    text = Text("Hello, World!")
+    new_text = text.set_layer(layer)
+    assert text.layer == layer
+    assert new_text is text
+
+
 @given(magnification=float_strategy())
 def test_text_magnification_setter(magnification: float):
     text = Text("Hello, World!")
     text.magnification = magnification
     assert text.magnification == magnification
+
+
+@given(magnification=float_strategy())
+def test_text_magnification_setter_method(magnification: float):
+    text = Text("Hello, World!")
+    new_text = text.set_magnification(magnification)
+    assert text.magnification == magnification
+    assert new_text is text
 
 
 @given(angle=float_strategy())
@@ -93,11 +125,27 @@ def test_text_angle_setter(angle: float):
     assert text.angle == angle
 
 
+@given(angle=float_strategy())
+def test_text_angle_setter_method(angle: float):
+    text = Text("Hello, World!")
+    new_text = text.set_angle(angle)
+    assert text.angle == angle
+    assert new_text is text
+
+
 @given(x_reflection=st.booleans())
 def test_text_x_reflection_setter(x_reflection: bool):
     text = Text("Hello, World!")
     text.x_reflection = x_reflection
     assert text.x_reflection == x_reflection
+
+
+@given(x_reflection=st.booleans())
+def test_text_x_reflection_setter_method(x_reflection: bool):
+    text = Text("Hello, World!")
+    new_text = text.set_x_reflection(x_reflection)
+    assert text.x_reflection == x_reflection
+    assert new_text is text
 
 
 @given(vertical_presentation=st.sampled_from(VerticalPresentation.values()))
@@ -107,6 +155,16 @@ def test_text_vertical_presentation_setter(vertical_presentation: VerticalPresen
     assert text.vertical_presentation == vertical_presentation
 
 
+@given(vertical_presentation=st.sampled_from(VerticalPresentation.values()))
+def test_text_vertical_presentation_setter_method(
+    vertical_presentation: VerticalPresentation,
+):
+    text = Text("Hello, World!")
+    new_text = text.set_vertical_presentation(vertical_presentation)
+    assert text.vertical_presentation == vertical_presentation
+    assert new_text is text
+
+
 @given(horizontal_presentation=st.sampled_from(HorizontalPresentation.values()))
 def test_text_horizontal_presentation_setter(
     horizontal_presentation: HorizontalPresentation,
@@ -114,6 +172,16 @@ def test_text_horizontal_presentation_setter(
     text = Text("Hello, World!")
     text.horizontal_presentation = horizontal_presentation
     assert text.horizontal_presentation == horizontal_presentation
+
+
+@given(horizontal_presentation=st.sampled_from(HorizontalPresentation.values()))
+def test_text_horizontal_presentation_setter_method(
+    horizontal_presentation: HorizontalPresentation,
+):
+    text = Text("Hello, World!")
+    new_text = text.set_horizontal_presentation(horizontal_presentation)
+    assert text.horizontal_presentation == horizontal_presentation
+    assert new_text is text
 
 
 # Text str
