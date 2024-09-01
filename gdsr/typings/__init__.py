@@ -111,3 +111,4 @@ Layer = int
 DataType = int
 PathLike = Path | str
 LayerDataType = tuple[Layer, DataType]
+"""A tuple containing a layer and a data type."""

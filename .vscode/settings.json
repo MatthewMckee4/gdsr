@@ -62,6 +62,7 @@
         "tempfile",
         "Timelike",
         "truediv",
+        "venv",
         "viewcode",
         "xlim",
         "ylim"
