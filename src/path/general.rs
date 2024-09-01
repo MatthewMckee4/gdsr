@@ -40,28 +40,67 @@ impl Path {
         })
     }
 
-    #[setter]
-    fn set_points(
-        &mut self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> PyResult<()> {
-        check_points_vec_has_at_least_two_points(&points)?;
+    #[setter(points)]
+    fn setter_points(&mut self, #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>) {
+        check_points_vec_has_at_least_two_points(&points).unwrap();
         self.points = points;
-        Ok(())
     }
 
-    #[setter]
-    fn set_layer(&mut self, layer: i32) -> PyResult<()> {
+    fn set_points(
+        mut slf: PyRefMut<'_, Self>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_points(points);
+        slf
+    }
+
+    #[setter(layer)]
+    fn setter_layer(&mut self, layer: i32) -> PyResult<()> {
         check_layer_valid(layer)?;
         self.layer = layer;
         Ok(())
     }
 
-    #[setter]
-    fn set_data_type(&mut self, data_type: i32) -> PyResult<()> {
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
+        slf.setter_layer(layer).unwrap();
+        slf
+    }
+
+    #[setter(data_type)]
+    fn setter_data_type(&mut self, data_type: i32) -> PyResult<()> {
         check_data_type_valid(data_type)?;
         self.data_type = data_type;
         Ok(())
+    }
+
+    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyRefMut<'_, Self> {
+        slf.setter_data_type(data_type).unwrap();
+        slf
+    }
+
+    #[setter(path_type)]
+    fn setter_path_type(&mut self, path_type: Option<PathType>) {
+        self.path_type = path_type;
+    }
+
+    #[pyo3(signature = (path_type=None))]
+    fn set_path_type(
+        mut slf: PyRefMut<'_, Self>,
+        path_type: Option<PathType>,
+    ) -> PyRefMut<'_, Self> {
+        slf.setter_path_type(path_type);
+        slf
+    }
+
+    #[setter(width)]
+    fn setter_width(&mut self, width: Option<f64>) {
+        self.width = width;
+    }
+
+    #[pyo3(signature = (width=None))]
+    fn set_width(mut slf: PyRefMut<'_, Self>, width: Option<f64>) -> PyRefMut<'_, Self> {
+        slf.setter_width(width);
+        slf
     }
 
     #[getter]

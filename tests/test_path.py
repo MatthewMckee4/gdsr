@@ -62,6 +62,76 @@ def test_path_tuple_points_type():
         pytest.fail("Path should accept tuple points")
 
 
+# Path setters
+
+
+@given(path=path_strategy())
+def test_path_points_setter(path: Path):
+    new_points = [(1, 1), (2, 2)]
+    path.points = new_points  # type: ignore
+    assert path.points == new_points
+
+
+@given(path=path_strategy())
+def test_path_points_setter_method(path: Path):
+    new_points = [(1, 1), (2, 2)]
+    new_path = path.set_points(new_points)
+    assert path.points == new_points
+    assert new_path is path
+
+
+@given(path=path_strategy())
+def test_path_layer_setter(path: Path):
+    path.layer = 5
+    assert path.layer == 5
+
+
+@given(path=path_strategy())
+def test_path_layer_setter_method(path: Path):
+    new_path = path.set_layer(5)
+    assert path.layer == 5
+    assert new_path is path
+
+
+@given(path=path_strategy())
+def test_path_data_type_setter(path: Path):
+    path.data_type = 5
+    assert path.data_type == 5
+
+
+@given(path=path_strategy())
+def test_path_data_type_setter_method(path: Path):
+    new_path = path.set_data_type(5)
+    assert path.data_type == 5
+    assert new_path is path
+
+
+@given(path=path_strategy())
+def test_path_width_setter(path: Path):
+    path.width = 5
+    assert path.width == 5
+
+
+@given(path=path_strategy())
+def test_path_width_setter_method(path: Path):
+    new_path = path.set_width(5)
+    assert path.width == 5
+    assert new_path is path
+
+
+@given(path=path_strategy())
+def test_path_path_type_setter(path: Path):
+    path.path_type = PathType.Overlap
+    assert path.path_type == PathType.Overlap
+
+
+@given(path=path_strategy())
+def test_path_path_type_setter_method(path: Path):
+    new_path = path.set_path_type(PathType.Overlap)
+    assert path.path_type == PathType.Overlap
+    assert new_path is path
+
+
 # Path length
 
 

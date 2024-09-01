@@ -12,21 +12,21 @@ pub mod utils;
 #[pyclass(eq)]
 #[derive(Clone)]
 pub struct Text {
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub text: String,
     #[pyo3(get)]
     pub origin: Point,
     #[pyo3(get)]
     pub layer: i32,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub magnification: f64,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub angle: f64,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub x_reflection: bool,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub vertical_presentation: presentation::VerticalPresentation,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub horizontal_presentation: presentation::HorizontalPresentation,
 }
 

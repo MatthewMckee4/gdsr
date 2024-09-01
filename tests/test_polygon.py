@@ -125,6 +125,28 @@ def test_polygon_properties_after_modification():
     assert polygon.perimeter != original_perimeter
 
 
+def test_polygon_set_points_method():
+    polygon = Polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+    new_points = [(4.0, 4.0), (5.0, 5.0)]
+    new_polygon = polygon.set_points(new_points)
+    assert polygon.points == [(4.0, 4.0), (5.0, 5.0), (4.0, 4.0)]
+    assert new_polygon is polygon
+
+
+def test_polygon_set_layer_method():
+    polygon = Polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+    new_polygon = polygon.set_layer(5)
+    assert polygon.layer == 5
+    assert new_polygon is polygon
+
+
+def test_polygon_set_data_type_method():
+    polygon = Polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+    new_polygon = polygon.set_data_type(5)
+    assert polygon.data_type == 5
+    assert new_polygon is polygon
+
+
 # Polygon str
 
 
