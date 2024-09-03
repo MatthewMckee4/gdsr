@@ -154,7 +154,7 @@ impl Dimensions for Path {
             let first_point = points[0];
             let second_point = points[1];
 
-            if let Ok(Some(angle)) = first_point.angle_to(second_point) {
+            if let Some(angle) = first_point.angle_to(second_point) {
                 let angle = angle.to_radians();
                 let (sin, cos) = angle.sin_cos();
                 let new_point = Point::new(
@@ -168,7 +168,7 @@ impl Dimensions for Path {
             let last_point = points[points.len() - 1];
             let second_last_point = points[points.len() - 2];
 
-            if let Ok(Some(angle)) = second_last_point.angle_to(last_point) {
+            if let Some(angle) = second_last_point.angle_to(last_point) {
                 let angle = angle.to_radians();
                 let (sin, cos) = angle.sin_cos();
                 let new_point = Point::new(
@@ -186,7 +186,7 @@ impl Dimensions for Path {
             if i == 0 || i == points.len() - 1 {
                 let next_point = if i == 0 { points[i + 1] } else { points[i - 1] };
 
-                if let Ok(Some(angle)) = point.angle_to(next_point) {
+                if let Some(angle) = point.angle_to(next_point) {
                     let angle = angle.to_radians();
                     let (sin, cos) = angle.sin_cos();
                     let perp_x = -sin;
@@ -206,7 +206,7 @@ impl Dimensions for Path {
                 let prev_point = points[i - 1];
                 let next_point = points[i + 1];
 
-                if let Ok(Some(angle_prev)) = point.angle_to(prev_point) {
+                if let Some(angle_prev) = point.angle_to(prev_point) {
                     let angle_prev = angle_prev.to_radians();
                     let (sin_prev, cos_prev) = angle_prev.sin_cos();
                     let perp_x_prev = -sin_prev;
@@ -222,7 +222,7 @@ impl Dimensions for Path {
                     ));
                 }
 
-                if let Ok(Some(angle_next)) = point.angle_to(next_point) {
+                if let Some(angle_next) = point.angle_to(next_point) {
                     let angle_next = angle_next.to_radians();
                     let (sin_next, cos_next) = angle_next.sin_cos();
                     let perp_x_next = -sin_next;

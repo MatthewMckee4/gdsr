@@ -74,7 +74,10 @@ class Point:
     def angle_to(self, other: PointLike) -> float | None:
         """Return the angle to another point in degrees.
 
-        Returns None if the points are the same.
+        The angle is measured counter-clockwise from the x-axis
+        and is in the range of 0 to 360 degrees.
+
+        Return None if the points are the same.
 
         :param PointLike other: The other point.
         """
@@ -491,6 +494,45 @@ class Polygon:
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the polygon is on any of the layer, data_type pairs."""
+    @staticmethod
+    def regular(
+        centre: PointLike,
+        radius: float,
+        n_sides: int,
+        rotation: float = 0,
+        layer: int = 0,
+        data_type: int = 0,
+    ) -> Polygon:
+        """Return a regular polygon.
+
+        :param PointLike centre: Centre of the polygon.
+        :param float radius: Radius of the polygon.
+        :param int n_sides: Number of sides of the polygon.
+        :param float rotation: Rotation of the polygon in degrees.
+        :param int layer: Layer of the polygon, defaults to 0.
+        :param int data_type: Data type of the polygon, defaults to 0.
+        """
+    @staticmethod
+    def ellipse(
+        centre: PointLike,
+        horizontal_radius: float,
+        vertical_radius: float | None = None,
+        initial_angle: float = 0.0,
+        final_angle: float = 360.0,
+        n_sides: int = 400,
+        layer: int = 0,
+        data_type: int = 0,
+    ) -> Polygon:
+        """Return an ellipse.
+
+        :param PointLike centre: Centre of the ellipse.
+        :param float radius: Radius of the ellipse.
+        :param float initial_angle: Initial angle  in degrees, defaults to 0.
+        :param float final_angle: Final angle in degrees, defaults to 0.
+        :param int n_sides: Number of sides of the ellipse, defaults to 400.
+        :param int layer: Layer of the ellipse, defaults to 0.
+        :param int data_type: Data type of the ellipse, defaults to 0.
+        """
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
     def __repr__(self) -> str:
