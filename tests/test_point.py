@@ -1,3 +1,5 @@
+import math
+
 import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
@@ -375,20 +377,15 @@ def test_negative_point_neg():
 
 
 # Point distance_to
-def test_point_distance_to():
-    p1 = Point(1, 1)
-    p2 = Point(4, 5)
-    assert p1.distance_to(p2) == 5
 
 
-def test_point_distance_to_():
-    p = Point(1, 1)
-    assert p.distance_to(p) == 0
+@given(p=point_strategy(), q=point_strategy())
+def test_point_distance_to(p: Point, q: Point):
+    assert p.distance_to(q) == q.distance_to(p)
 
+    assert p.distance_to(q) == 0 if p == q else p.distance_to(q) > 0
 
-def test_point_distance_to_tuple():
-    p = Point(1, 1)
-    assert p.distance_to((4, 5)) == 5
+    assert p.distance_to(q) == ((p.x - q.x) ** 2 + (p.y - q.y) ** 2) ** 0.5
 
 
 def test_point_large_values():
@@ -397,7 +394,35 @@ def test_point_large_values():
     assert p1.distance_to(p2) == 0
 
 
+# Point angle_to
+
+
+@given(p=point_strategy(), q=point_strategy())
+def test_point_angle_to(p: Point, q: Point):
+    angle_to_forward = p.angle_to(q)
+    angle_to_backward = q.angle_to(p)
+    if angle_to_forward and angle_to_backward:
+        assert math.isclose(
+            angle_to_forward % 360,
+            (angle_to_backward + 180) % 360,
+        )
+
+    if p == q:
+        assert angle_to_forward is None
+        assert angle_to_backward is None
+
+
+@given(p=point_strategy())
+def test_point_angle_to_fixed_cases(p: Point):
+    assert p.angle_to(p + (1, 0)) == 0  # noqa: RUF005
+    assert p.angle_to(p + (0, 1)) == 90  # noqa: RUF005
+    assert p.angle_to(p + (-1, 0)) == 180  # noqa: RUF005
+    assert p.angle_to(p + (0, -1)) == 270  # noqa: RUF005
+
+
 # Point copy
+
+
 def test_point_copy():
     p = Point(1, 2)
     p2 = p.copy()

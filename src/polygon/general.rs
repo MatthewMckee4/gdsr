@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::{f64::consts::PI, ops::DerefMut};
 
 use plotly::{common::Mode, layout::Margin, plot::Plot, Layout, Scatter};
 
@@ -9,19 +9,19 @@ use crate::{
     traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
     utils::{
         geometry::{area, is_point_inside, is_point_on_edge, perimeter},
-        transformations::py_any_to_point,
+        transformations::{py_any_to_point, py_any_to_points_vec},
     },
     validation::input::{check_data_type_valid, check_layer_valid},
 };
 
-use super::{utils::py_any_to_correct_polygon_points_format, Polygon};
+use super::{utils::get_correct_polygon_points_format, Polygon};
 
 #[pymethods]
 impl Polygon {
     #[new]
     #[pyo3(signature = (points, layer=0, data_type=0))]
     pub fn new(
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
         layer: i32,
         data_type: i32,
     ) -> PyResult<Self> {
@@ -29,23 +29,20 @@ impl Polygon {
         check_data_type_valid(data_type)?;
 
         Ok(Self {
-            points,
+            points: get_correct_polygon_points_format(points),
             layer,
             data_type,
         })
     }
 
     #[setter(points)]
-    fn setter_points(
-        &mut self,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
-    ) {
-        self.points = points;
+    fn setter_points(&mut self, #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>) {
+        self.points = get_correct_polygon_points_format(points);
     }
 
     fn set_points(
         mut slf: PyRefMut<'_, Self>,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> PyRefMut<'_, Self> {
         slf.setter_points(points);
         slf
@@ -97,7 +94,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn contains_all(
         &self,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> bool {
         points.iter().all(|p| is_point_inside(p, &self.points))
     }
@@ -105,7 +102,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn contains_any(
         &self,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> bool {
         points.iter().any(|p| is_point_inside(p, &self.points))
     }
@@ -117,7 +114,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn on_edge_all(
         &self,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> bool {
         points.iter().all(|p| is_point_on_edge(p, &self.points))
     }
@@ -125,7 +122,7 @@ impl Polygon {
     #[pyo3(signature = (*points))]
     fn on_edge_any(
         &self,
-        #[pyo3(from_py_with = "py_any_to_correct_polygon_points_format")] points: Vec<Point>,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
     ) -> bool {
         points.iter().any(|p| is_point_on_edge(p, &self.points))
     }
@@ -200,6 +197,73 @@ impl Polygon {
     #[pyo3(signature = (*layer_data_types))]
     pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
         LayerDataTypeMatches::is_on(self, layer_data_types)
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (centre, radius, n_sides, rotation=0.0, layer=0, data_type=0))]
+    fn regular(
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+        radius: f64,
+        n_sides: u32,
+        rotation: f64,
+        layer: i32,
+        data_type: i32,
+    ) -> PyResult<Polygon> {
+        let mut points = Vec::with_capacity((n_sides + 1) as usize);
+        let rotation_rad = rotation.to_radians();
+
+        for i in 0..n_sides {
+            let angle = 2.0 * PI * i as f64 / n_sides as f64 + rotation_rad;
+            let x = centre.x + radius * angle.cos();
+            let y = centre.y + radius * angle.sin();
+            points.push(Point { x, y });
+        }
+
+        points.push(points[0]);
+
+        Polygon::new(points, layer, data_type)
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (centre, horizontal_radius, vertical_radius=None, initial_angle=0.0, final_angle=360.0, n_sides=400, layer=0, data_type=0))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn ellipse(
+        #[pyo3(from_py_with = "py_any_to_point")] centre: Point,
+        horizontal_radius: f64,
+        vertical_radius: Option<f64>,
+        initial_angle: f64,
+        final_angle: f64,
+        n_sides: usize,
+        layer: i32,
+        data_type: i32,
+    ) -> Polygon {
+        let mut points = Vec::new();
+
+        let final_angle = final_angle.to_radians();
+        let initial_angle = initial_angle.to_radians();
+
+        let vertical_radius = vertical_radius.unwrap_or(horizontal_radius);
+
+        let step = (final_angle - initial_angle) / n_sides as f64;
+
+        for i in 0..n_sides {
+            let angle = initial_angle + i as f64 * step;
+            let x = centre.x + horizontal_radius * angle.cos();
+            let y = centre.y + vertical_radius * angle.sin();
+            points.push(Point { x, y });
+        }
+
+        if final_angle == 360.0 {
+            points.push(points[0]);
+        } else {
+            points.push(centre)
+        }
+
+        Polygon {
+            points,
+            layer,
+            data_type,
+        }
     }
 
     fn __str__(&self) -> PyResult<String> {

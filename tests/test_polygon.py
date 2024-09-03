@@ -1,9 +1,12 @@
 import math
 import sys
 
+import hypothesis.strategies as st
 import pytest
+from hypothesis import assume, given
 
 from gdsr import InputPointsLike, Point, Polygon
+from tests.conftest import point_strategy
 
 
 @pytest.fixture
@@ -680,6 +683,8 @@ def test_rotate_invalid_angle():
 
 
 # Polygon move
+
+
 def test_move_to_returns_self():
     polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
     new_polygon = polygon.move_to((1, 1))
@@ -694,3 +699,105 @@ def test_move_by_returns_self():
     assert polygon is new_polygon
     assert polygon == new_polygon
     assert polygon.points[0]
+
+
+# Polygon regular
+
+
+@given(
+    centre=point_strategy(),
+    radius=st.floats(min_value=0.1, max_value=1000),
+    n_sides=st.integers(min_value=3, max_value=12),
+    rotation=st.floats(min_value=0, max_value=360),
+    layer=st.integers(min_value=0, max_value=10),
+    datatype=st.integers(min_value=0, max_value=10),
+)
+def test_regular_polygon(
+    centre: Point,
+    radius: float,
+    n_sides: int,
+    rotation: float,
+    layer: int,
+    datatype: int,
+):
+    polygon = Polygon.regular(centre, radius, n_sides, rotation, layer, datatype)
+
+    assert len(polygon.points) == n_sides + 1
+
+    for point in polygon.points:
+        distance = ((point.x - centre.x) ** 2 + (point.y - centre.y) ** 2) ** 0.5
+        assert math.isclose(distance, radius, rel_tol=1e-5)
+
+    assert polygon.layer == layer
+    assert polygon.data_type == datatype
+
+    first_side_length = abs(polygon.points[1].distance_to(polygon.points[0]))
+    assert all(
+        math.isclose(
+            abs(polygon.points[i].distance_to(polygon.points[i - 1])),
+            first_side_length,
+            rel_tol=1e-5,
+        )
+        for i in range(1, n_sides)
+    )
+
+
+# Polygon ellipse
+
+
+@given(
+    centre=point_strategy(),
+    horizontal_radius=st.floats(min_value=0.5, max_value=100),
+    vertical_radius=st.one_of(st.floats(min_value=0.5, max_value=100), st.none()),
+    initial_angle=st.floats(min_value=0, max_value=360),
+    final_angle=st.floats(min_value=10, max_value=360),
+    n_sides=st.sampled_from([1000]),
+    layer=st.integers(min_value=0, max_value=10),
+    data_type=st.integers(min_value=0, max_value=10),
+)
+def test_ellipse(
+    centre: Point,
+    horizontal_radius: float,
+    vertical_radius: float | None,
+    initial_angle: float,
+    final_angle: float,
+    n_sides: int,
+    layer: int,
+    data_type: int,
+):
+    assume(initial_angle < final_angle)
+
+    polygon = Polygon.ellipse(
+        centre,
+        horizontal_radius,
+        vertical_radius,
+        initial_angle,
+        final_angle,
+        n_sides,
+        layer,
+        data_type,
+    )
+
+    assert len(polygon.points) > 1
+
+    for point in polygon.points:
+        if point == centre:
+            continue
+
+        x = point.x - centre.x
+        y = point.y - centre.y
+
+        angle = math.degrees(math.atan2(y, x))
+
+        if angle < 0:
+            angle += 360
+
+        if vertical_radius is not None:
+            assert math.isclose(
+                (x / horizontal_radius) ** 2 + (y / vertical_radius) ** 2,
+                1,
+                rel_tol=1e-5,
+            )
+
+    assert polygon.layer == layer
+    assert polygon.data_type == data_type

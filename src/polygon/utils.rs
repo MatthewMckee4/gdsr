@@ -1,7 +1,6 @@
 use log::info;
-use pyo3::prelude::*;
 
-use crate::{point::Point, utils::transformations::py_any_to_points_vec};
+use crate::point::Point;
 
 fn are_points_closed(points: &[Point]) -> bool {
     points.first() == points.last()
@@ -20,9 +19,4 @@ pub fn close_points(points: &[Point]) -> Vec<Point> {
 
 pub fn get_correct_polygon_points_format(points: Vec<Point>) -> Vec<Point> {
     close_points(&points)
-}
-
-pub fn py_any_to_correct_polygon_points_format(points: &Bound<'_, PyAny>) -> PyResult<Vec<Point>> {
-    let points = py_any_to_points_vec(points)?;
-    Ok(get_correct_polygon_points_format(points))
 }

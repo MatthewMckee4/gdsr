@@ -68,18 +68,17 @@ impl Point {
         }
     }
 
-    pub fn angle_to(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_point")] other: Point,
-    ) -> PyResult<Option<f64>> {
+    pub fn angle_to(&self, #[pyo3(from_py_with = "py_any_to_point")] other: Point) -> Option<f64> {
         let dx = other.x - self.x;
         let dy = other.y - self.y;
 
         if dx == 0.0 && dy == 0.0 {
-            return Ok(None);
+            return None;
         }
 
-        Ok(Some(dy.atan2(dx).to_degrees()))
+        let angle = dy.atan2(dx).to_degrees();
+
+        if angle < 0.0 { angle + 360.0 } else { angle }.into()
     }
 
     #[pyo3(signature = (other, rel_tol=1e-6, abs_tol=1e-10))]
