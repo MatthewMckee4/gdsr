@@ -30,38 +30,6 @@ Issues = "https://github.com/MatthewMckee4/gdsr/issues"
 [tool.maturin]
 module-name = "gdsr._gdsr"
 
-[project.optional-dependencies]
-dev = [     
-    "maturin",
-    "ruff",
-    "mypy",
-    "isort",
-    "pytest",
-    "hypothesis",
-    "pytest-randomly",
-    "pytest-xdist",
-]
-
-docs = [
-    "mkdocs",
-    "mkdocstrings-python",
-    "mkdocs-material",
-]
-
-test = [
-    "pytest",
-    "hypothesis",
-    "pytest-randomly",
-    "pytest-xdist"
-]
-
-lint = [
-    "ruff",
-    "mypy",
-    "isort",
-]
-
-
 
 [tool.isort]
 profile = "black"

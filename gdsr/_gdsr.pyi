@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Generic, Iterator, Literal, Mapping, TypeAlias, TypeVar
+from typing import Generic, Iterator, Literal, Mapping, Sequence, TypeAlias, TypeVar
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -30,6 +30,26 @@ def get_epsilon() -> float:
     When using Cell.to_gds or Library.to_gds this value should match precision/units.
 
     :return: Epsilon value
+    """
+
+BooleanOperationInput: TypeAlias = Polygon | Path | Reference[BooleanOperationInput]
+BooleanOperationOperation: TypeAlias = Literal["or", "and", "sub", "xor"]
+BooleanOperationResult: TypeAlias = list[Polygon]
+
+def boolean(
+    a: Sequence[BooleanOperationInput],
+    b: Sequence[BooleanOperationInput],
+    *,
+    operation: BooleanOperationOperation,
+    layer: Layer = 0,
+    data_type: DataType = 0,
+) -> BooleanOperationResult:
+    """Perform a boolean operation on two elements.
+
+    :param list[Element] a: First element or list of elements.
+    :param list[Element] b: Second element or list of elements.
+    :param str operation: Operation to perform. One of "or", "and", "sub", "xor"
+    :return: Result of the boolean operation
     """
 
 class PointIterator(Iterator[float]):
@@ -396,8 +416,6 @@ class Path:
         """Return True if the path is equal to another object."""
 
 class Polygon:
-    """Polygon object."""
-
     @property
     def points(self) -> list[Point]:
         """Return the points of the polygon."""
@@ -533,6 +551,21 @@ class Polygon:
         :param int layer: Layer of the ellipse, defaults to 0.
         :param int data_type: Data type of the ellipse, defaults to 0.
         """
+    def simplify(self) -> Self:
+        """Simplify the polygon.
+
+        This method modifies the polygon in place and returns itself.
+        """
+    def looks_like(self, other: Polygon) -> bool:
+        """Return True if the polygon looks like another polygon."""
+    def __or__(self, other: Element) -> BooleanOperationResult:
+        """Return the union of the polygon with another element."""
+    def __and__(self, other: Element) -> BooleanOperationResult:
+        """Return the intersection of the polygon with another element."""
+    def __sub__(self, other: Element) -> BooleanOperationResult:
+        """Return the difference of the polygon with another element."""
+    def __xor__(self, other: Element) -> BooleanOperationResult:
+        """Return the symmetric difference of the polygon with another element."""
     def __str__(self) -> str:
         """Return a string representation of the polygon."""
     def __repr__(self) -> str:

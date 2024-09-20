@@ -1,3 +1,4 @@
+use geo::MultiPolygon;
 use pyo3::prelude::*;
 use std::fs::File;
 
@@ -30,4 +31,18 @@ pub trait Reflect {
 
 pub trait LayerDataTypeMatches {
     fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool;
+}
+
+pub trait Simplifiable {
+    fn simplify(&mut self) -> &mut Self;
+}
+
+pub trait ToGeo {
+    fn to_geo(&self) -> PyResult<MultiPolygon>;
+}
+
+pub trait FromGeo {
+    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> Vec<Self>
+    where
+        Self: std::marker::Sized;
 }

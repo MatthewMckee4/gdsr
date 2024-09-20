@@ -124,3 +124,13 @@ pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
     let factor = 10f64.powi(ndigits as i32);
     (value * factor).round() / factor
 }
+
+pub fn rotate_points_to_minimum(points: &mut [Point]) {
+    if let Some((min_index, _)) = points
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+    {
+        points.rotate_left(min_index);
+    }
+}

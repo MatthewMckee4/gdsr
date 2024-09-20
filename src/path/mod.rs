@@ -1,9 +1,10 @@
+use geo::{LineString, MultiPolygon};
 use path_type::PathType;
 use pyo3::prelude::*;
 
 use crate::{
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
 };
 
 mod general;
@@ -263,5 +264,41 @@ impl Reflect for Path {
 impl LayerDataTypeMatches for Path {
     fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
         layer_data_types.contains(&(self.layer, self.data_type)) || layer_data_types.is_empty()
+    }
+}
+
+impl ToGeo for Path {
+    fn to_geo(&self) -> PyResult<MultiPolygon> {
+        let half_width = self.width.unwrap_or(0.0) / 2.0;
+        let mut exterior: Vec<(f64, f64)> = Vec::new();
+
+        for window in self.points.windows(2) {
+            let (start, end) = (window[0], window[1]);
+            let angle = start.angle_to(end).unwrap_or(0.0).to_radians();
+            let (sin, cos) = angle.sin_cos();
+            let perp_x = -sin;
+            let perp_y = cos;
+
+            exterior.push((start.x + half_width * perp_x, start.y + half_width * perp_y));
+            exterior.push((end.x + half_width * perp_x, end.y + half_width * perp_y));
+        }
+
+        for window in self.points.windows(2).rev() {
+            let (start, end) = (window[0], window[1]);
+            let angle = start.angle_to(end).unwrap_or(0.0).to_radians();
+            let (sin, cos) = angle.sin_cos();
+            let perp_x = -sin;
+            let perp_y = cos;
+
+            exterior.push((end.x - half_width * perp_x, end.y - half_width * perp_y));
+            exterior.push((start.x - half_width * perp_x, start.y - half_width * perp_y));
+        }
+
+        if let Some(first) = self.points.first() {
+            exterior.push((first.x + half_width, first.y));
+        }
+
+        let polygon = geo::Polygon::new(LineString::from(exterior), vec![]);
+        Ok(MultiPolygon::new(vec![polygon]))
     }
 }

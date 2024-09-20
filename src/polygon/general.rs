@@ -2,14 +2,14 @@ use std::{f64::consts::PI, ops::DerefMut};
 
 use plotly::{common::Mode, layout::Margin, plot::Plot, Layout, Scatter};
 
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyTuple};
 
 use crate::{
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable, Simplifiable},
     utils::{
         geometry::{area, is_point_inside, is_point_on_edge, perimeter},
-        transformations::{py_any_to_point, py_any_to_points_vec},
+        transformations::{py_any_to_point, py_any_to_points_vec, py_tuple_to_points_vec},
     },
     validation::input::{check_data_type_valid, check_layer_valid},
 };
@@ -92,19 +92,15 @@ impl Polygon {
     }
 
     #[pyo3(signature = (*points))]
-    fn contains_all(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().all(|p| is_point_inside(p, &self.points))
+    fn contains_all(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().all(|p| is_point_inside(p, &self.points)))
     }
 
     #[pyo3(signature = (*points))]
-    fn contains_any(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().any(|p| is_point_inside(p, &self.points))
+    fn contains_any(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().any(|p| is_point_inside(p, &self.points)))
     }
 
     fn on_edge(&self, #[pyo3(from_py_with = "py_any_to_point")] point: Point) -> bool {
@@ -112,19 +108,15 @@ impl Polygon {
     }
 
     #[pyo3(signature = (*points))]
-    fn on_edge_all(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().all(|p| is_point_on_edge(p, &self.points))
+    fn on_edge_all(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().all(|p| is_point_on_edge(p, &self.points)))
     }
 
     #[pyo3(signature = (*points))]
-    fn on_edge_any(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().any(|p| is_point_on_edge(p, &self.points))
+    fn on_edge_any(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().any(|p| is_point_on_edge(p, &self.points)))
     }
 
     fn intersects(&self, other: Polygon) -> bool {
@@ -154,6 +146,7 @@ impl Polygon {
 
         Ok(())
     }
+
     pub fn copy(&self) -> Self {
         self.clone()
     }
@@ -252,8 +245,7 @@ impl Polygon {
             let y = centre.y + vertical_radius * angle.sin();
             points.push(Point { x, y });
         }
-
-        if final_angle == 360.0 {
+        if final_angle == 2.0 * PI {
             points.push(points[0]);
         } else {
             points.push(centre)
@@ -264,6 +256,29 @@ impl Polygon {
             layer,
             data_type,
         }
+    }
+
+    pub fn simplify(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
+        Simplifiable::simplify(slf.deref_mut());
+        slf
+    }
+
+    fn looks_like(&self, other: &Polygon) -> bool {
+        let mut binding = self.clone();
+        let self_simplified = binding.simplify();
+        let mut binding = other.clone();
+        let other_simplified = binding.simplify();
+
+        let self_simplified_points = &self_simplified.points;
+        let other_simplified_points = &other_simplified.points;
+
+        self_simplified_points == other_simplified_points
+            || *self_simplified_points
+                == other_simplified_points
+                    .iter()
+                    .rev()
+                    .cloned()
+                    .collect::<Vec<_>>()
     }
 
     fn __str__(&self) -> PyResult<String> {

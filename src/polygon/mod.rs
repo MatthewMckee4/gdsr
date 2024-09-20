@@ -1,8 +1,12 @@
 use crate::{
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
-    utils::geometry::bounding_box,
+    traits::{
+        Dimensions, FromGeo, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        Simplifiable, ToGeo,
+    },
+    utils::geometry::{bounding_box, rotate_points_to_minimum},
 };
+use geo::{LineString, MultiPolygon, Polygon as GeoPolygon};
 use pyo3::prelude::*;
 
 mod general;
@@ -57,18 +61,38 @@ impl std::fmt::Debug for Polygon {
             }
             [first_point] => write!(
                 f,
-                "Polygon([{:?}, ..., {:?}], {}, {})",
-                first_point, first_point, self.layer, self.data_type
+                "Polygon([{:?}], {}, {})",
+                first_point, self.layer, self.data_type
             ),
             [first_point, _] => write!(
                 f,
-                "Polygon([{:?}, ..., {:?}], {}, {})",
-                first_point, first_point, self.layer, self.data_type
+                "Polygon([{:?}], {}, {})",
+                first_point, self.layer, self.data_type
             ),
-            [first_point, .., second_last_point, _] => write!(
+            [first_point, second_point, _] => write!(
                 f,
-                "Polygon([{:?}, ..., {:?}], {}, {})",
-                first_point, second_last_point, self.layer, self.data_type
+                "Polygon([{:?}, {:?}], {}, {})",
+                first_point, second_point, self.layer, self.data_type
+            ),
+            [first_point, second_point, third_point, _] => write!(
+                f,
+                "Polygon([{:?}, {:?}, {:?}], {}, {})",
+                first_point, second_point, third_point, self.layer, self.data_type
+            ),
+            [first_point, second_point, third_point, fourth_point, _] => write!(
+                f,
+                "Polygon([{:?}, {:?}, {:?}, {:?}], {}, {})",
+                first_point, second_point, third_point, fourth_point, self.layer, self.data_type
+            ),
+            [first_point, second_point, third_point, .., second_last_point, _] => write!(
+                f,
+                "Polygon([{:?}, {:?}, {:?}, ..., {:?}], {}, {})",
+                first_point,
+                second_point,
+                third_point,
+                second_last_point,
+                self.layer,
+                self.data_type
             ),
         }
     }
@@ -123,5 +147,84 @@ impl Reflect for Polygon {
 impl LayerDataTypeMatches for Polygon {
     fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
         layer_data_types.contains(&(self.layer, self.data_type)) || layer_data_types.is_empty()
+    }
+}
+
+impl Simplifiable for Polygon {
+    fn simplify(&mut self) -> &mut Self {
+        let mut simplified_points = Vec::new();
+        let n = self.points.len();
+
+        if n < 3 {
+            return self;
+        }
+
+        let mut unique_points = self.points.clone();
+        unique_points.dedup();
+
+        simplified_points.push(unique_points[0]);
+        let m = unique_points.len();
+        for i in 1..m - 1 {
+            let prev = unique_points[i - 1];
+            let curr = unique_points[i];
+            let next = unique_points[i + 1];
+
+            let dx1 = curr.x - prev.x;
+            let dy1 = curr.y - prev.y;
+            let dx2 = next.x - curr.x;
+            let dy2 = next.y - curr.y;
+
+            if dx1 * dy2 != dy1 * dx2 {
+                simplified_points.push(curr);
+            }
+        }
+
+        if simplified_points.first() != simplified_points.last() {
+            simplified_points.push(simplified_points[0]);
+        }
+
+        self.points = simplified_points;
+        self
+    }
+}
+
+impl ToGeo for Polygon {
+    fn to_geo(&self) -> PyResult<MultiPolygon> {
+        let exterior: LineString<f64> = self.points.iter().map(|p| (p.x, p.y)).collect();
+        Ok(MultiPolygon::new(vec![GeoPolygon::new(exterior, vec![])]))
+    }
+}
+
+impl FromGeo for Polygon {
+    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> Vec<Self> {
+        let mut polygons = Vec::new();
+        for polygon in geo {
+            let mut points: Vec<Point> = polygon
+                .exterior()
+                .into_iter()
+                .map(|p| Point::new(p.x, p.y))
+                .chain(
+                    polygon
+                        .interiors()
+                        .iter()
+                        .flat_map(|ring| ring.points().map(|p| Point::new(p.x(), p.y()))),
+                )
+                .collect();
+            for point in &mut points {
+                *point = point.round(9);
+            }
+
+            rotate_points_to_minimum(&mut points);
+
+            if let Some(first_point) = points.first().cloned() {
+                points.push(first_point);
+            }
+            polygons.push(Polygon {
+                points,
+                layer,
+                data_type,
+            });
+        }
+        polygons
     }
 }

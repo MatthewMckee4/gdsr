@@ -23,6 +23,17 @@ pub fn py_any_to_point(point: &Bound<'_, PyAny>) -> PyResult<Point> {
     }
 }
 
+#[allow(dead_code)]
+pub fn py_tuple_to_points_vec(points: &Bound<'_, PyTuple>) -> PyResult<Vec<Point>> {
+    let mut points_list = Vec::new();
+    for item in points.iter() {
+        let point = py_any_to_point(&item)?;
+        points_list.push(point);
+    }
+    check_points_vec_not_empty(&points_list)?;
+    Ok(points_list)
+}
+
 #[allow(unused)]
 pub fn py_any_to_cells_vec(cells: &Bound<'_, PyAny>) -> PyResult<Vec<Cell>> {
     let mut result = Vec::new();

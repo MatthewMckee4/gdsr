@@ -72,7 +72,7 @@ impl std::fmt::Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Text({}, {:?}, {:?}, {:?}, {}, {}, {:?}, {:?})",
+            "Text({}, {:?}, {}, {}, {}, {}, {:?}, {:?})",
             self.text,
             self.origin,
             self.layer,

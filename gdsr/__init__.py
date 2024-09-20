@@ -19,6 +19,7 @@ from ._gdsr import (
     Reference,
     Text,
     VerticalPresentation,
+    boolean,
 )
 from .typings import InputPointsLike, PointLike
 
@@ -39,6 +40,7 @@ __all__ = [
     "Reference",
     "Text",
     "VerticalPresentation",
+    "boolean",
 ]
 
 BaseElement: TypeAlias = "Polygon | Path | Text"

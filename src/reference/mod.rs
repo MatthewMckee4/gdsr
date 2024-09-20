@@ -1,10 +1,11 @@
+use geo::MultiPolygon;
 use pyo3::prelude::*;
 
 use crate::{
     cell::Cell,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
 };
 
 mod general;
@@ -167,5 +168,20 @@ impl LayerDataTypeMatches for Reference {
             Instance::Cell(cell) => Python::with_gil(|py| cell.borrow(py).is_on(layer_data_types)),
             Instance::Element(element) => element.is_on(layer_data_types),
         }
+    }
+}
+
+impl ToGeo for Reference {
+    fn to_geo(&self) -> PyResult<MultiPolygon> {
+        Python::with_gil(|py| {
+            let mut geometries = Vec::new();
+            for element in self.clone().flatten([].to_vec(), None, py) {
+                for geometry in element.to_geo()? {
+                    geometries.push(geometry);
+                }
+            }
+
+            Ok(MultiPolygon::new(geometries))
+        })
     }
 }
