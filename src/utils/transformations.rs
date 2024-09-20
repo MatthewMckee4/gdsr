@@ -4,7 +4,10 @@ use pyo3::{
     types::{PyAny, PySequence, PyTuple},
 };
 
-use crate::{cell::Cell, point::Point, utils::io::create_temp_file};
+use crate::{
+    boolean::BooleanOperationInput, cell::Cell, element::Element, point::Point,
+    utils::io::create_temp_file,
+};
 
 use super::general::check_points_vec_not_empty;
 
@@ -89,4 +92,22 @@ pub fn py_any_path_to_string(file_name: &Bound<'_, PyAny>) -> PyResult<String> {
             .map_err(|_| PyTypeError::new_err("Failed to convert to string")),
         Err(_) => Err(PyTypeError::new_err("Invalid path format")),
     }
+}
+
+pub fn py_any_to_boolean_operation_input(
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<BooleanOperationInput> {
+    let mut elements = Vec::new();
+    if let Ok(py_elements) = obj.downcast::<PySequence>() {
+        for item in py_elements.iter()? {
+            let element = item?.extract::<Element>()?;
+            elements.push(element);
+        }
+    }
+    if elements.is_empty() {
+        let element = obj.extract::<Element>()?;
+        elements.push(element);
+    }
+
+    Ok(elements)
 }

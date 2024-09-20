@@ -1,51 +1,29 @@
 use geo::BooleanOps;
+use log::info;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use utils::{check_for_text, get_geo_multi_polygon};
 
 use crate::element::Element;
 use crate::polygon::Polygon;
 use crate::traits::FromGeo;
-use crate::traits::ToGeo;
-use geo::MultiPolygon;
 
-fn check_for_text(elements: &Vec<Element>) -> PyResult<()> {
-    for element in elements {
-        if let Element::Text(_) = element {
-            return Err(PyValueError::new_err(
-                "Text elements are not allowed in boolean operations",
-            ));
-        }
-    }
-    Ok(())
-}
+mod utils;
 
-fn get_geo_multi_polygon(elements: &[Element]) -> PyResult<MultiPolygon> {
-    let geo_a = MultiPolygon::new(
-        elements
-            .iter()
-            .filter_map(|e| {
-                if let Ok(MultiPolygon(multi_polygon)) = e.to_geo() {
-                    Some(multi_polygon)
-                } else {
-                    None
-                }
-            })
-            .flatten()
-            .collect(),
-    );
-
-    Ok(geo_a)
-}
+pub type BooleanOperationInput = Vec<Element>;
+pub type BooleanOperationOperation = String;
+pub type BooleanOperationResult = PyResult<Vec<Polygon>>;
 
 #[pyfunction]
 #[pyo3(signature = (a, b, operation, layer=0, data_type=0))]
 pub fn boolean(
-    a: Vec<Element>,
-    b: Vec<Element>,
-    operation: String,
+    a: BooleanOperationInput,
+    b: BooleanOperationInput,
+    operation: BooleanOperationOperation,
     layer: i32,
     data_type: i32,
-) -> PyResult<Vec<Polygon>> {
+) -> BooleanOperationResult {
+    info!("Boolean operation: {:?}, {:?}", a, b);
     check_for_text(&a)?;
     check_for_text(&b)?;
 

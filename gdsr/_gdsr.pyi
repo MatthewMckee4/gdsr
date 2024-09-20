@@ -558,6 +558,8 @@ class Polygon:
         """
     def looks_like(self, other: Polygon) -> bool:
         """Return True if the polygon looks like another polygon."""
+    def __add__(self, other: Element) -> BooleanOperationResult:
+        """Return the union of the polygon with another element."""
     def __or__(self, other: Element) -> BooleanOperationResult:
         """Return the union of the polygon with another element."""
     def __and__(self, other: Element) -> BooleanOperationResult:

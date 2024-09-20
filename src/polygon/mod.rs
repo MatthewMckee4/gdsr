@@ -1,4 +1,6 @@
 use crate::{
+    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
+    element::Element,
     point::Point,
     traits::{
         Dimensions, FromGeo, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
@@ -22,6 +24,23 @@ pub struct Polygon {
     pub layer: i32,
     #[pyo3(get)]
     pub data_type: i32,
+}
+
+impl Polygon {
+    pub fn boolean(
+        &self,
+        other: BooleanOperationInput,
+        operation: BooleanOperationOperation,
+        py: Python,
+    ) -> BooleanOperationResult {
+        boolean(
+            vec![Element::Polygon(Py::new(py, self.clone())?)],
+            other,
+            operation,
+            self.layer,
+            self.data_type,
+        )
+    }
 }
 
 impl PartialEq for Polygon {
