@@ -844,3 +844,6 @@ def test_looks_like_returns_true_for_equivalent_polygons_with_extra_points():
     polygon2 = Polygon([(0, 0), (0, 1), (1, 1), (1, 0), (1, 0), (0, 0)])
     assert polygon1.looks_like(polygon2)
     assert polygon2.looks_like(polygon1)
+
+
+# Polygon boolean

@@ -1,5 +1,4 @@
 use geo::BooleanOps;
-use log::info;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use utils::{check_for_text, get_geo_multi_polygon};
@@ -23,7 +22,6 @@ pub fn boolean(
     layer: i32,
     data_type: i32,
 ) -> BooleanOperationResult {
-    info!("Boolean operation: {:?}, {:?}", a, b);
     check_for_text(&a)?;
     check_for_text(&b)?;
 

@@ -32,24 +32,30 @@ def get_epsilon() -> float:
     :return: Epsilon value
     """
 
-BooleanOperationInput: TypeAlias = Polygon | Path | Reference[BooleanOperationInput]
+BooleanOperationInputElement: TypeAlias = (
+    Polygon | Path | Reference[BooleanOperationInputElement]
+)
+BooleanOperationInput: TypeAlias = (
+    Sequence[BooleanOperationInputElement] | BooleanOperationInputElement
+)
 BooleanOperationOperation: TypeAlias = Literal["or", "and", "sub", "xor"]
 BooleanOperationResult: TypeAlias = list[Polygon]
 
 def boolean(
-    a: Sequence[BooleanOperationInput],
-    b: Sequence[BooleanOperationInput],
+    a: BooleanOperationInput,
+    b: BooleanOperationInput,
     *,
     operation: BooleanOperationOperation,
     layer: Layer = 0,
     data_type: DataType = 0,
 ) -> BooleanOperationResult:
-    """Perform a boolean operation on two elements.
+    """Perform a boolean operation on two elements / lists of elements.
 
-    :param list[Element] a: First element or list of elements.
-    :param list[Element] b: Second element or list of elements.
-    :param str operation: Operation to perform. One of "or", "and", "sub", "xor"
-    :return: Result of the boolean operation
+    :param BooleanOperationInput a: First element or list of elements.
+    :param BooleanOperationInput b: Second element or list of elements.
+    :param BooleanOperationOperation operation: The boolean operation to perform.
+    :param Layer layer: The layer to use for the resulting polygons
+    :param DataType data_type: The data type to use for the resulting polygons,
     """
 
 class PointIterator(Iterator[float]):
@@ -57,23 +63,13 @@ class PointIterator(Iterator[float]):
 
 class Point:
     @property
-    def x(self) -> float:
-        """Return the x coordinate."""
+    def x(self) -> float: ...
     @property
-    def y(self) -> float:
-        """Return the y coordinate."""
-    def __init__(self, x: float, y: float) -> None:
-        """Initialize the Point with x and y coordinates.
-
-        :param float x: x coordinate
-        :param float y: y coordinate
-        """
-    def distance_to(self, other: PointLike) -> float:
-        """Return the distance to another point."""
-    def cross(self, other: PointLike) -> float:
-        """Return the cross product with another point."""
-    def copy(self) -> Self:
-        """Return a copy of the point."""
+    def y(self) -> float: ...
+    def __init__(self, x: float, y: float) -> None: ...
+    def distance_to(self, other: PointLike) -> float: ...
+    def cross(self, other: PointLike) -> float: ...
+    def copy(self) -> Self: ...
     def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
         """Rotates the point by an angle around a centre point.
 
@@ -123,6 +119,10 @@ class Point:
         :param float angle: Angle of the line in degrees.
         :param PointLike centre: Centre point of reflection, defaults to Point(0, 0).
         """
+    def ortho(self) -> Self:
+        """Return the orthogonal vector of the point."""
+    def normalize(self) -> Self:
+        """Return the normalized vector of the point."""
     def __getitem__(self, index: Literal[0, 1]) -> float:
         """Return the x or y coordinate of the point."""
     def __bool__(self) -> bool:
@@ -170,33 +170,22 @@ class Point:
 
 class Grid:
     @property
-    def origin(self) -> Point:
-        """Return the origin of the grid."""
+    def origin(self) -> Point: ...
     @origin.setter
-    def origin(self, origin: PointLike) -> None:
-        """Set the origin of the grid."""
+    def origin(self, origin: PointLike) -> None: ...
     columns: int
-    """Number of columns in the grid."""
     rows: int
-    """Number of rows in the grid."""
     @property
-    def spacing_x(self) -> Point:
-        """Return the spacing in the x direction."""
+    def spacing_x(self) -> Point: ...
     @spacing_x.setter
-    def spacing_x(self, spacing: PointLike) -> None:
-        """Set the spacing in the x direction."""
+    def spacing_x(self, spacing: PointLike) -> None: ...
     @property
-    def spacing_y(self) -> Point:
-        """Return the spacing in the y direction."""
+    def spacing_y(self) -> Point: ...
     @spacing_y.setter
-    def spacing_y(self, spacing: PointLike) -> None:
-        """Set the spacing in the y direction."""
+    def spacing_y(self, spacing: PointLike) -> None: ...
     magnification: float
-    """Magnification of the elements in the grid."""
     angle: float
-    """Angle of the grid."""
     x_reflection: bool
-    """X reflection of the grid."""
     def __init__(
         self,
         origin: PointLike = Point(0, 0),
@@ -207,55 +196,31 @@ class Grid:
         magnification: float = 1.0,
         angle: float = 0.0,
         x_reflection: bool = False,
-    ) -> None:
-        """Initialize the Grid with origin, columns, rows and spacing.
-
-        :param PointLike origin: The origin of the grid, defaults to Point(0, 0)
-        :param int columns: The number of columns in the grid, defaults to 1
-        :param int rows: The number of rows in the grid, defaults to 1
-        :param PointLike spacing_x: The spacing in the x direction, defaults to
-        Point(0, 0)
-        :param PointLike spacing_y: The spacing in the y direction, defaults to
-        Point(0, 0)
-        """
-    def copy(self) -> Self:
-        """Return a copy of the grid."""
+    ) -> None: ...
+    def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the grid to a point.
 
         This method modifies the grid in place and returns itself.
-
-        :param PointLike point: Point to move the grid to.
         """
     def move_by(self, vector: PointLike) -> Self:
         """Move the grid by a vector.
 
         This method modifies the grid in place and returns itself.
-
-        :param PointLike vector: Vector to move the grid by.
         """
     def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
         """Rotate the grid by an angle around a centre point.
 
         This method modifies the grid in place and returns itself.
-
-        :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
         """
     def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
         """Scale the grid by a factor around a centre point.
 
         This method modifies the grid in place and returns itself.
-
-        :param float factor: Scaling factor.
-        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
-    def __eq__(self, value: object) -> bool:
-        """Return True if the grid is equal to another object."""
-    def __str__(self) -> str:
-        """Return a string representation of the grid."""
-    def __repr__(self) -> str:
-        """Return a string representation of the grid."""
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, value: object) -> bool: ...
 
 Instance: TypeAlias = Cell | Element
 
@@ -266,20 +231,11 @@ class Reference(Generic[T_Instance]):
     """Reference object. Do not subscript this class, use inferred generic types."""
 
     instance: T_Instance
-    """The instance to reference."""
     grid: Grid
-    """The grid to reference the cell."""
-    def __init__(self, instance: T_Instance, grid: Grid = Grid()) -> None:
-        """Initialize the Reference with an instance and a grid.
-
-        :param Instance instance: The instance to reference.
-        :param Grid grid: The grid to reference the cell.
-        """
+    def __init__(self, instance: T_Instance, grid: Grid = Grid()) -> None: ...
     @property
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the reference."""
-    def copy(self) -> Self:
-        """Return a copy of the reference."""
+    def bounding_box(self) -> tuple[Point, Point]: ...
+    def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the reference to a point.
 
@@ -322,12 +278,9 @@ class Reference(Generic[T_Instance]):
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the instance is on any of the layer, data_type pairs."""
-    def __str__(self) -> str:
-        """Return a string representation of the reference."""
-    def __repr__(self) -> str:
-        """Return a string representation of the reference."""
-    def __eq__(self, value: object) -> bool:
-        """Return True if the reference is equal to another object."""
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, value: object) -> bool: ...
 
 class PathType(Enum):
     Square = 0
@@ -340,11 +293,9 @@ class PathType(Enum):
 
 class Path:
     @property
-    def points(self) -> list[Point]:
-        """Return the points of the path."""
+    def points(self) -> list[Point]: ...
     @points.setter
-    def points(self, points: InputPointsLike) -> None:
-        """Set the points of the path."""
+    def points(self, points: InputPointsLike) -> None: ...
     layer: Layer
     data_type: DataType
     path_type: PathType | None
@@ -358,24 +309,15 @@ class Path:
         width: float | None = None,
     ) -> None: ...
     @property
-    def length(self) -> float:
-        """Return the length of the path."""
+    def length(self) -> float: ...
     @property
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the path."""
-    def set_points(self, points: InputPointsLike) -> Self:
-        """Set the points of the path."""
-    def set_layer(self, layer: Layer) -> Self:
-        """Set the layer of the path."""
-    def set_data_type(self, data_type: DataType) -> Self:
-        """Set the data type of the path."""
-    def set_path_type(self, path_type: PathType | None) -> Self:
-        """Set the path type of the path."""
-    def set_width(self, width: float | None) -> Self:
-        """Set the width of the path."""
-
-    def copy(self) -> Self:
-        """Return a copy of the path."""
+    def bounding_box(self) -> tuple[Point, Point]: ...
+    def set_points(self, points: InputPointsLike) -> Self: ...
+    def set_layer(self, layer: Layer) -> Self: ...
+    def set_data_type(self, data_type: DataType) -> Self: ...
+    def set_path_type(self, path_type: PathType | None) -> Self: ...
+    def set_width(self, width: float | None) -> Self: ...
+    def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the path to a point.
 
@@ -408,60 +350,48 @@ class Path:
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the path is on any of the specified layer, data_type pairs."""
-    def __str__(self) -> str:
-        """Return a string representation of the path."""
-    def __repr__(self) -> str:
-        """Return a string representation of the path."""
-    def __eq__(self, value: object) -> bool:
-        """Return True if the path is equal to another object."""
+    def to_polygon(
+        self, layer: Layer | None = None, data_type: DataType | None = None
+    ) -> Polygon:
+        """Return the path as a polygon.
+
+        :param Layer layer: Layer to set the polygon to, defaults to current layer.
+        :param DataType data_type: Data type to set the polygon to, defaults to current
+        data type.
+        """
+    def __add__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the union of the path with another element."""
+    def __or__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the union of the path with another element."""
+    def __and__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the intersection of the path with another element."""
+    def __sub__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the difference of the path with another element."""
+    def __xor__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the symmetric difference of the path with another element."""
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, value: object) -> bool: ...
 
 class Polygon:
     @property
-    def points(self) -> list[Point]:
-        """Return the points of the polygon."""
+    def points(self) -> list[Point]: ...
     @points.setter
-    def points(self, points: InputPointsLike) -> None:
-        """Set the points of the polygon."""
+    def points(self, points: InputPointsLike) -> None: ...
     layer: Layer
-    """The layer of the polygon."""
     data_type: DataType
-    """The data type of the polygon."""
     def __init__(
         self, points: InputPointsLike, layer: Layer = 0, data_type: DataType = 0
-    ) -> None:
-        """Initialize the Polygon.
-
-        If the first and last points are not the same,
-        the first point is appended to the end, to ensure that the polygon is closed.
-
-        :param InputPointsLike points: Polygon vertices. Sequence of objects that are
-        indexable at 0 and 1. Must not be empty
-        :param Layer layer: Polygon layer, defaults to 0
-        :param DataType data_type: Polygon data_type, defaults to 0
-        """
+    ) -> None: ...
     @property
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the polygon."""
+    def bounding_box(self) -> tuple[Point, Point]: ...
     @property
-    def area(self) -> float:
-        """Return the area of the polygon."""
+    def area(self) -> float: ...
     @property
-    def perimeter(self) -> float:
-        """Return the perimeter of the polygon."""
-    def set_points(self, points: InputPointsLike) -> Self:
-        """Set the points of the polygon.
-
-        If the first and last points are not the same,
-        the first point is appended to the end, to ensure that the polygon is closed.
-
-        :param InputPointsLike points: Polygon vertices. Sequence of objects that are
-        indexable at 0 and 1. Must not be empty
-        """
-    def set_layer(self, layer: Layer) -> Self:
-        """Set the layer of the polygon."""
-    def set_data_type(self, data_type: DataType) -> Self:
-        """Set the data type of the polygon."""
-
+    def perimeter(self) -> float: ...
+    def set_points(self, points: InputPointsLike) -> Self: ...
+    def set_layer(self, layer: Layer) -> Self: ...
+    def set_data_type(self, data_type: DataType) -> Self: ...
     def contains(self, point: PointLike) -> bool:
         """Return True if the polygon contains the point."""
     def contains_all(self, *points: PointLike) -> bool:
@@ -478,37 +408,26 @@ class Polygon:
         """Return True if the polygon intersects with another polygon."""
     def visualize(self) -> None:
         """Visualises the polygon in your default web browser."""
-    def copy(self) -> Self:
-        """Return a copy of the polygon."""
+    def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the polygon to a point.
 
         This method modifies the polygon in place and returns itself.
-
-        :param PointLike point: Point to move the polygon to.
         """
     def move_by(self, vector: PointLike) -> Self:
         """Move the polygon by a vector.
 
         This method modifies the polygon in place and returns itself.
-
-        :param PointLike vector: Vector to move the polygon by.
         """
     def rotate(self, angle: float, centre: PointLike = Point(0, 0)) -> Self:
         """Rotate the polygon by an angle around a centre point.
 
         This method modifies the polygon in place and returns itself.
-
-        :param float angle: Counter-clockwise rotation angle in degrees.
-        :param PointLike centre: Centre point of rotation, defaults to (0, 0).
         """
     def scale(self, factor: float, centre: PointLike = Point(0, 0)) -> Self:
         """Scale the polygon by a factor around a centre point.
 
         This method modifies the polygon in place and returns itself.
-
-        :param float factor: Scaling factor.
-        :param PointLike centre: Centre point of scaling, defaults to (0, 0).
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the polygon is on any of the layer, data_type pairs."""
@@ -518,18 +437,9 @@ class Polygon:
         radius: float,
         n_sides: int,
         rotation: float = 0,
-        layer: int = 0,
-        data_type: int = 0,
-    ) -> Polygon:
-        """Return a regular polygon.
-
-        :param PointLike centre: Centre of the polygon.
-        :param float radius: Radius of the polygon.
-        :param int n_sides: Number of sides of the polygon.
-        :param float rotation: Rotation of the polygon in degrees.
-        :param int layer: Layer of the polygon, defaults to 0.
-        :param int data_type: Data type of the polygon, defaults to 0.
-        """
+        layer: Layer = 0,
+        data_type: DataType = 0,
+    ) -> Polygon: ...
     @staticmethod
     def ellipse(
         centre: PointLike,
@@ -538,42 +448,31 @@ class Polygon:
         initial_angle: float = 0.0,
         final_angle: float = 360.0,
         n_sides: int = 400,
-        layer: int = 0,
-        data_type: int = 0,
-    ) -> Polygon:
-        """Return an ellipse.
-
-        :param PointLike centre: Centre of the ellipse.
-        :param float radius: Radius of the ellipse.
-        :param float initial_angle: Initial angle  in degrees, defaults to 0.
-        :param float final_angle: Final angle in degrees, defaults to 0.
-        :param int n_sides: Number of sides of the ellipse, defaults to 400.
-        :param int layer: Layer of the ellipse, defaults to 0.
-        :param int data_type: Data type of the ellipse, defaults to 0.
-        """
+        layer: Layer = 0,
+        data_type: DataType = 0,
+    ) -> Polygon: ...
     def simplify(self) -> Self:
         """Simplify the polygon.
 
         This method modifies the polygon in place and returns itself.
+
+        This method removes consecutive duplicate points.
+        This method removes collinear consecutive points.
         """
-    def looks_like(self, other: Polygon) -> bool:
-        """Return True if the polygon looks like another polygon."""
-    def __add__(self, other: Element) -> BooleanOperationResult:
+    def looks_like(self, other: Polygon) -> bool: ...
+    def __add__(self, other: BooleanOperationInput) -> BooleanOperationResult:
         """Return the union of the polygon with another element."""
-    def __or__(self, other: Element) -> BooleanOperationResult:
+    def __or__(self, other: BooleanOperationInput) -> BooleanOperationResult:
         """Return the union of the polygon with another element."""
-    def __and__(self, other: Element) -> BooleanOperationResult:
+    def __and__(self, other: BooleanOperationInput) -> BooleanOperationResult:
         """Return the intersection of the polygon with another element."""
-    def __sub__(self, other: Element) -> BooleanOperationResult:
+    def __sub__(self, other: BooleanOperationInput) -> BooleanOperationResult:
         """Return the difference of the polygon with another element."""
-    def __xor__(self, other: Element) -> BooleanOperationResult:
+    def __xor__(self, other: BooleanOperationInput) -> BooleanOperationResult:
         """Return the symmetric difference of the polygon with another element."""
-    def __str__(self) -> str:
-        """Return a string representation of the polygon."""
-    def __repr__(self) -> str:
-        """Return a string representation of the polygon."""
-    def __eq__(self, value: object) -> bool:
-        """Return True if the polygon is equal to another object."""
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, value: object) -> bool: ...
 
 class VerticalPresentation(Enum):
     Top = 0
@@ -581,8 +480,7 @@ class VerticalPresentation(Enum):
     Bottom = 2
 
     @staticmethod
-    def values() -> list[VerticalPresentation]:
-        """Return a list of all VerticalPresentation values."""
+    def values() -> list[VerticalPresentation]: ...
 
 class HorizontalPresentation(Enum):
     Left = 0
@@ -590,30 +488,20 @@ class HorizontalPresentation(Enum):
     Right = 2
 
     @staticmethod
-    def values() -> list[HorizontalPresentation]:
-        """Return a list of all HorizontalPresentation values."""
+    def values() -> list[HorizontalPresentation]: ...
 
 class Text:
     text: str
-    """Text content."""
     @property
-    def origin(self) -> Point:
-        """Text origin."""
+    def origin(self) -> Point: ...
     @origin.setter
-    def origin(self, origin: PointLike) -> None:
-        """Set the text origin."""
+    def origin(self, origin: PointLike) -> None: ...
     layer: Layer
-    """Text layer."""
     magnification: float
-    """Text magnification."""
     angle: float
-    """Text angle in degrees."""
     x_reflection: bool
-    """Text x reflection."""
     vertical_presentation: VerticalPresentation
-    """Text vertical presentation."""
     horizontal_presentation: HorizontalPresentation
-    """Text horizontal presentation."""
     def __init__(
         self,
         text: str,
@@ -624,45 +512,22 @@ class Text:
         x_reflection: bool = False,
         vertical_presentation: VerticalPresentation = VerticalPresentation.Middle,
         horizontal_presentation: HorizontalPresentation = HorizontalPresentation.Centre,
-    ) -> None:
-        """Initialize the Text with text and origin.
-
-        :param str text: Text content.
-        :param PointLike origin: Text origin, defaults to Point(0, 0).
-        :param Layer layer: Text layer, defaults to 0.
-        :param float magnification: Text magnification, defaults to 1.0.
-        :param float angle: Text angle in degrees, defaults to 0.0.
-        :param bool x_reflection: Text x reflection, defaults to False.
-        :param VerticalPresentation vertical_presentation: Text vertical presentation,
-        defaults to VerticalPresentation.Middle.
-        :param HorizontalPresentation horizontal_presentation: Text horizontal
-        presentation, defaults to HorizontalPresentation.Centre.
-        """
+    ) -> None: ...
     @property
-    def bounding_box(self) -> tuple[Point, Point]:
-        """Return the bounding box of the text."""
-    def set_text(self, text: str) -> Self:
-        """Set the text content."""
-    def set_origin(self, origin: PointLike) -> Self:
-        """Set the origin of the text."""
-    def set_layer(self, layer: Layer) -> Self:
-        """Set the layer of the text."""
-    def set_magnification(self, magnification: float) -> Self:
-        """Set the magnification of the text."""
-    def set_angle(self, angle: float) -> Self:
-        """Set the angle of the text."""
-    def set_x_reflection(self, x_reflection: bool) -> Self:
-        """Set the x reflection of the text."""
+    def bounding_box(self) -> tuple[Point, Point]: ...
+    def set_text(self, text: str) -> Self: ...
+    def set_origin(self, origin: PointLike) -> Self: ...
+    def set_layer(self, layer: Layer) -> Self: ...
+    def set_magnification(self, magnification: float) -> Self: ...
+    def set_angle(self, angle: float) -> Self: ...
+    def set_x_reflection(self, x_reflection: bool) -> Self: ...
     def set_vertical_presentation(
         self, vertical_presentation: VerticalPresentation
-    ) -> Self:
-        """Set the vertical presentation of the text."""
+    ) -> Self: ...
     def set_horizontal_presentation(
         self, horizontal_presentation: HorizontalPresentation
-    ) -> Self:
-        """Set the horizontal presentation of the text."""
-    def copy(self) -> Self:
-        """Return a copy of the text."""
+    ) -> Self: ...
+    def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the text to a point.
 
@@ -695,12 +560,9 @@ class Text:
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the text is on any of the layer, data_type pairs."""
-    def __str__(self) -> str:
-        """Return a string representation of the text."""
-    def __repr__(self) -> str:
-        """Return a string representation of the text."""
-    def __eq__(self, value: object) -> bool:
-        """Return True if the text is equal to another object."""
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, value: object) -> bool: ...
 
 BaseElement: TypeAlias = Path | Polygon | Text
 Element: TypeAlias = Reference[Instance] | BaseElement
@@ -818,13 +680,8 @@ class Cell:
 class Library:
     name: str
     @property
-    def cells(self) -> Mapping[str, Cell]:
-        """Return the cells in the library."""
-    def __init__(self, name: str = "library") -> None:
-        """Initialize the Library with a name.
-
-        :param str name: Library name
-        """
+    def cells(self) -> Mapping[str, Cell]: ...
+    def __init__(self, name: str = "library") -> None: ...
     def add(self, *cells: Cell, replace_pre_existing: bool = False) -> None:
         """Add cells to the library.
 
@@ -857,10 +714,8 @@ class Library:
         assert cell is cell_from_lib
         ```
         """
-    def remove(self, *cells: Cell) -> None:
-        """Remove cells from the library."""
-    def contains(self, cell: Cell) -> bool:
-        """Return True if the library contains the cell."""
+    def remove(self, *cells: Cell) -> None: ...
+    def contains(self, cell: Cell) -> bool: ...
     def copy(self, deep: bool = False) -> Self:
         """Return a copy of the library.
 
@@ -874,18 +729,15 @@ class Library:
     ) -> str:
         """Write the Library to a GDS file.
 
+        If file_name is None, the library is written to a temporary file.
+
         :param PathLike file_name: Output GDS file name.
         :param float units: GDS file units in meters, defaults to 1e-6.
         :param float precision: GDS file precision, defaults to 1e-10.
         :return: GDS file path
         """
     @staticmethod
-    def from_gds(file_name: PathLike) -> Library:
-        """Read a Library from a GDS file.
-
-        :param PathLike file_name: Input GDS file name.
-        :return: Library
-        """
+    def from_gds(file_name: PathLike) -> Library: ...
     def __add__(self, other: Cell) -> Self:
         """Add a cell to the library.
 
@@ -911,12 +763,9 @@ class Library:
         """
     def __contains__(self, cell: Cell) -> bool:
         """Return True if the library contains the cell."""
-    def __eq__(self, value: object) -> bool:
-        """Return True if the library is equal to another object."""
-    def __str__(self) -> str:
-        """Return a string representation of the library."""
-    def __repr__(self) -> str:
-        """Return a string representation of the library."""
+    def __eq__(self, value: object) -> bool: ...
+    def __str__(self) -> str: ...
+    def __repr__(self) -> str: ...
 
 __all__ = [
     "Cell",

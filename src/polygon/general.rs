@@ -284,6 +284,7 @@ impl Polygon {
                     .cloned()
                     .collect::<Vec<_>>()
     }
+
     fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
         match py_any_to_boolean_operation_input(obj) {
             Ok(other) => Ok(self.boolean(other, String::from("or"), py)),

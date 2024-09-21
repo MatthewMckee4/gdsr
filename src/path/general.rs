@@ -1,13 +1,18 @@
-use std::ops::DerefMut;
+use std::{f64::consts::PI, ops::DerefMut};
 
-use pyo3::prelude::*;
+use log::info;
+use pyo3::{exceptions::PyNotImplementedError, prelude::*};
 
 use crate::{
+    boolean::BooleanOperationResult,
     point::Point,
+    polygon::Polygon,
     traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
     utils::{
-        geometry::perimeter,
-        transformations::{py_any_to_point, py_any_to_points_vec},
+        geometry::{perimeter, round_to_decimals},
+        transformations::{
+            py_any_to_boolean_operation_input, py_any_to_point, py_any_to_points_vec,
+        },
     },
     validation::input::{
         check_data_type_valid, check_layer_valid, check_points_vec_has_at_least_two_points,
@@ -159,6 +164,85 @@ impl Path {
         LayerDataTypeMatches::is_on(self, layer_data_types)
     }
 
+    #[pyo3(signature = (layer=None, data_type=None))]
+    pub fn to_polygon(&self, layer: Option<i32>, data_type: Option<i32>) -> PyResult<Polygon> {
+        let half_width = self.width.unwrap_or(0.0) / 2.0;
+        let mut points: Vec<Point> = Vec::new();
+
+        let mut left_points: Vec<Point> = Vec::new();
+        let mut right_points: Vec<Point> = Vec::new();
+
+        for i in 0..self.points.len() {
+            let current = self.points[i];
+
+            let dir_prev = if i > 0 {
+                (self.points[i] - self.points[i - 1]).normalize()
+            } else {
+                (self.points[i + 1] - self.points[i]).normalize()
+            };
+
+            let dir_next = if i < self.points.len() - 1 {
+                (self.points[i + 1] - self.points[i]).normalize()
+            } else {
+                dir_prev
+            };
+
+            let avg_dir = (dir_prev + dir_next).normalize();
+
+            let normal = avg_dir.ortho();
+
+            let left_p = current + normal * half_width;
+            let right_p = current - normal * half_width;
+
+            left_points.push(left_p);
+            right_points.push(right_p);
+        }
+
+        points.extend(left_points);
+        points.extend(right_points.into_iter().rev());
+
+        Polygon::new(
+            points,
+            layer.unwrap_or(self.layer),
+            data_type.unwrap_or(self.data_type),
+        )
+    }
+
+    fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __or__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __and__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("and"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __sub__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("sub"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __xor__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("xor"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
     fn __str__(&self) -> PyResult<String> {
         Ok(format!("{}", self))
     }
@@ -166,4 +250,16 @@ impl Path {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("{:?}", self))
     }
+}
+
+fn segments_intersection(p0: &Point, t0: &Point, p1: &Point, t1: &Point) -> PyResult<(f64, f64)> {
+    let den = t0.cross(*t1)?;
+    let mut u0 = 0.0;
+    let mut u1 = 0.0;
+    if den.abs() >= 1e-8 {
+        let delta_p = *p1 - *p0;
+        u0 = delta_p.cross(*t1)? / den;
+        u1 = delta_p.cross(*t0)? / den;
+    }
+    Ok((u0, u1))
 }

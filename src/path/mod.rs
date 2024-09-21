@@ -3,6 +3,8 @@ use path_type::PathType;
 use pyo3::prelude::*;
 
 use crate::{
+    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
+    element::Element,
     point::Point,
     traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
 };
@@ -24,6 +26,23 @@ pub struct Path {
     pub path_type: Option<PathType>,
     #[pyo3(get)]
     pub width: Option<f64>,
+}
+
+impl Path {
+    pub fn boolean(
+        &self,
+        other: BooleanOperationInput,
+        operation: BooleanOperationOperation,
+        py: Python,
+    ) -> BooleanOperationResult {
+        boolean(
+            vec![Element::Path(Py::new(py, self.clone())?)],
+            other,
+            operation,
+            self.layer,
+            self.data_type,
+        )
+    }
 }
 
 impl PartialEq for Path {
