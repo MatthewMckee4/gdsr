@@ -1,10 +1,7 @@
 use std::fs::File;
 
 use geo::MultiPolygon;
-use pyo3::{
-    exceptions::{PyTypeError, PyValueError},
-    prelude::*,
-};
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::{
     path::Path,
@@ -244,7 +241,7 @@ impl ToGeo for Element {
             Element::Path(element) => element.borrow(py).to_geo(),
             Element::Polygon(element) => element.borrow(py).to_geo(),
             Element::Reference(element) => element.borrow(py).to_geo(),
-            Element::Text(_) => Err(PyValueError::new_err("Text elements are not supported")),
+            Element::Text(_) => Ok(MultiPolygon::new(vec![])),
         })
     }
 }

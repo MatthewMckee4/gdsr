@@ -1,13 +1,12 @@
 use std::{f64::consts::PI, ops::DerefMut};
 
-use log::info;
 use pyo3::{exceptions::PyNotImplementedError, prelude::*};
 
 use crate::{
     boolean::BooleanOperationResult,
     point::Point,
     polygon::Polygon,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable, Simplifiable},
     utils::{
         geometry::perimeter,
         transformations::{
@@ -46,17 +45,21 @@ impl Path {
     }
 
     #[setter(points)]
-    fn setter_points(&mut self, #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>) {
-        check_points_vec_has_at_least_two_points(&points).unwrap();
+    fn setter_points(
+        &mut self,
+        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
+    ) -> PyResult<()> {
+        check_points_vec_has_at_least_two_points(&points)?;
         self.points = points;
+        Ok(())
     }
 
     fn set_points(
         mut slf: PyRefMut<'_, Self>,
         #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> PyRefMut<'_, Self> {
-        slf.setter_points(points);
-        slf
+    ) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_points(points)?;
+        Ok(slf)
     }
 
     #[setter(layer)]
@@ -66,9 +69,9 @@ impl Path {
         Ok(())
     }
 
-    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
-        slf.setter_layer(layer).unwrap();
-        slf
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_layer(layer)?;
+        Ok(slf)
     }
 
     #[setter(data_type)]
@@ -78,9 +81,9 @@ impl Path {
         Ok(())
     }
 
-    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyRefMut<'_, Self> {
-        slf.setter_data_type(data_type).unwrap();
-        slf
+    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_data_type(data_type)?;
+        Ok(slf)
     }
 
     #[setter(path_type)]
@@ -217,13 +220,14 @@ impl Path {
             Some(PathType::Round) => {
                 let num_points = 16;
                 let angle_increment = PI / (num_points) as f64;
+                let length_multiplier = 1.0048386;
 
                 for i in 0..num_points {
                     let angle = PI - angle_increment * (i as f64 + 0.5);
                     let cap_point = first_point
                         - dir_next.ortho() * half_width * angle.cos()
                         - dir_next * half_width * angle.sin();
-                    left_points.insert(0, cap_point);
+                    left_points.insert(0, cap_point.scale(length_multiplier, first_point));
                 }
 
                 for i in 0..num_points {
@@ -231,7 +235,7 @@ impl Path {
                     let cap_point = last_point
                         + dir_prev.ortho() * half_width * angle.cos()
                         + dir_prev * half_width * angle.sin();
-                    right_points.push(cap_point);
+                    right_points.push(cap_point.scale(length_multiplier, last_point));
                 }
             }
             Some(PathType::Overlap) => {
@@ -258,11 +262,15 @@ impl Path {
 
         points.push(points[0]);
 
-        Polygon::new(
+        let mut polygon = Polygon::new(
             points,
             layer.unwrap_or(self.layer),
             data_type.unwrap_or(self.data_type),
-        )
+        )?;
+
+        polygon.simplify();
+
+        Ok(polygon)
     }
 
     fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {

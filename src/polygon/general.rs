@@ -6,7 +6,7 @@ use pyo3::{exceptions::PyNotImplementedError, prelude::*, types::PyTuple};
 
 use crate::{
     boolean::BooleanOperationResult,
-    point::Point,
+    point::{points_are_close, Point},
     traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable, Simplifiable},
     utils::{
         geometry::{area, is_point_inside, is_point_on_edge, perimeter},
@@ -59,9 +59,9 @@ impl Polygon {
         Ok(())
     }
 
-    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
-        slf.setter_layer(layer).unwrap();
-        slf
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_layer(layer)?;
+        Ok(slf)
     }
 
     #[setter(data_type)]
@@ -71,9 +71,9 @@ impl Polygon {
         Ok(())
     }
 
-    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyRefMut<'_, Self> {
-        slf.setter_data_type(data_type).unwrap();
-        slf
+    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_data_type(data_type)?;
+        Ok(slf)
     }
 
     #[getter]
@@ -273,16 +273,46 @@ impl Polygon {
         let mut binding = other.clone();
         let other_simplified = binding.simplify();
 
-        let self_simplified_points = &self_simplified.points;
-        let other_simplified_points = &other_simplified.points;
+        let self_simplified_points = &self_simplified.points[..self_simplified.points.len() - 1];
+        let other_simplified_points = &other_simplified.points[..other_simplified.points.len() - 1];
 
-        self_simplified_points == other_simplified_points
-            || *self_simplified_points
-                == other_simplified_points
+        if points_are_close(self_simplified_points, other_simplified_points)
+            || points_are_close(
+                self_simplified_points,
+                &other_simplified_points
                     .iter()
                     .rev()
                     .cloned()
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>(),
+            )
+        {
+            return true;
+        }
+
+        for i in 0..self_simplified_points.len() {
+            let rotated_self_points = self_simplified_points
+                .iter()
+                .cycle()
+                .skip(i)
+                .take(self_simplified_points.len())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if points_are_close(&rotated_self_points, other_simplified_points)
+                || points_are_close(
+                    &rotated_self_points,
+                    &other_simplified_points
+                        .iter()
+                        .rev()
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                )
+            {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {

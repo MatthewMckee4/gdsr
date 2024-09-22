@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Generic, Iterator, Literal, Mapping, Sequence, TypeAlias, TypeVar
+from typing import Generic, Iterator, Literal, Mapping, TypeAlias, TypeVar
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -8,6 +8,9 @@ else:
     from typing_extensions import Self
 
 from .typings import (
+    BooleanOperationInput,
+    BooleanOperationOperation,
+    BooleanOperationResult,
     DataType,
     InputPointsLike,
     Layer,
@@ -31,15 +34,6 @@ def get_epsilon() -> float:
 
     :return: Epsilon value
     """
-
-BooleanOperationInputElement: TypeAlias = (
-    Polygon | Path | Reference[BooleanOperationInputElement]
-)
-BooleanOperationInput: TypeAlias = (
-    Sequence[BooleanOperationInputElement] | BooleanOperationInputElement
-)
-BooleanOperationOperation: TypeAlias = Literal["or", "and", "sub", "xor"]
-BooleanOperationResult: TypeAlias = list[Polygon]
 
 def boolean(
     a: BooleanOperationInput,
@@ -278,6 +272,16 @@ class Reference(Generic[T_Instance]):
         """
     def is_on(self, *layer_data_types: LayerDataType) -> bool:
         """Return True if the instance is on any of the layer, data_type pairs."""
+    def __add__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the union of the reference with another element."""
+    def __or__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the union of the reference with another element."""
+    def __and__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the intersection of the reference with another element."""
+    def __sub__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the difference of the reference with another element."""
+    def __xor__(self, other: BooleanOperationInput) -> BooleanOperationResult:
+        """Return the symmetric difference of the reference with another element."""
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
     def __eq__(self, value: object) -> bool: ...
@@ -308,15 +312,15 @@ class Path:
         path_type: PathType | None = None,
         width: float | None = None,
     ) -> None: ...
-    @property
-    def length(self) -> float: ...
-    @property
-    def bounding_box(self) -> tuple[Point, Point]: ...
     def set_points(self, points: InputPointsLike) -> Self: ...
     def set_layer(self, layer: Layer) -> Self: ...
     def set_data_type(self, data_type: DataType) -> Self: ...
     def set_path_type(self, path_type: PathType | None) -> Self: ...
     def set_width(self, width: float | None) -> Self: ...
+    @property
+    def length(self) -> float: ...
+    @property
+    def bounding_box(self) -> tuple[Point, Point]: ...
     def copy(self) -> Self: ...
     def move_to(self, point: PointLike) -> Self:
         """Move the path to a point.

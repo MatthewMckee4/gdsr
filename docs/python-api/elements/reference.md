@@ -4,4 +4,4 @@
 ::: gdsr._gdsr.T_Instance
 
 ## Reference
-::: gdsr._gdsr.Reference
+::: gdsr.Reference

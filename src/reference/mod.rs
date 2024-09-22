@@ -2,7 +2,9 @@ use geo::MultiPolygon;
 use pyo3::prelude::*;
 
 use crate::{
+    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
     cell::Cell,
+    element::Element,
     grid::Grid,
     point::Point,
     traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
@@ -21,6 +23,23 @@ pub struct Reference {
     pub instance: Instance,
     #[pyo3(get, set)]
     pub grid: Py<Grid>,
+}
+
+impl Reference {
+    pub fn boolean(
+        &self,
+        other: BooleanOperationInput,
+        operation: BooleanOperationOperation,
+        py: Python,
+    ) -> BooleanOperationResult {
+        boolean(
+            vec![Element::Reference(Py::new(py, self.clone())?)],
+            other,
+            operation,
+            0,
+            0,
+        )
+    }
 }
 
 impl std::fmt::Display for Reference {

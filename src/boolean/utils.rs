@@ -1,17 +1,6 @@
 use crate::{element::Element, traits::ToGeo};
 use geo::MultiPolygon;
-use pyo3::{exceptions::PyValueError, prelude::*};
-
-pub fn check_for_text(elements: &Vec<Element>) -> PyResult<()> {
-    for element in elements {
-        if let Element::Text(_) = element {
-            return Err(PyValueError::new_err(
-                "Text elements are not allowed in boolean operations",
-            ));
-        }
-    }
-    Ok(())
-}
+use pyo3::prelude::*;
 
 pub fn get_geo_multi_polygon(elements: &[Element]) -> PyResult<MultiPolygon> {
     let geo_a = MultiPolygon::new(

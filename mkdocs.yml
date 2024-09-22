@@ -12,6 +12,7 @@ nav:
       - python-api/cell.md
       - python-api/library.md
       - python-api/typings.md
+      - python-api/boolean_tools.md
       - Elements:
           - python-api/elements/reference.md
           - python-api/elements/path.md
@@ -57,6 +58,8 @@ plugins:
             members_order: source
             show_if_no_docstring: true
             show_root_full_path: true
+            show_signature: true
+            show_root_heading: true
   - search
 
 markdown_extensions:

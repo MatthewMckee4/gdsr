@@ -1,7 +1,7 @@
 use geo::BooleanOps;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use utils::{check_for_text, get_geo_multi_polygon};
+use utils::get_geo_multi_polygon;
 
 use crate::element::Element;
 use crate::polygon::Polygon;
@@ -22,19 +22,22 @@ pub fn boolean(
     layer: i32,
     data_type: i32,
 ) -> BooleanOperationResult {
-    check_for_text(&a)?;
-    check_for_text(&b)?;
-
     let geo_a = get_geo_multi_polygon(&a)?;
     let geo_b = get_geo_multi_polygon(&b)?;
 
-    let result = match operation.as_str() {
-        "or" => geo_a.union(&geo_b),
-        "and" => geo_a.intersection(&geo_b),
-        "sub" => geo_a.difference(&geo_b),
-        "xor" => geo_a.xor(&geo_b),
-        _ => return Err(PyValueError::new_err("Invalid operation")),
-    };
+    let result = std::panic::catch_unwind(|| match operation.as_str() {
+        "or" => Ok(geo_a.union(&geo_b)),
+        "and" => Ok(geo_a.intersection(&geo_b)),
+        "sub" => Ok(geo_a.difference(&geo_b)),
+        "xor" => Ok(geo_a.xor(&geo_b)),
+        _ => Err(PyValueError::new_err("Invalid operation")),
+    });
 
-    Ok(Polygon::from_geo(result, layer, data_type))
+    let result = match result {
+        Ok(Ok(mp)) => Ok(Polygon::from_geo(mp, layer, data_type)?),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Ok(vec![]),
+    }?;
+
+    Ok(result)
 }

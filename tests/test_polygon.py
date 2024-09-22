@@ -5,7 +5,7 @@ import pytest
 from hypothesis import assume, given
 
 from gdsr import InputPointsLike, Point, Polygon
-from tests.conftest import point_strategy, polygon_strategy
+from tests.conftest import ellipse_strategy, point_strategy, polygon_strategy
 
 
 @pytest.fixture
@@ -846,4 +846,24 @@ def test_looks_like_returns_true_for_equivalent_polygons_with_extra_points():
     assert polygon2.looks_like(polygon1)
 
 
+@given(ellipse=ellipse_strategy())
+def test_ellipse_after_rotation_looks_like_original(ellipse: Polygon):
+    rotated_polygon = ellipse.copy().rotate(360 / (len(ellipse.points) - 1))
+    assert ellipse.looks_like(rotated_polygon)
+    assert rotated_polygon.looks_like(ellipse)
+
+
 # Polygon boolean
+
+
+@given(polygon=polygon_strategy())
+def test_polygon_boolean_self_intersection_returns_empty_list(polygon: Polygon):
+    res = polygon - polygon
+    assert res == []
+
+
+@pytest.mark.skip(reason="Not implemented yet")
+@given(polygon=polygon_strategy())
+def test_polygon_boolean_self_symmetric_difference_returns_empty_list(polygon: Polygon):
+    res = polygon ^ polygon
+    assert res == []

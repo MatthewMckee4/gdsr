@@ -42,7 +42,7 @@ pub trait ToGeo {
 }
 
 pub trait FromGeo {
-    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> Vec<Self>
+    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> PyResult<Vec<Self>>
     where
         Self: std::marker::Sized;
 }

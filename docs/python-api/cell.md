@@ -1,5 +1,3 @@
 # Cell
 
-::: gdsr._gdsr.Cell
-
-    
+::: gdsr.Cell

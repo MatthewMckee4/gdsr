@@ -1,7 +1,7 @@
 import pytest
 from hypothesis import given
 
-from gdsr import InputPointsLike, Path, PathType, Point
+from gdsr import InputPointsLike, Path, PathType, Point, Polygon
 from tests.conftest import path_strategy
 
 
@@ -362,3 +362,36 @@ def test_path_not_eq_to_different_points():
     path1 = Path([(0, 0), (1, 1)])
     path2 = Path([(0, 0), (1, 2)])
     assert path1 != path2
+
+
+# to_polygon
+
+
+def test_to_polygon():
+    path = Path([(0, 0), (1, 1), (2, 2)])
+    polygon = path.to_polygon()
+    assert polygon.points == [(0, 0)]
+
+
+def test_to_polygon_with_width_horizontal():
+    path = Path([(0, 0), (2, 0)], width=1)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(0, 0.5), (2, 0.5), (2, -0.5), (0, -0.5), (0, 0.5)])
+    )
+
+
+def test_to_polygon_with_width_vertical():
+    path = Path([(0, 0), (0, 2)], width=1)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(0.5, 0), (-0.5, 0), (-0.5, 2), (0.5, 2), (0.5, 0)])
+    )
+
+
+def test_to_polygon_with_width_horizontal_square_ends():
+    path = Path([(0, 0), (2, 0)], width=1, path_type=PathType.Overlap)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(-0.5, 0.5), (2.5, 0.5), (2.5, -0.5), (-0.5, -0.5), (-0.5, 0.5)])
+    )

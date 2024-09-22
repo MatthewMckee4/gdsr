@@ -159,6 +159,16 @@ def polygon_strategy(draw: st.DrawFn) -> Polygon:
 
 
 @st.composite
+def ellipse_strategy(draw: st.DrawFn) -> Polygon:
+    radius = draw(float_strategy(min_value=1, max_value=100))
+    return Polygon.ellipse(
+        (0, 0),
+        radius,
+        n_sides=draw(st.integers(min_value=20, max_value=50)),
+    )
+
+
+@st.composite
 def path_strategy(draw: st.DrawFn) -> Path:
     width_from_draw = draw(
         st.one_of(

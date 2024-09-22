@@ -1,7 +1,9 @@
 """Type hints for the gdsr package."""
 
-from pathlib import Path
-from typing import Iterable, Literal, Protocol, runtime_checkable
+from pathlib import Path as PathLibPath
+from typing import Iterable, Literal, Protocol, Sequence, TypeAlias, runtime_checkable
+
+from gdsr import Path, Polygon, Reference
 
 
 @runtime_checkable
@@ -109,6 +111,16 @@ Examples:
 
 Layer = int
 DataType = int
-PathLike = Path | str
+PathLike = PathLibPath | str
 LayerDataType = tuple[Layer, DataType]
 """A tuple containing a layer and a data type."""
+
+BooleanOperationInputElement: TypeAlias = (
+    Polygon | Path | Reference["BooleanOperationInputElement"]
+)
+
+BooleanOperationInput: TypeAlias = (
+    "Sequence[BooleanOperationInputElement] | BooleanOperationInputElement"
+)
+BooleanOperationOperation: TypeAlias = Literal["or", "and", "sub", "xor"]
+BooleanOperationResult: TypeAlias = list[Polygon]

@@ -1,14 +1,15 @@
 use std::ops::DerefMut;
 
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyNotImplementedError, prelude::*};
 
 use crate::{
+    boolean::BooleanOperationResult,
     config::FLOATING_POINT_INACCURACY_ROUND_DECIMALS,
     element::Element,
     grid::Grid,
     point::Point,
     traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
-    utils::transformations::py_any_to_point,
+    utils::transformations::{py_any_to_boolean_operation_input, py_any_to_point},
 };
 
 use super::{Instance, Reference};
@@ -151,6 +152,41 @@ impl Reference {
     #[pyo3(signature = (*layer_data_types))]
     pub fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
         LayerDataTypeMatches::is_on(self, layer_data_types)
+    }
+
+    fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __or__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __and__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("and"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __sub__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("sub"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __xor__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("xor"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
     }
 
     fn __str__(&self) -> PyResult<String> {

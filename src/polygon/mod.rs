@@ -182,7 +182,7 @@ impl Simplifiable for Polygon {
         unique_points.dedup();
 
         simplified_points.push(unique_points[0]);
-        let m = unique_points.len();
+        let m: usize = unique_points.len();
         for i in 1..m - 1 {
             let prev = unique_points[i - 1];
             let curr = unique_points[i];
@@ -197,6 +197,8 @@ impl Simplifiable for Polygon {
                 simplified_points.push(curr);
             }
         }
+
+        simplified_points.dedup();
 
         if simplified_points.first() != simplified_points.last() {
             simplified_points.push(simplified_points[0]);
@@ -215,7 +217,7 @@ impl ToGeo for Polygon {
 }
 
 impl FromGeo for Polygon {
-    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> Vec<Self> {
+    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> PyResult<Vec<Self>> {
         let mut polygons = Vec::new();
         for polygon in geo {
             let mut points: Vec<Point> = polygon
@@ -238,12 +240,12 @@ impl FromGeo for Polygon {
             if let Some(first_point) = points.first().cloned() {
                 points.push(first_point);
             }
-            polygons.push(Polygon {
-                points,
-                layer,
-                data_type,
-            });
+            let mut polygon = Polygon::new(points, layer, data_type)?;
+            polygon.simplify();
+            if polygon.points.len() > 3 {
+                polygons.push(polygon);
+            }
         }
-        polygons
+        Ok(polygons)
     }
 }

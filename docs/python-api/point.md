@@ -1,3 +1,3 @@
 # Point
 
-::: gdsr._gdsr.Point
+::: gdsr.Point
