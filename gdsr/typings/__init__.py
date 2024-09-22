@@ -116,7 +116,7 @@ LayerDataType = tuple[Layer, DataType]
 """A tuple containing a layer and a data type."""
 
 BooleanOperationInputElement: TypeAlias = (
-    Polygon | Path | Reference["BooleanOperationInputElement"]
+    "Polygon | Path | Reference[BooleanOperationInputElement]"
 )
 
 BooleanOperationInput: TypeAlias = (
