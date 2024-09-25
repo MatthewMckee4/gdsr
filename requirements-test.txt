@@ -4,4 +4,5 @@ pytest-randomly
 pytest-only
 pytest-xdist
 pytest-timeout
+setuptools
 typing_extensions
