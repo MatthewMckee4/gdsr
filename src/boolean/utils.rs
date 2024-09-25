@@ -1,13 +1,15 @@
 use crate::{element::Element, traits::ToGeo};
-use geo::MultiPolygon;
+
 use pyo3::prelude::*;
 
-pub fn get_geo_multi_polygon(elements: &[Element]) -> PyResult<MultiPolygon> {
-    let geo_a = MultiPolygon::new(
+use super::ExternalPolygonGroup;
+
+pub fn get_external_polygon_group(elements: &[Element]) -> PyResult<ExternalPolygonGroup> {
+    let geo_a = ExternalPolygonGroup::new(
         elements
             .iter()
             .filter_map(|e| {
-                if let Ok(MultiPolygon(multi_polygon)) = e.to_geo() {
+                if let Ok(multi_polygon) = e.to_geo() {
                     Some(multi_polygon)
                 } else {
                     None

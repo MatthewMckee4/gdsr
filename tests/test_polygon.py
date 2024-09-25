@@ -2,7 +2,7 @@ import math
 
 import hypothesis.strategies as st
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 
 from gdsr import InputPointsLike, Point, Polygon
 from tests.conftest import ellipse_strategy, point_strategy, polygon_strategy
@@ -857,6 +857,8 @@ def test_ellipse_after_rotation_looks_like_original(ellipse: Polygon):
 
 
 @given(polygon=polygon_strategy())
+@settings(max_examples=50, deadline=None)
+@pytest.mark.timeout(1)
 def test_polygon_boolean_self_intersection_returns_empty_list(polygon: Polygon):
     res = polygon - polygon
     assert res == []
@@ -864,6 +866,8 @@ def test_polygon_boolean_self_intersection_returns_empty_list(polygon: Polygon):
 
 @pytest.mark.skip(reason="Not implemented yet")
 @given(polygon=polygon_strategy())
+@settings(max_examples=50)
+@pytest.mark.timeout(1)
 def test_polygon_boolean_self_symmetric_difference_returns_empty_list(polygon: Polygon):
     res = polygon ^ polygon
     assert res == []

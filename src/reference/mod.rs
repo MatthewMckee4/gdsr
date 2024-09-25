@@ -1,8 +1,10 @@
-use geo::MultiPolygon;
 use pyo3::prelude::*;
 
 use crate::{
-    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
+    boolean::{
+        boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
+        ExternalPolygonGroup,
+    },
     cell::Cell,
     element::Element,
     grid::Grid,
@@ -191,7 +193,7 @@ impl LayerDataTypeMatches for Reference {
 }
 
 impl ToGeo for Reference {
-    fn to_geo(&self) -> PyResult<MultiPolygon> {
+    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
         Python::with_gil(|py| {
             let mut geometries = Vec::new();
             for element in self.clone().flatten([].to_vec(), None, py) {
@@ -200,7 +202,7 @@ impl ToGeo for Reference {
                 }
             }
 
-            Ok(MultiPolygon::new(geometries))
+            Ok(ExternalPolygonGroup::new(geometries))
         })
     }
 }

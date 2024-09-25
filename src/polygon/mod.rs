@@ -1,5 +1,8 @@
 use crate::{
-    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
+    boolean::{
+        boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
+        ExternalPolygonGroup,
+    },
     element::Element,
     point::Point,
     traits::{
@@ -8,7 +11,7 @@ use crate::{
     },
     utils::geometry::{bounding_box, rotate_points_to_minimum},
 };
-use geo::{LineString, MultiPolygon, Polygon as GeoPolygon};
+use geo::{LineString, Polygon as GeoPolygon};
 use pyo3::prelude::*;
 
 mod general;
@@ -210,14 +213,17 @@ impl Simplifiable for Polygon {
 }
 
 impl ToGeo for Polygon {
-    fn to_geo(&self) -> PyResult<MultiPolygon> {
+    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
         let exterior: LineString<f64> = self.points.iter().map(|p| (p.x, p.y)).collect();
-        Ok(MultiPolygon::new(vec![GeoPolygon::new(exterior, vec![])]))
+        Ok(ExternalPolygonGroup::new(vec![GeoPolygon::new(
+            exterior,
+            vec![],
+        )]))
     }
 }
 
 impl FromGeo for Polygon {
-    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> PyResult<Vec<Self>> {
+    fn from_geo(geo: ExternalPolygonGroup, layer: i32, data_type: i32) -> PyResult<Vec<Self>> {
         let mut polygons = Vec::new();
         for polygon in geo {
             let mut points: Vec<Point> = polygon

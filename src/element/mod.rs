@@ -1,9 +1,9 @@
 use std::fs::File;
 
-use geo::MultiPolygon;
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::{
+    boolean::ExternalPolygonGroup,
     path::Path,
     point::Point,
     polygon::Polygon,
@@ -236,12 +236,12 @@ impl std::fmt::Debug for Element {
 }
 
 impl ToGeo for Element {
-    fn to_geo(&self) -> PyResult<MultiPolygon> {
+    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
         Python::with_gil(|py| match self {
             Element::Path(element) => element.borrow(py).to_geo(),
             Element::Polygon(element) => element.borrow(py).to_geo(),
             Element::Reference(element) => element.borrow(py).to_geo(),
-            Element::Text(_) => Ok(MultiPolygon::new(vec![])),
+            Element::Text(_) => Ok(ExternalPolygonGroup::new(vec![])),
         })
     }
 }

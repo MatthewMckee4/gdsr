@@ -1,8 +1,7 @@
-use geo::MultiPolygon;
 use pyo3::prelude::*;
 use std::fs::File;
 
-use crate::point::Point;
+use crate::{boolean::ExternalPolygonGroup, point::Point};
 
 pub trait ToGds {
     fn _to_gds(&self, file: File, scale: f64) -> PyResult<File>;
@@ -38,11 +37,11 @@ pub trait Simplifiable {
 }
 
 pub trait ToGeo {
-    fn to_geo(&self) -> PyResult<MultiPolygon>;
+    fn to_geo(&self) -> PyResult<ExternalPolygonGroup>;
 }
 
 pub trait FromGeo {
-    fn from_geo(geo: MultiPolygon, layer: i32, data_type: i32) -> PyResult<Vec<Self>>
+    fn from_geo(geo: ExternalPolygonGroup, layer: i32, data_type: i32) -> PyResult<Vec<Self>>
     where
         Self: std::marker::Sized;
 }

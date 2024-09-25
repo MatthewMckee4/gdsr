@@ -581,11 +581,7 @@ class Cell:
     def references(self) -> list[Reference[Instance]]: ...
     @property
     def texts(self) -> list[Text]: ...
-    def __init__(self, name: str) -> None:
-        """Initialize the Cell with a name.
-
-        :param str name: Cell name
-        """
+    def __init__(self, name: str) -> None: ...
     @property
     def bounding_box(self) -> tuple[Point, Point]:
         """Return the bounding box of the cell."""

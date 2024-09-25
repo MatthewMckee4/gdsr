@@ -1,9 +1,12 @@
-use geo::{LineString, MultiPolygon};
+use geo::LineString;
 use path_type::PathType;
 use pyo3::prelude::*;
 
 use crate::{
-    boolean::{boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult},
+    boolean::{
+        boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
+        ExternalPolygonGroup,
+    },
     element::Element,
     point::Point,
     traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
@@ -287,7 +290,7 @@ impl LayerDataTypeMatches for Path {
 }
 
 impl ToGeo for Path {
-    fn to_geo(&self) -> PyResult<MultiPolygon> {
+    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
         let half_width = self.width.unwrap_or(0.0) / 2.0;
         let mut exterior: Vec<(f64, f64)> = Vec::new();
 
@@ -318,6 +321,6 @@ impl ToGeo for Path {
         }
 
         let polygon = geo::Polygon::new(LineString::from(exterior), vec![]);
-        Ok(MultiPolygon::new(vec![polygon]))
+        Ok(ExternalPolygonGroup::new(vec![polygon]))
     }
 }

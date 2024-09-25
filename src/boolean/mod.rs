@@ -1,7 +1,8 @@
-use geo::BooleanOps;
+use geo::{BooleanOps, MultiPolygon};
+use log::error;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use utils::get_geo_multi_polygon;
+use utils::get_external_polygon_group;
 
 use crate::element::Element;
 use crate::polygon::Polygon;
@@ -13,6 +14,8 @@ pub type BooleanOperationInput = Vec<Element>;
 pub type BooleanOperationOperation = String;
 pub type BooleanOperationResult = PyResult<Vec<Polygon>>;
 
+pub type ExternalPolygonGroup = MultiPolygon<f64>;
+
 #[pyfunction]
 #[pyo3(signature = (a, b, operation, layer=0, data_type=0))]
 pub fn boolean(
@@ -22,8 +25,8 @@ pub fn boolean(
     layer: i32,
     data_type: i32,
 ) -> BooleanOperationResult {
-    let geo_a = get_geo_multi_polygon(&a)?;
-    let geo_b = get_geo_multi_polygon(&b)?;
+    let geo_a = get_external_polygon_group(&a)?;
+    let geo_b = get_external_polygon_group(&b)?;
 
     let result = std::panic::catch_unwind(|| match operation.as_str() {
         "or" => Ok(geo_a.union(&geo_b)),
@@ -33,11 +36,12 @@ pub fn boolean(
         _ => Err(PyValueError::new_err("Invalid operation")),
     });
 
-    let result = match result {
+    match result {
         Ok(Ok(mp)) => Ok(Polygon::from_geo(mp, layer, data_type)?),
         Ok(Err(e)) => Err(e),
-        Err(_) => Ok(vec![]),
-    }?;
-
-    Ok(result)
+        Err(_) => {
+            error!("Panic occurred during the operation");
+            Ok(vec![])
+        }
+    }
 }
