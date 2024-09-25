@@ -1,5 +1,7 @@
 pytest
 hypothesis
 pytest-randomly
+pytest-only
 pytest-xdist
+pytest-timeout
 typing_extensions
