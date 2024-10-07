@@ -136,6 +136,10 @@ impl Point {
         }
     }
 
+    pub fn as_tuple(&self) -> (f64, f64) {
+        (self.x, self.y)
+    }
+
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
         match index {
             0 => Ok(self.x),

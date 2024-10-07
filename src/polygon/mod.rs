@@ -213,7 +213,7 @@ impl Simplifiable for Polygon {
 
 impl ToExternalPolygonGroup for Polygon {
     fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
-        let points: Vec<(f64, f64)> = self.points.iter().map(|p| (p.x, p.y)).collect();
+        let points: Vec<(f64, f64)> = self.points.iter().map(|p| p.as_tuple()).collect();
         Ok(points.into())
     }
 }

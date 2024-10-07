@@ -293,35 +293,13 @@ impl LayerDataTypeMatches for Path {
 
 impl ToExternalPolygonGroup for Path {
     fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
-        let half_width = self.width.unwrap_or(0.0) / 2.0;
-        let mut points: Vec<(f64, f64)> = Vec::new();
+        let converted_polygon = self.to_polygon(Some(self.layer), Some(self.data_type))?;
 
-        for window in self.points.windows(2) {
-            let (start, end) = (window[0], window[1]);
-            let angle = start.angle_to(end).unwrap_or(0.0).to_radians();
-            let (sin, cos) = angle.sin_cos();
-            let perp_x = -sin;
-            let perp_y = cos;
-
-            points.push((start.x + half_width * perp_x, start.y + half_width * perp_y));
-            points.push((end.x + half_width * perp_x, end.y + half_width * perp_y));
-        }
-
-        for window in self.points.windows(2).rev() {
-            let (start, end) = (window[0], window[1]);
-            let angle = start.angle_to(end).unwrap_or(0.0).to_radians();
-            let (sin, cos) = angle.sin_cos();
-            let perp_x = -sin;
-            let perp_y = cos;
-
-            points.push((end.x - half_width * perp_x, end.y - half_width * perp_y));
-            points.push((start.x - half_width * perp_x, start.y - half_width * perp_y));
-        }
-
-        if let Some(first) = self.points.first() {
-            points.push((first.x + half_width, first.y));
-        }
-
-        Ok(points.into())
+        Ok(converted_polygon
+            .points
+            .into_iter()
+            .map(|p| p.as_tuple())
+            .collect::<Vec<(f64, f64)>>()
+            .into())
     }
 }

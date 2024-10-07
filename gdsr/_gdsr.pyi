@@ -117,6 +117,8 @@ class Point:
         """Return the orthogonal vector of the point."""
     def normalize(self) -> Self:
         """Return the normalized vector of the point."""
+    def as_tuple(self) -> tuple[float, float]:
+        """Return the point as a tuple of x and y coordinates."""
     def __getitem__(self, index: Literal[0, 1]) -> float:
         """Return the x or y coordinate of the point."""
     def __bool__(self) -> bool:

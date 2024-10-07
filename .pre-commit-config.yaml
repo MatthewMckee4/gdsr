@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.10
+    rev: v0.6.9
     hooks:
       - id: ruff
         stages: [pre-commit]
@@ -8,7 +8,12 @@ repos:
         stages: [pre-commit]
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.11.5
+    rev: 5.13.2
     hooks:
       - id: isort
         stages: [pre-commit]
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+      - id: cargo-check

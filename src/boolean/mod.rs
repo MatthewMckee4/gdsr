@@ -5,7 +5,6 @@ use pyo3::prelude::*;
 
 use utils::get_external_polygon_group;
 
-use crate::config::get_epsilon;
 use crate::element::Element;
 use crate::polygon::Polygon;
 use crate::traits::FromExternalPolygonGroup;
@@ -17,13 +16,13 @@ pub type BooleanOperationOperation = String;
 pub type BooleanOperationResult = PyResult<Vec<Polygon>>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct CustomScale;
+pub struct CustomPointScaler;
 
-impl PointScaler for CustomScale {
-    const MULTIPLIER: f64 = 1000000.0;
+impl PointScaler for CustomPointScaler {
+    const MULTIPLIER: f64 = 10000000.0;
 }
 
-pub type ExternalPolygonGroup = Paths<CustomScale>;
+pub type ExternalPolygonGroup = Paths<CustomPointScaler>;
 
 #[pyfunction]
 #[pyo3(signature = (a, b, operation, layer=0, data_type=0))]
@@ -37,43 +36,24 @@ pub fn boolean(
     let epg_a = get_external_polygon_group(&a)?;
     let epg_b = get_external_polygon_group(&b)?;
 
+    info!("epg_a: {:?}", epg_a);
+    info!("epg_b: {:?}", epg_b);
+
     let fill_rule = FillRule::EvenOdd;
 
-    let scale_factor = get_epsilon();
+    let clipper_obj = Clipper::new().add_subject(epg_a).add_clip(epg_b);
 
-    let result = std::panic::catch_unwind(|| match operation.as_str() {
-        "or" => Ok(Clipper::new()
-            .add_subject(epg_a)
-            .add_clip(epg_b)
-            .union(fill_rule)),
-        "and" => Ok(Clipper::new()
-            .add_subject(epg_a)
-            .add_clip(epg_b)
-            .intersect(fill_rule)),
-        "sub" => Ok(Clipper::new()
-            .add_subject(epg_a)
-            .add_clip(epg_b)
-            .difference(fill_rule)),
-        "xor" => Ok(Clipper::new()
-            .add_subject(epg_a)
-            .add_clip(epg_b)
-            .xor(fill_rule)),
+    let result = match operation.as_str() {
+        "or" => Ok(clipper_obj.union(fill_rule)),
+        "and" => Ok(clipper_obj.intersect(fill_rule)),
+        "sub" => Ok(clipper_obj.difference(fill_rule)),
+        "xor" => Ok(clipper_obj.xor(fill_rule)),
         _ => Err(PyValueError::new_err("Invalid operation")),
-    });
+    };
 
     match result {
-        Ok(Ok(Ok(mp))) => Ok(Polygon::from_external_polygon_group(
-            mp.simplify(scale_factor, false),
-            layer,
-            data_type,
-        )?),
-        Ok(Ok(Err(_))) => Err(PyValueError::new_err(
-            "Failed to run boolean operation".to_string(),
-        )),
-        Ok(Err(e)) => Err(e),
-        Err(e) => {
-            info!("Panic occurred during the operation: {:?}", e);
-            Err(PyValueError::new_err("Panic occurred during the operation"))
-        }
+        Ok(Ok(mp)) => Ok(Polygon::from_external_polygon_group(mp, layer, data_type)?),
+        Ok(Err(_)) => Err(PyValueError::new_err("Failed to run boolean operation")),
+        Err(e) => Err(e),
     }
 }

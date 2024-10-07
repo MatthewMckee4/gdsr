@@ -8,14 +8,10 @@ requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: PyPy",
-
 ]
-keywords = ["gdsr", "rust", "python", "pyo3", "GDSII", "CAD"]
+keywords = ["gdsr", "rust", "python", "pyo3", "GDSII", "CAD", "boolean"]
 dynamic = ["version"]
 license = {file = "LICENSE"}
-dependencies = [
-    "typing_extensions; python_version < '3.11'"
-]
 readme = "README.md"
 authors = [
     {name = "Matthew Mckee", email = "matthewmckee04@yahoo.co.uk"}

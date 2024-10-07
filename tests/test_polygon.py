@@ -858,21 +858,13 @@ def test_ellipse_after_rotation_looks_like_original(ellipse: Polygon):
 
 @given(polygon=polygon_strategy())
 @settings(max_examples=50)
-@pytest.mark.timeout(1)
 def test_polygon_boolean_self_intersection_returns_empty_list(polygon: Polygon):
-    try:
-        res = polygon - polygon
-        assert res == []
-    except Exception as _:
-        ...
+    res = polygon - polygon
+    assert res == []
 
 
 @given(polygon=polygon_strategy())
 @settings(max_examples=50)
-@pytest.mark.timeout(1)
 def test_polygon_boolean_self_symmetric_difference_returns_empty_list(polygon: Polygon):
-    try:
-        res = polygon ^ polygon
-        assert res == []
-    except Exception as _:
-        ...
+    res = polygon ^ polygon
+    assert res == []

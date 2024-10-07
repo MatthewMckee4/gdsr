@@ -43,6 +43,7 @@
         "gdsr",
         "getfixturevalue",
         "getitem",
+        "hypot",
         "ifloor",
         "matthewmckee",
         "Milli",
