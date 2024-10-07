@@ -6,12 +6,11 @@ use crate::{
     element::Element,
     point::Point,
     traits::{
-        Dimensions, FromGeo, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
-        Simplifiable, ToGeo,
+        Dimensions, FromExternalPolygonGroup, LayerDataTypeMatches, Movable, Reflect, Rotatable,
+        Scalable, Simplifiable, ToExternalPolygonGroup,
     },
     utils::geometry::{bounding_box, rotate_points_to_minimum},
 };
-use geo::{LineString, Polygon as GeoPolygon};
 use pyo3::prelude::*;
 
 mod general;
@@ -212,31 +211,22 @@ impl Simplifiable for Polygon {
     }
 }
 
-impl ToGeo for Polygon {
-    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
-        let exterior: LineString<f64> = self.points.iter().map(|p| (p.x, p.y)).collect();
-        Ok(ExternalPolygonGroup::new(vec![GeoPolygon::new(
-            exterior,
-            vec![],
-        )]))
+impl ToExternalPolygonGroup for Polygon {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
+        let points: Vec<(f64, f64)> = self.points.iter().map(|p| (p.x, p.y)).collect();
+        Ok(points.into())
     }
 }
 
-impl FromGeo for Polygon {
-    fn from_geo(geo: ExternalPolygonGroup, layer: i32, data_type: i32) -> PyResult<Vec<Self>> {
+impl FromExternalPolygonGroup for Polygon {
+    fn from_external_polygon_group(
+        external_polygon_group: ExternalPolygonGroup,
+        layer: i32,
+        data_type: i32,
+    ) -> PyResult<Vec<Self>> {
         let mut polygons = Vec::new();
-        for polygon in geo {
-            let mut points: Vec<Point> = polygon
-                .exterior()
-                .into_iter()
-                .map(|p| Point::new(p.x, p.y))
-                .chain(
-                    polygon
-                        .interiors()
-                        .iter()
-                        .flat_map(|ring| ring.points().map(|p| Point::new(p.x(), p.y()))),
-                )
-                .collect();
+        for polygon in external_polygon_group {
+            let mut points: Vec<Point> = polygon.iter().map(|p| Point::new(p.x(), p.y())).collect();
             for point in &mut points {
                 *point = point.round(9);
             }
@@ -246,7 +236,11 @@ impl FromGeo for Polygon {
             if let Some(first_point) = points.first().cloned() {
                 points.push(first_point);
             }
-            let mut polygon = Polygon::new(points, layer, data_type)?;
+            let mut polygon = Polygon {
+                points,
+                layer,
+                data_type,
+            };
             polygon.simplify();
             if polygon.points.len() > 3 {
                 polygons.push(polygon);

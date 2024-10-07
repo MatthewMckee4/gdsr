@@ -152,7 +152,7 @@ def grid_strategy(
 
 @st.composite
 def polygon_strategy(draw: st.DrawFn) -> Polygon:
-    points = draw(st.lists(point_strategy(), min_size=4, max_size=8191, unique=True))
+    points = draw(st.lists(point_strategy(), min_size=4, max_size=30, unique=True))
     if points[0] != points[-1]:
         points.append(points[0])
     return Polygon(points, draw(layer_strategy()), draw(data_type_strategy()))

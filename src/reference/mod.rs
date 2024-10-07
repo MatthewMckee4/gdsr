@@ -9,7 +9,10 @@ use crate::{
     element::Element,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
+    traits::{
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup,
+    },
 };
 
 mod general;
@@ -192,12 +195,12 @@ impl LayerDataTypeMatches for Reference {
     }
 }
 
-impl ToGeo for Reference {
-    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
+impl ToExternalPolygonGroup for Reference {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
         Python::with_gil(|py| {
             let mut geometries = Vec::new();
             for element in self.clone().flatten([].to_vec(), None, py) {
-                for geometry in element.to_geo()? {
+                for geometry in element.to_external_polygon_group()? {
                     geometries.push(geometry);
                 }
             }

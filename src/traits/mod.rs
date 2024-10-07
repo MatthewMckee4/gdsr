@@ -36,12 +36,16 @@ pub trait Simplifiable {
     fn simplify(&mut self) -> &mut Self;
 }
 
-pub trait ToGeo {
-    fn to_geo(&self) -> PyResult<ExternalPolygonGroup>;
+pub trait ToExternalPolygonGroup {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup>;
 }
 
-pub trait FromGeo {
-    fn from_geo(geo: ExternalPolygonGroup, layer: i32, data_type: i32) -> PyResult<Vec<Self>>
+pub trait FromExternalPolygonGroup {
+    fn from_external_polygon_group(
+        external_polygon_group: ExternalPolygonGroup,
+        layer: i32,
+        data_type: i32,
+    ) -> PyResult<Vec<Self>>
     where
         Self: std::marker::Sized;
 }

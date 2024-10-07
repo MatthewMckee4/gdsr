@@ -109,10 +109,8 @@ fn is_point_on_line_segment(point: &Point, a: &Point, b: &Point) -> bool {
         return false;
     }
 
-    // Check if the point is collinear with the line segment using the cross product
     let cross_product = (point.y - a.y) * (b.x - a.x) - (point.x - a.x) * (b.y - a.y);
 
-    // Check if the cross product is close to zero (collinearity)
     if cross_product.abs() > f64::EPSILON {
         return false;
     }

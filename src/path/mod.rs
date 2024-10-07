@@ -1,4 +1,3 @@
-use geo::LineString;
 use path_type::PathType;
 use pyo3::prelude::*;
 
@@ -9,7 +8,10 @@ use crate::{
     },
     element::Element,
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGeo},
+    traits::{
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup,
+    },
 };
 
 mod general;
@@ -289,10 +291,10 @@ impl LayerDataTypeMatches for Path {
     }
 }
 
-impl ToGeo for Path {
-    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
+impl ToExternalPolygonGroup for Path {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
         let half_width = self.width.unwrap_or(0.0) / 2.0;
-        let mut exterior: Vec<(f64, f64)> = Vec::new();
+        let mut points: Vec<(f64, f64)> = Vec::new();
 
         for window in self.points.windows(2) {
             let (start, end) = (window[0], window[1]);
@@ -301,8 +303,8 @@ impl ToGeo for Path {
             let perp_x = -sin;
             let perp_y = cos;
 
-            exterior.push((start.x + half_width * perp_x, start.y + half_width * perp_y));
-            exterior.push((end.x + half_width * perp_x, end.y + half_width * perp_y));
+            points.push((start.x + half_width * perp_x, start.y + half_width * perp_y));
+            points.push((end.x + half_width * perp_x, end.y + half_width * perp_y));
         }
 
         for window in self.points.windows(2).rev() {
@@ -312,15 +314,14 @@ impl ToGeo for Path {
             let perp_x = -sin;
             let perp_y = cos;
 
-            exterior.push((end.x - half_width * perp_x, end.y - half_width * perp_y));
-            exterior.push((start.x - half_width * perp_x, start.y - half_width * perp_y));
+            points.push((end.x - half_width * perp_x, end.y - half_width * perp_y));
+            points.push((start.x - half_width * perp_x, start.y - half_width * perp_y));
         }
 
         if let Some(first) = self.points.first() {
-            exterior.push((first.x + half_width, first.y));
+            points.push((first.x + half_width, first.y));
         }
 
-        let polygon = geo::Polygon::new(LineString::from(exterior), vec![]);
-        Ok(ExternalPolygonGroup::new(vec![polygon]))
+        Ok(points.into())
     }
 }

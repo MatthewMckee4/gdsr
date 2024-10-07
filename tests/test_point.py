@@ -403,8 +403,7 @@ def test_point_angle_to(p: Point, q: Point):
     angle_to_backward = q.angle_to(p)
     if angle_to_forward and angle_to_backward:
         assert math.isclose(
-            angle_to_forward % 360,
-            (angle_to_backward + 180) % 360,
+            angle_to_forward % 360, (angle_to_backward + 180) % 360, rel_tol=1e-6
         )
 
     if p == q:

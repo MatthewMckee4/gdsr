@@ -3,12 +3,12 @@ repos:
     rev: v0.4.10
     hooks:
       - id: ruff
-        stages: [commit]
+        stages: [pre-commit]
       - id: ruff-format
-        stages: [commit]
+        stages: [pre-commit]
 
   - repo: https://github.com/pycqa/isort
     rev: 5.11.5
     hooks:
       - id: isort
-        stages: [commit]
+        stages: [pre-commit]

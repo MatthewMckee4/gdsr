@@ -10,7 +10,8 @@ use crate::{
     reference::Reference,
     text::Text,
     traits::{
-        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGds, ToGeo,
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup, ToGds,
     },
 };
 
@@ -235,12 +236,12 @@ impl std::fmt::Debug for Element {
     }
 }
 
-impl ToGeo for Element {
-    fn to_geo(&self) -> PyResult<ExternalPolygonGroup> {
+impl ToExternalPolygonGroup for Element {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
         Python::with_gil(|py| match self {
-            Element::Path(element) => element.borrow(py).to_geo(),
-            Element::Polygon(element) => element.borrow(py).to_geo(),
-            Element::Reference(element) => element.borrow(py).to_geo(),
+            Element::Path(element) => element.borrow(py).to_external_polygon_group(),
+            Element::Polygon(element) => element.borrow(py).to_external_polygon_group(),
+            Element::Reference(element) => element.borrow(py).to_external_polygon_group(),
             Element::Text(_) => Ok(ExternalPolygonGroup::new(vec![])),
         })
     }

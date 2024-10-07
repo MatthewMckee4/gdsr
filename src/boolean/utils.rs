@@ -1,4 +1,4 @@
-use crate::{element::Element, traits::ToGeo};
+use crate::{element::Element, traits::ToExternalPolygonGroup};
 
 use pyo3::prelude::*;
 
@@ -9,7 +9,7 @@ pub fn get_external_polygon_group(elements: &[Element]) -> PyResult<ExternalPoly
         elements
             .iter()
             .filter_map(|e| {
-                if let Ok(multi_polygon) = e.to_geo() {
+                if let Ok(multi_polygon) = e.to_external_polygon_group() {
                     Some(multi_polygon)
                 } else {
                     None
