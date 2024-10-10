@@ -188,12 +188,12 @@ def test_text_horizontal_presentation_setter_method(
 
 
 def test_text_str_with_different_states():
-    text = Text("Hello, World!", angle=30.0, magnification=1.2)
+    text = Text("Hello, World!", angle=30, magnification=1.2)
     assert (
         str(text)
         == "Text 'Hello, World!' vertical: Middle, horizontal: Centre at (0, 0)"
     )
-    text.angle = 45.0
+    text.angle = 45
     assert (
         str(text)
         == "Text 'Hello, World!' vertical: Middle, horizontal: Centre at (0, 0)"
@@ -205,7 +205,7 @@ def test_text_str_with_different_states():
 
 def test_text_repr_with_different_states():
     text = Text("Hello, World!", magnification=2)
-    assert repr(text) == "Text(Hello, World!, (0, 0), 0, 2.0, 0, false, Middle, Centre)"
+    assert repr(text) == "Text(Hello, World!, (0, 0), 0, 2, 0, false, Middle, Centre)"
 
 
 # Text eq
@@ -241,11 +241,11 @@ def test_text_copy():
 
 
 def test_text_copy_with_different_states():
-    text = Text("Hello, World!", magnification=1.0)
+    text = Text("Hello, World!", magnification=1)
     text_copy = text.copy()
-    text.magnification = 2.0
-    assert text_copy.magnification == 1.0
-    assert text.magnification == 2.0
+    text.magnification = 2
+    assert text_copy.magnification == 1
+    assert text.magnification == 2
 
 
 def test_text_copy_immutability():

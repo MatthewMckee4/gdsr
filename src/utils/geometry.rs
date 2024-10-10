@@ -109,10 +109,8 @@ fn is_point_on_line_segment(point: &Point, a: &Point, b: &Point) -> bool {
         return false;
     }
 
-    // Check if the point is collinear with the line segment using the cross product
     let cross_product = (point.y - a.y) * (b.x - a.x) - (point.x - a.x) * (b.y - a.y);
 
-    // Check if the cross product is close to zero (collinearity)
     if cross_product.abs() > f64::EPSILON {
         return false;
     }
@@ -123,4 +121,14 @@ fn is_point_on_line_segment(point: &Point, a: &Point, b: &Point) -> bool {
 pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
     let factor = 10f64.powi(ndigits as i32);
     (value * factor).round() / factor
+}
+
+pub fn rotate_points_to_minimum(points: &mut [Point]) {
+    if let Some((min_index, _)) = points
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+    {
+        points.rotate_left(min_index);
+    }
 }

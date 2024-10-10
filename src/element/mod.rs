@@ -3,12 +3,16 @@ use std::fs::File;
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::{
+    boolean::ExternalPolygonGroup,
     path::Path,
     point::Point,
     polygon::Polygon,
     reference::Reference,
     text::Text,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable, ToGds},
+    traits::{
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup, ToGds,
+    },
 };
 
 #[derive(Clone)]
@@ -228,6 +232,17 @@ impl std::fmt::Debug for Element {
             Element::Polygon(element) => write!(f, "{:?}", element.borrow(py).clone()),
             Element::Reference(element) => write!(f, "{:?}", element.borrow(py).clone()),
             Element::Text(element) => write!(f, "{:?}", element.borrow(py).clone()),
+        })
+    }
+}
+
+impl ToExternalPolygonGroup for Element {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
+        Python::with_gil(|py| match self {
+            Element::Path(element) => element.borrow(py).to_external_polygon_group(),
+            Element::Polygon(element) => element.borrow(py).to_external_polygon_group(),
+            Element::Reference(element) => element.borrow(py).to_external_polygon_group(),
+            Element::Text(_) => Ok(ExternalPolygonGroup::new(vec![])),
         })
     }
 }

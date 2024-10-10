@@ -4,7 +4,10 @@ use pyo3::{
     types::{PyAny, PySequence, PyTuple},
 };
 
-use crate::{cell::Cell, point::Point, utils::io::create_temp_file};
+use crate::{
+    boolean::BooleanOperationInput, cell::Cell, element::Element, point::Point,
+    utils::io::create_temp_file,
+};
 
 use super::general::check_points_vec_not_empty;
 
@@ -21,6 +24,17 @@ pub fn py_any_to_point(point: &Bound<'_, PyAny>) -> PyResult<Point> {
             "Invalid point format: item is not indexable",
         ))
     }
+}
+
+#[allow(dead_code)]
+pub fn py_tuple_to_points_vec(points: &Bound<'_, PyTuple>) -> PyResult<Vec<Point>> {
+    let mut points_list = Vec::new();
+    for item in points.iter() {
+        let point = py_any_to_point(&item)?;
+        points_list.push(point);
+    }
+    check_points_vec_not_empty(&points_list)?;
+    Ok(points_list)
 }
 
 #[allow(unused)]
@@ -78,4 +92,22 @@ pub fn py_any_path_to_string(file_name: &Bound<'_, PyAny>) -> PyResult<String> {
             .map_err(|_| PyTypeError::new_err("Failed to convert to string")),
         Err(_) => Err(PyTypeError::new_err("Invalid path format")),
     }
+}
+
+pub fn py_any_to_boolean_operation_input(
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<BooleanOperationInput> {
+    let mut elements = Vec::new();
+    if let Ok(py_elements) = obj.downcast::<PySequence>() {
+        for item in py_elements.iter()? {
+            let element = item?.extract::<Element>()?;
+            elements.push(element);
+        }
+    }
+    if elements.is_empty() {
+        let element = obj.extract::<Element>()?;
+        elements.push(element);
+    }
+
+    Ok(elements)
 }

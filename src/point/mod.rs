@@ -60,6 +60,17 @@ impl Mul<f64> for Point {
     }
 }
 
+impl Mul<Point> for f64 {
+    type Output = Point;
+
+    fn mul(self, point: Point) -> Self::Output {
+        Point {
+            x: self * point.x,
+            y: self * point.y,
+        }
+    }
+}
+
 impl Add for Point {
     type Output = Self;
 

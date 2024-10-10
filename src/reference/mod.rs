@@ -1,10 +1,18 @@
 use pyo3::prelude::*;
 
 use crate::{
+    boolean::{
+        boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
+        ExternalPolygonGroup,
+    },
     cell::Cell,
+    element::Element,
     grid::Grid,
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
+    traits::{
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup,
+    },
 };
 
 mod general;
@@ -20,6 +28,23 @@ pub struct Reference {
     pub instance: Instance,
     #[pyo3(get, set)]
     pub grid: Py<Grid>,
+}
+
+impl Reference {
+    pub fn boolean(
+        &self,
+        other: BooleanOperationInput,
+        operation: BooleanOperationOperation,
+        py: Python,
+    ) -> BooleanOperationResult {
+        boolean(
+            vec![Element::Reference(Py::new(py, self.clone())?)],
+            other,
+            operation,
+            0,
+            0,
+        )
+    }
 }
 
 impl std::fmt::Display for Reference {
@@ -167,5 +192,20 @@ impl LayerDataTypeMatches for Reference {
             Instance::Cell(cell) => Python::with_gil(|py| cell.borrow(py).is_on(layer_data_types)),
             Instance::Element(element) => element.is_on(layer_data_types),
         }
+    }
+}
+
+impl ToExternalPolygonGroup for Reference {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
+        Python::with_gil(|py| {
+            let mut geometries = Vec::new();
+            for element in self.clone().flatten([].to_vec(), None, py) {
+                for geometry in element.to_external_polygon_group()? {
+                    geometries.push(geometry);
+                }
+            }
+
+            Ok(ExternalPolygonGroup::new(geometries))
+        })
     }
 }

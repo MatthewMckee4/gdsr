@@ -2,14 +2,18 @@ use std::{f64::consts::PI, ops::DerefMut};
 
 use plotly::{common::Mode, layout::Margin, plot::Plot, Layout, Scatter};
 
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyNotImplementedError, prelude::*, types::PyTuple};
 
 use crate::{
-    point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable},
+    boolean::BooleanOperationResult,
+    point::{points_are_close, Point},
+    traits::{Dimensions, LayerDataTypeMatches, Movable, Rotatable, Scalable, Simplifiable},
     utils::{
         geometry::{area, is_point_inside, is_point_on_edge, perimeter},
-        transformations::{py_any_to_point, py_any_to_points_vec},
+        transformations::{
+            py_any_to_boolean_operation_input, py_any_to_point, py_any_to_points_vec,
+            py_tuple_to_points_vec,
+        },
     },
     validation::input::{check_data_type_valid, check_layer_valid},
 };
@@ -55,9 +59,9 @@ impl Polygon {
         Ok(())
     }
 
-    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyRefMut<'_, Self> {
-        slf.setter_layer(layer).unwrap();
-        slf
+    fn set_layer(mut slf: PyRefMut<'_, Self>, layer: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_layer(layer)?;
+        Ok(slf)
     }
 
     #[setter(data_type)]
@@ -67,9 +71,9 @@ impl Polygon {
         Ok(())
     }
 
-    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyRefMut<'_, Self> {
-        slf.setter_data_type(data_type).unwrap();
-        slf
+    fn set_data_type(mut slf: PyRefMut<'_, Self>, data_type: i32) -> PyResult<PyRefMut<'_, Self>> {
+        slf.setter_data_type(data_type)?;
+        Ok(slf)
     }
 
     #[getter]
@@ -92,19 +96,15 @@ impl Polygon {
     }
 
     #[pyo3(signature = (*points))]
-    fn contains_all(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().all(|p| is_point_inside(p, &self.points))
+    fn contains_all(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().all(|p| is_point_inside(p, &self.points)))
     }
 
     #[pyo3(signature = (*points))]
-    fn contains_any(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().any(|p| is_point_inside(p, &self.points))
+    fn contains_any(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().any(|p| is_point_inside(p, &self.points)))
     }
 
     fn on_edge(&self, #[pyo3(from_py_with = "py_any_to_point")] point: Point) -> bool {
@@ -112,19 +112,15 @@ impl Polygon {
     }
 
     #[pyo3(signature = (*points))]
-    fn on_edge_all(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().all(|p| is_point_on_edge(p, &self.points))
+    fn on_edge_all(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().all(|p| is_point_on_edge(p, &self.points)))
     }
 
     #[pyo3(signature = (*points))]
-    fn on_edge_any(
-        &self,
-        #[pyo3(from_py_with = "py_any_to_points_vec")] points: Vec<Point>,
-    ) -> bool {
-        points.iter().any(|p| is_point_on_edge(p, &self.points))
+    fn on_edge_any(&self, points: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let points = py_tuple_to_points_vec(points)?;
+        Ok(points.iter().any(|p| is_point_on_edge(p, &self.points)))
     }
 
     fn intersects(&self, other: Polygon) -> bool {
@@ -154,6 +150,7 @@ impl Polygon {
 
         Ok(())
     }
+
     pub fn copy(&self) -> Self {
         self.clone()
     }
@@ -252,8 +249,7 @@ impl Polygon {
             let y = centre.y + vertical_radius * angle.sin();
             points.push(Point { x, y });
         }
-
-        if final_angle == 360.0 {
+        if final_angle == 2.0 * PI {
             points.push(points[0]);
         } else {
             points.push(centre)
@@ -263,6 +259,94 @@ impl Polygon {
             points,
             layer,
             data_type,
+        }
+    }
+
+    pub fn simplify(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
+        Simplifiable::simplify(slf.deref_mut());
+        slf
+    }
+
+    fn looks_like(&self, other: &Polygon) -> bool {
+        let mut binding = self.clone();
+        let self_simplified = binding.simplify();
+        let mut binding = other.clone();
+        let other_simplified = binding.simplify();
+
+        let self_simplified_points = &self_simplified.points[..self_simplified.points.len() - 1];
+        let other_simplified_points = &other_simplified.points[..other_simplified.points.len() - 1];
+
+        if points_are_close(self_simplified_points, other_simplified_points)
+            || points_are_close(
+                self_simplified_points,
+                &other_simplified_points
+                    .iter()
+                    .rev()
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+        {
+            return true;
+        }
+
+        for i in 0..self_simplified_points.len() {
+            let rotated_self_points = self_simplified_points
+                .iter()
+                .cycle()
+                .skip(i)
+                .take(self_simplified_points.len())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if points_are_close(&rotated_self_points, other_simplified_points)
+                || points_are_close(
+                    &rotated_self_points,
+                    &other_simplified_points
+                        .iter()
+                        .rev()
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                )
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn __add__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __or__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("or"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __and__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("and"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __sub__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("sub"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
+        }
+    }
+
+    fn __xor__(&self, obj: &Bound<'_, PyAny>, py: Python) -> PyResult<BooleanOperationResult> {
+        match py_any_to_boolean_operation_input(obj) {
+            Ok(other) => Ok(self.boolean(other, String::from("xor"), py)),
+            Err(_) => Err(PyNotImplementedError::new_err("NotImplemented")),
         }
     }
 

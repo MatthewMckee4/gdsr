@@ -1,4 +1,4 @@
 # Library
 
-::: gdsr._gdsr.Library
+::: gdsr.Library
     

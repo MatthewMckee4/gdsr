@@ -1,13 +1,13 @@
 import pytest
 from hypothesis import given
 
-from gdsr import InputPointsLike, Path, PathType, Point
+from gdsr import InputPointsLike, Path, PathType, Point, Polygon
 from tests.conftest import path_strategy
 
 
 @pytest.fixture
 def sample_points() -> InputPointsLike:
-    return [(0.0, 0.0), [1.0, 1.0], {0: 2.0, 1: 2.0}, Point(0, 0)]
+    return [(0, 0), [1, 1], {0: 2, 1: 2}, Point(0, 0)]
 
 
 # Path init
@@ -15,14 +15,14 @@ def sample_points() -> InputPointsLike:
 
 def test_path_init(sample_points: InputPointsLike):
     path = Path(sample_points)
-    assert path.points == [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (0, 0)]
+    assert path.points == [(0, 0), (1, 1), (2, 2), (0, 0)]
     assert path.layer == 0
     assert path.data_type == 0
 
 
 def test_path_init_with_layer_and_data_type(sample_points: InputPointsLike):
     path = Path(sample_points, layer=5, data_type=10)
-    assert path.points == [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (0, 0)]
+    assert path.points == [(0, 0), (1, 1), (2, 2), (0, 0)]
     assert path.layer == 5
     assert path.data_type == 10
 
@@ -38,7 +38,7 @@ def test_path_non_integer_data_type():
 
 
 def test_path_invalid_point_type():
-    invalid_points = ["invalid", (1.0, 1.0), (2.0, 2.0)]
+    invalid_points = ["invalid", (1, 1), (2, 2)]
 
     with pytest.raises(TypeError, match="Invalid point format"):
         Path(invalid_points)  # type: ignore
@@ -137,14 +137,14 @@ def test_path_path_type_setter_method(path: Path):
 
 def test_length_basic():
     path = Path([(0, 0), (1, 0), (1, 1)])
-    assert path.length == 2.0
+    assert path.length == 2
 
 
 def test_length_complex_path():
     path = Path(
         [(0, 0), (1, 0), (1, 1), (2, 1), (2, 2), (3, 2), (3, 3), (4, 3)],
     )
-    assert path.length == 7.0
+    assert path.length == 7
 
 
 # Path bounding_box
@@ -362,3 +362,36 @@ def test_path_not_eq_to_different_points():
     path1 = Path([(0, 0), (1, 1)])
     path2 = Path([(0, 0), (1, 2)])
     assert path1 != path2
+
+
+# to_polygon
+
+
+def test_to_polygon():
+    path = Path([(0, 0), (1, 1), (2, 2)])
+    polygon = path.to_polygon()
+    assert polygon.points == [(0, 0)]
+
+
+def test_to_polygon_with_width_horizontal():
+    path = Path([(0, 0), (2, 0)], width=1)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(0, 0.5), (2, 0.5), (2, -0.5), (0, -0.5), (0, 0.5)])
+    )
+
+
+def test_to_polygon_with_width_vertical():
+    path = Path([(0, 0), (0, 2)], width=1)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(0.5, 0), (-0.5, 0), (-0.5, 2), (0.5, 2), (0.5, 0)])
+    )
+
+
+def test_to_polygon_with_width_horizontal_square_ends():
+    path = Path([(0, 0), (2, 0)], width=1, path_type=PathType.Overlap)
+    polygon = path.to_polygon()
+    assert polygon.looks_like(
+        Polygon([(-0.5, 0.5), (2.5, 0.5), (2.5, -0.5), (-0.5, -0.5), (-0.5, 0.5)])
+    )

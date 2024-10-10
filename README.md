@@ -18,7 +18,7 @@ uv pip install gdsr
 To use from source code:
 
 ```bash
-uv pip install requirements-dev.txt
+uv pip install -r requirements-dev.txt
 
 maturin develop
 # or

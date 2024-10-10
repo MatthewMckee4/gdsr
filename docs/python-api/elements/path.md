@@ -1,7 +1,7 @@
 # Path
 
 ## Path
-::: gdsr._gdsr.Path
+::: gdsr.Path
 
 ## PathType
-::: gdsr._gdsr.PathType
+::: gdsr.PathType

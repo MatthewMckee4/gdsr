@@ -2,8 +2,16 @@ use path_type::PathType;
 use pyo3::prelude::*;
 
 use crate::{
+    boolean::{
+        boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
+        ExternalPolygonGroup,
+    },
+    element::Element,
     point::Point,
-    traits::{Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable},
+    traits::{
+        Dimensions, LayerDataTypeMatches, Movable, Reflect, Rotatable, Scalable,
+        ToExternalPolygonGroup,
+    },
 };
 
 mod general;
@@ -23,6 +31,23 @@ pub struct Path {
     pub path_type: Option<PathType>,
     #[pyo3(get)]
     pub width: Option<f64>,
+}
+
+impl Path {
+    pub fn boolean(
+        &self,
+        other: BooleanOperationInput,
+        operation: BooleanOperationOperation,
+        py: Python,
+    ) -> BooleanOperationResult {
+        boolean(
+            vec![Element::Path(Py::new(py, self.clone())?)],
+            other,
+            operation,
+            self.layer,
+            self.data_type,
+        )
+    }
 }
 
 impl PartialEq for Path {
@@ -263,5 +288,18 @@ impl Reflect for Path {
 impl LayerDataTypeMatches for Path {
     fn is_on(&self, layer_data_types: Vec<(i32, i32)>) -> bool {
         layer_data_types.contains(&(self.layer, self.data_type)) || layer_data_types.is_empty()
+    }
+}
+
+impl ToExternalPolygonGroup for Path {
+    fn to_external_polygon_group(&self) -> PyResult<ExternalPolygonGroup> {
+        let converted_polygon = self.to_polygon(Some(self.layer), Some(self.data_type))?;
+
+        Ok(converted_polygon
+            .points
+            .into_iter()
+            .map(|p| p.as_tuple())
+            .collect::<Vec<(f64, f64)>>()
+            .into())
     }
 }

@@ -121,6 +121,25 @@ impl Point {
         Point { x, y }
     }
 
+    pub fn ortho(&self) -> Self {
+        Self {
+            x: -self.y,
+            y: self.x,
+        }
+    }
+
+    pub fn normalize(&self) -> Self {
+        let norm = self.x.hypot(self.y);
+        Self {
+            x: self.x / norm,
+            y: self.y / norm,
+        }
+    }
+
+    pub fn as_tuple(&self) -> (f64, f64) {
+        (self.x, self.y)
+    }
+
     pub fn __getitem__(&self, index: usize) -> PyResult<f64> {
         match index {
             0 => Ok(self.x),

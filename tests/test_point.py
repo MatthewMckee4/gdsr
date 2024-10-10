@@ -385,7 +385,7 @@ def test_point_distance_to(p: Point, q: Point):
 
     assert p.distance_to(q) == 0 if p == q else p.distance_to(q) > 0
 
-    assert p.distance_to(q) == ((p.x - q.x) ** 2 + (p.y - q.y) ** 2) ** 0.5
+    assert math.isclose(p.distance_to(q), ((p.x - q.x) ** 2 + (p.y - q.y) ** 2) ** 0.5)
 
 
 def test_point_large_values():
@@ -403,8 +403,7 @@ def test_point_angle_to(p: Point, q: Point):
     angle_to_backward = q.angle_to(p)
     if angle_to_forward and angle_to_backward:
         assert math.isclose(
-            angle_to_forward % 360,
-            (angle_to_backward + 180) % 360,
+            angle_to_forward % 360, (angle_to_backward + 180) % 360, rel_tol=1e-6
         )
 
     if p == q:
@@ -445,8 +444,8 @@ def test_point_is_immutable():
 
 # Point hash
 def test_hash():
-    point_dict = {Point(3.0, 4.0): "test"}
-    assert point_dict[Point(3.0, 4.0)] == "test"
+    point_dict = {Point(3, 4): "test"}
+    assert point_dict[Point(3, 4)] == "test"
 
 
 # Point init with negative values

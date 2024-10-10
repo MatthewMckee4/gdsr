@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 
 mod utils;
 
+mod boolean;
 mod cell;
 mod config;
 mod element;
@@ -44,6 +45,8 @@ fn gdsr(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let _ = m.add_function(wrap_pyfunction!(set_epsilon, m)?);
     let _ = m.add_function(wrap_pyfunction!(get_epsilon, m)?);
+
+    m.add_function(wrap_pyfunction!(boolean::boolean, m)?)?;
 
     Ok(())
 }

@@ -2,7 +2,9 @@ use pyo3::{exceptions::PyValueError, prelude::*};
 use std::fs::File;
 
 use crate::{
-    config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
+    config::gds_file_types::{
+        combine_record_and_data_type, GDSDataType, GDSRecord, MAX_POLYGON_POINTS,
+    },
     traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
@@ -11,10 +13,11 @@ use super::Polygon;
 
 impl ToGds for Polygon {
     fn _to_gds(&self, mut file: File, scale: f64) -> PyResult<File> {
-        if self.points.len() > 8191 {
-            Err(PyValueError::new_err(
-                "A polygon can only have a maximum of 8191 points",
-            ))?;
+        if self.points.len() > MAX_POLYGON_POINTS {
+            Err(PyValueError::new_err(format!(
+                "A polygon can only have a maximum of {} points",
+                MAX_POLYGON_POINTS
+            )))?;
         }
 
         let mut polygon_head = [
