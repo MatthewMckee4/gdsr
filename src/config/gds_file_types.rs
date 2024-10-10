@@ -192,3 +192,5 @@ impl std::fmt::Display for GDSRecordData {
 pub fn combine_record_and_data_type(record: GDSRecord, data_type: GDSDataType) -> u16 {
     ((record as u16) << 8) | (data_type as u16)
 }
+
+pub const MAX_POLYGON_POINTS: usize = 8000;

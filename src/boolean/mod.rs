@@ -1,5 +1,4 @@
 use clipper2::*;
-use log::info;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -36,10 +35,7 @@ pub fn boolean(
     let epg_a = get_external_polygon_group(&a)?;
     let epg_b = get_external_polygon_group(&b)?;
 
-    info!("epg_a: {:?}", epg_a);
-    info!("epg_b: {:?}", epg_b);
-
-    let fill_rule = FillRule::EvenOdd;
+    let fill_rule = FillRule::NonZero;
 
     let clipper_obj = Clipper::new().add_subject(epg_a).add_clip(epg_b);
 

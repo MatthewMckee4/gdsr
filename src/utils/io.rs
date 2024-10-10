@@ -9,8 +9,8 @@ use pyo3::{exceptions::PyIOError, prelude::*};
 use tempfile::Builder;
 
 use crate::cell::Cell;
-use crate::config::gds_file_types::GDSRecordData;
 use crate::config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord};
+use crate::config::gds_file_types::{GDSRecordData, MAX_POLYGON_POINTS};
 use crate::library::Library;
 use crate::path::path_type::PathType;
 use crate::path::Path;
@@ -93,8 +93,7 @@ pub fn write_float_to_eight_byte_real_to_file(mut file: File, value: f64) -> PyR
 }
 
 pub fn write_points_to_file(mut file: File, points: &[Point], scale: f64) -> PyResult<File> {
-    const MAX_POINTS: usize = 8191;
-    let points_to_write = points.get(..MAX_POINTS).unwrap_or(points);
+    let points_to_write = points.get(..MAX_POLYGON_POINTS).unwrap_or(points);
 
     let points_length = points_to_write.len();
     let record_length = 4 + 8 * points_length;

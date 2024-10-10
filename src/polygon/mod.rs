@@ -3,6 +3,7 @@ use crate::{
         boolean, BooleanOperationInput, BooleanOperationOperation, BooleanOperationResult,
         ExternalPolygonGroup,
     },
+    config::gds_file_types::MAX_POLYGON_POINTS,
     element::Element,
     point::Point,
     traits::{
@@ -224,27 +225,44 @@ impl FromExternalPolygonGroup for Polygon {
         layer: i32,
         data_type: i32,
     ) -> PyResult<Vec<Self>> {
-        let mut polygons = Vec::new();
+        let mut points: Vec<Vec<Point>> = Vec::new();
         for polygon in external_polygon_group {
-            let mut points: Vec<Point> = polygon.iter().map(|p| Point::new(p.x(), p.y())).collect();
-            for point in &mut points {
+            let mut current_polygon_points: Vec<Point> =
+                polygon.iter().map(|p| Point::new(p.x(), p.y())).collect();
+            for point in &mut current_polygon_points {
                 *point = point.round(9);
             }
 
-            rotate_points_to_minimum(&mut points);
+            rotate_points_to_minimum(&mut current_polygon_points);
 
-            if let Some(first_point) = points.first().cloned() {
-                points.push(first_point);
+            points.push(current_polygon_points);
+        }
+        let mut polygons = Vec::new();
+        let mut current_points = Vec::new();
+
+        for polygon_points in points {
+            if current_points.len() + polygon_points.len() <= MAX_POLYGON_POINTS {
+                current_points.extend(polygon_points);
+            } else {
+                let mut polygon = Polygon {
+                    points: current_points,
+                    layer,
+                    data_type,
+                };
+                polygon.simplify();
+                polygons.push(polygon);
+                current_points = polygon_points;
             }
+        }
+
+        if !current_points.is_empty() {
             let mut polygon = Polygon {
-                points,
+                points: current_points,
                 layer,
                 data_type,
             };
             polygon.simplify();
-            if polygon.points.len() > 3 {
-                polygons.push(polygon);
-            }
+            polygons.push(polygon);
         }
         Ok(polygons)
     }
