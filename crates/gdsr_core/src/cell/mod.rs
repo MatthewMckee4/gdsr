@@ -1,72 +1,50 @@
 use crate::{
-    Point,
-    path::Path,
-    polygon::Polygon,
-    text::Text,
-    traits::{Dimensions, Transformable},
+    CoordNum, DatabaseIntegerUnit,
+    elements::{Path, Polygon, Reference, Text},
+    traits::Transformable,
     transformation::Transformation,
 };
 
-#[derive(Clone, Default)]
-pub struct Cell {
+mod io;
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Cell<DatabaseUnitT: CoordNum> {
     pub name: String,
-    pub polygons: Vec<Polygon>,
-    pub paths: Vec<Path>,
-    pub texts: Vec<Text>,
+    pub polygons: Vec<Polygon<DatabaseUnitT>>,
+    pub paths: Vec<Path<DatabaseUnitT>>,
+    pub texts: Vec<Text<DatabaseUnitT>>,
+    pub references: Vec<Reference<DatabaseUnitT>>,
 }
 
-impl Cell {
+impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     pub fn new(name: String) -> Self {
         Self {
             name,
             polygons: Vec::new(),
             paths: Vec::new(),
             texts: Vec::new(),
+            references: Vec::new(),
         }
     }
 
-    pub fn add_polygon(&mut self, polygon: Polygon) {
+    pub fn add_polygon(&mut self, polygon: Polygon<DatabaseUnitT>) {
         self.polygons.push(polygon);
     }
 
-    pub fn add_path(&mut self, path: Path) {
+    pub fn add_path(&mut self, path: Path<DatabaseUnitT>) {
         self.paths.push(path);
     }
 
-    pub fn add_text(&mut self, text: Text) {
+    pub fn add_text(&mut self, text: Text<DatabaseUnitT>) {
         self.texts.push(text);
     }
-}
 
-impl std::fmt::Display for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Cell: {} with {} polygons, {} paths, and {} texts",
-            self.name,
-            self.polygons.len(),
-            self.paths.len(),
-            self.texts.len()
-        )
+    pub fn add_reference(&mut self, reference: Reference<DatabaseUnitT>) {
+        self.references.push(reference);
     }
 }
 
-impl std::fmt::Debug for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Cell({})", self.name)
-    }
-}
-
-impl PartialEq for Cell {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.polygons == other.polygons
-            && self.paths == other.paths
-            && self.texts == other.texts
-    }
-}
-
-impl Transformable for Cell {
+impl Transformable for Cell<DatabaseIntegerUnit> {
     fn transform(&mut self, transformation: &Transformation) -> &mut Self {
         for polygon in &mut self.polygons {
             polygon.transform(transformation);
@@ -76,45 +54,60 @@ impl Transformable for Cell {
             path.transform(transformation);
         }
 
-        for text in &mut self.texts {
-            text.transform(transformation);
+        // for text in &mut self.texts {
+        //     text.transform(transformation);
+        // }
+
+        for reference in &mut self.references {
+            reference.transform(transformation);
         }
 
         self
     }
 }
 
-impl Dimensions for Cell {
-    fn bounding_box(&self) -> (Point, Point) {
-        let mut min_x = f64::INFINITY;
-        let mut min_y = f64::INFINITY;
-        let mut max_x = f64::NEG_INFINITY;
-        let mut max_y = f64::NEG_INFINITY;
+// impl<T: CoordNum> Dimensions<T> for Cell<T> {
+//     fn bounding_box(&self) -> (Point<T>, Point<T>) {
+//         let mut min_x = f64::INFINITY;
+//         let mut min_y = f64::INFINITY;
+//         let mut max_x = f64::NEG_INFINITY;
+//         let mut max_y = f64::NEG_INFINITY;
 
-        for polygon in &self.polygons {
-            let (polygon_min, polygon_max) = polygon.bounding_box();
-            min_x = min_x.min(polygon_min.x());
-            min_y = min_y.min(polygon_min.y());
-            max_x = max_x.max(polygon_max.x());
-            max_y = max_y.max(polygon_max.y());
-        }
+//         for polygon in &self.polygons {
+//             let (polygon_min, polygon_max) = polygon.bounding_box();
+//             min_x = min_x.min(polygon_min.x().into());
+//             min_y = min_y.min(polygon_min.y().into());
+//             max_x = max_x.max(polygon_max.x().into());
+//             max_y = max_y.max(polygon_max.y().into());
+//         }
 
-        for path in &self.paths {
-            let (path_min, path_max) = path.bounding_box();
-            min_x = min_x.min(path_min.x());
-            min_y = min_y.min(path_min.y());
-            max_x = max_x.max(path_max.x());
-            max_y = max_y.max(path_max.y());
-        }
+//         for path in &self.paths {
+//             let (path_min, path_max) = path.bounding_box();
+//             min_x = min_x.min(path_min.x().into());
+//             min_y = min_y.min(path_min.y().into());
+//             max_x = max_x.max(path_max.x().into());
+//             max_y = max_y.max(path_max.y().into());
+//         }
 
-        for text in &self.texts {
-            let (text_min, text_max) = text.bounding_box();
-            min_x = min_x.min(text_min.x());
-            min_y = min_y.min(text_min.y());
-            max_x = max_x.max(text_max.x());
-            max_y = max_y.max(text_max.y());
-        }
+//         for text in &self.texts {
+//             let (text_min, text_max) = text.bounding_box();
+//             min_x = min_x.min(text_min.x().into());
+//             min_y = min_y.min(text_min.y().into());
+//             max_x = max_x.max(text_max.x().into());
+//             max_y = max_y.max(text_max.y().into());
+//         }
 
-        (Point::new(min_x, min_y), Point::new(max_x, max_y))
-    }
-}
+//         for reference in &self.references {
+//             let (reference_min, reference_max) = reference.bounding_box();
+//             min_x = min_x.min(reference_min.x().into());
+//             min_y = min_y.min(reference_min.y().into());
+//             max_x = max_x.max(reference_max.x().into());
+//             max_y = max_y.max(reference_max.y().into());
+//         }
+
+//         (
+//             Point::new(min_x.into(), min_y.into()),
+//             Point::new(max_x.into(), max_y.into()),
+//         )
+//     }
+// }

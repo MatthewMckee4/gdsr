@@ -1,4 +1,4 @@
-use crate::Point;
+use crate::{DatabaseIntegerUnit, Point};
 
 mod reflection;
 mod rotation;
@@ -10,70 +10,54 @@ pub use rotation::Rotation;
 pub use scale::Scale;
 pub use translation::Translation;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Transformation {
-    pub translation: Option<Translation>,
+    pub reflection: Option<Reflection>,
     pub rotation: Option<Rotation>,
     pub scale: Option<Scale>,
-    pub reflection: Option<Reflection>,
+    pub translation: Option<Translation>,
 }
 
 impl Transformation {
-    pub fn new() -> Self {
-        Self {
-            translation: None,
-            rotation: None,
-            scale: None,
-            reflection: None,
-        }
-    }
-
-    pub fn with_translation(mut self, delta: Point) -> Self {
-        self.translation = Some(Translation::new(delta));
+    pub fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
+        self.reflection = reflection;
         self
     }
 
-    pub fn with_rotation(mut self, angle: f64, centre: Point) -> Self {
-        self.rotation = Some(Rotation::new(angle, centre));
+    pub fn with_rotation(&mut self, rotation: Option<Rotation>) -> &mut Self {
+        self.rotation = rotation;
         self
     }
 
-    pub fn with_scale(mut self, factor: f64, centre: Point) -> Self {
-        self.scale = Some(Scale::new(factor, centre));
+    pub fn with_scale(&mut self, scale: Option<Scale>) -> &mut Self {
+        self.scale = scale;
         self
     }
 
-    pub fn with_reflection(mut self, angle: f64, centre: Point) -> Self {
-        self.reflection = Some(Reflection::new(angle, centre));
+    pub fn with_translation(&mut self, translation: Option<Translation>) -> &mut Self {
+        self.translation = translation;
         self
     }
 
-    pub fn apply_to_point(&self, point: &Point) -> Point {
-        let mut result = *point;
+    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
+        let mut new_point = point.clone();
 
-        if let Some(translation) = &self.translation {
-            result = translation.apply_to_point(&result);
-        }
-
-        if let Some(scale) = &self.scale {
-            result = scale.apply_to_point(&result);
+        if let Some(reflection) = &self.reflection {
+            new_point = reflection.apply_to_point(&new_point);
         }
 
         if let Some(rotation) = &self.rotation {
-            result = rotation.apply_to_point(&result);
+            new_point = rotation.apply_to_point(&new_point);
         }
 
-        if let Some(reflection) = &self.reflection {
-            result = reflection.apply_to_point(&result);
+        if let Some(scale) = &self.scale {
+            new_point = scale.apply_to_point(&new_point);
         }
 
-        result
+        if let Some(translation) = &self.translation {
+            new_point = translation.apply_to_point(&new_point);
+        }
+
+        new_point
     }
 }
-
-impl Default for Transformation {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-

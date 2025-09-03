@@ -1,25 +1,39 @@
-use crate::Point;
+use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Reflection {
-    pub angle: f64,
-    pub centre: Point,
+#[derive(Clone, Debug)]
+struct ReflectionInner<DatabaseUnitT: CoordNum, AngleT: CoordNum> {
+    angle: AngleT,
+    centre: Point<DatabaseUnitT>,
 }
 
+#[derive(Clone, Debug)]
+pub struct Reflection(ReflectionInner<DatabaseIntegerUnit, f64>);
+
 impl Reflection {
-    pub fn new(angle: f64, centre: Point) -> Self {
-        Self { angle, centre }
+    pub fn new(angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+        Self(ReflectionInner { angle, centre })
     }
 
-    pub fn apply_to_point(&self, point: &Point) -> Point {
-        let cos_2angle = (2.0 * self.angle).cos();
-        let sin_2angle = (2.0 * self.angle).sin();
-        let dx = point.x() - self.centre.x();
-        let dy = point.y() - self.centre.y();
+    pub fn from_line(_point1: &Point<DatabaseIntegerUnit>, _point2: &Point<DatabaseIntegerUnit>) {
+        todo!()
+    }
 
-        let new_x = self.centre.x() + dx * cos_2angle + dy * sin_2angle;
-        let new_y = self.centre.y() + dx * sin_2angle - dy * cos_2angle;
+    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
+        let cos_2angle = (2.0 * self.0.angle).cos();
+        let sin_2angle = (2.0 * self.0.angle).sin();
 
-        Point::new(new_x, new_y)
+        let self_center_x = self.0.centre.x() as f64;
+        let self_center_y = self.0.centre.y() as f64;
+
+        let dx = point.x() as f64 - self_center_x;
+        let dy = point.y() as f64 - self_center_y;
+
+        let new_x = self_center_x + dx * cos_2angle + dy * sin_2angle;
+        let new_y = self_center_y + dx * sin_2angle - dy * cos_2angle;
+
+        Point::new(
+            new_x.round() as DatabaseIntegerUnit,
+            new_y.round() as DatabaseIntegerUnit,
+        )
     }
 }

@@ -3,34 +3,27 @@ use std::fs::File;
 
 use chrono::{Datelike, Local, Timelike};
 
-use pyo3::prelude::*;
-
 use crate::{
-    config::gds_file_types::{combine_record_and_data_type, GDSDataType, GDSRecord},
-    element::Element,
-    reference::Instance,
+    config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
+    elements::{Element, reference::Instance},
     traits::ToGds,
-    utils::io::create_temp_file,
-    utils::{
-        io::{write_gds, write_string_with_record_to_file, write_u16_array_to_file},
-        // transformations::py_any_path_to_string_or_temp_name,
-    },
+    utils::io::{write_string_with_record_to_file, write_u16_array_to_file},
 };
 
 use super::*;
 
-impl Cell {
+impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     pub fn _to_gds(
         &self,
-        mut file: File,
+        file: &mut File,
         units: f64,
         precision: f64,
         written_cell_names: &mut HashSet<String>,
-    ) -> PyResult<File> {
+    ) -> std::io::Result<()> {
         let now = Local::now();
         let timestamp = now.naive_utc();
 
-        let mut cells_to_write: Vec<Cell> = Vec::new();
+        let mut cells_to_write: Vec<Cell<DatabaseUnitT>> = Vec::new();
 
         let mut cell_head = [
             28,
@@ -49,87 +42,59 @@ impl Cell {
             timestamp.second() as u16,
         ];
 
-        file = write_u16_array_to_file(file, &mut cell_head)?;
+        write_u16_array_to_file(file, &mut cell_head)?;
 
-        file = write_string_with_record_to_file(file, GDSRecord::StrName, &self.name)?;
+        write_string_with_record_to_file(file, GDSRecord::StrName, &self.name)?;
 
-        file = Python::with_gil(|py| {
-            for path in &self.paths {
-                file = path.borrow_mut(py)._to_gds(file, units / precision)?;
-            }
+        for path in &self.paths {
+            path._to_gds(file, units / precision)?;
+        }
 
-            for polygon in &self.polygons {
-                file = polygon.borrow_mut(py)._to_gds(file, units / precision)?
-            }
+        for polygon in &self.polygons {
+            polygon._to_gds(file, units / precision)?
+        }
 
-            for text in &self.texts {
-                file = text.borrow_mut(py)._to_gds(file, units / precision)?
-            }
+        for text in &self.texts {
+            text._to_gds(file, units / precision)?
+        }
 
-            for reference in &self.references {
-                get_child_cells(
-                    &reference.borrow(py),
-                    &mut cells_to_write,
-                    written_cell_names,
-                );
-                file = reference.borrow_mut(py)._to_gds(file, units / precision)?
-            }
-            Ok::<_, PyErr>(file)
-        })?;
+        for reference in &self.references {
+            get_child_cells(&reference, &mut cells_to_write, written_cell_names);
+            reference._to_gds(file, units / precision)?
+        }
 
         let mut cell_tail = [
             4,
             combine_record_and_data_type(GDSRecord::EndStr, GDSDataType::NoData),
         ];
 
-        file = write_u16_array_to_file(file, &mut cell_tail)?;
+        write_u16_array_to_file(file, &mut cell_tail)?;
 
         for cell in cells_to_write {
-            file = cell._to_gds(file, units, precision, written_cell_names)?;
+            cell._to_gds(file, units, precision, written_cell_names)?;
         }
 
-        Ok(file)
+        Ok(())
     }
 }
 
-fn get_child_cells(
-    reference: &Reference,
-    child_cells: &mut Vec<Cell>,
+fn get_child_cells<DatabaseUnitT: CoordNum>(
+    reference: &Reference<DatabaseUnitT>,
+    child_cells: &mut Vec<Cell<DatabaseUnitT>>,
     written_cell_names: &mut HashSet<String>,
 ) {
-    Python::with_gil(|py| match &reference.instance {
+    match &reference.instance() {
         Instance::Cell(child_cell) => {
-            let cell = child_cell.borrow(py);
-            if !written_cell_names.contains(&cell.name) {
-                written_cell_names.insert(cell.name.clone());
-                child_cells.push(cell.clone());
+            if !written_cell_names.contains(&child_cell.name) {
+                written_cell_names.insert(child_cell.name.clone());
+                child_cells.push(child_cell.clone());
             }
         }
-        Instance::Element(element) => match element {
+        Instance::Element(element) => match element.as_ref().as_ref() {
             Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {}
             Element::Reference(reference) => {
-                let reference = reference.borrow(py);
                 get_child_cells(&reference, child_cells, written_cell_names)
             }
         },
-    })
-}
-
-#[pymethods]
-impl Cell {
-    #[pyo3(signature=(file_name=None, units=1e-6, precision=1e-10))]
-    pub fn to_gds(
-        &self,
-        #[pyo3(from_py_with = "py_any_path_to_string_or_temp_name")] file_name: Option<String>,
-        units: f64,
-        precision: f64,
-    ) -> PyResult<String> {
-        write_gds(
-            file_name.unwrap_or(create_temp_file()?),
-            "library",
-            units,
-            precision,
-            [self.clone()].to_vec(),
-        )
     }
 }

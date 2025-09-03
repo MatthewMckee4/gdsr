@@ -7,7 +7,6 @@ use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 use tempfile::Builder;
 
-use crate::Point;
 use crate::cell::Cell;
 use crate::config::gds_file_types::GDSRecordData;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
@@ -18,6 +17,7 @@ use crate::polygon::Polygon;
 use crate::reference::{Instance, Reference};
 use crate::text::Text;
 use crate::text::utils::get_presentations_from_value;
+use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
 use super::gds_format::{eight_byte_real, u16_array_to_big_endian};
 use super::geometry::round_to_decimals;
@@ -83,31 +83,45 @@ pub fn write_float_to_eight_byte_real_to_file(file: &mut File, value: f64) -> io
     file.write_all(&value)
 }
 
-pub fn write_points_to_file(file: &mut File, points: &[Point], scale: f64) -> io::Result<()> {
+pub fn write_points_to_file<DatabaseUnitT: CoordNum>(
+    file: &mut File,
+    points: &[Point<DatabaseUnitT>],
+    scale: f64,
+    to_integer: &dyn Fn(DatabaseUnitT) -> DatabaseIntegerUnit,
+) -> io::Result<()> {
+    let new_points: Vec<Point<DatabaseIntegerUnit>> = points
+        .iter()
+        .map(|point| Point::new(to_integer(point.x()), to_integer(point.y())))
+        .collect();
+
+    write_integer_points_to_file(file, &new_points, scale)
+}
+
+pub fn write_integer_points_to_file(
+    file: &mut File,
+    points: &[Point<DatabaseIntegerUnit>],
+    scale: f64,
+) -> io::Result<()> {
     const MAX_POINTS: usize = 8191;
     let points_to_write = points.get(..MAX_POINTS).unwrap_or(points);
 
-    let points_length = points_to_write.len();
-    let record_length = 4 + 8 * points_length;
-
-    let mut points_buffer = Vec::with_capacity(8 * points_length);
-
-    let mut xy_header_buffer = [
-        (record_length as u16),
+    let record_size = 4 + (points.len() * 8) as u16;
+    let xy_header_buffer = [
+        record_size,
         combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
     ];
 
-    write_u16_array_to_file(file, &mut xy_header_buffer)?;
+    write_u16_array_to_file(file, &xy_header_buffer)?;
 
     for point in points_to_write {
-        let scaled_x = (point.x() * scale).round() as i32;
-        let scaled_y = (point.y() * scale).round() as i32;
+        let scaled_x = (point.x() as f64 * scale).round() as i32;
+        let scaled_y = (point.y() as f64 * scale).round() as i32;
 
-        points_buffer.extend_from_slice(&scaled_x.to_be_bytes());
-        points_buffer.extend_from_slice(&scaled_y.to_be_bytes());
+        file.write_all(&scaled_x.to_be_bytes())?;
+        file.write_all(&scaled_y.to_be_bytes())?;
     }
 
-    file.write_all(&points_buffer)
+    Ok(())
 }
 
 pub fn write_element_tail_to_file(file: &mut File) -> io::Result<()> {
@@ -142,12 +156,12 @@ pub fn write_string_with_record_to_file(
     file.write_all(&lib_name_bytes)
 }
 
-pub fn write_gds(
+pub fn write_gds<T: CoordNum>(
     file_name: String,
     library_name: &str,
     units: f64,
     precision: f64,
-    cells: Vec<Cell>,
+    cells: Vec<Cell<T>>,
 ) -> io::Result<()> {
     let mut file = File::create(file_name.clone())?;
 
@@ -158,7 +172,7 @@ pub fn write_gds(
     for cell in cells {
         if !written_cell_names.contains(&cell.name) {
             written_cell_names.insert(cell.name.clone());
-            file = cell._to_gds(file, units, precision, &mut written_cell_names)?;
+            cell._to_gds(&mut file, units, precision, &mut written_cell_names)?;
         }
     }
 
@@ -205,17 +219,17 @@ pub fn write_transformation_to_file(
     Ok(())
 }
 
-pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
+pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
     let mut library = Library::new("Library".to_string());
 
     let file = File::open(file_name)?;
     let reader = RecordReader::new(BufReader::new(file));
 
-    let mut cell: Option<Cell> = None;
-    let mut path: Option<Path> = None;
-    let mut polygon: Option<Polygon> = None;
-    let mut text: Option<Text> = None;
-    let mut reference: Option<Reference> = None;
+    let mut cell: Option<Cell<T>> = None;
+    let mut path: Option<Path<T>> = None;
+    let mut polygon: Option<Polygon<T>> = None;
+    let mut text: Option<Text<T>> = None;
+    let mut reference: Option<Reference<T>> = None;
 
     let mut scale = 1.0;
     let mut rounding_digits = 0;
@@ -258,9 +272,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 }
                 GDSRecord::EndStr => {
                     if let Some(cell) = cell.take() {
-                        library
-                            .cells
-                            .insert(cell.name.clone(), Py::new(py, cell).unwrap());
+                        library.cells.insert(cell.name.clone(), cell);
                     }
 
                     continue;
@@ -323,7 +335,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 }
                 GDSRecord::XY => {
                     if let GDSRecordData::I32(xy) = data {
-                        let points = get_points_from_i32_vec(xy)
+                        let points = get_points_from_i32_vec::<T>(xy)
                             .iter()
                             .map(|p| p.scale(scale, Point::default()).round(rounding_digits))
                             .collect::<Vec<Point>>();
@@ -333,38 +345,36 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         } else if let Some(path) = &mut path {
                             path.points = points;
                         } else if let Some(reference) = &mut reference {
-                            Python::with_gil(|py| {
-                                let mut grid = reference.grid.borrow_mut(py);
-                                match points.len() {
-                                    1 => {
-                                        grid.origin = points[0];
-                                    }
-                                    3 => {
-                                        let origin = points[0];
-                                        let rotated_points = points
-                                            .iter()
-                                            .map(|&p| p.rotate(-grid.angle, origin))
-                                            .collect::<Vec<Point>>();
-
-                                        grid.origin = rotated_points[0].round(rounding_digits);
-                                        grid.spacing_x = if grid.columns > 0 {
-                                            ((rotated_points[1] - rotated_points[0])
-                                                / grid.columns as f64)
-                                                .round(rounding_digits)
-                                        } else {
-                                            Point::default()
-                                        };
-                                        grid.spacing_y = if grid.rows > 0 {
-                                            ((rotated_points[2] - rotated_points[0])
-                                                / grid.rows as f64)
-                                                .round(rounding_digits)
-                                        } else {
-                                            Point::default()
-                                        };
-                                    }
-                                    _ => {}
+                            match points.len() {
+                                1 => {
+                                    reference.grid.origin = points[0];
                                 }
-                            });
+                                3 => {
+                                    let origin = points[0];
+                                    let rotated_points = points
+                                        .iter()
+                                        .map(|&p| p.rotate(-reference.grid.angle, origin))
+                                        .collect::<Vec<Point>>();
+
+                                    reference.grid.origin =
+                                        rotated_points[0].round(rounding_digits);
+                                    reference.grid.spacing_x = if reference.grid.columns > 0 {
+                                        ((rotated_points[1] - rotated_points[0])
+                                            / reference.grid.columns as f64)
+                                            .round(rounding_digits)
+                                    } else {
+                                        Point::default()
+                                    };
+                                    reference.grid.spacing_y = if reference.grid.rows > 0 {
+                                        ((rotated_points[2] - rotated_points[0])
+                                            / reference.grid.rows as f64)
+                                            .round(rounding_digits)
+                                    } else {
+                                        Point::default()
+                                    };
+                                }
+                                _ => {}
+                            }
                         } else if let Some(text) = &mut text {
                             if let Some(&first_point) = points.first() {
                                 text.origin = first_point;
@@ -375,19 +385,17 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                     continue;
                 }
                 GDSRecord::EndEl => {
-                    Python::with_gil(|py| {
-                        if let Some(cell) = &mut cell {
-                            if let Some(polygon) = polygon.take() {
-                                cell.polygons.push(Py::new(py, polygon).unwrap());
-                            } else if let Some(path) = path.take() {
-                                cell.paths.push(Py::new(py, path).unwrap());
-                            } else if let Some(reference) = reference.take() {
-                                cell.references.push(Py::new(py, reference).unwrap());
-                            } else if let Some(text) = text.take() {
-                                cell.texts.push(Py::new(py, text).unwrap());
-                            }
+                    if let Some(cell) = &mut cell {
+                        if let Some(polygon) = polygon.take() {
+                            cell.polygons.push(polygon);
+                        } else if let Some(path) = path.take() {
+                            cell.paths.push(path);
+                        } else if let Some(reference) = reference.take() {
+                            cell.references.push(reference);
+                        } else if let Some(text) = text.take() {
+                            cell.texts.push(text);
                         }
-                    });
+                    }
                     polygon = None;
                     path = None;
                     text = None;
@@ -399,9 +407,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
                             if let Instance::Cell(cell) = &reference.instance {
-                                Python::with_gil(|py| {
-                                    cell.borrow_mut(py).name = cell_name;
-                                });
+                                cell.name = cell_name;
                             }
                         }
                     }
@@ -411,11 +417,8 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                 GDSRecord::ColRow => {
                     if let GDSRecordData::I16(col_row) = data {
                         if let Some(reference) = &mut reference {
-                            Python::with_gil(|py| {
-                                let mut grid = reference.grid.borrow_mut(py);
-                                grid.columns = col_row[0] as u32;
-                                grid.rows = col_row[1] as u32;
-                            });
+                            reference.grid.columns = col_row[0] as u32;
+                            reference.grid.rows = col_row[1] as u32;
                         }
                     }
 
@@ -447,10 +450,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                             text.x_reflection = x_reflection;
                         }
                         if let Some(reference) = &mut reference {
-                            Python::with_gil(|py| {
-                                let mut grid = reference.grid.borrow_mut(py);
-                                grid.x_reflection = x_reflection;
-                            });
+                            reference.grid.x_reflection = x_reflection;
                         }
                     }
 
@@ -461,10 +461,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.magnification = magnification[0]
                         } else if let Some(reference) = &mut reference {
-                            Python::with_gil(|py| {
-                                let mut grid = reference.grid.borrow_mut(py);
-                                grid.magnification = magnification[0];
-                            });
+                            reference.grid.magnification = magnification[0];
                         }
                     }
 
@@ -475,10 +472,7 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
                         if let Some(text) = &mut text {
                             text.angle = angle[0];
                         } else if let Some(reference) = &mut reference {
-                            Python::with_gil(|py| {
-                                let mut grid = reference.grid.borrow_mut(py);
-                                grid.angle = angle[0];
-                            });
+                            reference.grid.angle = angle[0];
                         }
                     }
 
@@ -502,28 +496,20 @@ pub fn from_gds(py: Python, file_name: String) -> PyResult<Library> {
     Ok(library)
 }
 
-fn update_references(library: &mut Library) {
-    Python::with_gil(|py| {
-        let cell_references: Vec<Reference> = library
-            .cells
-            .values()
-            .flat_map(|cell| {
-                cell.borrow_mut(py)
-                    .references
-                    .clone()
-                    .into_iter()
-                    .map(|r| r.borrow_mut(py).clone())
-            })
-            .collect();
+fn update_references<T: CoordNum>(library: &mut Library<T>) {
+    let cell_references: Vec<Reference<T>> = library
+        .cells
+        .values()
+        .flat_map(|cell| cell.references.clone().into_iter())
+        .collect();
 
-        for mut reference in cell_references {
-            if let Instance::Cell(referenced_name) = reference.instance {
-                if let Some(referenced_cell) = library.cells.get(&referenced_name.borrow(py).name) {
-                    reference.instance = Instance::Cell(referenced_cell.clone_ref(py));
-                }
+    for mut reference in cell_references {
+        if let Instance::Cell(referenced_name) = reference.instance {
+            if let Some(referenced_cell) = library.cells.get(&referenced_name.name) {
+                reference.instance = Instance::Cell(referenced_cell.clone());
             }
         }
-    });
+    }
 }
 
 pub struct RecordReader<R: Read> {
@@ -537,7 +523,7 @@ impl<R: Read> RecordReader<R> {
 }
 
 impl<R: Read> Iterator for RecordReader<R> {
-    type Item = PyResult<(GDSRecord, GDSRecordData)>;
+    type Item = io::Result<(GDSRecord, GDSRecordData)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut header = [0u8; 4];
@@ -545,7 +531,7 @@ impl<R: Read> Iterator for RecordReader<R> {
             if e.kind() == io::ErrorKind::UnexpectedEof {
                 return None;
             } else {
-                return Some(Err(PyErr::from(e)));
+                return Some(Err(e));
             }
         }
 
@@ -556,7 +542,7 @@ impl<R: Read> Iterator for RecordReader<R> {
         let data = if size > 4 {
             let mut buf = vec![0u8; size - 4];
             if let Err(e) = self.reader.read_exact(&mut buf) {
-                return Some(Err(PyErr::from(e)));
+                return Some(Err(e));
             }
 
             let result = match GDSDataType::try_from(data_type) {
@@ -597,10 +583,10 @@ impl<R: Read> Iterator for RecordReader<R> {
         let record = match GDSRecord::try_from(record_type) {
             Ok(record) => record,
             Err(_) => {
-                return Some(Err(PyIOError::new_err(format!(
-                    "Invalid record type: {}",
-                    record_type
-                ))));
+                return Some(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid record type",
+                )));
             }
         };
 
@@ -677,8 +663,14 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     }
 }
 
-pub fn create_temp_file() -> PyResult<String> {
+pub fn create_temp_file() -> io::Result<String> {
     let temp_file = Builder::new().suffix(".gds").tempfile()?;
     let temp_path = temp_file.path().to_string_lossy().to_string();
     Ok(temp_path)
+}
+
+pub fn get_points_from_i32_vec<T: CoordNum>(vec: Vec<i32>) -> Vec<Point<T>> {
+    vec.chunks(2)
+        .map(|chunk| Point::new((chunk[0] as f64).into(), (chunk[1] as f64).into()))
+        .collect()
 }

@@ -1,36 +1,45 @@
 use std::fs::File;
 use std::io;
 
-use crate::{Point, transformation::Transformation};
+use crate::{
+    CoordNum, DatabaseIntegerUnit, Point,
+    transformation::{Reflection, Rotation, Scale, Transformation, Translation},
+};
 
 pub trait ToGds {
     fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()>;
 }
 
-pub trait Transformable {
-    fn transform(&mut self, transformation: &Transformation) -> &mut Self;
+pub trait Transformable: Sized {
+    fn transform(self, transformation: &Transformation) -> Self;
 
-    fn rotate(&mut self, angle: f64, centre: Point) -> &mut Self {
-        self.transform(&Transformation::new().with_rotation(angle, centre))
+    fn rotate(self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+        self.transform(&Transformation::default().with_rotation(Some(Rotation::new(angle, centre))))
     }
 
-    fn scale(&mut self, factor: f64, centre: Point) -> &mut Self {
-        self.transform(&Transformation::new().with_scale(factor, centre))
+    fn scale(self, factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+        self.transform(&Transformation::default().with_scale(Some(Scale::new(factor, centre))))
     }
 
-    fn reflect(&mut self, angle: f64, centre: Point) -> &mut Self {
-        self.transform(&Transformation::new().with_reflection(angle, centre))
+    fn reflect(self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+        self.transform(
+            &Transformation::default().with_reflection(Some(Reflection::new(angle, centre))),
+        )
+    }
+
+    fn translate(self, delta: Point<DatabaseIntegerUnit>) -> Self {
+        self.transform(&Transformation::default().with_translation(Some(Translation::new(delta))))
     }
 }
 
 pub trait Movable: Transformable {
-    fn move_by(&mut self, delta: Point) -> &mut Self {
-        self.transform(&Transformation::new().with_translation(delta))
+    fn move_by(self, delta: Point<DatabaseIntegerUnit>) -> Self {
+        self.transform(&Transformation::default().with_translation(Some(Translation::new(delta))))
     }
 
-    fn move_to(&mut self, target: Point) -> &mut Self;
+    fn move_to(&mut self, target: Point<DatabaseIntegerUnit>) -> &mut Self;
 }
 
-pub trait Dimensions {
-    fn bounding_box(&self) -> (Point, Point);
+pub trait Dimensions<T: CoordNum> {
+    fn bounding_box(&self) -> (Point<T>, Point<T>);
 }

@@ -1,12 +1,14 @@
 use geo::{
-    Area, BoundingRect, Centroid, Contains, Coord, EuclideanDistance, EuclideanLength, GeoFloat,
-    Line, LineString, Point, Polygon,
+    Area, BoundingRect, Centroid, Contains, Coord, EuclideanDistance, EuclideanLength, Line,
+    LineString, Point, Polygon,
 };
 use std::iter::Sum;
 
+use crate::CoordNum;
+
 /// Calculate the bounding box of a collection of points
 /// Returns (min_point, max_point) representing the bottom-left and top-right corners
-pub fn bounding_box<T: GeoFloat>(points: &Vec<Point<T>>) -> (Point<T>, Point<T>) {
+pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
     if points.is_empty() {
         return (
             Point::new(T::zero(), T::zero()),
@@ -15,7 +17,7 @@ pub fn bounding_box<T: GeoFloat>(points: &Vec<Point<T>>) -> (Point<T>, Point<T>)
     }
 
     // Use geo's BoundingRect trait for robust calculation
-    let multipoint = geo::MultiPoint::new(points.clone());
+    let multipoint = geo::MultiPoint::new(points.to_vec());
     if let Some(rect) = multipoint.bounding_rect() {
         let min_point = Point::new(rect.min().x, rect.min().y);
         let max_point = Point::new(rect.max().x, rect.max().y);
@@ -29,7 +31,7 @@ pub fn bounding_box<T: GeoFloat>(points: &Vec<Point<T>>) -> (Point<T>, Point<T>)
 
 /// Calculate the area of a polygon defined by points using the shoelace formula
 /// Points should be in order (clockwise or counter-clockwise)
-pub fn area<T: GeoFloat>(points: &[Point<T>]) -> T {
+pub fn area<T: CoordNum>(points: &[Point<T>]) -> T {
     if points.len() < 3 {
         return T::zero();
     }
@@ -57,7 +59,7 @@ pub fn area<T: GeoFloat>(points: &[Point<T>]) -> T {
 /// Calculate the perimeter of a polygon defined by points
 /// For open polygons, calculates the total length of all segments
 /// For closed polygons, includes the segment from last to first point
-pub fn perimeter<T: GeoFloat + Sum>(points: &[Point<T>], closed: bool) -> T {
+pub fn perimeter<T: CoordNum + Sum>(points: &[Point<T>], closed: bool) -> T {
     if points.len() < 2 {
         return T::zero();
     }
@@ -83,13 +85,13 @@ pub fn perimeter<T: GeoFloat + Sum>(points: &[Point<T>], closed: bool) -> T {
 }
 
 /// Calculate the Euclidean distance between two points
-pub fn distance_between_points<T: GeoFloat>(point1: &Point<T>, point2: &Point<T>) -> T {
+pub fn distance_between_points<T: CoordNum>(point1: &Point<T>, point2: &Point<T>) -> T {
     point1.euclidean_distance(point2)
 }
 
 /// Check if a point is inside a polygon using the ray casting algorithm
 /// The polygon is defined by an ordered list of points
-pub fn is_point_inside<T: GeoFloat>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
+pub fn is_point_inside<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
     if polygon_points.len() < 3 {
         return false;
     }
@@ -115,7 +117,7 @@ pub fn is_point_inside<T: GeoFloat>(point: &Point<T>, polygon_points: &[Point<T>
 }
 
 /// Check if a point lies on the edge of a polygon
-pub fn is_point_on_edge<T: GeoFloat>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
+pub fn is_point_on_edge<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
     if polygon_points.len() < 2 {
         return false;
     }
@@ -133,7 +135,7 @@ pub fn is_point_on_edge<T: GeoFloat>(point: &Point<T>, polygon_points: &[Point<T
 }
 
 /// Check if a point lies on a line segment
-pub fn is_point_on_line_segment<T: GeoFloat>(point: &Point<T>, a: &Point<T>, b: &Point<T>) -> bool {
+pub fn is_point_on_line_segment<T: CoordNum>(point: &Point<T>, a: &Point<T>, b: &Point<T>) -> bool {
     let line_segment = Line::new(Coord { x: a.x(), y: a.y() }, Coord { x: b.x(), y: b.y() });
     line_segment.contains(point)
 }
@@ -147,7 +149,7 @@ pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
 // Additional utility functions leveraging geo's capabilities
 
 /// Calculate the centroid of a polygon
-pub fn centroid<T: GeoFloat>(points: &[Point<T>]) -> Option<Point<T>> {
+pub fn centroid<T: CoordNum>(points: &[Point<T>]) -> Option<Point<T>> {
     if points.len() < 3 {
         return None;
     }
@@ -171,7 +173,7 @@ pub fn centroid<T: GeoFloat>(points: &[Point<T>]) -> Option<Point<T>> {
 }
 
 /// Check if two polygons intersect
-pub fn polygons_intersect<T: GeoFloat>(points1: &[Point<T>], points2: &[Point<T>]) -> bool {
+pub fn polygons_intersect<T: CoordNum>(points1: &[Point<T>], points2: &[Point<T>]) -> bool {
     use geo::Intersects;
 
     if points1.len() < 3 || points2.len() < 3 {
@@ -185,7 +187,7 @@ pub fn polygons_intersect<T: GeoFloat>(points1: &[Point<T>], points2: &[Point<T>
 }
 
 /// Get the convex hull of a set of points
-pub fn convex_hull<T: GeoFloat>(points: &[Point<T>]) -> Vec<Point<T>> {
+pub fn convex_hull<T: CoordNum>(points: &[Point<T>]) -> Vec<Point<T>> {
     use geo::ConvexHull;
 
     let multipoint = geo::MultiPoint::new(points.to_vec());
@@ -198,7 +200,7 @@ pub fn convex_hull<T: GeoFloat>(points: &[Point<T>]) -> Vec<Point<T>> {
 }
 
 /// Simplify a polygon using the Douglas-Peucker algorithm
-pub fn simplify_polygon<T: GeoFloat>(points: &[Point<T>], epsilon: T) -> Vec<Point<T>> {
+pub fn simplify_polygon<T: CoordNum>(points: &[Point<T>], epsilon: T) -> Vec<Point<T>> {
     use geo::Simplify;
 
     if points.len() < 3 {
@@ -220,7 +222,7 @@ pub fn simplify_polygon<T: GeoFloat>(points: &[Point<T>], epsilon: T) -> Vec<Poi
 }
 
 // Helper function to create a polygon from points
-fn create_polygon_from_points<T: GeoFloat>(points: &[Point<T>]) -> Polygon<T> {
+fn create_polygon_from_points<T: CoordNum>(points: &[Point<T>]) -> Polygon<T> {
     let coords: Vec<Coord<T>> = points
         .iter()
         .map(|p| Coord { x: p.x(), y: p.y() })

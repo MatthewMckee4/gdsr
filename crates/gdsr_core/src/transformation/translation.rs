@@ -1,16 +1,19 @@
-use crate::{CoordNum, Point};
+use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Translation<T: CoordNum> {
-    pub delta: Point<T>,
+#[derive(Clone, Debug)]
+pub struct TranslationInner<DatabaseUnitT: CoordNum> {
+    delta: Point<DatabaseUnitT>,
 }
 
-impl<T: CoordNum> Translation<T> {
-    pub fn new(delta: Point<T>) -> Self {
-        Self { delta }
+#[derive(Clone, Debug)]
+pub struct Translation(TranslationInner<DatabaseIntegerUnit>);
+
+impl Translation {
+    pub fn new(delta: Point<DatabaseIntegerUnit>) -> Self {
+        Self(TranslationInner { delta })
     }
 
-    pub fn apply_to_point(&self, point: &Point<T>) -> Point<T> {
-        Point::new(point.x() + self.delta.x(), point.y() + self.delta.y())
+    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
+        Point::new(point.x() + self.0.delta.x(), point.y() + self.0.delta.y())
     }
 }

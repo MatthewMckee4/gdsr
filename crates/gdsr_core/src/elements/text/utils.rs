@@ -1,13 +1,13 @@
 use super::presentation::{HorizontalPresentation, VerticalPresentation};
 
 pub fn get_presentation_value(
-    vertical_presentation: VerticalPresentation,
-    horizontal_presentation: HorizontalPresentation,
-) -> Result<u16, String> {
+    vertical_presentation: &VerticalPresentation,
+    horizontal_presentation: &HorizontalPresentation,
+) -> u16 {
     let vertical_value = vertical_presentation.value();
     let horizontal_value = horizontal_presentation.value();
 
-    let combined_value = match (vertical_value, horizontal_value) {
+    match (vertical_value, horizontal_value) {
         (0, 0) => 0,
         (0, 1) => 1,
         (0, 2) => 2,
@@ -17,10 +17,8 @@ pub fn get_presentation_value(
         (2, 0) => 8,
         (2, 1) => 9,
         (2, 2) => 10,
-        _ => return Err("Invalid combination of presentations".to_string()),
-    };
-
-    Ok(combined_value)
+        _ => 0,
+    }
 }
 
 pub fn get_presentations_from_value(
