@@ -70,7 +70,7 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Cell<DatabaseUnitT> {
-    fn transform(self, transformation: &Transformation) -> Self {
+    fn transform(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 
         new_self.polygons = new_self

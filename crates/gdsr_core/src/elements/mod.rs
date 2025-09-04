@@ -30,7 +30,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
-    fn transform(self, transformation: &crate::Transformation) -> Self {
+    fn transform(&self, transformation: &crate::Transformation) -> Self {
         match self {
             Element::Path(path) => Element::Path(path.transform(transformation)),
             Element::Polygon(polygon) => Element::Polygon(polygon.transform(transformation)),
@@ -43,7 +43,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Movable for Element<DatabaseUnitT> {
-    fn move_to(self, target: geo::Point<DatabaseIntegerUnit>) -> Self {
+    fn move_to(&self, target: geo::Point<DatabaseIntegerUnit>) -> Self {
         match self {
             Element::Path(path) => Element::Path(path.move_to(target)),
             Element::Polygon(polygon) => Element::Polygon(polygon.move_to(target)),

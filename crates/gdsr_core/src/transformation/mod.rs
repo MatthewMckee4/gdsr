@@ -19,6 +19,42 @@ pub struct Transformation {
 }
 
 impl Transformation {
+    pub fn translation(translation: Translation) -> Self {
+        Self {
+            reflection: None,
+            rotation: None,
+            scale: None,
+            translation: Some(translation),
+        }
+    }
+
+    pub fn rotation(rotation: Rotation) -> Self {
+        Self {
+            reflection: None,
+            rotation: Some(rotation),
+            scale: None,
+            translation: None,
+        }
+    }
+
+    pub fn scale(scale: Scale) -> Self {
+        Self {
+            reflection: None,
+            rotation: None,
+            scale: Some(scale),
+            translation: None,
+        }
+    }
+
+    pub fn reflection(reflection: Reflection) -> Self {
+        Self {
+            reflection: Some(reflection),
+            rotation: None,
+            scale: None,
+            translation: None,
+        }
+    }
+
     pub fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
         self.reflection = reflection;
         self

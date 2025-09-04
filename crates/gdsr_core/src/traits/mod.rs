@@ -11,33 +11,33 @@ pub trait ToGds {
 }
 
 pub trait Transformable: Sized {
-    fn transform(self, transformation: &Transformation) -> Self;
+    fn transform(&self, transformation: &Transformation) -> Self;
 
-    fn rotate(self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+    fn rotate(&self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
         self.transform(&Transformation::default().with_rotation(Some(Rotation::new(angle, centre))))
     }
 
-    fn scale(self, factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+    fn scale(&self, factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
         self.transform(&Transformation::default().with_scale(Some(Scale::new(factor, centre))))
     }
 
-    fn reflect(self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+    fn reflect(&self, angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
         self.transform(
             &Transformation::default().with_reflection(Some(Reflection::new(angle, centre))),
         )
     }
 
-    fn translate(self, delta: Point<DatabaseIntegerUnit>) -> Self {
+    fn translate(&self, delta: Point<DatabaseIntegerUnit>) -> Self {
         self.transform(&Transformation::default().with_translation(Some(Translation::new(delta))))
     }
 }
 
 pub trait Movable: Transformable {
-    fn move_by(self, delta: Point<DatabaseIntegerUnit>) -> Self {
+    fn move_by(&self, delta: Point<DatabaseIntegerUnit>) -> Self {
         self.transform(&Transformation::default().with_translation(Some(Translation::new(delta))))
     }
 
-    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self;
+    fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self;
 }
 
 pub trait Dimensions<T: CoordNum> {

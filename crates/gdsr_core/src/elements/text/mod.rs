@@ -106,7 +106,7 @@ impl<T: CoordNum> std::fmt::Display for Text<T> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
-    fn transform(self, transformation: &Transformation) -> Self {
+    fn transform(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 
         if let Some(translation) = &transformation.translation {
@@ -130,7 +130,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Movable for Text<DatabaseUnitT> {
-    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
+    fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let mut new_self = self.clone();
         new_self.set_origin(Point::new(
             DatabaseUnitT::from_float(target.x().to_float()),

@@ -118,7 +118,7 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
-    fn transform(self, transformation: &Transformation) -> Self {
+    fn transform(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.grid = new_self.grid.transform(transformation);
         new_self
@@ -126,7 +126,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Movable for Reference<DatabaseUnitT> {
-    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
+    fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let mut new_self = self.clone();
         new_self.grid = new_self.grid.move_to(target);
         new_self

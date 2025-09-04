@@ -86,7 +86,7 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Path<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
-    fn transform(self, transformation: &Transformation) -> Self {
+    fn transform(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.points = new_self
             .points()
@@ -98,7 +98,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Movable for Path<DatabaseUnitT> {
-    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
+    fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let first_point = &self.points()[0];
         let delta = Point::new(
             DatabaseIntegerUnit::from_float(target.x().to_float() - first_point.x().to_float()),

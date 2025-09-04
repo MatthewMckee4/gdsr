@@ -23,9 +23,9 @@ fn main() {
 
     library.add(cell);
 
-    let _res = library.to_gds("main.gds", 1e-9, 1e-9);
+    let _res = library.to_gds("main.gds", 1e-9, 1e-10);
 
     let new_library: Library<DatabaseIntegerUnit> = Library::from_gds("main.gds").unwrap();
 
-    println!("{:?}", new_library);
+    eprintln!("{new_library:#?}");
 }

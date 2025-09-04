@@ -20,7 +20,6 @@ use crate::utils::general::{point_to_database_float, point_to_database_unit};
 use crate::{CoordNum, DataType, DatabaseIntegerUnit, Layer, Point};
 
 use super::gds_format::{eight_byte_real, u16_array_to_big_endian};
-use super::geometry::round_to_decimals;
 
 pub fn write_gds_head_to_file(
     library_name: &str,
@@ -237,7 +236,6 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
     let mut reference: Option<Reference<DatabaseUnitT>> = None;
 
     let mut scale = 1.0;
-    let mut rounding_digits = 0;
 
     for record in reader {
         match record {
@@ -251,8 +249,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::Units => {
                     if let GDSRecordData::F64(units) = data {
-                        scale = units[0];
-                        rounding_digits = -(units[1] / units[0]).log10() as u32 - 1;
+                        scale = units[1] / units[0];
                     }
 
                     continue;
@@ -329,8 +326,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::Width => {
                     if let GDSRecordData::I32(width) = data {
-                        let path_width =
-                            round_to_decimals(width[0] as f64 * scale, rounding_digits);
+                        let path_width = width[0] as f64 * scale;
                         if let Some(path) = &mut path {
                             path.width = Some(path_width);
                         }
@@ -517,7 +513,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
     Ok(library)
 }
 
-fn update_references<T: CoordNum>(library: &mut Library<T>) {
+fn update_references<T: CoordNum>(library: &Library<T>) {
     let cell_references: Vec<Reference<T>> = library
         .cells
         .values()
@@ -538,8 +534,8 @@ pub struct RecordReader<R: Read> {
 }
 
 impl<R: Read> RecordReader<R> {
-    pub fn new(reader: BufReader<R>) -> Self {
-        RecordReader { reader }
+    pub const fn new(reader: BufReader<R>) -> Self {
+        Self { reader }
     }
 }
 
@@ -551,9 +547,8 @@ impl<R: Read> Iterator for RecordReader<R> {
         if let Err(e) = self.reader.read_exact(&mut header) {
             if e.kind() == io::ErrorKind::UnexpectedEof {
                 return None;
-            } else {
-                return Some(Err(e));
             }
+            return Some(Err(e));
         }
 
         let size = u16::from_be_bytes([header[0], header[1]]) as usize;
@@ -566,8 +561,9 @@ impl<R: Read> Iterator for RecordReader<R> {
                 return Some(Err(e));
             }
 
-            let result = match GDSDataType::try_from(data_type) {
-                Ok(data_type) => match data_type {
+            GDSDataType::try_from(data_type).map_or(
+                GDSRecordData::None,
+                |data_type| match data_type {
                     GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
                         let result = read_i16_be(&buf);
                         GDSRecordData::I16(result)
@@ -593,25 +589,20 @@ impl<R: Read> Iterator for RecordReader<R> {
                     }
                     _ => GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned()),
                 },
-                Err(_) => GDSRecordData::None,
-            };
-
-            result
+            )
         } else {
             GDSRecordData::None
         };
 
-        let record = match GDSRecord::try_from(record_type) {
-            Ok(record) => record,
-            Err(_) => {
-                return Some(Err(io::Error::new(
+        GDSRecord::try_from(record_type).map_or_else(
+            |()| {
+                Some(Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Invalid record type",
-                )));
-            }
-        };
-
-        Some(Ok((record, data)))
+                )))
+            },
+            |record| Some(Ok((record, data))),
+        )
     }
 }
 

@@ -16,7 +16,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
             return Ok(());
         }
 
-        let mut polygon_head = [
+        let polygon_head = [
             4,
             combine_record_and_data_type(GDSRecord::Boundary, GDSDataType::NoData),
             6,
@@ -27,9 +27,9 @@ impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
             self.data_type(),
         ];
 
-        write_u16_array_to_file(file, &mut polygon_head)?;
+        write_u16_array_to_file(file, &polygon_head)?;
 
-        write_points_to_file(file, &self.points(), scale, &|val| val.to_integer())?;
+        write_points_to_file(file, self.points(), scale, &|val| val.to_integer())?;
 
         write_element_tail_to_file(file)
     }

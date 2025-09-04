@@ -14,6 +14,10 @@ impl Reflection {
         Self(ReflectionInner { angle, centre })
     }
 
+    pub fn new_horizontal() -> Self {
+        Self::new(0.0, Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)))
+    }
+
     pub fn from_line(_point1: &Point<DatabaseIntegerUnit>, _point2: &Point<DatabaseIntegerUnit>) {
         todo!()
     }
