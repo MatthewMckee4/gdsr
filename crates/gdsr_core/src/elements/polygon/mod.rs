@@ -2,7 +2,7 @@ use crate::{
     CoordNum, DataType, DatabaseIntegerUnit, Layer, Point,
     traits::{Dimensions, Movable, Transformable},
     transformation::Transformation,
-    utils::geometry::bounding_box,
+    utils::geometry::{area, bounding_box, perimeter},
 };
 
 mod io;
@@ -44,6 +44,14 @@ impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
 
     pub fn data_type(&self) -> DataType {
         self.data_type
+    }
+
+    pub fn area(&self) -> DatabaseUnitT {
+        area(&self.points)
+    }
+
+    pub fn perimeter(&self) -> DatabaseUnitT {
+        perimeter(&self.points)
     }
 }
 

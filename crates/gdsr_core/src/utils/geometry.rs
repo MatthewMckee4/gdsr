@@ -67,28 +67,14 @@ pub fn area<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> Databas
 /// Calculate the perimeter of a polygon defined by points
 /// For open polygons, calculates the total length of all segments
 /// For closed polygons, includes the segment from last to first point
-pub fn perimeter<DatabaseUnitT: CoordNum + Sum>(
-    points: &[Point<DatabaseUnitT>],
-    closed: bool,
-) -> DatabaseUnitT {
+pub fn perimeter<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> DatabaseUnitT {
     if points.len() < 2 {
         return DatabaseUnitT::zero();
     }
 
     let coords = to_float_coords(points);
 
-    let mut linestring_coords = coords;
-
-    // If it's a closed polygon, ensure it's actually closed
-    if closed {
-        if let (Some(first), Some(last)) = (linestring_coords.first(), linestring_coords.last()) {
-            if first != last {
-                linestring_coords.push(*first);
-            }
-        }
-    }
-
-    let linestring = LineString::new(linestring_coords);
+    let linestring = LineString::new(coords);
 
     DatabaseUnitT::from_float(linestring.euclidean_length())
 }

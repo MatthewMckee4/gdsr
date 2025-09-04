@@ -1,43 +1,51 @@
-use crate::{CoordNum, cell::Cell};
+use crate::{
+    CoordNum,
+    cell::Cell,
+    utils::io::{from_gds, write_gds},
+};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, io};
 
 #[derive(Default)]
-pub struct Library<T: CoordNum> {
+pub struct Library<DatabaseUnitT: CoordNum> {
     pub name: String,
-    pub cells: HashMap<String, Cell<T>>,
+    pub cells: HashMap<String, Cell<DatabaseUnitT>>,
 }
 
-impl<T: CoordNum> Library<T> {
-    pub fn new(name: String) -> Self {
+impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
+    pub fn new(name: &str) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             cells: HashMap::new(),
         }
     }
 
-    pub fn add(&mut self, cells: Vec<Cell<T>>, replace_pre_existing: bool) -> Result<(), String> {
-        for cell in cells {
-            if !replace_pre_existing && self.cells.contains_key(&cell.name) {
-                return Err(format!(
-                    "Cell with name {} already exists in library",
-                    cell.name
-                ));
-            }
-            self.cells.insert(cell.name.clone(), cell);
-        }
-        Ok(())
+    pub fn add(&mut self, cell: Cell<DatabaseUnitT>) {
+        self.cells.insert(cell.name.clone(), cell);
     }
 
-    pub fn remove(&mut self, cells: Vec<Cell<T>>) -> Result<(), String> {
+    pub fn remove(&mut self, cells: Vec<Cell<DatabaseUnitT>>) {
         for cell in cells {
             self.cells.remove(&cell.name);
         }
-        Ok(())
     }
 
-    pub fn contains(&self, cell: Cell<T>) -> bool {
+    pub fn contains(&self, cell: Cell<DatabaseUnitT>) -> bool {
         self.cells.contains_key(&cell.name)
+    }
+
+    pub fn to_gds(&self, file_name: &str, units: f64, precision: f64) -> io::Result<()> {
+        write_gds(
+            file_name.to_string(),
+            &self.name,
+            units,
+            precision,
+            self.cells.values().map(|cell| cell.clone()).collect(),
+        )
+    }
+
+    pub fn from_gds(file_name: String) -> io::Result<Self> {
+        from_gds(file_name)
     }
 }
 

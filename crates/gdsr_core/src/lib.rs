@@ -1,6 +1,6 @@
 mod cell;
 mod config;
-mod elements;
+pub mod elements;
 mod grid;
 mod library;
 mod traits;

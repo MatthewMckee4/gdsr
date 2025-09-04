@@ -29,9 +29,9 @@ impl<DatabaseUnitT: CoordNum> Default for Cell<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             polygons: Vec::new(),
             paths: Vec::new(),
             texts: Vec::new(),

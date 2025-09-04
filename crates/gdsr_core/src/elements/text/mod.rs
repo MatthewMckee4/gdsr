@@ -71,10 +71,6 @@ impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
         self.layer
     }
 
-    pub(crate) fn set_layer(&mut self, layer: Layer) {
-        self.layer = layer
-    }
-
     pub fn magnification(&self) -> f64 {
         self.magnification
     }

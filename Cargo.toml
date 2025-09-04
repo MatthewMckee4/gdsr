@@ -26,7 +26,6 @@ pyo3 = { version = "0.22.2", features = [
     "py-clone",
 ] }
 pyo3-log = "0.11.0"
-tempfile = "3.10.1"
 geo = "0.28"
 approx = "0.5"
 

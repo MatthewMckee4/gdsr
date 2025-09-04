@@ -6,7 +6,6 @@ use std::io::{self, BufReader, Read, Write};
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 use geo::Rotate;
-use tempfile::Builder;
 
 use crate::cell::Cell;
 use crate::config::gds_file_types::GDSRecordData;
@@ -221,7 +220,7 @@ pub fn write_transformation_to_file(
 }
 
 pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Library<DatabaseUnitT>> {
-    let mut library = Library::new("Library".to_string());
+    let mut library = Library::new(&"Library");
 
     let file = File::open(file_name)?;
     let reader = RecordReader::new(BufReader::new(file));
@@ -678,12 +677,6 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     } else {
         mantissa * 16.0_f64.powi(exponent)
     }
-}
-
-pub fn create_temp_file() -> io::Result<String> {
-    let temp_file = Builder::new().suffix(".gds").tempfile()?;
-    let temp_path = temp_file.path().to_string_lossy().to_string();
-    Ok(temp_path)
 }
 
 pub fn get_points_from_i32_vec<DatabaseUnitT: CoordNum>(
