@@ -24,8 +24,8 @@ use super::geometry::round_to_decimals;
 
 pub fn write_gds_head_to_file(
     library_name: &str,
-    units: f64,
-    precision: f64,
+    user_units: f64,
+    database_units: f64,
     file: &mut File,
 ) -> io::Result<()> {
     let now = Local::now();
@@ -61,8 +61,8 @@ pub fn write_gds_head_to_file(
     ];
     write_u16_array_to_file(file, &mut head_units)?;
 
-    write_float_to_eight_byte_real_to_file(file, precision / units)?;
-    write_float_to_eight_byte_real_to_file(file, precision)
+    write_float_to_eight_byte_real_to_file(file, user_units)?;
+    write_float_to_eight_byte_real_to_file(file, database_units)
 }
 
 pub fn write_gds_tail_to_file(file: &mut File) -> io::Result<()> {
@@ -156,23 +156,28 @@ pub fn write_string_with_record_to_file(
     file.write_all(&lib_name_bytes)
 }
 
-pub fn write_gds<T: CoordNum>(
+pub fn write_gds<'a, T: CoordNum + 'a>(
     file_name: String,
     library_name: &str,
-    units: f64,
-    precision: f64,
-    cells: Vec<Cell<T>>,
+    user_units: f64,
+    database_units: f64,
+    cells: impl Iterator<Item = &'a Cell<T>>,
 ) -> io::Result<()> {
     let mut file = File::create(file_name.clone())?;
 
-    write_gds_head_to_file(library_name, units, precision, &mut file)?;
+    write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
 
     let mut written_cell_names: HashSet<String> = HashSet::new();
 
     for cell in cells {
         if !written_cell_names.contains(&cell.name) {
             written_cell_names.insert(cell.name.clone());
-            cell._to_gds(&mut file, units, precision, &mut written_cell_names)?;
+            cell._to_gds(
+                &mut file,
+                user_units,
+                database_units,
+                &mut written_cell_names,
+            )?;
         }
     }
 

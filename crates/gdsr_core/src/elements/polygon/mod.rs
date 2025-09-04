@@ -9,7 +9,7 @@ mod io;
 mod utils;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Polygon<DatabaseUnitT: CoordNum> {
+pub struct Polygon<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) points: Vec<Point<DatabaseUnitT>>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,

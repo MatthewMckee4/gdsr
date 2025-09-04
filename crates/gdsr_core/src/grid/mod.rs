@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Grid<DatabaseUnitT: CoordNum> {
+pub struct Grid<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) origin: Point<DatabaseUnitT>,
     pub(crate) columns: u32,
     pub(crate) rows: u32,
@@ -18,21 +18,21 @@ pub struct Grid<DatabaseUnitT: CoordNum> {
 
 impl<DatabaseUnitT: CoordNum> Grid<DatabaseUnitT> {
     pub fn new(
-        origin: Point<DatabaseUnitT>,
+        origin: impl Into<Point<DatabaseUnitT>>,
         columns: u32,
         rows: u32,
-        spacing_x: Point<DatabaseUnitT>,
-        spacing_y: Point<DatabaseUnitT>,
+        spacing_x: impl Into<Point<DatabaseUnitT>>,
+        spacing_y: impl Into<Point<DatabaseUnitT>>,
         magnification: f64,
         angle: f64,
         x_reflection: bool,
     ) -> Self {
         Self {
-            origin,
+            origin: origin.into(),
             columns,
             rows,
-            spacing_x,
-            spacing_y,
+            spacing_x: spacing_x.into(),
+            spacing_y: spacing_y.into(),
             magnification,
             angle,
             x_reflection,

@@ -1,7 +1,7 @@
 use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
 #[derive(Clone, Debug)]
-pub struct TranslationInner<DatabaseUnitT: CoordNum> {
+pub struct TranslationInner<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     delta: Point<DatabaseUnitT>,
 }
 

@@ -11,7 +11,7 @@ pub use reference::Reference;
 pub use text::Text;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Element<DatabaseUnitT: CoordNum> {
+pub enum Element<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     Path(Path<DatabaseUnitT>),
     Polygon(Polygon<DatabaseUnitT>),
     Reference(Reference<DatabaseUnitT>),

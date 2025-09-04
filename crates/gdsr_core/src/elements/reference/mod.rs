@@ -11,7 +11,7 @@ pub mod io;
 pub use instance::Instance;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Reference<DatabaseUnitT: CoordNum> {
+pub struct Reference<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) instance: Instance<DatabaseUnitT>,
     pub(crate) grid: Grid<DatabaseUnitT>,
 }

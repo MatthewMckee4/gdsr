@@ -6,7 +6,7 @@ pub mod presentation;
 pub mod utils;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Text<DatabaseUnitT: CoordNum> {
+pub struct Text<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub text: String,
     pub origin: Point<DatabaseUnitT>,
     pub layer: Layer,

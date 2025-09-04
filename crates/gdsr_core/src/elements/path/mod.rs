@@ -13,7 +13,7 @@ pub mod path_type;
 pub(crate) type Width = f64;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Path<DatabaseUnitT: CoordNum> {
+pub struct Path<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) points: Vec<Point<DatabaseUnitT>>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,

@@ -1,5 +1,5 @@
 use crate::{
-    CoordNum,
+    CoordNum, DatabaseIntegerUnit,
     elements::{Element, Path, Polygon, Reference, Text},
     traits::Transformable,
     transformation::Transformation,
@@ -8,7 +8,7 @@ use crate::{
 mod io;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Cell<DatabaseUnitT: CoordNum> {
+pub struct Cell<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) name: String,
     pub(crate) polygons: Vec<Polygon<DatabaseUnitT>>,
     pub(crate) paths: Vec<Path<DatabaseUnitT>>,
@@ -53,6 +53,15 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
 
     pub fn add_reference(&mut self, reference: Reference<DatabaseUnitT>) {
         self.references.push(reference);
+    }
+
+    pub fn add(&mut self, element: impl Into<Element<DatabaseUnitT>>) {
+        match element.into() {
+            Element::Path(path) => self.add_path(path),
+            Element::Polygon(polygon) => self.add_polygon(polygon),
+            Element::Reference(reference) => self.add_reference(reference),
+            Element::Text(text) => self.add_text(text),
+        };
     }
 
     pub(crate) fn get_elements(&self, _depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {
