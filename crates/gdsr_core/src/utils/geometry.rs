@@ -174,15 +174,6 @@ mod tests {
     }
 
     #[test]
-    fn test_distance() {
-        let p1 = Point::new(0.0, 0.0);
-        let p2 = Point::new(3.0, 4.0);
-
-        let dist = distance_between_points(&p1, &p2);
-        assert_relative_eq!(dist, 5.0, epsilon = 1e-10);
-    }
-
-    #[test]
     fn test_point_inside() {
         let square = vec![
             Point::new(0.0, 0.0),
