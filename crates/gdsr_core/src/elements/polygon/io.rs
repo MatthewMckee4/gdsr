@@ -12,7 +12,7 @@ use super::Polygon;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
     fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()> {
-        if self.0.points.len() > 8191 {
+        if self.points().len() > 8191 {
             return Ok(());
         }
 
@@ -29,7 +29,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
 
         write_u16_array_to_file(file, &mut polygon_head)?;
 
-        write_points_to_file(file, &self.0.points, scale, &|val| val.to_integer())?;
+        write_points_to_file(file, &self.points(), scale, &|val| val.to_integer())?;
 
         write_element_tail_to_file(file)
     }

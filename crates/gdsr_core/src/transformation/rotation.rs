@@ -22,22 +22,25 @@ impl Rotation {
         &self.0.centre
     }
 
-    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
+    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
+        &self,
+        point: &Point<DatabaseUnitT>,
+    ) -> Point<DatabaseUnitT> {
         let cos_angle = (self.0.angle as f64).cos();
         let sin_angle = (self.0.angle as f64).sin();
 
         let self_center_x = self.0.centre.x() as f64;
         let self_center_y = self.0.centre.y() as f64;
 
-        let dx = (point.x() as f64) - self_center_x;
-        let dy = (point.y() as f64) - self_center_y;
+        let dx = (point.x().to_float()) - self_center_x;
+        let dy = (point.y().to_float()) - self_center_y;
 
         let new_x = self_center_x + dx * cos_angle - dy * sin_angle;
         let new_y = self_center_y + dx * sin_angle + dy * cos_angle;
 
         Point::new(
-            new_x.round() as DatabaseIntegerUnit,
-            new_y.round() as DatabaseIntegerUnit,
+            DatabaseUnitT::from_float(new_x),
+            DatabaseUnitT::from_float(new_y),
         )
     }
 }

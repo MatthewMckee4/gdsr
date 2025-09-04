@@ -1,6 +1,8 @@
+use geo::Rotate;
+
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Point, elements::Element, grid::Grid, traits::Transformable,
-    transformation::Transformation, utils::general::point_to_database_float,
+    CoordNum, DatabaseIntegerUnit, Movable, Point, elements::Element, grid::Grid,
+    traits::Transformable, transformation::Transformation, utils::general::point_to_database_float,
 };
 
 pub mod instance;
@@ -9,9 +11,18 @@ pub mod io;
 pub use instance::Instance;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Reference<T: CoordNum> {
-    instance: Instance<T>,
-    grid: Grid<T>,
+pub struct Reference<DatabaseUnitT: CoordNum> {
+    pub(crate) instance: Instance<DatabaseUnitT>,
+    pub(crate) grid: Grid<DatabaseUnitT>,
+}
+
+impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
+    fn default() -> Self {
+        Self {
+            instance: Default::default(),
+            grid: Default::default(),
+        }
+    }
 }
 
 impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
@@ -46,47 +57,49 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
                 let mut new_element = element.clone();
 
                 if grid.x_reflection {
-                    new_element.reflect(0.0, Point::new(1.0, 0.0));
+                    new_element = new_element.reflect(0.0, Point::new(1, 0));
                 }
 
-                new_element.rotate(grid.angle, Point::default());
-                new_element.scale(grid.magnification, Point::default());
+                new_element = new_element.rotate(grid.angle, Point::default());
+                new_element = new_element.scale(grid.magnification, Point::default());
 
-                new_element.move_by(origin.rotate(grid.angle, grid.origin));
+                let move_point = origin.rotate_around_point(
+                    grid.angle,
+                    Point::new(grid.origin.x().to_float(), grid.origin.y().to_float()),
+                );
 
-                elements.push(new_element.copy());
+                new_element = new_element.move_by(Point::new(
+                    DatabaseIntegerUnit::from_float(move_point.x()),
+                    DatabaseIntegerUnit::from_float(move_point.y()),
+                ));
+
+                elements.push(new_element.clone());
             }
         }
 
         elements
     }
 
-    pub fn flatten(
-        &mut self,
-        layer_data_types: Vec<(i32, i32)>,
-        depth: Option<usize>,
-    ) -> Vec<Element<DatabaseUnitT>> {
+    pub fn flatten(self, depth: Option<usize>) -> Vec<Element<DatabaseUnitT>> {
         let depth = depth.unwrap_or(usize::MAX);
-        let flatten_all = layer_data_types.is_empty();
         let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
         if depth == 0 {
             return [Element::Reference(self.clone())].to_vec();
         }
         match &self.instance {
             Instance::Cell(cell) => {
-                let flattened_cell_elements = cell.get_elements(layer_data_types, Some(depth - 1));
+                let flattened_cell_elements = cell.get_elements(Some(depth - 1));
                 for cell_element in flattened_cell_elements {
                     elements.extend(self._get_elements_in_grid(cell_element));
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
                 Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
-                    elements.extend(self._get_elements_in_grid(element));
+                    elements.extend(self._get_elements_in_grid(&element));
                 }
 
                 Element::Reference(reference) => {
-                    let flattened_reference_elements =
-                        reference.flatten(layer_data_types, Some(depth - 1));
+                    let flattened_reference_elements = reference.clone().flatten(Some(depth - 1));
 
                     let flattened_copied_elements = flattened_reference_elements
                         .iter()
@@ -104,10 +117,19 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
     }
 }
 
-impl Transformable for Reference<DatabaseIntegerUnit> {
-    fn transform(&mut self, transformation: &Transformation) -> &mut Self {
-        self.grid.transform(transformation);
-        self
+impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
+    fn transform(self, transformation: &Transformation) -> Self {
+        let mut new_self = self.clone();
+        new_self.grid = new_self.grid.transform(transformation);
+        new_self
+    }
+}
+
+impl<DatabaseUnitT: CoordNum> Movable for Reference<DatabaseUnitT> {
+    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
+        let mut new_self = self.clone();
+        new_self.grid = new_self.grid.move_to(target);
+        new_self
     }
 }
 

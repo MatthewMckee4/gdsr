@@ -12,17 +12,26 @@ pub mod path_type;
 
 pub(crate) type Width = f64;
 
-#[derive(Clone, Default, Debug, PartialEq)]
-struct PathInner<DatabaseUnitT: CoordNum> {
-    points: Vec<Point<DatabaseUnitT>>,
-    layer: Layer,
-    data_type: DataType,
-    path_type: Option<PathType>,
-    width: Option<Width>,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Path<DatabaseUnitT: CoordNum> {
+    pub(crate) points: Vec<Point<DatabaseUnitT>>,
+    pub(crate) layer: Layer,
+    pub(crate) data_type: DataType,
+    pub(crate) path_type: Option<PathType>,
+    pub(crate) width: Option<Width>,
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
-pub struct Path<DatabaseUnitT: CoordNum>(PathInner<DatabaseUnitT>);
+impl<DatabaseUnitT: CoordNum> Default for Path<DatabaseUnitT> {
+    fn default() -> Self {
+        Self {
+            points: Default::default(),
+            layer: Default::default(),
+            data_type: Default::default(),
+            path_type: Default::default(),
+            width: Default::default(),
+        }
+    }
+}
 
 impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
     pub fn new(
@@ -32,33 +41,33 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
         path_type: Option<PathType>,
         width: Option<Width>,
     ) -> Self {
-        Self(PathInner {
+        Self {
             points,
             layer,
             data_type,
             path_type,
             width,
-        })
+        }
     }
 
     pub fn points(&self) -> &[Point<DatabaseUnitT>] {
-        &self.0.points
+        &self.points
     }
 
     pub fn layer(&self) -> Layer {
-        self.0.layer
+        self.layer
     }
 
     pub fn data_type(&self) -> DataType {
-        self.0.data_type
+        self.data_type
     }
 
     pub fn path_type(&self) -> &Option<PathType> {
-        &self.0.path_type
+        &self.path_type
     }
 
     pub fn width(&self) -> Option<Width> {
-        self.0.width
+        self.width
     }
 }
 
@@ -76,21 +85,25 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Path<DatabaseUnitT> {
     }
 }
 
-impl Transformable for Path<DatabaseIntegerUnit> {
-    fn transform(&mut self, transformation: &Transformation) -> &mut Self {
-        self.0.points = self
+impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
+    fn transform(self, transformation: &Transformation) -> Self {
+        let mut new_self = self.clone();
+        new_self.points = new_self
             .points()
             .iter()
             .map(|point| transformation.apply_to_point(point))
             .collect();
-        self
+        new_self
     }
 }
 
-impl Movable for Path<DatabaseIntegerUnit> {
-    fn move_to(&mut self, target: Point<DatabaseIntegerUnit>) -> &mut Self {
+impl<DatabaseUnitT: CoordNum> Movable for Path<DatabaseUnitT> {
+    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
         let first_point = &self.points()[0];
-        let delta = Point::new(target.x() - first_point.x(), target.y() - first_point.y());
+        let delta = Point::new(
+            DatabaseIntegerUnit::from_float(target.x().to_float() - first_point.x().to_float()),
+            DatabaseIntegerUnit::from_float(target.y().to_float() - first_point.y().to_float()),
+        );
         self.move_by(delta)
     }
 }

@@ -1,19 +1,31 @@
 use crate::{
-    CoordNum, DatabaseIntegerUnit,
-    elements::{Path, Polygon, Reference, Text},
+    CoordNum,
+    elements::{Element, Path, Polygon, Reference, Text},
     traits::Transformable,
     transformation::Transformation,
 };
 
 mod io;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Cell<DatabaseUnitT: CoordNum> {
-    pub name: String,
-    pub polygons: Vec<Polygon<DatabaseUnitT>>,
-    pub paths: Vec<Path<DatabaseUnitT>>,
-    pub texts: Vec<Text<DatabaseUnitT>>,
-    pub references: Vec<Reference<DatabaseUnitT>>,
+    pub(crate) name: String,
+    pub(crate) polygons: Vec<Polygon<DatabaseUnitT>>,
+    pub(crate) paths: Vec<Path<DatabaseUnitT>>,
+    pub(crate) texts: Vec<Text<DatabaseUnitT>>,
+    pub(crate) references: Vec<Reference<DatabaseUnitT>>,
+}
+
+impl<DatabaseUnitT: CoordNum> Default for Cell<DatabaseUnitT> {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            polygons: Default::default(),
+            paths: Default::default(),
+            texts: Default::default(),
+            references: Default::default(),
+        }
+    }
 }
 
 impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
@@ -42,27 +54,41 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     pub fn add_reference(&mut self, reference: Reference<DatabaseUnitT>) {
         self.references.push(reference);
     }
+
+    pub(crate) fn get_elements(&self, depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {
+        todo!()
+    }
 }
 
-impl Transformable for Cell<DatabaseIntegerUnit> {
-    fn transform(&mut self, transformation: &Transformation) -> &mut Self {
-        for polygon in &mut self.polygons {
-            polygon.transform(transformation);
-        }
+impl<DatabaseUnitT: CoordNum> Transformable for Cell<DatabaseUnitT> {
+    fn transform(self, transformation: &Transformation) -> Self {
+        let mut new_self = self.clone();
 
-        for path in &mut self.paths {
-            path.transform(transformation);
-        }
+        new_self.polygons = new_self
+            .polygons
+            .into_iter()
+            .map(|polygon| polygon.transform(transformation))
+            .collect();
 
-        // for text in &mut self.texts {
-        //     text.transform(transformation);
-        // }
+        new_self.paths = new_self
+            .paths
+            .into_iter()
+            .map(|path| path.transform(transformation))
+            .collect();
 
-        for reference in &mut self.references {
-            reference.transform(transformation);
-        }
+        new_self.texts = new_self
+            .texts
+            .into_iter()
+            .map(|text| text.transform(transformation))
+            .collect();
 
-        self
+        new_self.references = new_self
+            .references
+            .into_iter()
+            .map(|reference| reference.transform(transformation))
+            .collect();
+
+        new_self
     }
 }
 

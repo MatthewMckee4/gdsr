@@ -1,10 +1,22 @@
 use geo::{
-    Area, BoundingRect, Centroid, Contains, Coord, EuclideanDistance, EuclideanLength, Line,
-    LineString, Point, Polygon,
+    Area, BoundingRect, Contains, Coord, EuclideanDistance, EuclideanLength, Line, LineString,
+    Point, Polygon,
 };
 use std::iter::Sum;
 
-use crate::CoordNum;
+use crate::{CoordNum, DatabaseFloatUnit, utils::general::point_to_database_float};
+
+fn to_float_coords<DatabaseUnitT: CoordNum>(
+    points: &[Point<DatabaseUnitT>],
+) -> Vec<Coord<DatabaseFloatUnit>> {
+    points
+        .iter()
+        .map(|p| Coord {
+            x: p.x().to_float(),
+            y: p.y().to_float(),
+        })
+        .collect()
+}
 
 /// Calculate the bounding box of a collection of points
 /// Returns (min_point, max_point) representing the bottom-left and top-right corners
@@ -31,16 +43,12 @@ pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
 
 /// Calculate the area of a polygon defined by points using the shoelace formula
 /// Points should be in order (clockwise or counter-clockwise)
-pub fn area<T: CoordNum>(points: &[Point<T>]) -> T {
+pub fn area<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> DatabaseUnitT {
     if points.len() < 3 {
-        return T::zero();
+        return DatabaseUnitT::zero();
     }
 
-    // Convert points to LineString and then to Polygon
-    let coords: Vec<Coord<T>> = points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
+    let coords = to_float_coords(points);
 
     // Close the polygon by adding the first point at the end if not already closed
     let mut closed_coords = coords;
@@ -53,21 +61,21 @@ pub fn area<T: CoordNum>(points: &[Point<T>]) -> T {
     let linestring = LineString::new(closed_coords);
     let polygon = Polygon::new(linestring, vec![]);
 
-    polygon.unsigned_area().abs()
+    DatabaseUnitT::from_float(polygon.unsigned_area().abs())
 }
 
 /// Calculate the perimeter of a polygon defined by points
 /// For open polygons, calculates the total length of all segments
 /// For closed polygons, includes the segment from last to first point
-pub fn perimeter<T: CoordNum + Sum>(points: &[Point<T>], closed: bool) -> T {
+pub fn perimeter<DatabaseUnitT: CoordNum + Sum>(
+    points: &[Point<DatabaseUnitT>],
+    closed: bool,
+) -> DatabaseUnitT {
     if points.len() < 2 {
-        return T::zero();
+        return DatabaseUnitT::zero();
     }
 
-    let coords: Vec<Coord<T>> = points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
+    let coords = to_float_coords(points);
 
     let mut linestring_coords = coords;
 
@@ -81,26 +89,31 @@ pub fn perimeter<T: CoordNum + Sum>(points: &[Point<T>], closed: bool) -> T {
     }
 
     let linestring = LineString::new(linestring_coords);
-    linestring.euclidean_length()
+
+    DatabaseUnitT::from_float(linestring.euclidean_length())
 }
 
 /// Calculate the Euclidean distance between two points
-pub fn distance_between_points<T: CoordNum>(point1: &Point<T>, point2: &Point<T>) -> T {
-    point1.euclidean_distance(point2)
+pub fn distance_between_points<DatabaseUnitT: CoordNum>(
+    point1: &Point<DatabaseUnitT>,
+    point2: &Point<DatabaseUnitT>,
+) -> DatabaseUnitT {
+    DatabaseUnitT::from_float(
+        point_to_database_float(*point1).euclidean_distance(&point_to_database_float(*point2)),
+    )
 }
 
 /// Check if a point is inside a polygon using the ray casting algorithm
 /// The polygon is defined by an ordered list of points
-pub fn is_point_inside<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
+pub fn is_point_inside<DatabaseUnitT: CoordNum>(
+    point: &Point<DatabaseUnitT>,
+    polygon_points: &[Point<DatabaseUnitT>],
+) -> bool {
     if polygon_points.len() < 3 {
         return false;
     }
 
-    // Convert points to a proper Polygon
-    let coords: Vec<Coord<T>> = polygon_points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
+    let coords = to_float_coords(polygon_points);
 
     // Ensure the polygon is closed
     let mut closed_coords = coords;
@@ -113,7 +126,7 @@ pub fn is_point_inside<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T>
     let linestring = LineString::new(closed_coords);
     let polygon = Polygon::new(linestring, vec![]);
 
-    polygon.contains(point)
+    polygon.contains(&point_to_database_float(*point))
 }
 
 /// Check if a point lies on the edge of a polygon
@@ -136,107 +149,23 @@ pub fn is_point_on_edge<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T
 
 /// Check if a point lies on a line segment
 pub fn is_point_on_line_segment<T: CoordNum>(point: &Point<T>, a: &Point<T>, b: &Point<T>) -> bool {
-    let line_segment = Line::new(Coord { x: a.x(), y: a.y() }, Coord { x: b.x(), y: b.y() });
-    line_segment.contains(point)
+    let line_segment = Line::new(
+        Coord {
+            x: a.x().to_float(),
+            y: a.y().to_float(),
+        },
+        Coord {
+            x: b.x().to_float(),
+            y: b.y().to_float(),
+        },
+    );
+    line_segment.contains(&point_to_database_float(*point))
 }
 
 /// Round a floating point value to a specified number of decimal places
 pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
     let factor = 10f64.powi(ndigits as i32);
     (value * factor).round() / factor
-}
-
-// Additional utility functions leveraging geo's capabilities
-
-/// Calculate the centroid of a polygon
-pub fn centroid<T: CoordNum>(points: &[Point<T>]) -> Option<Point<T>> {
-    if points.len() < 3 {
-        return None;
-    }
-
-    let coords: Vec<Coord<T>> = points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
-
-    let mut closed_coords = coords;
-    if let (Some(first), Some(last)) = (closed_coords.first(), closed_coords.last()) {
-        if first != last {
-            closed_coords.push(*first);
-        }
-    }
-
-    let linestring = LineString::new(closed_coords);
-    let polygon = Polygon::new(linestring, vec![]);
-
-    polygon.centroid().map(|c| Point::new(c.x(), c.y()))
-}
-
-/// Check if two polygons intersect
-pub fn polygons_intersect<T: CoordNum>(points1: &[Point<T>], points2: &[Point<T>]) -> bool {
-    use geo::Intersects;
-
-    if points1.len() < 3 || points2.len() < 3 {
-        return false;
-    }
-
-    let polygon1 = create_polygon_from_points(points1);
-    let polygon2 = create_polygon_from_points(points2);
-
-    polygon1.intersects(&polygon2)
-}
-
-/// Get the convex hull of a set of points
-pub fn convex_hull<T: CoordNum>(points: &[Point<T>]) -> Vec<Point<T>> {
-    use geo::ConvexHull;
-
-    let multipoint = geo::MultiPoint::new(points.to_vec());
-    let hull = multipoint.convex_hull();
-
-    hull.exterior()
-        .coords()
-        .map(|coord| Point::new(coord.x, coord.y))
-        .collect()
-}
-
-/// Simplify a polygon using the Douglas-Peucker algorithm
-pub fn simplify_polygon<T: CoordNum>(points: &[Point<T>], epsilon: T) -> Vec<Point<T>> {
-    use geo::Simplify;
-
-    if points.len() < 3 {
-        return points.to_vec();
-    }
-
-    let coords: Vec<Coord<T>> = points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
-
-    let linestring = LineString::new(coords);
-    let simplified = linestring.simplify(&epsilon);
-
-    simplified
-        .coords()
-        .map(|coord| Point::new(coord.x, coord.y))
-        .collect()
-}
-
-// Helper function to create a polygon from points
-fn create_polygon_from_points<T: CoordNum>(points: &[Point<T>]) -> Polygon<T> {
-    let coords: Vec<Coord<T>> = points
-        .iter()
-        .map(|p| Coord { x: p.x(), y: p.y() })
-        .collect();
-
-    let mut closed_coords = coords;
-    if let (Some(first), Some(last)) = (closed_coords.first(), closed_coords.last()) {
-        if first != last {
-            closed_coords.push(*first);
-        }
-    }
-
-    let linestring = LineString::new(closed_coords);
-    Polygon::new(linestring, vec![])
 }
 
 #[cfg(test)]

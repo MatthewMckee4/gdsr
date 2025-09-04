@@ -22,6 +22,7 @@ pub use validation::input::{
 pub trait CoordNum: geo::CoordNum {
     fn to_integer(&self) -> DatabaseIntegerUnit;
     fn to_float(&self) -> DatabaseFloatUnit;
+    fn from_float(val: DatabaseFloatUnit) -> Self;
 }
 
 pub type DatabaseFloatUnit = f64;
@@ -35,6 +36,10 @@ impl CoordNum for DatabaseFloatUnit {
     fn to_float(&self) -> DatabaseFloatUnit {
         *self
     }
+
+    fn from_float(val: DatabaseFloatUnit) -> Self {
+        val
+    }
 }
 impl CoordNum for DatabaseIntegerUnit {
     fn to_integer(&self) -> DatabaseIntegerUnit {
@@ -43,6 +48,10 @@ impl CoordNum for DatabaseIntegerUnit {
 
     fn to_float(&self) -> DatabaseFloatUnit {
         *self as DatabaseFloatUnit
+    }
+
+    fn from_float(val: DatabaseFloatUnit) -> Self {
+        val.round() as DatabaseIntegerUnit
     }
 }
 

@@ -5,19 +5,20 @@ use std::io::{self, BufReader, Read, Write};
 
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
+use geo::Rotate;
 use tempfile::Builder;
 
 use crate::cell::Cell;
 use crate::config::gds_file_types::GDSRecordData;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::elements::path::path_type::PathType;
+use crate::elements::reference::Instance;
+use crate::elements::text::utils::get_presentations_from_value;
+use crate::elements::{Path, Polygon, Reference, Text};
 use crate::library::Library;
-use crate::path::Path;
-use crate::path::path_type::PathType;
-use crate::polygon::Polygon;
-use crate::reference::{Instance, Reference};
-use crate::text::Text;
-use crate::text::utils::get_presentations_from_value;
-use crate::{CoordNum, DatabaseIntegerUnit, Point};
+
+use crate::utils::general::{point_to_database_float, point_to_database_unit};
+use crate::{CoordNum, DataType, DatabaseIntegerUnit, Layer, Point};
 
 use super::gds_format::{eight_byte_real, u16_array_to_big_endian};
 use super::geometry::round_to_decimals;
@@ -219,17 +220,17 @@ pub fn write_transformation_to_file(
     Ok(())
 }
 
-pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
+pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Library<DatabaseUnitT>> {
     let mut library = Library::new("Library".to_string());
 
     let file = File::open(file_name)?;
     let reader = RecordReader::new(BufReader::new(file));
 
-    let mut cell: Option<Cell<T>> = None;
-    let mut path: Option<Path<T>> = None;
-    let mut polygon: Option<Polygon<T>> = None;
-    let mut text: Option<Text<T>> = None;
-    let mut reference: Option<Reference<T>> = None;
+    let mut cell: Option<Cell<DatabaseUnitT>> = None;
+    let mut path: Option<Path<DatabaseUnitT>> = None;
+    let mut polygon: Option<Polygon<DatabaseUnitT>> = None;
+    let mut text: Option<Text<DatabaseUnitT>> = None;
+    let mut reference: Option<Reference<DatabaseUnitT>> = None;
 
     let mut scale = 1.0;
     let mut rounding_digits = 0;
@@ -299,7 +300,7 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 }
                 GDSRecord::Layer => {
                     if let GDSRecordData::I16(layer) = data {
-                        let layer_value = layer[0] as i32;
+                        let layer_value = layer[0] as Layer;
                         if let Some(polygon) = &mut polygon {
                             polygon.layer = layer_value;
                         } else if let Some(path) = &mut path {
@@ -312,7 +313,7 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 }
                 GDSRecord::DataType | GDSRecord::BoxType => {
                     if let GDSRecordData::I16(data_type) = data {
-                        let data_type_val = data_type[0] as i32;
+                        let data_type_val = data_type[0] as DataType;
                         if let Some(polygon) = &mut polygon {
                             polygon.data_type = data_type_val;
                         } else if let Some(path) = &mut path {
@@ -335,10 +336,15 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 }
                 GDSRecord::XY => {
                     if let GDSRecordData::I32(xy) = data {
-                        let points = get_points_from_i32_vec::<T>(xy)
+                        let points = get_points_from_i32_vec::<DatabaseUnitT>(xy)
                             .iter()
-                            .map(|p| p.scale(scale, Point::default()).round(rounding_digits))
-                            .collect::<Vec<Point>>();
+                            .map(|p| {
+                                Point::new(
+                                    DatabaseUnitT::from_float(p.x().to_float() * scale),
+                                    DatabaseUnitT::from_float(p.y().to_float() * scale),
+                                )
+                            })
+                            .collect::<Vec<Point<DatabaseUnitT>>>();
 
                         if let Some(polygon) = &mut polygon {
                             polygon.points = points;
@@ -353,24 +359,31 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                                     let origin = points[0];
                                     let rotated_points = points
                                         .iter()
-                                        .map(|&p| p.rotate(-reference.grid.angle, origin))
-                                        .collect::<Vec<Point>>();
+                                        .map(|&p| {
+                                            point_to_database_unit(
+                                                point_to_database_float(p).rotate_around_point(
+                                                    -reference.grid.angle,
+                                                    point_to_database_float(origin),
+                                                ),
+                                            )
+                                        })
+                                        .collect::<Vec<Point<DatabaseUnitT>>>();
 
-                                    reference.grid.origin =
-                                        rotated_points[0].round(rounding_digits);
+                                    reference.grid.origin = rotated_points[0];
+
                                     reference.grid.spacing_x = if reference.grid.columns > 0 {
-                                        ((rotated_points[1] - rotated_points[0])
-                                            / reference.grid.columns as f64)
-                                            .round(rounding_digits)
+                                        (rotated_points[1] - rotated_points[0])
+                                            / DatabaseUnitT::from_float(
+                                                reference.grid.columns as f64,
+                                            )
                                     } else {
-                                        Point::default()
+                                        Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
                                     };
                                     reference.grid.spacing_y = if reference.grid.rows > 0 {
-                                        ((rotated_points[2] - rotated_points[0])
-                                            / reference.grid.rows as f64)
-                                            .round(rounding_digits)
+                                        (rotated_points[2] - rotated_points[0])
+                                            / DatabaseUnitT::from_float(reference.grid.rows as f64)
                                     } else {
-                                        Point::default()
+                                        Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
                                     };
                                 }
                                 _ => {}
@@ -406,7 +419,7 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
-                            if let Instance::Cell(cell) = &reference.instance {
+                            if let Instance::Cell(cell) = &mut reference.instance {
                                 cell.name = cell_name;
                             }
                         }
@@ -427,8 +440,12 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 GDSRecord::Presentation => {
                     if let GDSRecordData::I16(flags) = data {
                         if let Some(text) = &mut text {
-                            (text.vertical_presentation, text.horizontal_presentation) =
-                                get_presentations_from_value(flags[0])?;
+                            if let Ok((vertical_presentation, horizontal_presentation)) =
+                                get_presentations_from_value(flags[0])
+                            {
+                                text.vertical_presentation = vertical_presentation;
+                                text.horizontal_presentation = horizontal_presentation
+                            }
                         }
                     }
 
@@ -481,7 +498,7 @@ pub fn from_gds<T: CoordNum>(file_name: String) -> io::Result<Library<T>> {
                 GDSRecord::PathType => {
                     if let GDSRecordData::I16(path_type) = data {
                         if let Some(path) = &mut path {
-                            path.path_type = Some(PathType::new(path_type[0] as i32)?);
+                            path.path_type = Some(PathType::new(path_type[0] as i32));
                         }
                     }
 
@@ -669,8 +686,15 @@ pub fn create_temp_file() -> io::Result<String> {
     Ok(temp_path)
 }
 
-pub fn get_points_from_i32_vec<T: CoordNum>(vec: Vec<i32>) -> Vec<Point<T>> {
+pub fn get_points_from_i32_vec<DatabaseUnitT: CoordNum>(
+    vec: Vec<i32>,
+) -> Vec<Point<DatabaseUnitT>> {
     vec.chunks(2)
-        .map(|chunk| Point::new((chunk[0] as f64).into(), (chunk[1] as f64).into()))
+        .map(|chunk| {
+            Point::new(
+                DatabaseUnitT::from_float(chunk[0] as f64),
+                DatabaseUnitT::from_float(chunk[1] as f64),
+            )
+        })
         .collect()
 }

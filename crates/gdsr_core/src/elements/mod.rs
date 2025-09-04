@@ -1,4 +1,4 @@
-use crate::{CoordNum, DatabaseIntegerUnit, ToGds, Transformable};
+use crate::{CoordNum, DatabaseIntegerUnit, Movable, ToGds, Transformable};
 
 pub mod path;
 pub mod polygon;
@@ -29,13 +29,26 @@ impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
     }
 }
 
-impl Transformable for Element<DatabaseIntegerUnit> {
+impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
     fn transform(self, transformation: &crate::Transformation) -> Self {
         match self {
             Element::Path(path) => Element::Path(path.transform(transformation)),
-            Element::Polygon(polygon) => Element::Polygon(polygon.transform(transformation))
-            Element::Reference(reference) => Element::Reference(reference.transform(transformation)),
+            Element::Polygon(polygon) => Element::Polygon(polygon.transform(transformation)),
+            Element::Reference(reference) => {
+                Element::Reference(reference.transform(transformation))
+            }
             Element::Text(text) => Element::Text(text.transform(transformation)),
+        }
+    }
+}
+
+impl<DatabaseUnitT: CoordNum> Movable for Element<DatabaseUnitT> {
+    fn move_to(self, target: geo::Point<DatabaseIntegerUnit>) -> Self {
+        match self {
+            Element::Path(path) => Element::Path(path.move_to(target)),
+            Element::Polygon(polygon) => Element::Polygon(polygon.move_to(target)),
+            Element::Reference(reference) => Element::Reference(reference.move_to(target)),
+            Element::Text(text) => Element::Text(text.move_to(target)),
         }
     }
 }

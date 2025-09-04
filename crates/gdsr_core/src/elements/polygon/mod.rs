@@ -8,35 +8,42 @@ use crate::{
 mod io;
 mod utils;
 
-#[derive(Clone, Default, Debug, PartialEq)]
-struct PolygonInner<DatabaseUnitT: CoordNum> {
-    points: Vec<Point<DatabaseUnitT>>,
-    layer: Layer,
-    data_type: DataType,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Polygon<DatabaseUnitT: CoordNum> {
+    pub(crate) points: Vec<Point<DatabaseUnitT>>,
+    pub(crate) layer: Layer,
+    pub(crate) data_type: DataType,
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
-pub struct Polygon<DatabaseUnitT: CoordNum>(PolygonInner<DatabaseUnitT>);
+impl<DatabaseUnitT: CoordNum> Default for Polygon<DatabaseUnitT> {
+    fn default() -> Self {
+        Self {
+            points: Default::default(),
+            layer: Default::default(),
+            data_type: Default::default(),
+        }
+    }
+}
 
 impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
     pub fn new(points: Vec<Point<DatabaseUnitT>>, layer: Layer, data_type: DataType) -> Self {
-        Self(PolygonInner {
+        Self {
             points: utils::get_correct_polygon_points_format(points),
             layer,
             data_type,
-        })
+        }
     }
 
     pub fn points(&self) -> &[Point<DatabaseUnitT>] {
-        &self.0.points
+        &self.points
     }
 
     pub fn layer(&self) -> Layer {
-        self.0.layer
+        self.layer
     }
 
     pub fn data_type(&self) -> DataType {
-        self.0.data_type
+        self.data_type
     }
 }
 
@@ -54,28 +61,31 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Polygon<DatabaseUnitT> {
     }
 }
 
-impl Transformable for Polygon<DatabaseIntegerUnit> {
-    fn transform(&mut self, transformation: &Transformation) -> &mut Self {
-        self.0.points = self
-            .0
+impl<DatabaseUnitT: CoordNum> Transformable for Polygon<DatabaseUnitT> {
+    fn transform(self, transformation: &Transformation) -> Self {
+        let mut new_self = self.clone();
+        new_self.points = new_self
             .points
             .iter()
             .map(|point| transformation.apply_to_point(point))
             .collect();
-        self
+        new_self
     }
 }
 
-impl Movable for Polygon<DatabaseIntegerUnit> {
-    fn move_to(&mut self, target: Point<DatabaseIntegerUnit>) -> &mut Self {
-        let first_point = &self.0.points[0];
-        let delta = Point::new(target.x() - first_point.x(), target.y() - first_point.y());
+impl<DatabaseUnitT: CoordNum> Movable for Polygon<DatabaseUnitT> {
+    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self {
+        let first_point = &self.points()[0];
+        let delta = Point::new(
+            DatabaseIntegerUnit::from_float(target.x().to_float() - first_point.x().to_float()),
+            DatabaseIntegerUnit::from_float(target.y().to_float() - first_point.y().to_float()),
+        );
         self.move_by(delta)
     }
 }
 
 impl<DatabaseUnitT: CoordNum> Dimensions<DatabaseUnitT> for Polygon<DatabaseUnitT> {
     fn bounding_box(&self) -> (Point<DatabaseUnitT>, Point<DatabaseUnitT>) {
-        bounding_box(&self.0.points)
+        bounding_box(&self.points())
     }
 }

@@ -7,3 +7,9 @@ pub enum Instance<DatabaseUnitT: CoordNum> {
     Cell(Cell<DatabaseUnitT>),
     Element(Arc<Box<Element<DatabaseUnitT>>>),
 }
+
+impl<DatabaseUnitT: CoordNum> Default for Instance<DatabaseUnitT> {
+    fn default() -> Self {
+        Instance::Cell(Cell::default())
+    }
+}

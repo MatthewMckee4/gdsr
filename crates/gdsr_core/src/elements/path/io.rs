@@ -64,7 +64,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             file.write_all(&bytes)?;
         }
 
-        write_points_to_file(file, &self.0.points, scale, &|val| val.to_integer())?;
+        write_points_to_file(file, &self.points(), scale, &|val| val.to_integer())?;
 
         write_element_tail_to_file(file)
     }

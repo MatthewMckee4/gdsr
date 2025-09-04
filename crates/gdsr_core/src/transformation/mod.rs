@@ -1,4 +1,4 @@
-use crate::{DatabaseIntegerUnit, Point};
+use crate::{CoordNum, Point};
 
 mod reflection;
 mod rotation;
@@ -39,7 +39,10 @@ impl Transformation {
         self
     }
 
-    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
+    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
+        &self,
+        point: &Point<DatabaseUnitT>,
+    ) -> Point<DatabaseUnitT> {
         let mut new_point = point.clone();
 
         if let Some(reflection) = &self.reflection {

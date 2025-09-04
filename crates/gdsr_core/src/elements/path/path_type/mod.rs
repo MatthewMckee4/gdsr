@@ -7,12 +7,12 @@ pub enum PathType {
 }
 
 impl PathType {
-    pub fn new(value: i32) -> Result<Self, String> {
+    pub fn new(value: i32) -> Self {
         match value {
-            0 => Ok(PathType::Square),
-            1 => Ok(PathType::Round),
-            2 => Ok(PathType::Overlap),
-            _ => Err("Invalid value for PathType".to_string()),
+            0 => PathType::Square,
+            1 => PathType::Round,
+            2 => PathType::Overlap,
+            _ => PathType::Square,
         }
     }
 

@@ -37,7 +37,7 @@ pub trait Movable: Transformable {
         self.transform(&Transformation::default().with_translation(Some(Translation::new(delta))))
     }
 
-    fn move_to(&mut self, target: Point<DatabaseIntegerUnit>) -> &mut Self;
+    fn move_to(self, target: Point<DatabaseIntegerUnit>) -> Self;
 }
 
 pub trait Dimensions<T: CoordNum> {

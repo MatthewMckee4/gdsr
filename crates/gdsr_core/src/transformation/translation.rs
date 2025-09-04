@@ -13,7 +13,13 @@ impl Translation {
         Self(TranslationInner { delta })
     }
 
-    pub fn apply_to_point(&self, point: &Point<DatabaseIntegerUnit>) -> Point<DatabaseIntegerUnit> {
-        Point::new(point.x() + self.0.delta.x(), point.y() + self.0.delta.y())
+    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
+        &self,
+        point: &Point<DatabaseUnitT>,
+    ) -> Point<DatabaseUnitT> {
+        Point::new(
+            DatabaseUnitT::from_float(point.x().to_float() + self.0.delta.x() as f64),
+            DatabaseUnitT::from_float(point.y().to_float() + self.0.delta.y() as f64),
+        )
     }
 }
