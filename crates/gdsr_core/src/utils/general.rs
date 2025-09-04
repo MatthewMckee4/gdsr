@@ -11,6 +11,6 @@ pub(crate) fn point_to_database_unit<DatabaseUnitT: CoordNum>(
 ) -> Point<DatabaseUnitT> {
     Point::new(
         DatabaseUnitT::from_float(point.x()),
-        DatabaseUnitT::from_float(point.y().to_float()),
+        DatabaseUnitT::from_float(point.y()),
     )
 }

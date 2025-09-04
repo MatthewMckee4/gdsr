@@ -1,8 +1,4 @@
-use geo::{
-    Area, BoundingRect, Contains, Coord, EuclideanDistance, EuclideanLength, Line, LineString,
-    Point, Polygon,
-};
-use std::iter::Sum;
+use geo::{Area, BoundingRect, Contains, Coord, EuclideanLength, Line, LineString, Point, Polygon};
 
 use crate::{CoordNum, DatabaseFloatUnit, utils::general::point_to_database_float};
 
@@ -77,16 +73,6 @@ pub fn perimeter<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> Da
     let linestring = LineString::new(coords);
 
     DatabaseUnitT::from_float(linestring.euclidean_length())
-}
-
-/// Calculate the Euclidean distance between two points
-pub fn distance_between_points<DatabaseUnitT: CoordNum>(
-    point1: &Point<DatabaseUnitT>,
-    point2: &Point<DatabaseUnitT>,
-) -> DatabaseUnitT {
-    DatabaseUnitT::from_float(
-        point_to_database_float(*point1).euclidean_distance(&point_to_database_float(*point2)),
-    )
 }
 
 /// Check if a point is inside a polygon using the ray casting algorithm

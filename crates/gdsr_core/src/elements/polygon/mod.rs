@@ -2,7 +2,7 @@ use crate::{
     CoordNum, DataType, DatabaseIntegerUnit, Layer, Point,
     traits::{Dimensions, Movable, Transformable},
     transformation::Transformation,
-    utils::geometry::{area, bounding_box, perimeter},
+    utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
 };
 
 mod io;
@@ -52,6 +52,14 @@ impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
 
     pub fn perimeter(&self) -> DatabaseUnitT {
         perimeter(&self.points)
+    }
+
+    pub fn is_point_inside(&self, point: &Point<DatabaseUnitT>) -> bool {
+        is_point_inside(point, &self.points)
+    }
+
+    pub fn is_point_on_edge(&self, point: &Point<DatabaseUnitT>) -> bool {
+        is_point_on_edge(point, &self.points)
     }
 }
 

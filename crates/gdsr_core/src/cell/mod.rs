@@ -55,7 +55,7 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
         self.references.push(reference);
     }
 
-    pub(crate) fn get_elements(&self, depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {
+    pub(crate) fn get_elements(&self, _depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {
         todo!()
     }
 }
