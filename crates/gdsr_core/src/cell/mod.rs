@@ -147,3 +147,169 @@ impl<DatabaseUnitT: CoordNum> Transformable for Cell<DatabaseUnitT> {
 //         )
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Grid, HorizontalPresentation, PathType, Point, VerticalPresentation};
+
+    #[test]
+    fn test_cell_new() {
+        let cell: Cell = Cell::new("test_cell");
+        assert_eq!(cell.name, "test_cell");
+        assert!(cell.polygons.is_empty());
+        assert!(cell.paths.is_empty());
+        assert!(cell.texts.is_empty());
+        assert!(cell.references.is_empty());
+    }
+
+    #[test]
+    fn test_cell_default() {
+        let cell: Cell = Cell::default();
+        assert_eq!(cell.name, "");
+        assert!(cell.polygons.is_empty());
+        assert!(cell.paths.is_empty());
+        assert!(cell.texts.is_empty());
+        assert!(cell.references.is_empty());
+    }
+
+    #[test]
+    fn test_add_polygon() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+
+        cell.add_polygon(polygon.clone());
+        assert_eq!(cell.polygons.len(), 1);
+        assert_eq!(cell.polygons[0], polygon);
+    }
+
+    #[test]
+    fn test_add_path() {
+        let mut cell = Cell::new("test_cell");
+        let path = Path::new(
+            vec![Point::new(0, 0), Point::new(10, 10)],
+            1,
+            0,
+            Some(PathType::Square),
+            Some(2.0),
+        );
+
+        cell.add_path(path.clone());
+        assert_eq!(cell.paths.len(), 1);
+        assert_eq!(cell.paths[0], path);
+    }
+
+    #[test]
+    fn test_add_text() {
+        let mut cell = Cell::new("test_cell");
+        let text = Text::new(
+            "Test Text".to_string(),
+            Point::new(5, 5),
+            1,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        );
+
+        cell.add_text(text.clone());
+        assert_eq!(cell.texts.len(), 1);
+        assert_eq!(cell.texts[0], text);
+    }
+
+    #[test]
+    fn test_add_reference() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        let reference = Reference::new(
+            polygon,
+            Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false),
+        );
+
+        cell.add_reference(reference.clone());
+        assert_eq!(cell.references.len(), 1);
+        assert_eq!(cell.references[0], reference);
+    }
+
+    #[test]
+    fn test_add_element_polygon() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+
+        cell.add(polygon.clone());
+        assert_eq!(cell.polygons.len(), 1);
+        assert_eq!(cell.polygons[0], polygon);
+    }
+
+    #[test]
+    fn test_add_element_path() {
+        let mut cell = Cell::new("test_cell");
+        let path = Path::new(
+            vec![Point::new(0, 0), Point::new(10, 10)],
+            1,
+            0,
+            Some(PathType::Square),
+            Some(2.0),
+        );
+
+        cell.add(path.clone());
+        assert_eq!(cell.paths.len(), 1);
+        assert_eq!(cell.paths[0], path);
+    }
+
+    #[test]
+    fn test_cell_transformable() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        cell.add(polygon);
+
+        let transformed = cell.translate(Point::new(5, 5));
+        assert_ne!(cell, transformed);
+        assert_eq!(transformed.name, "test_cell");
+        assert_eq!(transformed.polygons.len(), 1);
+    }
+
+    #[test]
+    fn test_cell_rotation() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        cell.add(polygon);
+
+        let rotated = cell.rotate(90.0, Point::new(0, 0));
+        assert_eq!(rotated.name, "test_cell");
+        assert_eq!(rotated.polygons.len(), 1);
+    }
+
+    #[test]
+    fn test_cell_scale() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        cell.add(polygon);
+
+        let scaled = cell.scale(2.0, Point::new(0, 0));
+        assert_eq!(scaled.name, "test_cell");
+        assert_eq!(scaled.polygons.len(), 1);
+    }
+
+    #[test]
+    fn test_cell_reflect() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        cell.add(polygon);
+
+        let reflected = cell.reflect(0.0, Point::new(0, 0));
+        assert_eq!(reflected.name, "test_cell");
+        assert_eq!(reflected.polygons.len(), 1);
+    }
+
+    #[test]
+    fn test_cell_clone() {
+        let mut cell = Cell::new("test_cell");
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        cell.add(polygon);
+
+        let cloned = cell.clone();
+        assert_eq!(cell, cloned);
+    }
+}

@@ -10,7 +10,7 @@ pub use rotation::Rotation;
 pub use scale::Scale;
 pub use translation::Translation;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Transformation {
     pub reflection: Option<Reflection>,
     pub rotation: Option<Rotation>,
@@ -106,5 +106,147 @@ impl From<&mut Self> for Transformation {
 impl From<&Self> for Transformation {
     fn from(value: &Self) -> Self {
         value.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transformation_default() {
+        let transformation = Transformation::default();
+        assert!(transformation.reflection.is_none());
+        assert!(transformation.rotation.is_none());
+        assert!(transformation.scale.is_none());
+        assert!(transformation.translation.is_none());
+    }
+
+    #[test]
+    fn test_transformation_with_reflection() {
+        let reflection = Reflection::new(0.0, Point::new(0, 0));
+        let mut transformation = Transformation::default();
+        transformation.with_reflection(Some(reflection.clone()));
+
+        assert!(transformation.reflection.is_some());
+        assert_eq!(transformation.reflection.unwrap(), reflection);
+    }
+
+    #[test]
+    fn test_transformation_with_rotation() {
+        let rotation = Rotation::new(45.0, Point::new(0, 0));
+        let mut transformation = Transformation::default();
+        transformation.with_rotation(Some(rotation.clone()));
+
+        assert!(transformation.rotation.is_some());
+        assert_eq!(transformation.rotation.unwrap(), rotation);
+    }
+
+    #[test]
+    fn test_transformation_with_scale() {
+        let scale = Scale::new(2.0, Point::new(0, 0));
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale.clone()));
+
+        assert!(transformation.scale.is_some());
+        assert_eq!(transformation.scale.unwrap(), scale);
+    }
+
+    #[test]
+    fn test_transformation_with_translation() {
+        let translation = Translation::new(Point::new(10, 20));
+        let mut transformation = Transformation::default();
+        transformation.with_translation(Some(translation.clone()));
+
+        assert!(transformation.translation.is_some());
+        assert_eq!(transformation.translation.unwrap(), translation);
+    }
+
+    #[test]
+    fn test_apply_to_point_identity() {
+        let transformation = Transformation::default();
+        let point = Point::new(5, 10);
+        let result = transformation.apply_to_point(&point);
+        assert_eq!(result, point);
+    }
+
+    #[test]
+    fn test_apply_to_point_translation() {
+        let translation = Translation::new(Point::new(5, 5));
+        let mut transformation = Transformation::default();
+        transformation.with_translation(Some(translation));
+
+        let point = Point::new(0, 0);
+        let result = transformation.apply_to_point(&point);
+        assert_eq!(result, Point::new(5, 5));
+    }
+
+    #[test]
+    fn test_apply_to_point_scale() {
+        let scale = Scale::new(2.0, Point::new(0, 0));
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+
+        let point = Point::new(5, 10);
+        let result = transformation.apply_to_point(&point);
+        assert_eq!(result, Point::new(10, 20));
+    }
+
+    #[test]
+    fn test_from_reflection() {
+        let reflection = Reflection::new(0.0, Point::new(0, 0));
+        let transformation: Transformation = reflection.clone().into();
+
+        assert!(transformation.reflection.is_some());
+        assert_eq!(transformation.reflection.unwrap(), reflection);
+        assert!(transformation.rotation.is_none());
+        assert!(transformation.scale.is_none());
+        assert!(transformation.translation.is_none());
+    }
+
+    #[test]
+    fn test_from_rotation() {
+        let rotation = Rotation::new(45.0, Point::new(0, 0));
+        let transformation: Transformation = rotation.clone().into();
+
+        assert!(transformation.rotation.is_some());
+        assert_eq!(transformation.rotation.unwrap(), rotation);
+        assert!(transformation.reflection.is_none());
+        assert!(transformation.scale.is_none());
+        assert!(transformation.translation.is_none());
+    }
+
+    #[test]
+    fn test_from_scale() {
+        let scale = Scale::new(2.0, Point::new(0, 0));
+        let transformation: Transformation = scale.clone().into();
+
+        assert!(transformation.scale.is_some());
+        assert_eq!(transformation.scale.unwrap(), scale);
+        assert!(transformation.reflection.is_none());
+        assert!(transformation.rotation.is_none());
+        assert!(transformation.translation.is_none());
+    }
+
+    #[test]
+    fn test_from_translation() {
+        let translation = Translation::new(Point::new(10, 20));
+        let transformation: Transformation = translation.clone().into();
+
+        assert!(transformation.translation.is_some());
+        assert_eq!(transformation.translation.unwrap(), translation);
+        assert!(transformation.reflection.is_none());
+        assert!(transformation.rotation.is_none());
+        assert!(transformation.scale.is_none());
+    }
+
+    #[test]
+    fn test_clone() {
+        let translation = Translation::new(Point::new(10, 20));
+        let mut transformation = Transformation::default();
+        transformation.with_translation(Some(translation));
+
+        let cloned = transformation.clone();
+        assert_eq!(cloned.translation, transformation.translation);
     }
 }

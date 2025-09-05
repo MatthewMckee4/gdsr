@@ -1,12 +1,12 @@
 use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct ScaleInner<DatabaseUnitT: CoordNum, ScaleT: CoordNum> {
     factor: ScaleT,
     centre: Point<DatabaseUnitT>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Scale(ScaleInner<DatabaseIntegerUnit, f64>);
 
 impl Scale {

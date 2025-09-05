@@ -1,12 +1,12 @@
 use crate::{CoordNum, DatabaseIntegerUnit, Point};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct ReflectionInner<DatabaseUnitT: CoordNum, AngleT: CoordNum> {
     angle: AngleT,
     centre: Point<DatabaseUnitT>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Reflection(ReflectionInner<DatabaseIntegerUnit, f64>);
 
 impl Reflection {

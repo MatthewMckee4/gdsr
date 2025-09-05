@@ -13,8 +13,6 @@ license = "MIT"
 
 [workspace.dependencies]
 approx = "0.5"
-rstest = "0.23.0"
-tempfile = "3.8"
 
 bytemuck = "1.16.1"
 byteorder = "1.5.0"
@@ -30,6 +28,8 @@ pyo3 = { version = "0.22.2", features = [
     "py-clone",
 ] }
 pyo3-log = "0.11.0"
+rstest = "0.23.0"
+tempfile = "3.8"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

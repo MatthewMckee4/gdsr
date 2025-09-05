@@ -110,3 +110,140 @@ impl<DatabaseUnitT: CoordNum> Movable for Grid<DatabaseUnitT> {
         new_self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grid_new() {
+        let grid = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+
+        assert_eq!(grid.origin, Point::new(10, 20));
+        assert_eq!(grid.columns, 3);
+        assert_eq!(grid.rows, 4);
+        assert_eq!(grid.spacing_x, Point::new(5, 0));
+        assert_eq!(grid.spacing_y, Point::new(0, 5));
+        assert_eq!(grid.magnification, 1.5);
+        assert_eq!(grid.angle, 45.0);
+        assert!(grid.x_reflection);
+    }
+
+    #[test]
+    fn test_grid_default() {
+        let grid: Grid = Grid::default();
+        assert_eq!(grid.origin, Point::new(0, 0));
+        assert_eq!(grid.columns, 1);
+        assert_eq!(grid.rows, 1);
+        assert_eq!(grid.spacing_x, Point::new(0, 0));
+        assert_eq!(grid.spacing_y, Point::new(0, 0));
+        assert_eq!(grid.magnification, 1.0);
+        assert_eq!(grid.angle, 0.0);
+        assert!(!grid.x_reflection);
+    }
+
+    #[test]
+    fn test_grid_display() {
+        let grid = Grid::new((10, 20), 2, 3, (5, 0), (0, 5), 1.0, 0.0, false);
+
+        let display_str = format!("{grid}");
+        assert!(display_str.contains("Grid at"));
+        assert!(display_str.contains("2 columns"));
+        assert!(display_str.contains("3 rows"));
+        assert!(display_str.contains("magnification 1"));
+        assert!(display_str.contains("angle 0"));
+        assert!(display_str.contains("x_reflection false"));
+    }
+
+    #[test]
+    fn test_grid_clone() {
+        let grid = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+
+        let cloned = grid.clone();
+        assert_eq!(grid, cloned);
+    }
+
+    #[test]
+    fn test_grid_translate() {
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let translated = grid.translate(Point::new(5, 5));
+        assert_eq!(translated.origin, Point::new(5, 5));
+        assert_eq!(translated.columns, 2);
+        assert_eq!(translated.rows, 2);
+    }
+
+    #[test]
+    fn test_grid_move_to() {
+        let grid = Grid::new((10, 10), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let moved = grid.move_to(Point::new(20, 30));
+        assert_eq!(moved.origin, Point::new(20, 30));
+        assert_eq!(moved.columns, 2);
+        assert_eq!(moved.rows, 2);
+    }
+
+    #[test]
+    fn test_grid_move_by() {
+        let grid = Grid::new((10, 10), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let moved = grid.move_by(Point::new(5, 5));
+        assert_eq!(moved.origin, Point::new(15, 15));
+        assert_eq!(moved.columns, 2);
+        assert_eq!(moved.rows, 2);
+    }
+
+    #[test]
+    fn test_grid_rotate() {
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let rotated = grid.rotate(90.0, Point::new(0, 0));
+        assert_eq!(rotated.angle, 90.0);
+        assert_eq!(rotated.columns, 2);
+        assert_eq!(rotated.rows, 2);
+    }
+
+    #[test]
+    fn test_grid_rotate_angle_normalization() {
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 45.0, false);
+
+        let rotated_450 = grid.rotate(450.0, Point::new(0, 0));
+        assert_eq!(rotated_450.angle, 135.0);
+
+        let rotated_negative = grid.rotate(-45.0, Point::new(0, 0));
+        assert_eq!(rotated_negative.angle, 0.0);
+    }
+
+    #[test]
+    fn test_grid_scale() {
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let scaled = grid.scale(2.0, Point::new(0, 0));
+        assert_eq!(scaled.magnification, 2.0);
+        assert_eq!(scaled.columns, 2);
+        assert_eq!(scaled.rows, 2);
+    }
+
+    #[test]
+    fn test_grid_reflect() {
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+
+        let reflected = grid.reflect(0.0, Point::new(0, 0));
+        assert!(reflected.x_reflection);
+
+        let double_reflected = reflected.reflect(0.0, Point::new(0, 0));
+        assert!(!double_reflected.x_reflection);
+    }
+
+    #[test]
+    fn test_grid_partial_eq() {
+        let grid1 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+
+        let grid2 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+
+        let grid3 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, false);
+
+        assert_eq!(grid1, grid2);
+        assert_ne!(grid1, grid3);
+    }
+}

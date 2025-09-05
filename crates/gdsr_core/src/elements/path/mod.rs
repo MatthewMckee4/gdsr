@@ -177,3 +177,112 @@ impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_creation() {
+        let points = vec![Point::new(0, 0), Point::new(100, 100)];
+        let path = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(10.0));
+
+        assert_eq!(path.points(), &points);
+        assert_eq!(path.layer(), 1);
+        assert_eq!(path.data_type(), 2);
+        assert_eq!(path.path_type(), &Some(PathType::Round));
+        assert_eq!(path.width(), Some(10.0));
+    }
+
+    #[test]
+    fn test_path_default() {
+        let path = Path::<DatabaseIntegerUnit>::default();
+
+        assert!(path.points().is_empty());
+        assert_eq!(path.layer(), 0);
+        assert_eq!(path.data_type(), 0);
+        assert_eq!(path.path_type(), &None);
+        assert_eq!(path.width(), None);
+    }
+
+    #[test]
+    fn test_path_display() {
+        let points = vec![Point::new(0, 0), Point::new(100, 100)];
+        let path = Path::new(points, 5, 10, Some(PathType::Square), Some(20.0));
+
+        let display_str = format!("{path}");
+        assert!(display_str.contains("Path with 2 points"));
+        assert!(display_str.contains("layer 5"));
+        assert!(display_str.contains("data type 10"));
+        assert!(display_str.contains("Square"));
+        assert!(display_str.contains("width 20"));
+    }
+
+    #[test]
+    fn test_path_bounding_box_without_width() {
+        let points = vec![Point::new(10, 20), Point::new(30, 40), Point::new(50, 10)];
+        let path = Path::new(points, 0, 0, None, None);
+
+        let (bottom_left, top_right) = path.bounding_box();
+        assert_eq!(bottom_left.x(), 10.0);
+        assert_eq!(bottom_left.y(), 10.0);
+        assert_eq!(top_right.x(), 50.0);
+        assert_eq!(top_right.y(), 40.0);
+    }
+
+    #[test]
+    fn test_path_bounding_box_with_width() {
+        let points = vec![Point::new(0, 0), Point::new(100, 0)];
+        let path = Path::new(points, 0, 0, None, Some(20.0));
+
+        let (bottom_left, top_right) = path.bounding_box();
+        // With width 20, the path should extend 10 units in each perpendicular direction
+        assert!(bottom_left.y() <= -10.0);
+        assert!(top_right.y() >= 10.0);
+        assert_eq!(bottom_left.x(), 0.0);
+        assert_eq!(top_right.x(), 100.0);
+    }
+
+    #[test]
+    fn test_path_movable() {
+        let points = vec![Point::new(10, 20), Point::new(30, 40)];
+        let path = Path::new(points, 0, 0, None, None);
+
+        let moved_path = path.move_to(Point::new(50, 60));
+        let expected_delta_x = 50 - 10;
+        let expected_delta_y = 60 - 20;
+
+        assert_eq!(moved_path.points()[0], Point::new(50, 60));
+        assert_eq!(
+            moved_path.points()[1],
+            Point::new(30 + expected_delta_x, 40 + expected_delta_y)
+        );
+    }
+
+    #[test]
+    fn test_path_transformable() {
+        use crate::transformation::{Transformation, Translation};
+
+        let points = vec![Point::new(0, 0), Point::new(10, 10)];
+        let path = Path::new(points, 0, 0, None, None);
+
+        let translation = Translation::new(Point::new(5, 5));
+        let transformation = Transformation::from(translation);
+
+        let transformed_path = path.transform_impl(&transformation);
+        assert_eq!(transformed_path.points()[0], Point::new(5, 5));
+        assert_eq!(transformed_path.points()[1], Point::new(15, 15));
+    }
+
+    #[test]
+    fn test_path_clone_and_partial_eq() {
+        let points = vec![Point::new(0, 0), Point::new(10, 10)];
+        let path1 = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(5.0));
+        let path2 = path1.clone();
+
+        assert_eq!(path1, path2);
+
+        let path3 = Path::new(points, 1, 2, Some(PathType::Square), Some(5.0));
+        assert_ne!(path1, path3);
+    }
+}
