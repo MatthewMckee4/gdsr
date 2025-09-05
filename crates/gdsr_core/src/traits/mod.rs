@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io;
+use std::{fs::File, io};
 
 use crate::{
     CoordNum, DatabaseIntegerUnit, Point,

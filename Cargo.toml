@@ -12,11 +12,13 @@ authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
 [workspace.dependencies]
-gdsr_core = { path = "crates/gdsr_core" }
+approx = "0.5"
 
 bytemuck = "1.16.1"
 byteorder = "1.5.0"
 chrono = "0.4.38"
+gdsr_core = { path = "crates/gdsr_core" }
+geo = "0.28"
 inventory = "0.3.15"
 log = "0.4.22"
 plotly = "0.9.0"
@@ -26,8 +28,6 @@ pyo3 = { version = "0.22.2", features = [
     "py-clone",
 ] }
 pyo3-log = "0.11.0"
-geo = "0.28"
-approx = "0.5"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -43,3 +43,4 @@ cast_precision_loss = "allow"
 cast_possible_truncation = "allow"
 cast_sign_loss = "allow"
 missing_errors_doc = "allow"
+float_cmp = "allow"

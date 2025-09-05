@@ -1,10 +1,10 @@
+use std::{collections::HashMap, io};
+
 use crate::{
     CoordNum, DatabaseIntegerUnit,
     cell::Cell,
     utils::io::{from_gds, write_gds},
 };
-
-use std::{collections::HashMap, io};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Library<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {

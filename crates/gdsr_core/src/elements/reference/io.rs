@@ -1,3 +1,8 @@
+use std::{fs::File, io};
+
+use geo::algorithm::rotate::Rotate;
+
+use super::{Instance, Reference};
 use crate::{
     CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
@@ -11,10 +16,6 @@ use crate::{
         },
     },
 };
-use geo::algorithm::rotate::Rotate;
-use std::{fs::File, io};
-
-use super::{Instance, Reference};
 
 impl<DatabaseUnitT: CoordNum> ToGds for Reference<DatabaseUnitT> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
@@ -34,7 +35,7 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
         scale: f64,
         element: &Element<DatabaseUnitT>,
     ) -> io::Result<()> {
-        for element in self._get_elements_in_grid(element) {
+        for element in self.get_elements_in_grid(element) {
             element.to_gds_impl(file, scale)?;
         }
 
@@ -47,12 +48,12 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
         scale: f64,
         cell_name: &str,
     ) -> io::Result<()> {
-        let mut buffer_start = [
+        let buffer_start = [
             4,
             combine_record_and_data_type(GDSRecord::ARef, GDSDataType::NoData),
         ];
 
-        write_u16_array_to_file(file, &mut buffer_start)?;
+        write_u16_array_to_file(file, &buffer_start)?;
 
         write_string_with_record_to_file(file, GDSRecord::SName, cell_name)?;
 
@@ -63,24 +64,24 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
             self.grid.x_reflection,
         )?;
 
-        let mut buffer_array = [
+        let buffer_array = [
             8,
             combine_record_and_data_type(GDSRecord::ColRow, GDSDataType::TwoByteSignedInteger),
             self.grid.columns as u16,
             self.grid.rows as u16,
         ];
 
-        write_u16_array_to_file(file, &mut buffer_array)?;
+        write_u16_array_to_file(file, &buffer_array)?;
 
         let origin = point_to_database_float(self.grid.origin);
         let point2 = point_to_database_float(self.grid.origin + self.grid.spacing_x)
-            * (self.grid.columns as f64);
+            * f64::from(self.grid.columns);
         let point3 = point_to_database_float(self.grid.origin + self.grid.spacing_y)
-            * (self.grid.rows as f64);
+            * f64::from(self.grid.rows);
 
-        let reference_points: Vec<_> = vec![origin, point2, point3]
+        let reference_points: Vec<_> = [origin, point2, point3]
             .iter()
-            .map(|&p| p.rotate_around_point(self.grid.angle.into(), origin))
+            .map(|&p| p.rotate_around_point(self.grid.angle, origin))
             .collect();
 
         write_points_to_file(file, &reference_points, scale, &|val| val.to_integer())?;

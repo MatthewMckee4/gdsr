@@ -1,7 +1,4 @@
-use gdsr_core::{
-    Cell, DatabaseIntegerUnit, Grid, Library,
-    elements::{Polygon, Reference},
-};
+use gdsr_core::{Cell, DatabaseIntegerUnit, Grid, Library, Polygon, Reference};
 
 fn main() {
     let mut library = Library::new("main");

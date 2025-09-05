@@ -13,21 +13,21 @@ pub enum Instance<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 
 impl<DatabaseUnitT: CoordNum> Default for Instance<DatabaseUnitT> {
     fn default() -> Self {
-        Instance::Cell(Cell::default())
+        Self::Cell(Cell::default())
     }
 }
 
 macro_rules! into_instance_impl {
     ($t:ty, $et:expr) => {
-        impl<DatabaseUnitT: CoordNum> Into<Instance<DatabaseUnitT>> for $t {
-            fn into(self) -> Instance<DatabaseUnitT> {
-                Instance::Element(Arc::new(Box::new($et(self))))
+        impl<DatabaseUnitT: CoordNum> From<$t> for Instance<DatabaseUnitT> {
+            fn from(value: $t) -> Self {
+                Instance::Element(Arc::new(Box::new($et(value))))
             }
         }
 
-        impl<DatabaseUnitT: CoordNum> Into<Element<DatabaseUnitT>> for $t {
-            fn into(self) -> Element<DatabaseUnitT> {
-                $et(self)
+        impl<DatabaseUnitT: CoordNum> From<$t> for Element<DatabaseUnitT> {
+            fn from(value: $t) -> Self {
+                $et(value)
             }
         }
     };

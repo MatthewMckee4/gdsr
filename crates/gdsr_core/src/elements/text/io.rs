@@ -1,6 +1,6 @@
-use std::fs::File;
-use std::io;
+use std::{fs::File, io};
 
+use super::{Text, utils::get_presentation_value};
 use crate::{
     CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
@@ -10,9 +10,6 @@ use crate::{
         write_transformation_to_file, write_u16_array_to_file,
     },
 };
-
-use super::Text;
-use super::utils::get_presentation_value;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {

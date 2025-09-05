@@ -15,7 +15,7 @@ fn to_float_coords<DatabaseUnitT: CoordNum>(
 }
 
 /// Calculate the bounding box of a collection of points
-/// Returns (min_point, max_point) representing the bottom-left and top-right corners
+/// Returns (`min_point`, `max_point`) representing the bottom-left and top-right corners
 pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
     if points.is_empty() {
         return (
@@ -26,15 +26,17 @@ pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
 
     // Use geo's BoundingRect trait for robust calculation
     let multipoint = geo::MultiPoint::new(points.to_vec());
-    if let Some(rect) = multipoint.bounding_rect() {
-        let min_point = Point::new(rect.min().x, rect.min().y);
-        let max_point = Point::new(rect.max().x, rect.max().y);
-        (min_point, max_point)
-    } else {
-        // Fallback for edge cases
-        let first = points[0];
-        (first, first)
-    }
+    multipoint.bounding_rect().map_or_else(
+        || {
+            let first = points[0];
+            (first, first)
+        },
+        |rect| {
+            let min_point = Point::new(rect.min().x, rect.min().y);
+            let max_point = Point::new(rect.max().x, rect.max().y);
+            (min_point, max_point)
+        },
+    )
 }
 
 /// Calculate the area of a polygon defined by points using the shoelace formula
@@ -134,16 +136,11 @@ pub fn is_point_on_line_segment<T: CoordNum>(point: &Point<T>, a: &Point<T>, b: 
     line_segment.contains(&point_to_database_float(*point))
 }
 
-/// Round a floating point value to a specified number of decimal places
-pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
-    let factor = 10f64.powi(ndigits as i32);
-    (value * factor).round() / factor
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use approx::assert_relative_eq;
+
+    use super::*;
 
     #[test]
     fn test_bounding_box() {

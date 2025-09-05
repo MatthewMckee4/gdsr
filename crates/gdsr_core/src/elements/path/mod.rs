@@ -1,5 +1,3 @@
-use path_type::PathType;
-
 use crate::{
     CoordNum, DataType, DatabaseFloatUnit, DatabaseIntegerUnit, Layer, Point,
     traits::{Dimensions, Movable, Transformable},
@@ -8,9 +6,11 @@ use crate::{
 };
 
 mod io;
-pub mod path_type;
+mod path_type;
 
-pub(crate) type Width = f64;
+pub use path_type::PathType;
+
+pub type Width = f64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Path<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
@@ -34,7 +34,8 @@ impl<DatabaseUnitT: CoordNum> Default for Path<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         points: Vec<Point<DatabaseUnitT>>,
         layer: Layer,
         data_type: DataType,
@@ -50,6 +51,7 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
         }
     }
 
+    #[must_use]
     pub fn points(&self) -> &[Point<DatabaseUnitT>] {
         &self.points
     }

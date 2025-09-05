@@ -1,5 +1,4 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Layer, Movable, Transformable};
-use crate::{Point, Transformation};
+use crate::{CoordNum, DatabaseIntegerUnit, Layer, Movable, Point, Transformable, Transformation};
 
 pub mod io;
 pub mod presentation;

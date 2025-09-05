@@ -3,14 +3,13 @@ use std::{
     io::{self, Write},
 };
 
+use super::Path;
 use crate::{
     CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
     traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
-
-use super::Path;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {

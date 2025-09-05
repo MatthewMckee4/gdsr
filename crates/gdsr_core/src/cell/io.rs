@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::{collections::HashSet, io};
+use std::{collections::HashSet, fs::File, io};
 
 use chrono::{Datelike, Local, Timelike};
 

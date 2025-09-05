@@ -31,7 +31,7 @@ Issues = "https://github.com/MatthewMckee4/gdsr/issues"
 module-name = "gdsr._gdsr"
 
 [project.optional-dependencies]
-dev = [     
+dev = [
     "maturin",
     "ruff",
     "mypy",

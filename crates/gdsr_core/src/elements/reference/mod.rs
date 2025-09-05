@@ -19,26 +19,26 @@ pub struct Reference<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
     fn default() -> Self {
         Self {
-            instance: Default::default(),
-            grid: Default::default(),
+            instance: Instance::default(),
+            grid: Grid::default(),
         }
     }
 }
 
 impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
-    pub fn new(instance: Instance<DatabaseUnitT>, grid: Grid<DatabaseUnitT>) -> Self {
+    pub const fn new(instance: Instance<DatabaseUnitT>, grid: Grid<DatabaseUnitT>) -> Self {
         Self { instance, grid }
     }
 
-    pub fn instance(&self) -> &Instance<DatabaseUnitT> {
+    pub const fn instance(&self) -> &Instance<DatabaseUnitT> {
         &self.instance
     }
 
-    pub fn grid(&self) -> &Grid<DatabaseUnitT> {
+    pub const fn grid(&self) -> &Grid<DatabaseUnitT> {
         &self.grid
     }
 
-    pub fn _get_elements_in_grid(
+    pub fn get_elements_in_grid(
         &self,
         element: &Element<DatabaseUnitT>,
     ) -> Vec<Element<DatabaseUnitT>> {
@@ -49,10 +49,10 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
 
         for column_index in 0..grid.columns {
             let column_origin = point_to_database_float(grid.origin)
-                + (point_to_database_float(grid.spacing_x) * column_index as f64);
+                + (point_to_database_float(grid.spacing_x) * f64::from(column_index));
             for row_index in 0..grid.rows {
                 let origin = point_to_database_float(column_origin)
-                    + (point_to_database_float(grid.spacing_y) * row_index as f64);
+                    + (point_to_database_float(grid.spacing_y) * f64::from(row_index));
 
                 let mut new_element = element.clone();
 
@@ -84,30 +84,25 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
         if depth == 0 {
-            return [Element::Reference(self.clone())].to_vec();
+            return [Element::Reference(self)].to_vec();
         }
         match &self.instance {
             Instance::Cell(cell) => {
                 let flattened_cell_elements = cell.get_elements(Some(depth - 1));
                 for cell_element in flattened_cell_elements {
-                    elements.extend(self._get_elements_in_grid(cell_element));
+                    elements.extend(self.get_elements_in_grid(cell_element));
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
                 Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
-                    elements.extend(self._get_elements_in_grid(&element));
+                    elements.extend(self.get_elements_in_grid(element));
                 }
 
                 Element::Reference(reference) => {
                     let flattened_reference_elements = reference.clone().flatten(Some(depth - 1));
 
-                    let flattened_copied_elements = flattened_reference_elements
-                        .iter()
-                        .map(|element| element.clone())
-                        .collect::<Vec<Element<_>>>();
-
-                    for reference_element in flattened_copied_elements {
-                        elements.extend(self._get_elements_in_grid(&reference_element).into_iter());
+                    for reference_element in flattened_reference_elements {
+                        elements.extend(self.get_elements_in_grid(&reference_element).into_iter());
                     }
                 }
             },

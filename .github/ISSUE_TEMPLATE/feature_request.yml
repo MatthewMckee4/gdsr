@@ -1,6 +1,6 @@
-name: '✨ Feature request'
+name: "✨ Feature request"
 description: Suggest a new feature or enhancement for gdsr.
-title: '✨ [FEATURE] - <title>'
+title: "✨ [FEATURE] - <title>"
 labels: [enhancement]
 
 body:
