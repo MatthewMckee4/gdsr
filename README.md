@@ -1,36 +1,10 @@
-# gdsr
+# GDSR
 GDSII manipulation, written in rust.
 
-## Documentation
+> [!WARNING]
+> This is a work in progress and is not yet ready for production use.
 
-The documentation for this project is available at [matthewmckee4.github.io/gdsr/](https://matthewmckee4.github.io/gdsr/).
-
-## Installation
-
-I recommend using [uv](https://github.com/astral-sh/uv) to manage your python packages.
-
-To install and use yourself:
-
-```bash
-uv pip install gdsr
-```
-
-To use from source code:
-
-```bash
-uv pip install requirements-dev.txt
-
-maturin develop
-# or
-uv pip install .
-```
-
-## What can you do with gdsr
-
-gdsr offers many features which include but are not limited to:
-- Easy reading from and writing to gds files
-- Strictly typed python code
-- Easy to understand code
+gdsr is currently being repurposed to being a rust crate at the core. Python bindings will be added back in the future.
 
 ## Inspiration
 
@@ -40,22 +14,31 @@ Other inspirations include:
 - [gdsfactory](https://github.com/gdsfactory/gdsfactory)
 - [klayout](https://www.klayout.org/klayout-pypi/)
 
-## How to get started using gdsr
+## Getting Started
 
 A simple program below shows the easy to use interface.
 
-```python
-import gdsr
+```rust
+use gdsr_core::{Cell, Grid, Library, Polygon, Reference};
 
-library = gdsr.Library("My First Library")
+fn main() {
+    let mut library = Library::new("main");
 
-cell = gdsr.Cell("My First Cell")
+    let mut cell = Cell::new("main_cell");
 
-cell.add(gdsr.Text("Hello, World!"))
+    let polygon = Polygon::new([(0, 0), (1, 0), (1, 1), (0, 1)], 1, 0);
 
-library.add(cell)
+    let reference = Reference::new(
+        polygon,
+        Grid::new((0, 0), 5, 5, (2, 0), (0, 2), 2.0, 0.0, false),
+    );
 
-library.to_gds("My first gdsr output.gds")
+    cell.add(reference);
+
+    library.add(cell);
+
+    let _res = library.to_gds("main.gds", 1e-9, 1e-9);
+}
 ```
 
 ## Need help?
