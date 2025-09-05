@@ -58,6 +58,7 @@ fn test_library_roundtrip_mixed_elements() {
 }
 
 #[rstest]
+#[case(1e-9, 1e-9)]
 #[case(1e-9, 1e-10)]
 #[case(1e-6, 1e-9)]
 #[case(1e-3, 1e-6)]
