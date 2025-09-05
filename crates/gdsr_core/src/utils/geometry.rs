@@ -16,11 +16,13 @@ fn to_float_coords<DatabaseUnitT: CoordNum>(
 
 /// Calculate the bounding box of a collection of points
 /// Returns (`min_point`, `max_point`) representing the bottom-left and top-right corners
-pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
+pub fn bounding_box<DatabaseUnitT: CoordNum>(
+    points: &[Point<DatabaseUnitT>],
+) -> (Point<DatabaseUnitT>, Point<DatabaseUnitT>) {
     if points.is_empty() {
         return (
-            Point::new(T::zero(), T::zero()),
-            Point::new(T::zero(), T::zero()),
+            Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero()),
+            Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero()),
         );
     }
 
