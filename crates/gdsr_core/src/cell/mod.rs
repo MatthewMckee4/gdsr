@@ -71,31 +71,31 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Cell<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 
         new_self.polygons = new_self
             .polygons
             .into_iter()
-            .map(|polygon| polygon.transform(transformation))
+            .map(|polygon| polygon.transform_impl(transformation))
             .collect();
 
         new_self.paths = new_self
             .paths
             .into_iter()
-            .map(|path| path.transform(transformation))
+            .map(|path| path.transform_impl(transformation))
             .collect();
 
         new_self.texts = new_self
             .texts
             .into_iter()
-            .map(|text| text.transform(transformation))
+            .map(|text| text.transform_impl(transformation))
             .collect();
 
         new_self.references = new_self
             .references
             .into_iter()
-            .map(|reference| reference.transform(transformation))
+            .map(|reference| reference.transform_impl(transformation))
             .collect();
 
         new_self

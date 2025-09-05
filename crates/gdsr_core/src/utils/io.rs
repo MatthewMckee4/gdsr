@@ -21,6 +21,7 @@ use crate::{
     utils::{
         gds_format::{eight_byte_real, u16_array_to_big_endian},
         general::{point_to_database_float, point_to_database_unit},
+        geometry::round_to_decimals,
     },
 };
 
@@ -310,7 +311,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::Width => {
                     if let GDSRecordData::I32(width) = data {
-                        let path_width = f64::from(width[0]) * scale;
+                        let path_width = round_to_decimals(f64::from(width[0]) * scale, 10);
                         if let Some(path) = &mut path {
                             path.width = Some(path_width);
                         }
@@ -478,15 +479,16 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
 }
 
 fn update_references<T: CoordNum>(library: &mut Library<T>) {
-    let cell_references: Vec<Reference<T>> = library
+    let library_cells = library.cells.clone();
+    let cell_references: Vec<&mut Reference<T>> = library
         .cells
-        .values()
-        .flat_map(|cell| cell.references.clone().into_iter())
+        .values_mut()
+        .flat_map(|cell| &mut cell.references)
         .collect();
 
-    for mut reference in cell_references {
-        if let Instance::Cell(referenced_name) = reference.instance {
-            if let Some(referenced_cell) = library.cells.get_mut(&referenced_name.name) {
+    for reference in cell_references {
+        if let Instance::Cell(referenced_name) = &mut reference.instance {
+            if let Some(referenced_cell) = library_cells.get(&referenced_name.name) {
                 reference.instance = Instance::Cell(referenced_cell.clone());
             }
         }

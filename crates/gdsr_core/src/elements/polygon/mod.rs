@@ -88,7 +88,7 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Polygon<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Polygon<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.points = new_self
             .points
@@ -164,7 +164,6 @@ mod tests {
 
         assert_eq!(polygon.layer(), 3);
         assert_eq!(polygon.data_type(), 2);
-        // Should be closed automatically
         assert_eq!(polygon.points().len(), 3);
         assert_eq!(polygon.points()[0], points[0]);
         assert_eq!(polygon.points()[1], points[1]);
@@ -204,15 +203,12 @@ mod tests {
     fn test_is_point_inside() {
         let polygon = create_square();
 
-        // Point inside
         let inside_point = Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(5));
         assert!(polygon.is_point_inside(&inside_point));
 
-        // Point outside
         let outside_point = Point::new(DatabaseIntegerUnit::from(15), DatabaseIntegerUnit::from(5));
         assert!(!polygon.is_point_inside(&outside_point));
 
-        // Point on vertex
         let vertex_point = Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0));
         assert!(polygon.is_point_inside(&vertex_point) || polygon.is_point_on_edge(&vertex_point));
     }
@@ -221,15 +217,12 @@ mod tests {
     fn test_is_point_on_edge() {
         let polygon = create_square();
 
-        // Point on edge
         let edge_point = Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(0));
         assert!(polygon.is_point_on_edge(&edge_point));
 
-        // Point not on edge
         let not_on_edge = Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(5));
         assert!(!polygon.is_point_on_edge(&not_on_edge));
 
-        // Vertex point
         let vertex_point = Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0));
         assert!(polygon.is_point_on_edge(&vertex_point));
     }
@@ -237,7 +230,7 @@ mod tests {
     #[test]
     fn test_display() {
         let polygon = create_square();
-        let display_str = format!("{}", polygon);
+        let display_str = format!("{polygon}");
         assert!(display_str.contains("Polygon with 5 point(s)"));
         assert!(display_str.contains("starting at (0, 0)"));
         assert!(display_str.contains("layer 1"));
@@ -270,11 +263,9 @@ mod tests {
             DatabaseIntegerUnit::from(5),
             DatabaseIntegerUnit::from(3),
         ));
-        let transformation = Transformation::translation(translation);
 
-        let transformed = polygon.transform(&transformation);
+        let transformed = polygon.transform(translation);
 
-        // Original first point (0,0) should become (5,3)
         assert_eq!(transformed.points()[0].x(), DatabaseIntegerUnit::from(5));
         assert_eq!(transformed.points()[0].y(), DatabaseIntegerUnit::from(3));
     }
@@ -283,11 +274,8 @@ mod tests {
     fn test_transformable_rotation() {
         let polygon = create_square();
         let rotation = Rotation::new(PI / 2.0, Point::new(0, 0));
-        let transformation = Transformation::rotation(rotation);
 
-        let transformed = polygon.transform(&transformation);
-
-        println!("Transformed points: {:?}", transformed.points());
+        let transformed = polygon.transform(rotation);
 
         assert_eq!(transformed.points().len(), polygon.points().len());
         assert_eq!(transformed.area(), polygon.area());
@@ -300,11 +288,9 @@ mod tests {
             2.0,
             Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)),
         );
-        let transformation = Transformation::scale(scale);
 
-        let transformed = polygon.transform(&transformation);
+        let transformed = polygon.transform(scale);
 
-        // Area should be 4x original (2x in each dimension)
         assert_eq!(
             transformed.area(),
             polygon.area() * DatabaseIntegerUnit::from(4)
@@ -315,13 +301,10 @@ mod tests {
     fn test_transformable_reflection() {
         let polygon = create_square();
         let reflection = Reflection::new_horizontal();
-        let transformation = Transformation::reflection(reflection);
 
-        let transformed = polygon.transform(&transformation);
+        let transformed = polygon.transform(reflection);
 
-        // Should have same area
         assert_eq!(transformed.area(), polygon.area());
-        // Should have same number of points
         assert_eq!(transformed.points().len(), polygon.points().len());
     }
 
@@ -335,11 +318,9 @@ mod tests {
 
         let moved = polygon.move_to(target);
 
-        // First point should be at target location
         assert_eq!(moved.points()[0].x(), DatabaseIntegerUnit::from(100));
         assert_eq!(moved.points()[0].y(), DatabaseIntegerUnit::from(200));
 
-        // Shape should be preserved (same area)
         assert_eq!(moved.area(), polygon.area());
     }
 
@@ -371,7 +352,6 @@ mod tests {
         )];
         let polygon = Polygon::new(single_point, 0, 0);
 
-        // Should be closed (duplicate point added)
         assert_eq!(polygon.points().len(), 1);
         assert_eq!(polygon.area(), DatabaseIntegerUnit::from(0));
     }
@@ -382,11 +362,39 @@ mod tests {
             Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)),
             Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(0)),
             Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(5)),
-            Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)), // Already closed
+            Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)),
         ];
         let polygon = Polygon::new(points.clone(), 0, 0);
 
-        // Should not add another closing point
         assert_eq!(polygon.points().len(), points.len());
+    }
+
+    #[test]
+    fn test_transformation_rotation_and_scale_area_and_points() {
+        let polygon = create_square();
+        let original_area = polygon.area();
+
+        let rotation = Rotation::new(PI / 2.0, Point::new(0, 0));
+        let scale = Scale::new(2.0, Point::new(0, 0));
+
+        let mut transformation = Transformation::from(rotation);
+        let transformation = transformation.with_scale(Some(scale));
+        let transformed = polygon.transform(transformation);
+
+        let expected_area = original_area * DatabaseIntegerUnit::from(4);
+        assert_eq!(transformed.area(), expected_area);
+
+        let expected_points = vec![
+            Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)),
+            Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(20)),
+            Point::new(
+                DatabaseIntegerUnit::from(-20),
+                DatabaseIntegerUnit::from(20),
+            ),
+            Point::new(DatabaseIntegerUnit::from(-20), DatabaseIntegerUnit::from(0)),
+            Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)),
+        ];
+
+        assert_eq!(transformed.points(), expected_points);
     }
 }

@@ -19,46 +19,6 @@ pub struct Transformation {
 }
 
 impl Transformation {
-    #[must_use] 
-    pub const fn translation(translation: Translation) -> Self {
-        Self {
-            reflection: None,
-            rotation: None,
-            scale: None,
-            translation: Some(translation),
-        }
-    }
-
-    #[must_use] 
-    pub const fn rotation(rotation: Rotation) -> Self {
-        Self {
-            reflection: None,
-            rotation: Some(rotation),
-            scale: None,
-            translation: None,
-        }
-    }
-
-    #[must_use] 
-    pub const fn scale(scale: Scale) -> Self {
-        Self {
-            reflection: None,
-            rotation: None,
-            scale: Some(scale),
-            translation: None,
-        }
-    }
-
-    #[must_use] 
-    pub const fn reflection(reflection: Reflection) -> Self {
-        Self {
-            reflection: Some(reflection),
-            rotation: None,
-            scale: None,
-            translation: None,
-        }
-    }
-
     pub const fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
         self.reflection = reflection;
         self
@@ -102,5 +62,49 @@ impl Transformation {
         }
 
         new_point
+    }
+}
+
+impl From<Reflection> for Transformation {
+    fn from(reflection: Reflection) -> Self {
+        let mut transformation = Self::default();
+        transformation.with_reflection(Some(reflection));
+        transformation
+    }
+}
+
+impl From<Rotation> for Transformation {
+    fn from(rotation: Rotation) -> Self {
+        let mut transformation = Self::default();
+        transformation.with_rotation(Some(rotation));
+        transformation
+    }
+}
+
+impl From<Scale> for Transformation {
+    fn from(scale: Scale) -> Self {
+        let mut transformation = Self::default();
+        transformation.with_scale(Some(scale));
+        transformation
+    }
+}
+
+impl From<Translation> for Transformation {
+    fn from(translation: Translation) -> Self {
+        let mut transformation = Self::default();
+        transformation.with_translation(Some(translation));
+        transformation
+    }
+}
+
+impl From<&mut Self> for Transformation {
+    fn from(value: &mut Self) -> Self {
+        value.clone()
+    }
+}
+
+impl From<&Self> for Transformation {
+    fn from(value: &Self) -> Self {
+        value.clone()
     }
 }

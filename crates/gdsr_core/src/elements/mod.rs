@@ -8,7 +8,10 @@ pub mod text;
 pub use path::{Path, PathType};
 pub use polygon::Polygon;
 pub use reference::{Instance, Reference};
-pub use text::Text;
+pub use text::{
+    Text,
+    presentation::{HorizontalPresentation, VerticalPresentation},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
@@ -30,12 +33,12 @@ impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
-    fn transform(&self, transformation: &crate::Transformation) -> Self {
+    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
         match self {
-            Self::Path(path) => Self::Path(path.transform(transformation)),
-            Self::Polygon(polygon) => Self::Polygon(polygon.transform(transformation)),
-            Self::Reference(reference) => Self::Reference(reference.transform(transformation)),
-            Self::Text(text) => Self::Text(text.transform(transformation)),
+            Self::Path(path) => Self::Path(path.transform_impl(transformation)),
+            Self::Polygon(polygon) => Self::Polygon(polygon.transform_impl(transformation)),
+            Self::Reference(reference) => Self::Reference(reference.transform_impl(transformation)),
+            Self::Text(text) => Self::Text(text.transform_impl(transformation)),
         }
     }
 }

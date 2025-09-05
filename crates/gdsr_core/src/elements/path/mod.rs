@@ -56,22 +56,22 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
         &self.points
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn path_type(&self) -> &Option<PathType> {
         &self.r#type
     }
 
-    #[must_use] 
+    #[must_use]
     pub const fn width(&self) -> Option<Width> {
         self.width
     }
@@ -92,7 +92,7 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Path<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.points = new_self
             .points()

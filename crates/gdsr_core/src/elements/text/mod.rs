@@ -106,7 +106,7 @@ impl<T: CoordNum> std::fmt::Display for Text<T> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 
         if let Some(translation) = &transformation.translation {

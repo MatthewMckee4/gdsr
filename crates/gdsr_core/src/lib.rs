@@ -8,7 +8,10 @@ mod transformation;
 mod utils;
 
 pub use cell::Cell;
-pub use elements::{Element, Instance, Path, PathType, Polygon, Reference, Text};
+pub use elements::{
+    Element, HorizontalPresentation, Instance, Path, PathType, Polygon, Reference, Text,
+    VerticalPresentation,
+};
 pub use geo::Point;
 pub use grid::Grid;
 pub use library::Library;

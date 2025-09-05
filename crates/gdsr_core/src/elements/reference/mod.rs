@@ -26,8 +26,11 @@ impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
-    pub const fn new(instance: Instance<DatabaseUnitT>, grid: Grid<DatabaseUnitT>) -> Self {
-        Self { instance, grid }
+    pub fn new(instance: impl Into<Instance<DatabaseUnitT>>, grid: Grid<DatabaseUnitT>) -> Self {
+        Self {
+            instance: instance.into(),
+            grid,
+        }
     }
 
     pub const fn instance(&self) -> &Instance<DatabaseUnitT> {
@@ -113,9 +116,9 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
-        new_self.grid = new_self.grid.transform(transformation);
+        new_self.grid = new_self.grid.transform_impl(transformation);
         new_self
     }
 }

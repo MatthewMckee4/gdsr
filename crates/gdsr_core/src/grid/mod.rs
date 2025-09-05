@@ -74,7 +74,7 @@ impl<T: CoordNum> std::fmt::Display for Grid<T> {
 }
 
 impl<DatabaseUnitT: CoordNum> Transformable for Grid<DatabaseUnitT> {
-    fn transform(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.origin = transformation.apply_to_point(&new_self.origin);
         new_self.spacing_x = transformation.apply_to_point(&new_self.spacing_x);

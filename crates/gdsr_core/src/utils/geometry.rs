@@ -136,6 +136,12 @@ pub fn is_point_on_line_segment<T: CoordNum>(point: &Point<T>, a: &Point<T>, b: 
     line_segment.contains(&point_to_database_float(*point))
 }
 
+/// Round a floating point value to a specified number of decimal places
+pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
+    let factor = 10f64.powi(ndigits as i32);
+    (value * factor).round() / factor
+}
+
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;

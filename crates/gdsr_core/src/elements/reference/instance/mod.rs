@@ -37,3 +37,9 @@ into_instance_impl!(Polygon<DatabaseUnitT>, Element::Polygon);
 into_instance_impl!(Path<DatabaseUnitT>, Element::Path);
 into_instance_impl!(Reference<DatabaseUnitT>, Element::Reference);
 into_instance_impl!(Text<DatabaseUnitT>, Element::Text);
+
+impl<DatabaseUnitT: CoordNum> From<Cell<DatabaseUnitT>> for Instance<DatabaseUnitT> {
+    fn from(value: Cell<DatabaseUnitT>) -> Self {
+        Self::Cell(value)
+    }
+}
