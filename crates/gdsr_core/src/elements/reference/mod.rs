@@ -93,7 +93,7 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
             Instance::Cell(cell) => {
                 let flattened_cell_elements = cell.get_elements(Some(depth - 1));
                 for cell_element in flattened_cell_elements {
-                    elements.extend(self.get_elements_in_grid(cell_element));
+                    elements.extend(self.get_elements_in_grid(&cell_element));
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {

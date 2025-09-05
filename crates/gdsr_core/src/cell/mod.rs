@@ -65,8 +65,30 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
         }
     }
 
-    pub(crate) fn get_elements(&self, _depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {
-        todo!()
+    pub(crate) fn get_elements(&self, depth: Option<usize>) -> Vec<Element<DatabaseUnitT>> {
+        let depth = depth.unwrap_or(usize::MAX);
+        let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
+
+        for polygon in &self.polygons {
+            elements.push(Element::Polygon(polygon.clone()));
+        }
+
+        for path in &self.paths {
+            elements.push(Element::Path(path.clone()));
+        }
+
+        for text in &self.texts {
+            elements.push(Element::Text(text.clone()));
+        }
+
+        for reference in &self.references {
+            let reference_elements = reference.clone().flatten(Some(depth));
+            for referenced_element in reference_elements {
+                elements.push(referenced_element);
+            }
+        }
+
+        elements
     }
 }
 
