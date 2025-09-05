@@ -1,9 +1,0 @@
-pytest
-hypothesis
-pytest-randomly
-pytest-xdist
-typing_extensions
-maturin
-ruff
-mypy
-isort
