@@ -20,7 +20,7 @@ use crate::{
 impl<DatabaseUnitT: CoordNum> ToGds for Reference<DatabaseUnitT> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         match &self.instance {
-            Instance::Cell(cell) => self.to_gds_impl_with_cell(file, scale, &cell.name),
+            Instance::Cell(cell_name) => self.to_gds_impl_with_cell(file, scale, cell_name),
             Instance::Element(element) => {
                 self.to_gds_impl_with_element(file, scale, element.as_ref().as_ref())
             }

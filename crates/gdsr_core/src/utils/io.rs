@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     convert::TryFrom,
     fs::File,
     io::{self, BufReader, Read, Write},
@@ -10,12 +9,11 @@ use chrono::{Datelike, Local, Timelike};
 use geo::Rotate;
 
 use crate::{
-    CoordNum, DataType, DatabaseIntegerUnit, Layer, Point,
+    CoordNum, DataType, DatabaseIntegerUnit, Instance, Layer, Point,
     cell::Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
     elements::{
-        Instance, Path, PathType, Polygon, Reference, Text,
-        text::utils::get_presentations_from_value,
+        Path, PathType, Polygon, Reference, Text, text::utils::get_presentations_from_value,
     },
     library::Library,
     utils::{
@@ -172,18 +170,8 @@ pub fn write_gds<'a, T: CoordNum + 'a>(
 
     write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
 
-    let mut written_cell_names: HashSet<String> = HashSet::new();
-
     for cell in cells {
-        if !written_cell_names.contains(&cell.name) {
-            written_cell_names.insert(cell.name.clone());
-            cell.to_gds_impl(
-                &mut file,
-                user_units,
-                database_units,
-                &mut written_cell_names,
-            )?;
-        }
+        cell.to_gds_impl(&mut file, user_units, database_units)?;
     }
 
     write_gds_tail_to_file(&mut file)?;
@@ -256,9 +244,6 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                     if let GDSRecordData::F64(units) = data {
                         scale = units[1] / units[0];
                     }
-                }
-                GDSRecord::EndLib => {
-                    update_references(&mut library);
                 }
                 GDSRecord::BgnStr => {
                     cell = Some(Cell::default());
@@ -400,8 +385,8 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(reference) = &mut reference {
-                            if let Instance::Cell(cell) = &mut reference.instance {
-                                cell.name = cell_name;
+                            if let Instance::Cell(_) = reference.instance {
+                                reference.instance = Instance::Cell(cell_name);
                             }
                         }
                     }
@@ -476,23 +461,6 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
     }
 
     Ok(library)
-}
-
-fn update_references<T: CoordNum>(library: &mut Library<T>) {
-    let library_cells = library.cells.clone();
-    let cell_references: Vec<&mut Reference<T>> = library
-        .cells
-        .values_mut()
-        .flat_map(|cell| &mut cell.references)
-        .collect();
-
-    for reference in cell_references {
-        if let Instance::Cell(referenced_name) = &mut reference.instance {
-            if let Some(referenced_cell) = library_cells.get(&referenced_name.name) {
-                reference.instance = Instance::Cell(referenced_cell.clone());
-            }
-        }
-    }
 }
 
 pub struct RecordReader<R: Read> {

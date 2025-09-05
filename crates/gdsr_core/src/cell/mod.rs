@@ -1,5 +1,5 @@
 use crate::{
-    CoordNum, DatabaseIntegerUnit,
+    CoordNum, DatabaseIntegerUnit, Library,
     elements::{Element, Path, Polygon, Reference, Text},
     traits::Transformable,
     transformation::Transformation,
@@ -40,32 +40,45 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
         }
     }
 
-    pub fn add_polygon(&mut self, polygon: Polygon<DatabaseUnitT>) {
-        self.polygons.push(polygon);
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn add_path(&mut self, path: Path<DatabaseUnitT>) {
-        self.paths.push(path);
+    #[must_use]
+    pub const fn polygons(&self) -> &Vec<Polygon<DatabaseUnitT>> {
+        &self.polygons
     }
 
-    pub fn add_text(&mut self, text: Text<DatabaseUnitT>) {
-        self.texts.push(text);
+    #[must_use]
+    pub const fn paths(&self) -> &Vec<Path<DatabaseUnitT>> {
+        &self.paths
     }
 
-    pub fn add_reference(&mut self, reference: Reference<DatabaseUnitT>) {
-        self.references.push(reference);
+    #[must_use]
+    pub const fn texts(&self) -> &Vec<Text<DatabaseUnitT>> {
+        &self.texts
+    }
+
+    #[must_use]
+    pub const fn references(&self) -> &Vec<Reference<DatabaseUnitT>> {
+        &self.references
     }
 
     pub fn add(&mut self, element: impl Into<Element<DatabaseUnitT>>) {
         match element.into() {
-            Element::Path(path) => self.add_path(path),
-            Element::Polygon(polygon) => self.add_polygon(polygon),
-            Element::Reference(reference) => self.add_reference(reference),
-            Element::Text(text) => self.add_text(text),
+            Element::Path(path) => self.paths.push(path),
+            Element::Polygon(polygon) => self.polygons.push(polygon),
+            Element::Reference(reference) => self.references.push(reference),
+            Element::Text(text) => self.texts.push(text),
         }
     }
 
-    pub(crate) fn get_elements(&self, depth: Option<usize>) -> Vec<Element<DatabaseUnitT>> {
+    pub(crate) fn get_elements(
+        &self,
+        depth: Option<usize>,
+        library: &Library<DatabaseUnitT>,
+    ) -> Vec<Element<DatabaseUnitT>> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
 
@@ -82,7 +95,7 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
         }
 
         for reference in &self.references {
-            let reference_elements = reference.clone().flatten(Some(depth));
+            let reference_elements = reference.clone().flatten(Some(depth), library);
             for referenced_element in reference_elements {
                 elements.push(referenced_element);
             }
@@ -200,7 +213,7 @@ mod tests {
         let mut cell = Cell::new("test_cell");
         let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
 
-        cell.add_polygon(polygon.clone());
+        cell.add(polygon.clone());
         assert_eq!(cell.polygons.len(), 1);
         assert_eq!(cell.polygons[0], polygon);
     }
@@ -216,7 +229,7 @@ mod tests {
             Some(2.0),
         );
 
-        cell.add_path(path.clone());
+        cell.add(path.clone());
         assert_eq!(cell.paths.len(), 1);
         assert_eq!(cell.paths[0], path);
     }
@@ -235,7 +248,7 @@ mod tests {
             HorizontalPresentation::default(),
         );
 
-        cell.add_text(text.clone());
+        cell.add(text.clone());
         assert_eq!(cell.texts.len(), 1);
         assert_eq!(cell.texts[0], text);
     }
@@ -249,35 +262,9 @@ mod tests {
             Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false),
         );
 
-        cell.add_reference(reference.clone());
+        cell.add(reference.clone());
         assert_eq!(cell.references.len(), 1);
         assert_eq!(cell.references[0], reference);
-    }
-
-    #[test]
-    fn test_add_element_polygon() {
-        let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
-
-        cell.add(polygon.clone());
-        assert_eq!(cell.polygons.len(), 1);
-        assert_eq!(cell.polygons[0], polygon);
-    }
-
-    #[test]
-    fn test_add_element_path() {
-        let mut cell = Cell::new("test_cell");
-        let path = Path::new(
-            vec![Point::new(0, 0), Point::new(10, 10)],
-            1,
-            0,
-            Some(PathType::Square),
-            Some(2.0),
-        );
-
-        cell.add(path.clone());
-        assert_eq!(cell.paths.len(), 1);
-        assert_eq!(cell.paths[0], path);
     }
 
     #[test]

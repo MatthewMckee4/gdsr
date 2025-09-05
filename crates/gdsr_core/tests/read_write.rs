@@ -41,7 +41,7 @@ fn test_library_roundtrip_mixed_elements() {
         Grid::new((0, 25), 2, 2, (25, 0), (0, 25), 1.0, 0.0, false),
     );
 
-    let elements = reference.flatten(None);
+    let elements = reference.flatten(None, &library);
 
     for element in elements {
         cell.add(element);
@@ -79,7 +79,7 @@ fn test_library_roundtrip_different_precision(
         Grid::new((0, 0), 3, 3, (150, 0), (0, 150), 1.5, 45.0, true),
     );
 
-    let elements = reference.flatten(None);
+    let elements = reference.flatten(None, &library);
 
     for element in elements {
         cell.add(element);
@@ -92,7 +92,7 @@ fn test_library_roundtrip_different_precision(
     cell2.add(polygon2);
 
     let reference2 = Reference::new(
-        cell2.clone(),
+        cell2.name(),
         Grid::new((0, 0), 3, 3, (150, 0), (0, 150), 0.0, 0.0, false),
     );
 

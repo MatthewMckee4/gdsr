@@ -32,6 +32,11 @@ impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
     }
 
     #[must_use]
+    pub fn get_cell(&self, name: &str) -> Option<&Cell<DatabaseUnitT>> {
+        self.cells.get(name)
+    }
+
+    #[must_use]
     pub fn contains(&self, cell: &Cell<DatabaseUnitT>) -> bool {
         self.cells.contains_key(&cell.name)
     }

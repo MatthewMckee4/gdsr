@@ -1,7 +1,7 @@
 use geo::Rotate;
 
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Movable, Point, elements::Element, grid::Grid,
+    CoordNum, DatabaseIntegerUnit, Library, Movable, Point, elements::Element, grid::Grid,
     traits::Transformable, transformation::Transformation, utils::general::point_to_database_float,
 };
 
@@ -83,17 +83,23 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
         elements
     }
 
-    pub fn flatten(self, depth: Option<usize>) -> Vec<Element<DatabaseUnitT>> {
+    pub fn flatten(
+        self,
+        depth: Option<usize>,
+        library: &Library<DatabaseUnitT>,
+    ) -> Vec<Element<DatabaseUnitT>> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
         if depth == 0 {
             return [Element::Reference(self)].to_vec();
         }
         match &self.instance {
-            Instance::Cell(cell) => {
-                let flattened_cell_elements = cell.get_elements(Some(depth - 1));
-                for cell_element in flattened_cell_elements {
-                    elements.extend(self.get_elements_in_grid(&cell_element));
+            Instance::Cell(cell_name) => {
+                if let Some(cell) = library.get_cell(cell_name) {
+                    let flattened_cell_elements = cell.get_elements(Some(depth - 1), library);
+                    for cell_element in flattened_cell_elements {
+                        elements.extend(self.get_elements_in_grid(&cell_element));
+                    }
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
@@ -102,7 +108,8 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
                 }
 
                 Element::Reference(reference) => {
-                    let flattened_reference_elements = reference.clone().flatten(Some(depth - 1));
+                    let flattened_reference_elements =
+                        reference.clone().flatten(Some(depth - 1), library);
 
                     for reference_element in flattened_reference_elements {
                         elements.extend(self.get_elements_in_grid(&reference_element).into_iter());

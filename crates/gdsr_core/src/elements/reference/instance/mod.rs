@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use crate::{
-    Cell, CoordNum, DatabaseIntegerUnit,
+    CoordNum, DatabaseIntegerUnit,
     elements::{Element, Path, Polygon, Reference, Text},
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instance<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    Cell(Cell<DatabaseUnitT>),
+    Cell(String),
     Element(Arc<Box<Element<DatabaseUnitT>>>),
 }
 
 impl<DatabaseUnitT: CoordNum> Default for Instance<DatabaseUnitT> {
     fn default() -> Self {
-        Self::Cell(Cell::default())
+        Self::Cell(String::new())
     }
 }
 
@@ -38,8 +38,14 @@ into_instance_impl!(Path<DatabaseUnitT>, Element::Path);
 into_instance_impl!(Reference<DatabaseUnitT>, Element::Reference);
 into_instance_impl!(Text<DatabaseUnitT>, Element::Text);
 
-impl<DatabaseUnitT: CoordNum> From<Cell<DatabaseUnitT>> for Instance<DatabaseUnitT> {
-    fn from(value: Cell<DatabaseUnitT>) -> Self {
+impl<DatabaseUnitT: CoordNum> From<String> for Instance<DatabaseUnitT> {
+    fn from(value: String) -> Self {
         Self::Cell(value)
+    }
+}
+
+impl<DatabaseUnitT: CoordNum> From<&str> for Instance<DatabaseUnitT> {
+    fn from(value: &str) -> Self {
+        Self::Cell(value.to_string())
     }
 }

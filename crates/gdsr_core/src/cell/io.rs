@@ -1,27 +1,18 @@
-use std::{collections::HashSet, fs::File, io};
+use std::{fs::File, io};
 
 use chrono::{Datelike, Local, Timelike};
 
 use crate::{
     Cell, CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
-    elements::{Element, Reference, reference::Instance},
     traits::ToGds,
     utils::io::{write_string_with_record_to_file, write_u16_array_to_file},
 };
 
 impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
-    pub fn to_gds_impl(
-        &self,
-        file: &mut File,
-        units: f64,
-        precision: f64,
-        written_cell_names: &mut HashSet<String>,
-    ) -> io::Result<()> {
+    pub fn to_gds_impl(&self, file: &mut File, units: f64, precision: f64) -> io::Result<()> {
         let now = Local::now();
         let timestamp = now.naive_utc();
-
-        let mut cells_to_write: Vec<Self> = Vec::new();
 
         let cell_head = [
             28,
@@ -57,7 +48,6 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
         }
 
         for reference in &self.references {
-            get_child_cells(reference, &mut cells_to_write, written_cell_names);
             reference.to_gds_impl(file, units / precision)?;
         }
 
@@ -68,31 +58,6 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
 
         write_u16_array_to_file(file, &cell_tail)?;
 
-        for cell in cells_to_write {
-            cell.to_gds_impl(file, units, precision, written_cell_names)?;
-        }
-
         Ok(())
-    }
-}
-
-fn get_child_cells<DatabaseUnitT: CoordNum>(
-    reference: &Reference<DatabaseUnitT>,
-    child_cells: &mut Vec<Cell<DatabaseUnitT>>,
-    written_cell_names: &mut HashSet<String>,
-) {
-    match &reference.instance() {
-        Instance::Cell(child_cell) => {
-            if !written_cell_names.contains(&child_cell.name) {
-                written_cell_names.insert(child_cell.name.clone());
-                child_cells.push(child_cell.clone());
-            }
-        }
-        Instance::Element(element) => match element.as_ref().as_ref() {
-            Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {}
-            Element::Reference(reference) => {
-                get_child_cells(reference, child_cells, written_cell_names);
-            }
-        },
     }
 }
