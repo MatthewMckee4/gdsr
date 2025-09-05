@@ -9,7 +9,7 @@ use chrono::{Datelike, Local, Timelike};
 use geo::Rotate;
 
 use crate::{
-    CoordNum, DataType, DatabaseIntegerUnit, Instance, Layer, Point,
+    CoordNum, DataType, DatabaseIntegerUnit, Instance, Layer, Point, ToGds,
     cell::Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
     elements::{
@@ -171,7 +171,7 @@ pub fn write_gds<'a, T: CoordNum + 'a>(
     write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
 
     for cell in cells {
-        cell.to_gds_impl(&mut file, user_units, database_units)?;
+        cell.to_gds_impl(&mut file, user_units / database_units)?;
     }
 
     write_gds_tail_to_file(&mut file)?;
