@@ -1,20 +1,26 @@
 use crate::{CoordNum, Point};
 
-fn are_points_closed<T: CoordNum>(points: &[Point<T>]) -> bool {
-    points.first() == points.last()
-}
-
-pub fn close_points<T: CoordNum>(points: &[Point<T>]) -> Vec<Point<T>> {
-    if are_points_closed(points) {
-        points.to_vec()
-    } else {
-        let mut closed_points = points.to_vec();
-        closed_points.push(points[0]);
-        closed_points
+fn are_points_closed<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> bool {
+    let points_vec: Vec<Point<DatabaseUnitT>> = points.to_vec();
+    if points_vec.is_empty() {
+        return true;
     }
+    points_vec.first() == points_vec.last()
 }
 
-pub fn get_correct_polygon_points_format<T: CoordNum>(points: &[Point<T>]) -> Vec<Point<T>> {
+pub fn close_points<DatabaseUnitT: CoordNum>(
+    points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
+) -> Vec<Point<DatabaseUnitT>> {
+    let mut points_vec = points.into_iter().map(Into::into).collect::<Vec<_>>();
+    if !are_points_closed(&points_vec) {
+        points_vec.push(points_vec[0]);
+    }
+    points_vec
+}
+
+pub fn get_correct_polygon_points_format<DatabaseUnitT: CoordNum>(
+    points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
+) -> Vec<Point<DatabaseUnitT>> {
     close_points(points)
 }
 
@@ -79,7 +85,7 @@ mod tests {
             Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(5)),
             Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(0)), // Already closed
         ];
-        let closed = close_points(&points);
+        let closed = close_points(points.clone());
 
         // Should return same points since already closed
         assert_eq!(closed.len(), points.len());
@@ -94,7 +100,7 @@ mod tests {
             Point::new(DatabaseIntegerUnit::from(5), DatabaseIntegerUnit::from(5)),
             Point::new(DatabaseIntegerUnit::from(0), DatabaseIntegerUnit::from(5)), // Not closed
         ];
-        let closed = close_points(&points);
+        let closed = close_points(points.clone());
 
         // Should add closing point
         assert_eq!(closed.len(), points.len() + 1);
@@ -113,7 +119,7 @@ mod tests {
             DatabaseIntegerUnit::from(7),
             DatabaseIntegerUnit::from(3),
         )];
-        let closed = close_points(&points);
+        let closed = close_points(points.clone());
 
         // Single point is already "closed", should return unchanged
         assert_eq!(closed.len(), 1);
@@ -126,7 +132,7 @@ mod tests {
             Point::new(DatabaseIntegerUnit::from(1), DatabaseIntegerUnit::from(2)),
             Point::new(DatabaseIntegerUnit::from(3), DatabaseIntegerUnit::from(4)),
         ];
-        let closed = close_points(&points);
+        let closed = close_points(points.clone());
 
         // Should add closing point
         assert_eq!(closed.len(), 3);
@@ -138,7 +144,7 @@ mod tests {
     #[test]
     fn test_close_points_empty() {
         let points: Vec<Point<DatabaseIntegerUnit>> = vec![];
-        let closed = close_points(&points);
+        let closed = close_points(points.clone());
 
         // Empty should remain empty
         assert_eq!(closed.len(), 0);

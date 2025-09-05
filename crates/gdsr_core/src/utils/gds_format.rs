@@ -25,7 +25,7 @@ pub fn eight_byte_real(value: f64) -> [u8; 8] {
 
     let byte2 = (mantissa >> 48) as u8;
     let short3 = ((mantissa >> 32) & 0xFFFF) as u16;
-    let long4 = (mantissa & 0xFFFFFFFF) as u32;
+    let long4 = (mantissa & 0xFFFF_FFFF) as u32;
 
     let mut result = [0u8; 8];
     result[0] = byte1;
@@ -42,7 +42,7 @@ pub fn eight_byte_real(value: f64) -> [u8; 8] {
 
 pub fn u16_array_to_big_endian(array: &[u16]) -> Vec<u16> {
     let mut result = Vec::with_capacity(array.len());
-    for value in array.iter() {
+    for value in array {
         result.push(value.to_be());
     }
     result

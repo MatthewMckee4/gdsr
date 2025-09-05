@@ -51,7 +51,7 @@ impl CoordNum for DatabaseIntegerUnit {
     }
 
     fn from_float(val: DatabaseFloatUnit) -> Self {
-        val.round() as DatabaseIntegerUnit
+        val.round() as Self
     }
 }
 

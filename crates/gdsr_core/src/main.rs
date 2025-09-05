@@ -8,11 +8,7 @@ fn main() {
 
     let mut cell = Cell::new("main_cell");
 
-    let polygon = Polygon::new(
-        [(0, 0).into(), (1, 0).into(), (1, 1).into(), (0, 1).into()].to_vec(),
-        1,
-        0,
-    );
+    let polygon = Polygon::new([(0, 0), (1, 0), (1, 1), (0, 1)], 1, 0);
 
     let reference = Reference::new(
         polygon.into(),

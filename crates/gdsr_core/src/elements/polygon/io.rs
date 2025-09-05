@@ -11,7 +11,7 @@ use crate::{
 use super::Polygon;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
-    fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         if self.points().len() > 8191 {
             return Ok(());
         }

@@ -19,16 +19,17 @@ pub struct Cell<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 impl<DatabaseUnitT: CoordNum> Default for Cell<DatabaseUnitT> {
     fn default() -> Self {
         Self {
-            name: Default::default(),
-            polygons: Default::default(),
-            paths: Default::default(),
-            texts: Default::default(),
-            references: Default::default(),
+            name: String::default(),
+            polygons: Vec::default(),
+            paths: Vec::default(),
+            texts: Vec::default(),
+            references: Vec::default(),
         }
     }
 }
 
 impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -61,7 +62,7 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
             Element::Polygon(polygon) => self.add_polygon(polygon),
             Element::Reference(reference) => self.add_reference(reference),
             Element::Text(text) => self.add_text(text),
-        };
+        }
     }
 
     pub(crate) fn get_elements(&self, _depth: Option<usize>) -> Vec<&Element<DatabaseUnitT>> {

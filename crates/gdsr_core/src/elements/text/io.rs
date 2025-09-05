@@ -15,7 +15,7 @@ use super::Text;
 use super::utils::get_presentation_value;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
-    fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         let mut buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),

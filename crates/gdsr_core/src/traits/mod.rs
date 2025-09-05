@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub trait ToGds {
-    fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()>;
+    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()>;
 }
 
 pub trait Transformable: Sized {

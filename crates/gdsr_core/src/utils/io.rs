@@ -171,7 +171,7 @@ pub fn write_gds<'a, T: CoordNum + 'a>(
     for cell in cells {
         if !written_cell_names.contains(&cell.name) {
             written_cell_names.insert(cell.name.clone());
-            cell._to_gds(
+            cell.to_gds_impl(
                 &mut file,
                 user_units,
                 database_units,
@@ -498,7 +498,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 GDSRecord::PathType => {
                     if let GDSRecordData::I16(path_type) = data {
                         if let Some(path) = &mut path {
-                            path.path_type = Some(PathType::new(path_type[0] as i32));
+                            path.r#type = Some(PathType::new(path_type[0] as i32));
                         }
                     }
 

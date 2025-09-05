@@ -27,7 +27,11 @@ impl<DatabaseUnitT: CoordNum> Default for Polygon<DatabaseUnitT> {
 
 impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
     #[must_use]
-    pub fn new(points: &[Point<DatabaseUnitT>], layer: Layer, data_type: DataType) -> Self {
+    pub fn new(
+        points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
         Self {
             points: utils::get_correct_polygon_points_format(points),
             layer,

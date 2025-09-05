@@ -17,18 +17,18 @@ pub struct Path<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub(crate) points: Vec<Point<DatabaseUnitT>>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,
-    pub(crate) path_type: Option<PathType>,
+    pub(crate) r#type: Option<PathType>,
     pub(crate) width: Option<Width>,
 }
 
 impl<DatabaseUnitT: CoordNum> Default for Path<DatabaseUnitT> {
     fn default() -> Self {
         Self {
-            points: Default::default(),
+            points: Vec::default(),
             layer: Default::default(),
             data_type: Default::default(),
-            path_type: Default::default(),
-            width: Default::default(),
+            r#type: None,
+            width: None,
         }
     }
 }
@@ -45,7 +45,7 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
             points,
             layer,
             data_type,
-            path_type,
+            r#type: path_type,
             width,
         }
     }
@@ -63,7 +63,7 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
     }
 
     pub fn path_type(&self) -> &Option<PathType> {
-        &self.path_type
+        &self.r#type
     }
 
     pub fn width(&self) -> Option<Width> {

@@ -13,7 +13,7 @@ use crate::{
 use super::Path;
 
 impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
-    fn _to_gds(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         if self.points().len() < 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -21,7 +21,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             ));
         }
 
-        let mut path_head = [
+        let path_head = [
             4,
             combine_record_and_data_type(GDSRecord::Path, GDSDataType::NoData),
             6,
@@ -32,10 +32,10 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             self.data_type(),
         ];
 
-        write_u16_array_to_file(file, &mut path_head)?;
+        write_u16_array_to_file(file, &path_head)?;
 
         if let Some(path_type) = self.path_type() {
-            let path_type_value = path_type.value() as u16;
+            let path_type_value = path_type.value();
 
             let path_type_head = [
                 6,
@@ -64,7 +64,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             file.write_all(&bytes)?;
         }
 
-        write_points_to_file(file, &self.points(), scale, &|val| val.to_integer())?;
+        write_points_to_file(file, self.points(), scale, &|val| val.to_integer())?;
 
         write_element_tail_to_file(file)
     }

@@ -19,12 +19,12 @@ pub enum Element<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 }
 
 impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
-    fn _to_gds(&self, file: &mut std::fs::File, scale: f64) -> std::io::Result<()> {
+    fn to_gds_impl(&self, file: &mut std::fs::File, scale: f64) -> std::io::Result<()> {
         match self {
-            Element::Path(path) => path._to_gds(file, scale),
-            Element::Polygon(polygon) => polygon._to_gds(file, scale),
-            Element::Reference(reference) => reference._to_gds(file, scale),
-            Element::Text(text) => text._to_gds(file, scale),
+            Element::Path(path) => path.to_gds_impl(file, scale),
+            Element::Polygon(polygon) => polygon.to_gds_impl(file, scale),
+            Element::Reference(reference) => reference.to_gds_impl(file, scale),
+            Element::Text(text) => text.to_gds_impl(file, scale),
         }
     }
 }
