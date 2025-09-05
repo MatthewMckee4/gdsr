@@ -9,7 +9,7 @@ pub struct TranslationInner<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 pub struct Translation(TranslationInner<DatabaseIntegerUnit>);
 
 impl Translation {
-    pub fn new(delta: Point<DatabaseIntegerUnit>) -> Self {
+    pub const fn new(delta: Point<DatabaseIntegerUnit>) -> Self {
         Self(TranslationInner { delta })
     }
 

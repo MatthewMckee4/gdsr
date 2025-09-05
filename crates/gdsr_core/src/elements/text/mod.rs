@@ -32,7 +32,8 @@ impl<DatabaseUnitT: CoordNum> Default for Text<DatabaseUnitT> {
 }
 
 impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new(
         text: String,
         origin: Point<DatabaseUnitT>,
         layer: Layer,
@@ -54,39 +55,39 @@ impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
         }
     }
 
-    pub fn text(&self) -> &String {
+    pub const fn text(&self) -> &String {
         &self.text
     }
 
-    pub fn origin(&self) -> &Point<DatabaseUnitT> {
+    pub const fn origin(&self) -> &Point<DatabaseUnitT> {
         &self.origin
     }
 
-    fn set_origin(&mut self, origin: Point<DatabaseUnitT>) {
-        self.origin = origin
+    const fn set_origin(&mut self, origin: Point<DatabaseUnitT>) {
+        self.origin = origin;
     }
 
-    pub fn layer(&self) -> Layer {
+    pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    pub fn magnification(&self) -> f64 {
+    pub const fn magnification(&self) -> f64 {
         self.magnification
     }
 
-    pub fn angle(&self) -> f64 {
+    pub const fn angle(&self) -> f64 {
         self.angle
     }
 
-    pub fn x_reflection(&self) -> bool {
+    pub const fn x_reflection(&self) -> bool {
         self.x_reflection
     }
 
-    pub fn vertical_presentation(&self) -> &presentation::VerticalPresentation {
+    pub const fn vertical_presentation(&self) -> &presentation::VerticalPresentation {
         &self.vertical_presentation
     }
 
-    pub fn horizontal_presentation(&self) -> &presentation::HorizontalPresentation {
+    pub const fn horizontal_presentation(&self) -> &presentation::HorizontalPresentation {
         &self.horizontal_presentation
     }
 }
@@ -109,11 +110,11 @@ impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
         let mut new_self = self.clone();
 
         if let Some(translation) = &transformation.translation {
-            new_self.origin = translation.apply_to_point(new_self.origin())
+            new_self.origin = translation.apply_to_point(new_self.origin());
         }
 
         if let Some(scale) = &transformation.scale {
-            new_self.magnification *= scale.factor()
+            new_self.magnification *= scale.factor();
         }
 
         if let Some(rotation) = &transformation.rotation {

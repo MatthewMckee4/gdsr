@@ -33,7 +33,7 @@ pub fn write_gds_head_to_file(
     let now = Local::now();
     let timestamp = now.naive_utc();
 
-    let mut head_start = [
+    let head_start = [
         6,
         combine_record_and_data_type(GDSRecord::Header, GDSDataType::TwoByteSignedInteger),
         0x0258,
@@ -53,15 +53,15 @@ pub fn write_gds_head_to_file(
         timestamp.second() as u16,
     ];
 
-    write_u16_array_to_file(file, &mut head_start)?;
+    write_u16_array_to_file(file, &head_start)?;
 
     write_string_with_record_to_file(file, GDSRecord::LibName, library_name)?;
 
-    let mut head_units = [
+    let head_units = [
         20,
         combine_record_and_data_type(GDSRecord::Units, GDSDataType::EightByteReal),
     ];
-    write_u16_array_to_file(file, &mut head_units)?;
+    write_u16_array_to_file(file, &head_units)?;
 
     write_float_to_eight_byte_real_to_file(file, user_units)?;
     write_float_to_eight_byte_real_to_file(file, database_units)
@@ -127,11 +127,11 @@ pub fn write_integer_points_to_file(
 }
 
 pub fn write_element_tail_to_file(file: &mut File) -> io::Result<()> {
-    let mut tail = [
+    let tail = [
         4,
         combine_record_and_data_type(GDSRecord::EndEl, GDSDataType::NoData),
     ];
-    write_u16_array_to_file(file, &mut tail)
+    write_u16_array_to_file(file, &tail)
 }
 
 pub fn write_string_with_record_to_file(
@@ -145,15 +145,17 @@ pub fn write_string_with_record_to_file(
     }
 
     let mut lib_name_bytes = string.as_bytes().to_vec();
+
     if string.len() % 2 != 0 {
         lib_name_bytes.push(0);
     }
-    let mut string_start = [
+
+    let string_start = [
         (4 + len) as u16,
         combine_record_and_data_type(record, GDSDataType::AsciiString),
     ];
 
-    write_u16_array_to_file(file, &mut string_start)?;
+    write_u16_array_to_file(file, &string_start)?;
 
     file.write_all(&lib_name_bytes)
 }
@@ -165,7 +167,7 @@ pub fn write_gds<'a, T: CoordNum + 'a>(
     database_units: f64,
     cells: impl Iterator<Item = &'a Cell<T>>,
 ) -> io::Result<()> {
-    let mut file = File::create(file_name.clone())?;
+    let mut file = File::create(file_name)?;
 
     write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
 
@@ -308,7 +310,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::Width => {
                     if let GDSRecordData::I32(width) = data {
-                        let path_width = width[0] as f64 * scale;
+                        let path_width = f64::from(width[0]) * scale;
                         if let Some(path) = &mut path {
                             path.width = Some(path_width);
                         }
@@ -353,15 +355,17 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
 
                                     reference.grid.spacing_x = if reference.grid.columns > 0 {
                                         (rotated_points[1] - rotated_points[0])
-                                            / DatabaseUnitT::from_float(
-                                                reference.grid.columns as f64,
-                                            )
+                                            / DatabaseUnitT::from_float(f64::from(
+                                                reference.grid.columns,
+                                            ))
                                     } else {
                                         Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
                                     };
                                     reference.grid.spacing_y = if reference.grid.rows > 0 {
                                         (rotated_points[2] - rotated_points[0])
-                                            / DatabaseUnitT::from_float(reference.grid.rows as f64)
+                                            / DatabaseUnitT::from_float(f64::from(
+                                                reference.grid.rows,
+                                            ))
                                     } else {
                                         Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
                                     };
@@ -416,7 +420,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                                 get_presentations_from_value(flags[0])
                             {
                                 text.vertical_presentation = vertical_presentation;
-                                text.horizontal_presentation = horizontal_presentation
+                                text.horizontal_presentation = horizontal_presentation;
                             }
                         }
                     }
@@ -442,7 +446,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 GDSRecord::Mag => {
                     if let GDSRecordData::F64(magnification) = data {
                         if let Some(text) = &mut text {
-                            text.magnification = magnification[0]
+                            text.magnification = magnification[0];
                         } else if let Some(reference) = &mut reference {
                             reference.grid.magnification = magnification[0];
                         }
@@ -460,7 +464,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 GDSRecord::PathType => {
                     if let GDSRecordData::I16(path_type) = data {
                         if let Some(path) = &mut path {
-                            path.r#type = Some(PathType::new(path_type[0] as i32));
+                            path.r#type = Some(PathType::new(i32::from(path_type[0])));
                         }
                     }
                 }
@@ -547,7 +551,9 @@ impl<R: Read> Iterator for RecordReader<R> {
                         }
                         GDSRecordData::Str(result)
                     }
-                    _ => GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned()),
+                    GDSDataType::NoData => {
+                        GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned())
+                    }
                 },
             )
         } else {
@@ -572,7 +578,7 @@ fn read_i16_be(buf: &[u8]) -> Vec<i16> {
     let mut i = 0;
 
     while i + chunk_size <= buf.len() {
-        let value = ((buf[i] as i16) << 8) | (buf[i + 1] as i16);
+        let value = (i16::from(buf[i]) << 8) | i16::from(buf[i + 1]);
         result.push(value);
         i += chunk_size;
     }
@@ -586,10 +592,10 @@ fn read_i32_be(buf: &[u8]) -> Vec<i32> {
     let mut i = 0;
 
     while i + chunk_size <= buf.len() {
-        let value = ((buf[i] as i32) << 24)
-            | ((buf[i + 1] as i32) << 16)
-            | ((buf[i + 2] as i32) << 8)
-            | (buf[i + 3] as i32);
+        let value = (i32::from(buf[i]) << 24)
+            | (i32::from(buf[i + 1]) << 16)
+            | (i32::from(buf[i + 2]) << 8)
+            | i32::from(buf[i + 3]);
         result.push(value);
         i += chunk_size;
     }
@@ -603,14 +609,14 @@ fn read_u64_be(buf: &[u8]) -> Vec<u64> {
     let mut i = 0;
 
     while i + chunk_size <= buf.len() {
-        let value = ((buf[i] as u64) << 56)
-            | ((buf[i + 1] as u64) << 48)
-            | ((buf[i + 2] as u64) << 40)
-            | ((buf[i + 3] as u64) << 32)
-            | ((buf[i + 4] as u64) << 24)
-            | ((buf[i + 5] as u64) << 16)
-            | ((buf[i + 6] as u64) << 8)
-            | (buf[i + 7] as u64);
+        let value = (u64::from(buf[i]) << 56)
+            | (u64::from(buf[i + 1]) << 48)
+            | (u64::from(buf[i + 2]) << 40)
+            | (u64::from(buf[i + 3]) << 32)
+            | (u64::from(buf[i + 4]) << 24)
+            | (u64::from(buf[i + 5]) << 16)
+            | (u64::from(buf[i + 6]) << 8)
+            | u64::from(buf[i + 7]);
         result.push(value);
         i += chunk_size;
     }
@@ -623,9 +629,10 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     let short2 = ((bytes >> 32) & 0xFFFF) as u16;
     let long3 = (bytes & 0xFFFF_FFFF) as u32;
 
-    let exponent = ((short1 & 0x7F00) >> 8) as i32 - 64;
+    let exponent = i32::from((short1 & 0x7F00) >> 8) - 64;
 
-    let mantissa = (((short1 & 0x00FF) as u64) << 48 | (short2 as u64) << 32 | long3 as u64) as f64
+    let mantissa = (u64::from(short1 & 0x00FF) << 48 | u64::from(short2) << 32 | u64::from(long3))
+        as f64
         / 72_057_594_037_927_936.0;
 
     if short1 & 0x8000 != 0 {

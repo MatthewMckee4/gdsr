@@ -17,6 +17,7 @@ pub struct Grid<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 }
 
 impl<DatabaseUnitT: CoordNum> Grid<DatabaseUnitT> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         origin: impl Into<Point<DatabaseUnitT>>,
         columns: u32,
@@ -42,7 +43,7 @@ impl<DatabaseUnitT: CoordNum> Grid<DatabaseUnitT> {
 
 impl<T: CoordNum> Default for Grid<T> {
     fn default() -> Self {
-        Grid {
+        Self {
             origin: Point::new(T::zero(), T::zero()),
             columns: 1,
             rows: 1,

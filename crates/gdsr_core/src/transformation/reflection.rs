@@ -10,7 +10,7 @@ struct ReflectionInner<DatabaseUnitT: CoordNum, AngleT: CoordNum> {
 pub struct Reflection(ReflectionInner<DatabaseIntegerUnit, f64>);
 
 impl Reflection {
-    pub fn new(angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+    pub const fn new(angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
         Self(ReflectionInner { angle, centre })
     }
 
@@ -38,8 +38,8 @@ impl Reflection {
         let dx = point.x().to_float() - self_center_x;
         let dy = point.y().to_float() - self_center_y;
 
-        let new_x = self_center_x + dx * cos_2angle + dy * sin_2angle;
-        let new_y = self_center_y + dx * sin_2angle - dy * cos_2angle;
+        let new_x = dy.mul_add(sin_2angle, dx.mul_add(cos_2angle, self_center_x));
+        let new_y = dy.mul_add(-cos_2angle, dx.mul_add(sin_2angle, self_center_y));
 
         Point::new(
             DatabaseUnitT::from_float(new_x),

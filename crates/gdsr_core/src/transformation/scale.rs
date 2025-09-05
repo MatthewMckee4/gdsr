@@ -10,15 +10,15 @@ struct ScaleInner<DatabaseUnitT: CoordNum, ScaleT: CoordNum> {
 pub struct Scale(ScaleInner<DatabaseIntegerUnit, f64>);
 
 impl Scale {
-    pub fn new(factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
+    pub const fn new(factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
         Self(ScaleInner { factor, centre })
     }
 
-    pub fn factor(&self) -> f64 {
+    pub const fn factor(&self) -> f64 {
         self.0.factor
     }
 
-    pub fn centre(&self) -> &Point<DatabaseIntegerUnit> {
+    pub const fn centre(&self) -> &Point<DatabaseIntegerUnit> {
         &self.0.centre
     }
 
@@ -32,8 +32,8 @@ impl Scale {
         let dx = (point.x().to_float()) - self_center_x;
         let dy = (point.y().to_float()) - self_center_y;
 
-        let new_x = self_center_x + dx * self.0.factor;
-        let new_y = self_center_y + dy * self.0.factor;
+        let new_x = dx.mul_add(self.0.factor, self_center_x);
+        let new_y = dy.mul_add(self.0.factor, self_center_y);
 
         Point::new(
             DatabaseUnitT::from_float(new_x),

@@ -19,7 +19,8 @@ pub struct Transformation {
 }
 
 impl Transformation {
-    pub fn translation(translation: Translation) -> Self {
+    #[must_use] 
+    pub const fn translation(translation: Translation) -> Self {
         Self {
             reflection: None,
             rotation: None,
@@ -28,7 +29,8 @@ impl Transformation {
         }
     }
 
-    pub fn rotation(rotation: Rotation) -> Self {
+    #[must_use] 
+    pub const fn rotation(rotation: Rotation) -> Self {
         Self {
             reflection: None,
             rotation: Some(rotation),
@@ -37,7 +39,8 @@ impl Transformation {
         }
     }
 
-    pub fn scale(scale: Scale) -> Self {
+    #[must_use] 
+    pub const fn scale(scale: Scale) -> Self {
         Self {
             reflection: None,
             rotation: None,
@@ -46,7 +49,8 @@ impl Transformation {
         }
     }
 
-    pub fn reflection(reflection: Reflection) -> Self {
+    #[must_use] 
+    pub const fn reflection(reflection: Reflection) -> Self {
         Self {
             reflection: Some(reflection),
             rotation: None,
@@ -55,22 +59,22 @@ impl Transformation {
         }
     }
 
-    pub fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
+    pub const fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
         self.reflection = reflection;
         self
     }
 
-    pub fn with_rotation(&mut self, rotation: Option<Rotation>) -> &mut Self {
+    pub const fn with_rotation(&mut self, rotation: Option<Rotation>) -> &mut Self {
         self.rotation = rotation;
         self
     }
 
-    pub fn with_scale(&mut self, scale: Option<Scale>) -> &mut Self {
+    pub const fn with_scale(&mut self, scale: Option<Scale>) -> &mut Self {
         self.scale = scale;
         self
     }
 
-    pub fn with_translation(&mut self, translation: Option<Translation>) -> &mut Self {
+    pub const fn with_translation(&mut self, translation: Option<Translation>) -> &mut Self {
         self.translation = translation;
         self
     }
@@ -79,7 +83,7 @@ impl Transformation {
         &self,
         point: &Point<DatabaseUnitT>,
     ) -> Point<DatabaseUnitT> {
-        let mut new_point = point.clone();
+        let mut new_point = *point;
 
         if let Some(reflection) = &self.reflection {
             new_point = reflection.apply_to_point(&new_point);

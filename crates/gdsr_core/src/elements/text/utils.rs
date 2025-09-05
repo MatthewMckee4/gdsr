@@ -1,14 +1,13 @@
 use super::presentation::{HorizontalPresentation, VerticalPresentation};
 
-pub fn get_presentation_value(
-    vertical_presentation: &VerticalPresentation,
-    horizontal_presentation: &HorizontalPresentation,
+pub const fn get_presentation_value(
+    vertical_presentation: VerticalPresentation,
+    horizontal_presentation: HorizontalPresentation,
 ) -> u16 {
     let vertical_value = vertical_presentation.value();
     let horizontal_value = horizontal_presentation.value();
 
     match (vertical_value, horizontal_value) {
-        (0, 0) => 0,
         (0, 1) => 1,
         (0, 2) => 2,
         (1, 0) => 4,

@@ -13,6 +13,7 @@ pub struct Library<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
 }
 
 impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -30,7 +31,8 @@ impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
         }
     }
 
-    pub fn contains(&self, cell: Cell<DatabaseUnitT>) -> bool {
+    #[must_use]
+    pub fn contains(&self, cell: &Cell<DatabaseUnitT>) -> bool {
         self.cells.contains_key(&cell.name)
     }
 

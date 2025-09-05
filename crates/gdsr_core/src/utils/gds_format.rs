@@ -16,7 +16,7 @@ pub fn eight_byte_real(value: f64) -> [u8; 8] {
     let fexp = val.log2() / 4.0;
     let mut exponent = fexp.ceil() as i32;
 
-    if fexp == exponent as f64 {
+    if fexp == f64::from(exponent) {
         exponent += 1;
     }
 

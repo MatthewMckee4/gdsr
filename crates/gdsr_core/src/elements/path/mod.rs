@@ -56,19 +56,23 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
         &self.points
     }
 
-    pub fn layer(&self) -> Layer {
+    #[must_use] 
+    pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    pub fn data_type(&self) -> DataType {
+    #[must_use] 
+    pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
-    pub fn path_type(&self) -> &Option<PathType> {
+    #[must_use] 
+    pub const fn path_type(&self) -> &Option<PathType> {
         &self.r#type
     }
 
-    pub fn width(&self) -> Option<Width> {
+    #[must_use] 
+    pub const fn width(&self) -> Option<Width> {
         self.width
     }
 }
@@ -137,7 +141,7 @@ impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
 
                     let dx = point.x() - prev.x();
                     let dy = point.y() - prev.y();
-                    let len = ((dx * dx + dy * dy) as f64).sqrt();
+                    let len = dx.mul_add(dx, dy * dy).sqrt();
                     if len > 0.0 {
                         let nx = -dy / len * half_width;
                         let ny = dx / len * half_width;
@@ -151,7 +155,7 @@ impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
 
                     let dx = next.x() - point.x();
                     let dy = next.y() - point.y();
-                    let len = (dx * dx + dy * dy).sqrt();
+                    let len = dx.hypot(dy);
                     if len > 0.0 {
                         let nx = -dy / len * half_width;
                         let ny = dx / len * half_width;

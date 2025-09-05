@@ -13,7 +13,7 @@ use crate::{
 
 impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
-        let mut buffer_start = vec![
+        let buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
             6,
@@ -24,10 +24,13 @@ impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
             0,
             6,
             combine_record_and_data_type(GDSRecord::Presentation, GDSDataType::BitArray),
-            get_presentation_value(self.vertical_presentation(), self.horizontal_presentation()),
+            get_presentation_value(
+                *self.vertical_presentation(),
+                *self.horizontal_presentation(),
+            ),
         ];
 
-        write_u16_array_to_file(file, &mut buffer_start)?;
+        write_u16_array_to_file(file, &buffer_start)?;
 
         write_transformation_to_file(
             file,
@@ -36,11 +39,9 @@ impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
             self.x_reflection(),
         )?;
 
-        write_points_to_file(file, &[self.origin().clone()], scale, &|val| {
-            val.to_integer()
-        })?;
+        write_points_to_file(file, &[*self.origin()], scale, &|val| val.to_integer())?;
 
-        write_string_with_record_to_file(file, GDSRecord::String, &self.text())?;
+        write_string_with_record_to_file(file, GDSRecord::String, self.text())?;
 
         write_element_tail_to_file(file)
     }
