@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use crate::{
-    CoordNum, DatabaseIntegerUnit,
+    CoordinateUnit, DatabaseIntegerUnit,
     elements::{Element, Path, Polygon, Reference, Text},
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Instance<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
+pub enum Instance<T: CoordinateUnit = DatabaseIntegerUnit> {
     Cell(String),
-    Element(Arc<Box<Element<DatabaseUnitT>>>),
+    Element(Arc<Box<Element<T>>>),
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Instance<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Instance<T> {
     fn default() -> Self {
         Self::Cell(String::new())
     }
@@ -19,13 +19,13 @@ impl<DatabaseUnitT: CoordNum> Default for Instance<DatabaseUnitT> {
 
 macro_rules! into_instance_impl {
     ($t:ty, $et:expr) => {
-        impl<DatabaseUnitT: CoordNum> From<$t> for Instance<DatabaseUnitT> {
+        impl<T: CoordinateUnit> From<$t> for Instance<T> {
             fn from(value: $t) -> Self {
                 Instance::Element(Arc::new(Box::new($et(value))))
             }
         }
 
-        impl<DatabaseUnitT: CoordNum> From<$t> for Element<DatabaseUnitT> {
+        impl<T: CoordinateUnit> From<$t> for Element<T> {
             fn from(value: $t) -> Self {
                 $et(value)
             }
@@ -33,18 +33,18 @@ macro_rules! into_instance_impl {
     };
 }
 
-into_instance_impl!(Polygon<DatabaseUnitT>, Element::Polygon);
-into_instance_impl!(Path<DatabaseUnitT>, Element::Path);
-into_instance_impl!(Reference<DatabaseUnitT>, Element::Reference);
-into_instance_impl!(Text<DatabaseUnitT>, Element::Text);
+into_instance_impl!(Polygon<T>, Element::Polygon);
+into_instance_impl!(Path<T>, Element::Path);
+into_instance_impl!(Reference<T>, Element::Reference);
+into_instance_impl!(Text<T>, Element::Text);
 
-impl<DatabaseUnitT: CoordNum> From<String> for Instance<DatabaseUnitT> {
+impl<T: CoordinateUnit> From<String> for Instance<T> {
     fn from(value: String) -> Self {
         Self::Cell(value)
     }
 }
 
-impl<DatabaseUnitT: CoordNum> From<&str> for Instance<DatabaseUnitT> {
+impl<T: CoordinateUnit> From<&str> for Instance<T> {
     fn from(value: &str) -> Self {
         Self::Cell(value.to_string())
     }

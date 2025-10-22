@@ -1,29 +1,29 @@
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Point,
+    CoordinateUnit, DatabaseIntegerUnit, Point,
     traits::{Movable, Transformable},
     transformation::Transformation,
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Grid<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    pub(crate) origin: Point<DatabaseUnitT>,
+pub struct Grid<T: CoordinateUnit = DatabaseIntegerUnit> {
+    pub(crate) origin: Point<T>,
     pub(crate) columns: u32,
     pub(crate) rows: u32,
-    pub(crate) spacing_x: Point<DatabaseUnitT>,
-    pub(crate) spacing_y: Point<DatabaseUnitT>,
+    pub(crate) spacing_x: Point<T>,
+    pub(crate) spacing_y: Point<T>,
     pub(crate) magnification: f64,
     pub(crate) angle: f64,
     pub(crate) x_reflection: bool,
 }
 
-impl<DatabaseUnitT: CoordNum> Grid<DatabaseUnitT> {
+impl<T: CoordinateUnit> Grid<T> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        origin: impl Into<Point<DatabaseUnitT>>,
+        origin: impl Into<Point<T>>,
         columns: u32,
         rows: u32,
-        spacing_x: impl Into<Point<DatabaseUnitT>>,
-        spacing_y: impl Into<Point<DatabaseUnitT>>,
+        spacing_x: impl Into<Point<T>>,
+        spacing_y: impl Into<Point<T>>,
         magnification: f64,
         angle: f64,
         x_reflection: bool,
@@ -41,7 +41,7 @@ impl<DatabaseUnitT: CoordNum> Grid<DatabaseUnitT> {
     }
 }
 
-impl<T: CoordNum> Default for Grid<T> {
+impl<T: CoordinateUnit> Default for Grid<T> {
     fn default() -> Self {
         Self {
             origin: Point::new(T::zero(), T::zero()),
@@ -56,7 +56,7 @@ impl<T: CoordNum> Default for Grid<T> {
     }
 }
 
-impl<T: CoordNum> std::fmt::Display for Grid<T> {
+impl<T: CoordinateUnit> std::fmt::Display for Grid<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -73,7 +73,7 @@ impl<T: CoordNum> std::fmt::Display for Grid<T> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Grid<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Grid<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.origin = transformation.apply_to_point(&new_self.origin);
@@ -100,12 +100,12 @@ impl<DatabaseUnitT: CoordNum> Transformable for Grid<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Grid<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Grid<T> {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let mut new_self = self.clone();
         new_self.origin = Point::new(
-            DatabaseUnitT::from_float(target.x().to_float()),
-            DatabaseUnitT::from_float(target.y().to_float()),
+            T::from_float(target.x().to_float_units()),
+            T::from_float(target.y().to_float_units()),
         );
         new_self
     }

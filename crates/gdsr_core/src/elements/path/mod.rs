@@ -1,5 +1,5 @@
 use crate::{
-    CoordNum, DataType, DatabaseFloatUnit, DatabaseIntegerUnit, Layer, Point,
+    CoordinateUnit, DataType, DatabaseFloatUnit, DatabaseIntegerUnit, Layer, Point,
     traits::{Dimensions, Movable, Transformable},
     transformation::Transformation,
     utils::geometry::bounding_box,
@@ -8,20 +8,21 @@ use crate::{
 mod io;
 mod path_type;
 
+use num_traits::MulAdd;
 pub use path_type::PathType;
 
 pub type Width = f64;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Path<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    pub(crate) points: Vec<Point<DatabaseUnitT>>,
+pub struct Path<T: CoordinateUnit = DatabaseIntegerUnit> {
+    pub(crate) points: Vec<Point<T>>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,
     pub(crate) r#type: Option<PathType>,
     pub(crate) width: Option<Width>,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Path<T> {
     fn default() -> Self {
         Self {
             points: Vec::default(),
@@ -33,10 +34,10 @@ impl<DatabaseUnitT: CoordNum> Default for Path<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> Path<T> {
     #[must_use]
     pub const fn new(
-        points: Vec<Point<DatabaseUnitT>>,
+        points: Vec<Point<T>>,
         layer: Layer,
         data_type: DataType,
         path_type: Option<PathType>,
@@ -52,7 +53,7 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
     }
 
     #[must_use]
-    pub fn points(&self) -> &[Point<DatabaseUnitT>] {
+    pub fn points(&self) -> &[Point<T>] {
         &self.points
     }
 
@@ -77,21 +78,21 @@ impl<DatabaseUnitT: CoordNum> Path<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> std::fmt::Display for Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> std::fmt::Display for Path<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "Path with {} points on layer {} with data type {}, {:?} and width {}",
             self.points().len(),
-            self.layer(),
-            self.data_type(),
+            self.layer().value(),
+            self.data_type().value(),
             self.path_type().unwrap_or_default(),
             self.width().unwrap_or_default()
         )
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Path<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.points = new_self
@@ -103,26 +104,19 @@ impl<DatabaseUnitT: CoordNum> Transformable for Path<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Path<T> {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let first_point = &self.points()[0];
         let delta = Point::new(
-            DatabaseIntegerUnit::from_float(target.x().to_float() - first_point.x().to_float()),
-            DatabaseIntegerUnit::from_float(target.y().to_float() - first_point.y().to_float()),
+            DatabaseFloatUnit(target.x().to_float_value() - first_point.x().to_float_value()),
+            DatabaseFloatUnit(target.y().to_float_value() - first_point.y().to_float_value()),
         );
-        self.move_by(delta)
+        self.move_by(delta.to_db_point())
     }
 }
 
 impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
     fn bounding_box(&self) -> (Point<DatabaseFloatUnit>, Point<DatabaseFloatUnit>) {
-        let to_database_float = |point: Point<DatabaseIntegerUnit>| {
-            Point::new(
-                point.x() as DatabaseFloatUnit,
-                point.y() as DatabaseFloatUnit,
-            )
-        };
-
         if let Some(width) = self.width()
             && width > 0.0
         {
@@ -133,34 +127,46 @@ impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
             let mut extended_points = Vec::new();
 
             for i in 0..self.points().len() {
-                let point = to_database_float(self.points()[i]);
+                let point = self.points()[i].to_float_point();
 
                 // Add points offset by half-width in perpendicular directions
                 if i > 0 {
-                    let prev = to_database_float(self.points()[i - 1]);
+                    let prev = self.points()[i - 1].to_float_point();
 
                     let dx = point.x() - prev.x();
                     let dy = point.y() - prev.y();
-                    let len = dx.mul_add(dx, dy * dy).sqrt();
+                    let len = dx.mul_add(dx, dy * dy).to_float_value().sqrt();
                     if len > 0.0 {
-                        let nx = -dy / len * half_width;
-                        let ny = dx / len * half_width;
-                        extended_points.push(Point::new(point.x() + nx, point.y() + ny));
-                        extended_points.push(Point::new(point.x() - nx, point.y() - ny));
+                        let nx = -dy.to_float_value() / len * half_width;
+                        let ny = dx.to_float_value() / len * half_width;
+                        extended_points.push(Point::new(
+                            point.x() + DatabaseFloatUnit(nx),
+                            point.y() + DatabaseFloatUnit(ny),
+                        ));
+                        extended_points.push(Point::new(
+                            point.x() - DatabaseFloatUnit(nx),
+                            point.y() - DatabaseFloatUnit(ny),
+                        ));
                     }
                 }
 
                 if i < self.points().len() - 1 {
-                    let next = to_database_float(self.points()[i + 1]);
+                    let next = self.points()[i + 1].to_float_point();
 
                     let dx = next.x() - point.x();
                     let dy = next.y() - point.y();
-                    let len = dx.hypot(dy);
+                    let len = dx.to_float_value().hypot(dy.to_float_value());
                     if len > 0.0 {
-                        let nx = -dy / len * half_width;
-                        let ny = dx / len * half_width;
-                        extended_points.push(Point::new(point.x() + nx, point.y() + ny));
-                        extended_points.push(Point::new(point.x() - nx, point.y() - ny));
+                        let nx = -dy.to_float_value() / len * half_width;
+                        let ny = dx.to_float_value() / len * half_width;
+                        extended_points.push(Point::new(
+                            point.x() + DatabaseFloatUnit(nx),
+                            point.y() + DatabaseFloatUnit(ny),
+                        ));
+                        extended_points.push(Point::new(
+                            point.x() - DatabaseFloatUnit(nx),
+                            point.y() - DatabaseFloatUnit(ny),
+                        ));
                     }
                 }
             }
@@ -170,10 +176,7 @@ impl Dimensions<DatabaseFloatUnit> for Path<DatabaseIntegerUnit> {
             // For paths without width, use the standard bounding box
             let (bottom_left, bottom_right) = bounding_box(self.points());
 
-            (
-                to_database_float(bottom_left),
-                to_database_float(bottom_right),
-            )
+            (bottom_left.to_float_point(), bottom_right.to_float_point())
         }
     }
 }
@@ -184,12 +187,21 @@ mod tests {
 
     #[test]
     fn test_path_creation() {
-        let points = vec![Point::new(0, 0), Point::new(100, 100)];
-        let path = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(10.0));
+        let points = vec![
+            Point::new(DatabaseIntegerUnit(0), DatabaseIntegerUnit(0)),
+            Point::new(DatabaseIntegerUnit(100), DatabaseIntegerUnit(100)),
+        ];
+        let path = Path::new(
+            points.clone(),
+            Layer(1),
+            DataType(2),
+            Some(PathType::Round),
+            Some(10.0),
+        );
 
         assert_eq!(path.points(), &points);
-        assert_eq!(path.layer(), 1);
-        assert_eq!(path.data_type(), 2);
+        assert_eq!(path.layer(), Layer(1));
+        assert_eq!(path.data_type(), DataType(2));
         assert_eq!(path.path_type(), &Some(PathType::Round));
         assert_eq!(path.width(), Some(10.0));
     }
@@ -199,15 +211,18 @@ mod tests {
         let path = Path::<DatabaseIntegerUnit>::default();
 
         assert!(path.points().is_empty());
-        assert_eq!(path.layer(), 0);
-        assert_eq!(path.data_type(), 0);
+        assert_eq!(path.layer(), Layer(0));
+        assert_eq!(path.data_type(), DataType(0));
         assert_eq!(path.path_type(), &None);
         assert_eq!(path.width(), None);
     }
 
     #[test]
     fn test_path_display() {
-        let points = vec![Point::new(0, 0), Point::new(100, 100)];
+        let points = vec![
+            Point::new(DatabaseIntegerUnit(0), DatabaseIntegerUnit(0)),
+            Point::new(DatabaseIntegerUnit(100), DatabaseIntegerUnit(100)),
+        ];
         let path = Path::new(points, 5, 10, Some(PathType::Square), Some(20.0));
 
         let display_str = format!("{path}");

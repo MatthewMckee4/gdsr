@@ -1,8 +1,8 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Point};
+use crate::{CoordinateUnit, DatabaseIntegerUnit, Point};
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TranslationInner<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    delta: Point<DatabaseUnitT>,
+pub struct TranslationInner<T: CoordinateUnit = DatabaseIntegerUnit> {
+    delta: Point<T>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,13 +13,10 @@ impl Translation {
         Self(TranslationInner { delta })
     }
 
-    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
-        &self,
-        point: &Point<DatabaseUnitT>,
-    ) -> Point<DatabaseUnitT> {
+    pub fn apply_to_point<T: CoordinateUnit>(&self, point: &Point<T>) -> Point<T> {
         Point::new(
-            DatabaseUnitT::from_float(point.x().to_float() + self.0.delta.x() as f64),
-            DatabaseUnitT::from_float(point.y().to_float() + self.0.delta.y() as f64),
+            T::from_float(point.x().to_float_units() + self.0.delta.x() as f64),
+            T::from_float(point.y().to_float_units() + self.0.delta.y() as f64),
         )
     }
 }

@@ -1,16 +1,16 @@
-use crate::{CoordNum, Point};
+use crate::{CoordinateUnit, Point};
 
-fn are_points_closed<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> bool {
-    let points_vec: Vec<Point<DatabaseUnitT>> = points.to_vec();
+fn are_points_closed<T: CoordinateUnit>(points: &[Point<T>]) -> bool {
+    let points_vec: Vec<Point<T>> = points.to_vec();
     if points_vec.is_empty() {
         return true;
     }
     points_vec.first() == points_vec.last()
 }
 
-pub fn close_points<DatabaseUnitT: CoordNum>(
-    points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
-) -> Vec<Point<DatabaseUnitT>> {
+pub fn close_points<T: CoordinateUnit>(
+    points: impl IntoIterator<Item = impl Into<Point<T>>>,
+) -> Vec<Point<T>> {
     let mut points_vec = points.into_iter().map(Into::into).collect::<Vec<_>>();
     if !are_points_closed(&points_vec) {
         points_vec.push(points_vec[0]);
@@ -18,9 +18,9 @@ pub fn close_points<DatabaseUnitT: CoordNum>(
     points_vec
 }
 
-pub fn get_correct_polygon_points_format<DatabaseUnitT: CoordNum>(
-    points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
-) -> Vec<Point<DatabaseUnitT>> {
+pub fn get_correct_polygon_points_format<T: CoordinateUnit>(
+    points: impl IntoIterator<Item = impl Into<Point<T>>>,
+) -> Vec<Point<T>> {
     close_points(points)
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    CoordNum, DataType, DatabaseIntegerUnit, Layer, Point,
+    CoordinateUnit, DataType, DatabaseIntegerUnit, Layer, Point,
     traits::{Dimensions, Movable, Transformable},
     transformation::Transformation,
     utils::geometry::{area, bounding_box, is_point_inside, is_point_on_edge, perimeter},
@@ -9,13 +9,13 @@ mod io;
 mod utils;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Polygon<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    pub(crate) points: Vec<Point<DatabaseUnitT>>,
+pub struct Polygon<T: CoordinateUnit = DatabaseIntegerUnit> {
+    pub(crate) points: Vec<Point<T>>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Polygon<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Polygon<T> {
     fn default() -> Self {
         Self {
             points: Vec::default(),
@@ -25,10 +25,10 @@ impl<DatabaseUnitT: CoordNum> Default for Polygon<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
+impl<T: CoordinateUnit> Polygon<T> {
     #[must_use]
     pub fn new(
-        points: impl IntoIterator<Item = impl Into<Point<DatabaseUnitT>>>,
+        points: impl IntoIterator<Item = impl Into<Point<T>>>,
         layer: Layer,
         data_type: DataType,
     ) -> Self {
@@ -40,7 +40,7 @@ impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
     }
 
     #[must_use]
-    pub fn points(&self) -> &[Point<DatabaseUnitT>] {
+    pub fn points(&self) -> &[Point<T>] {
         &self.points
     }
 
@@ -55,25 +55,25 @@ impl<DatabaseUnitT: CoordNum> Polygon<DatabaseUnitT> {
     }
 
     #[must_use]
-    pub fn area(&self) -> DatabaseUnitT {
+    pub fn area(&self) -> T {
         area(&self.points)
     }
 
     #[must_use]
-    pub fn perimeter(&self) -> DatabaseUnitT {
+    pub fn perimeter(&self) -> T {
         perimeter(&self.points)
     }
 
-    pub fn is_point_inside(&self, point: &Point<DatabaseUnitT>) -> bool {
+    pub fn is_point_inside(&self, point: &Point<T>) -> bool {
         is_point_inside(point, &self.points)
     }
 
-    pub fn is_point_on_edge(&self, point: &Point<DatabaseUnitT>) -> bool {
+    pub fn is_point_on_edge(&self, point: &Point<T>) -> bool {
         is_point_on_edge(point, &self.points)
     }
 }
 
-impl<DatabaseUnitT: CoordNum> std::fmt::Display for Polygon<DatabaseUnitT> {
+impl<T: CoordinateUnit> std::fmt::Display for Polygon<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -87,7 +87,7 @@ impl<DatabaseUnitT: CoordNum> std::fmt::Display for Polygon<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Polygon<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Polygon<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.points = new_self
@@ -99,19 +99,23 @@ impl<DatabaseUnitT: CoordNum> Transformable for Polygon<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Polygon<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Polygon<T> {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let first_point = &self.points()[0];
         let delta = Point::new(
-            DatabaseIntegerUnit::from_float(target.x().to_float() - first_point.x().to_float()),
-            DatabaseIntegerUnit::from_float(target.y().to_float() - first_point.y().to_float()),
+            DatabaseIntegerUnit::from_float(
+                target.x().to_float_units() - first_point.x().to_float_units(),
+            ),
+            DatabaseIntegerUnit::from_float(
+                target.y().to_float_units() - first_point.y().to_float_units(),
+            ),
         );
         self.move_by(delta)
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Dimensions<DatabaseUnitT> for Polygon<DatabaseUnitT> {
-    fn bounding_box(&self) -> (Point<DatabaseUnitT>, Point<DatabaseUnitT>) {
+impl<T: CoordinateUnit> Dimensions<T> for Polygon<T> {
+    fn bounding_box(&self) -> (Point<T>, Point<T>) {
         bounding_box(self.points())
     }
 }

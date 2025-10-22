@@ -20,6 +20,7 @@ gdsr_core = { path = "crates/gdsr_core" }
 geo = "0.28"
 rstest = "0.23.0"
 tempfile = "3.8"
+num-traits = "0.2.19"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

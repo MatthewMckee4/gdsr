@@ -5,13 +5,13 @@ use std::{
 
 use super::Path;
 use crate::{
-    CoordNum,
+    CoordinateUnit,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
     traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
 
-impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
+impl<T: CoordinateUnit> ToGds for Path<T> {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         if self.points().len() < 2 {
             return Err(io::Error::new(
@@ -25,10 +25,10 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             combine_record_and_data_type(GDSRecord::Path, GDSDataType::NoData),
             6,
             combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
-            self.layer(),
+            self.layer().0,
             6,
             combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
-            self.data_type(),
+            self.data_type().0,
         ];
 
         write_u16_array_to_file(file, &path_head)?;
@@ -63,7 +63,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Path<DatabaseUnitT> {
             file.write_all(&bytes)?;
         }
 
-        write_points_to_file(file, self.points(), scale, &|val| val.to_integer())?;
+        write_points_to_file(file, self.points(), scale)?;
 
         write_element_tail_to_file(file)
     }

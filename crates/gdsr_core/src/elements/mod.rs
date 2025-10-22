@@ -1,4 +1,4 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Movable, ToGds, Transformable};
+use crate::{CoordinateUnit, DatabaseIntegerUnit, Movable, ToGds, Transformable};
 
 pub mod path;
 pub mod polygon;
@@ -14,14 +14,14 @@ pub use text::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Element<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    Path(Path<DatabaseUnitT>),
-    Polygon(Polygon<DatabaseUnitT>),
-    Reference(Reference<DatabaseUnitT>),
-    Text(Text<DatabaseUnitT>),
+pub enum Element<T: CoordinateUnit = DatabaseIntegerUnit> {
+    Path(Path<T>),
+    Polygon(Polygon<T>),
+    Reference(Reference<T>),
+    Text(Text<T>),
 }
 
-impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
+impl<T: CoordinateUnit> ToGds for Element<T> {
     fn to_gds_impl(&self, file: &mut std::fs::File, scale: f64) -> std::io::Result<()> {
         match self {
             Self::Path(path) => path.to_gds_impl(file, scale),
@@ -32,7 +32,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Element<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Element<T> {
     fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
         match self {
             Self::Path(path) => Self::Path(path.transform_impl(transformation)),
@@ -43,7 +43,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Element<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Element<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Element<T> {
     fn move_to(&self, target: geo::Point<DatabaseIntegerUnit>) -> Self {
         match self {
             Self::Path(path) => Self::Path(path.move_to(target)),

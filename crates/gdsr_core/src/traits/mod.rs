@@ -1,7 +1,7 @@
 use std::{fs::File, io};
 
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Point,
+    CoordinateUnit, DatabaseIntegerUnit, Point,
     transformation::{Reflection, Rotation, Scale, Transformation, Translation},
 };
 
@@ -57,6 +57,6 @@ pub trait Movable: Transformable {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self;
 }
 
-pub trait Dimensions<T: CoordNum> {
+pub trait Dimensions<T: CoordinateUnit> {
     fn bounding_box(&self) -> (Point<T>, Point<T>);
 }

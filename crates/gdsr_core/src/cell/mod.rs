@@ -1,5 +1,5 @@
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Library,
+    CoordinateUnit, DatabaseIntegerUnit, Library,
     elements::{Element, Path, Polygon, Reference, Text},
     traits::Transformable,
     transformation::Transformation,
@@ -8,15 +8,15 @@ use crate::{
 mod io;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Cell<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
+pub struct Cell<T: CoordinateUnit = DatabaseIntegerUnit> {
     pub(crate) name: String,
-    pub(crate) polygons: Vec<Polygon<DatabaseUnitT>>,
-    pub(crate) paths: Vec<Path<DatabaseUnitT>>,
-    pub(crate) texts: Vec<Text<DatabaseUnitT>>,
-    pub(crate) references: Vec<Reference<DatabaseUnitT>>,
+    pub(crate) polygons: Vec<Polygon<T>>,
+    pub(crate) paths: Vec<Path<T>>,
+    pub(crate) texts: Vec<Text<T>>,
+    pub(crate) references: Vec<Reference<T>>,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Cell<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Cell<T> {
     fn default() -> Self {
         Self {
             name: String::default(),
@@ -28,7 +28,7 @@ impl<DatabaseUnitT: CoordNum> Default for Cell<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
+impl<T: CoordinateUnit> Cell<T> {
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -46,26 +46,26 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     }
 
     #[must_use]
-    pub const fn polygons(&self) -> &Vec<Polygon<DatabaseUnitT>> {
+    pub const fn polygons(&self) -> &Vec<Polygon<T>> {
         &self.polygons
     }
 
     #[must_use]
-    pub const fn paths(&self) -> &Vec<Path<DatabaseUnitT>> {
+    pub const fn paths(&self) -> &Vec<Path<T>> {
         &self.paths
     }
 
     #[must_use]
-    pub const fn texts(&self) -> &Vec<Text<DatabaseUnitT>> {
+    pub const fn texts(&self) -> &Vec<Text<T>> {
         &self.texts
     }
 
     #[must_use]
-    pub const fn references(&self) -> &Vec<Reference<DatabaseUnitT>> {
+    pub const fn references(&self) -> &Vec<Reference<T>> {
         &self.references
     }
 
-    pub fn add(&mut self, element: impl Into<Element<DatabaseUnitT>>) {
+    pub fn add(&mut self, element: impl Into<Element<T>>) {
         match element.into() {
             Element::Path(path) => self.paths.push(path),
             Element::Polygon(polygon) => self.polygons.push(polygon),
@@ -77,10 +77,10 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     pub(crate) fn get_elements(
         &self,
         depth: Option<usize>,
-        library: &Library<DatabaseUnitT>,
-    ) -> Vec<Element<DatabaseUnitT>> {
+        library: &Library<T>,
+    ) -> Vec<Element<T>> {
         let depth = depth.unwrap_or(usize::MAX);
-        let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
+        let mut elements: Vec<Element<T>> = Vec::new();
 
         for polygon in &self.polygons {
             elements.push(Element::Polygon(polygon.clone()));
@@ -105,7 +105,7 @@ impl<DatabaseUnitT: CoordNum> Cell<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Cell<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Cell<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 

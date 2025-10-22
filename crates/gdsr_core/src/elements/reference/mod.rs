@@ -1,8 +1,8 @@
-use geo::Rotate;
+use num_traits::Zero;
 
 use crate::{
-    CoordNum, DatabaseIntegerUnit, Library, Movable, Point, elements::Element, grid::Grid,
-    traits::Transformable, transformation::Transformation, utils::general::point_to_database_float,
+    AngleInRadians, CoordinateUnit, DatabaseIntegerUnit, Library, Movable, Point,
+    elements::Element, grid::Grid, traits::Transformable, transformation::Transformation,
 };
 
 pub mod instance;
@@ -11,12 +11,12 @@ pub mod io;
 pub use instance::Instance;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Reference<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    pub(crate) instance: Instance<DatabaseUnitT>,
-    pub(crate) grid: Grid<DatabaseUnitT>,
+pub struct Reference<T: CoordinateUnit = DatabaseIntegerUnit> {
+    pub(crate) instance: Instance<T>,
+    pub(crate) grid: Grid<T>,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Reference<T> {
     fn default() -> Self {
         Self {
             instance: Instance::default(),
@@ -25,55 +25,55 @@ impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
-    pub fn new(instance: impl Into<Instance<DatabaseUnitT>>, grid: Grid<DatabaseUnitT>) -> Self {
+impl<T: CoordinateUnit> Reference<T> {
+    pub fn new(instance: impl Into<Instance<T>>, grid: Grid<T>) -> Self {
         Self {
             instance: instance.into(),
             grid,
         }
     }
 
-    pub const fn instance(&self) -> &Instance<DatabaseUnitT> {
+    pub const fn instance(&self) -> &Instance<T> {
         &self.instance
     }
 
-    pub const fn grid(&self) -> &Grid<DatabaseUnitT> {
+    pub const fn grid(&self) -> &Grid<T> {
         &self.grid
     }
 
-    pub fn get_elements_in_grid(
-        &self,
-        element: &Element<DatabaseUnitT>,
-    ) -> Vec<Element<DatabaseUnitT>> {
+    pub fn get_elements_in_grid(&self, element: &Element<T>) -> Vec<Element<T>> {
         let grid = self.grid();
 
-        let mut elements: Vec<Element<DatabaseUnitT>> =
-            Vec::with_capacity((grid.columns * grid.rows) as usize);
+        let mut elements: Vec<Element<T>> = Vec::with_capacity((grid.columns * grid.rows) as usize);
 
         for column_index in 0..grid.columns {
-            let column_origin = point_to_database_float(grid.origin)
-                + (point_to_database_float(grid.spacing_x) * f64::from(column_index));
+            let column_origin = grid.origin + (grid.spacing_x * column_index);
             for row_index in 0..grid.rows {
-                let origin = point_to_database_float(column_origin)
-                    + (point_to_database_float(grid.spacing_y) * f64::from(row_index));
+                let origin = column_origin + (grid.spacing_y * row_index);
 
                 let mut new_element = element.clone();
 
                 if grid.x_reflection {
-                    new_element = new_element.reflect(0.0, Point::new(1, 0));
+                    new_element = new_element.reflect(
+                        0.0,
+                        Point::new(DatabaseIntegerUnit(1), DatabaseIntegerUnit(0)),
+                    );
                 }
 
-                new_element = new_element.rotate(grid.angle, Point::default());
-                new_element = new_element.scale(grid.magnification, Point::default());
+                new_element = new_element.rotate(grid.angle, Point::zero());
+                new_element = new_element.scale(grid.magnification, Point::zero());
 
                 let move_point = origin.rotate_around_point(
-                    grid.angle,
-                    Point::new(grid.origin.x().to_float(), grid.origin.y().to_float()),
+                    AngleInRadians(grid.angle),
+                    Point::new(
+                        grid.origin.x().to_float_units(),
+                        grid.origin.y().to_float_units(),
+                    ),
                 );
 
                 new_element = new_element.move_by(Point::new(
-                    DatabaseIntegerUnit::from_float(move_point.x()),
-                    DatabaseIntegerUnit::from_float(move_point.y()),
+                    DatabaseIntegerUnit::from_float_value(move_point.x().to_float_value()),
+                    DatabaseIntegerUnit::from_float_value(move_point.y().to_float_value()),
                 ));
 
                 elements.push(new_element.clone());
@@ -83,13 +83,9 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
         elements
     }
 
-    pub fn flatten(
-        self,
-        depth: Option<usize>,
-        library: &Library<DatabaseUnitT>,
-    ) -> Vec<Element<DatabaseUnitT>> {
+    pub fn flatten(self, depth: Option<usize>, library: &Library<T>) -> Vec<Element<T>> {
         let depth = depth.unwrap_or(usize::MAX);
-        let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
+        let mut elements: Vec<Element<T>> = Vec::new();
         if depth == 0 {
             return [Element::Reference(self)].to_vec();
         }
@@ -122,7 +118,7 @@ impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Reference<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
         new_self.grid = new_self.grid.transform_impl(transformation);
@@ -130,7 +126,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Reference<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Reference<T> {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let mut new_self = self.clone();
         new_self.grid = new_self.grid.move_to(target);

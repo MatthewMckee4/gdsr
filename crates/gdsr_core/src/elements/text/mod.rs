@@ -1,13 +1,15 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Layer, Movable, Point, Transformable, Transformation};
+use crate::{
+    CoordinateUnit, DatabaseIntegerUnit, Layer, Movable, Point, Transformable, Transformation,
+};
 
 pub mod io;
 pub mod presentation;
 pub mod utils;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Text<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
+pub struct Text<T: CoordinateUnit = DatabaseIntegerUnit> {
     pub text: String,
-    pub origin: Point<DatabaseUnitT>,
+    pub origin: Point<T>,
     pub layer: Layer,
     pub magnification: f64,
     pub angle: f64,
@@ -16,11 +18,11 @@ pub struct Text<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
     pub horizontal_presentation: presentation::HorizontalPresentation,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Text<DatabaseUnitT> {
+impl<T: CoordinateUnit> Default for Text<T> {
     fn default() -> Self {
         Self {
             text: String::new(),
-            origin: Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero()),
+            origin: Point::new(T::zero(), T::zero()),
             layer: 0,
             magnification: 1.0,
             angle: 0.0,
@@ -31,11 +33,11 @@ impl<DatabaseUnitT: CoordNum> Default for Text<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
+impl<T: CoordinateUnit> Text<T> {
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         text: String,
-        origin: Point<DatabaseUnitT>,
+        origin: Point<T>,
         layer: Layer,
         magnification: f64,
         angle: f64,
@@ -59,11 +61,11 @@ impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
         &self.text
     }
 
-    pub const fn origin(&self) -> &Point<DatabaseUnitT> {
+    pub const fn origin(&self) -> &Point<T> {
         &self.origin
     }
 
-    const fn set_origin(&mut self, origin: Point<DatabaseUnitT>) {
+    const fn set_origin(&mut self, origin: Point<T>) {
         self.origin = origin;
     }
 
@@ -92,7 +94,7 @@ impl<DatabaseUnitT: CoordNum> Text<DatabaseUnitT> {
     }
 }
 
-impl<T: CoordNum> std::fmt::Display for Text<T> {
+impl<T: CoordinateUnit> std::fmt::Display for Text<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -105,7 +107,7 @@ impl<T: CoordNum> std::fmt::Display for Text<T> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
+impl<T: CoordinateUnit> Transformable for Text<T> {
     fn transform_impl(&self, transformation: &Transformation) -> Self {
         let mut new_self = self.clone();
 
@@ -119,7 +121,7 @@ impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
 
         if let Some(rotation) = &transformation.rotation {
             if *rotation.centre() == Point::default() {
-                new_self.angle += rotation.angle();
+                new_self.angle = (new_self.angle + rotation.angle()) % (2.0 * std::f64::consts::PI);
             } else {
                 todo!()
             }
@@ -129,12 +131,12 @@ impl<DatabaseUnitT: CoordNum> Transformable for Text<DatabaseUnitT> {
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Movable for Text<DatabaseUnitT> {
+impl<T: CoordinateUnit> Movable for Text<T> {
     fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
         let mut new_self = self.clone();
         new_self.set_origin(Point::new(
-            DatabaseUnitT::from_float(target.x().to_float()),
-            DatabaseUnitT::from_float(target.y().to_float()),
+            T::from_float(target.x().to_float_units()),
+            T::from_float(target.y().to_float_units()),
         ));
         new_self
     }

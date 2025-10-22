@@ -1,18 +1,18 @@
 use std::{collections::HashMap, io};
 
 use crate::{
-    CoordNum, DatabaseIntegerUnit,
+    CoordinateUnit, DatabaseIntegerUnit,
     cell::Cell,
     utils::io::{from_gds, write_gds},
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Library<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
+pub struct Library<T: CoordinateUnit = DatabaseIntegerUnit> {
     pub name: String,
-    pub cells: HashMap<String, Cell<DatabaseUnitT>>,
+    pub cells: HashMap<String, Cell<T>>,
 }
 
-impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
+impl<T: CoordinateUnit> Library<T> {
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
@@ -21,23 +21,23 @@ impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
         }
     }
 
-    pub fn add(&mut self, cell: Cell<DatabaseUnitT>) {
+    pub fn add(&mut self, cell: Cell<T>) {
         self.cells.insert(cell.name.clone(), cell);
     }
 
-    pub fn remove(&mut self, cells: Vec<Cell<DatabaseUnitT>>) {
+    pub fn remove(&mut self, cells: Vec<Cell<T>>) {
         for cell in cells {
             self.cells.remove(&cell.name);
         }
     }
 
     #[must_use]
-    pub fn get_cell(&self, name: &str) -> Option<&Cell<DatabaseUnitT>> {
+    pub fn get_cell(&self, name: &str) -> Option<&Cell<T>> {
         self.cells.get(name)
     }
 
     #[must_use]
-    pub fn contains(&self, cell: &Cell<DatabaseUnitT>) -> bool {
+    pub fn contains(&self, cell: &Cell<T>) -> bool {
         self.cells.contains_key(&cell.name)
     }
 
@@ -56,7 +56,7 @@ impl<DatabaseUnitT: CoordNum> Library<DatabaseUnitT> {
     }
 }
 
-impl<T: CoordNum> std::fmt::Display for Library<T> {
+impl<T: CoordinateUnit> std::fmt::Display for Library<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Library '{}' with {} cells", self.name, self.cells.len())
     }

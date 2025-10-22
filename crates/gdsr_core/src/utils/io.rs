@@ -6,10 +6,10 @@ use std::{
 
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
-use geo::Rotate;
+use num_traits::Zero;
 
 use crate::{
-    CoordNum, DataType, DatabaseIntegerUnit, Instance, Layer, Point, ToGds,
+    AngleInRadians, CoordinateUnit, DataType, DatabaseIntegerUnit, Instance, Layer, Point, ToGds,
     cell::Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
     elements::{
@@ -84,16 +84,13 @@ pub fn write_float_to_eight_byte_real_to_file(file: &mut File, value: f64) -> io
     file.write_all(&value)
 }
 
-pub fn write_points_to_file<DatabaseUnitT: CoordNum>(
+pub fn write_points_to_file<T: CoordinateUnit>(
     file: &mut File,
-    points: &[Point<DatabaseUnitT>],
+    points: &[Point<T>],
     scale: f64,
-    to_integer: &dyn Fn(DatabaseUnitT) -> DatabaseIntegerUnit,
 ) -> io::Result<()> {
-    let new_points: Vec<Point<DatabaseIntegerUnit>> = points
-        .iter()
-        .map(|point| Point::new(to_integer(point.x()), to_integer(point.y())))
-        .collect();
+    let new_points: Vec<Point<DatabaseIntegerUnit>> =
+        points.iter().map(|point| point.to_db_point()).collect();
 
     write_integer_points_to_file(file, &new_points, scale)
 }
@@ -115,8 +112,8 @@ pub fn write_integer_points_to_file(
     write_u16_array_to_file(file, &xy_header_buffer)?;
 
     for point in points_to_write {
-        let scaled_x = (point.x() as f64 * scale).round() as i32;
-        let scaled_y = (point.y() as f64 * scale).round() as i32;
+        let scaled_x = (point.x().to_float_value() * scale).round() as i32;
+        let scaled_y = (point.y().to_float_value() * scale).round() as i32;
 
         file.write_all(&scaled_x.to_be_bytes())?;
         file.write_all(&scaled_y.to_be_bytes())?;
@@ -159,7 +156,7 @@ pub fn write_string_with_record_to_file(
     file.write_all(&lib_name_bytes)
 }
 
-pub fn write_gds<'a, T: CoordNum + 'a>(
+pub fn write_gds<'a, T: CoordinateUnit + 'a>(
     file_name: String,
     library_name: &str,
     user_units: f64,
@@ -218,17 +215,17 @@ pub fn write_transformation_to_file(
 }
 
 #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
-pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Library<DatabaseUnitT>> {
+pub fn from_gds<T: CoordinateUnit>(file_name: String) -> io::Result<Library<T>> {
     let mut library = Library::new("Library");
 
     let file = File::open(file_name)?;
     let reader = RecordReader::new(BufReader::new(file));
 
-    let mut cell: Option<Cell<DatabaseUnitT>> = None;
-    let mut path: Option<Path<DatabaseUnitT>> = None;
-    let mut polygon: Option<Polygon<DatabaseUnitT>> = None;
-    let mut text: Option<Text<DatabaseUnitT>> = None;
-    let mut reference: Option<Reference<DatabaseUnitT>> = None;
+    let mut cell: Option<Cell<T>> = None;
+    let mut path: Option<Path<T>> = None;
+    let mut polygon: Option<Polygon<T>> = None;
+    let mut text: Option<Text<T>> = None;
+    let mut reference: Option<Reference<T>> = None;
 
     let mut scale = 1.0;
 
@@ -274,7 +271,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::Layer => {
                     if let GDSRecordData::I16(layer) = data {
-                        let layer_value = layer[0] as Layer;
+                        let layer_value = Layer(layer[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.layer = layer_value;
                         } else if let Some(path) = &mut path {
@@ -286,7 +283,7 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::DataType | GDSRecord::BoxType => {
                     if let GDSRecordData::I16(data_type) = data {
-                        let data_type_val = data_type[0] as DataType;
+                        let data_type_val = DataType(data_type[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.data_type = data_type_val;
                         } else if let Some(path) = &mut path {
@@ -304,15 +301,15 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                 }
                 GDSRecord::XY => {
                     if let GDSRecordData::I32(xy) = data {
-                        let points = get_points_from_i32_vec::<DatabaseUnitT>(&xy)
+                        let points = get_points_from_i32_vec::<T>(&xy)
                             .iter()
                             .map(|p| {
                                 Point::new(
-                                    DatabaseUnitT::from_float(p.x().to_float() * scale),
-                                    DatabaseUnitT::from_float(p.y().to_float() * scale),
+                                    T::from_float_value(p.x().to_float_value() * scale),
+                                    T::from_float_value(p.y().to_float_value() * scale),
                                 )
                             })
-                            .collect::<Vec<Point<DatabaseUnitT>>>();
+                            .collect::<Vec<Point<T>>>();
 
                         if let Some(polygon) = &mut polygon {
                             polygon.points = points;
@@ -330,30 +327,26 @@ pub fn from_gds<DatabaseUnitT: CoordNum>(file_name: String) -> io::Result<Librar
                                         .map(|&p| {
                                             point_to_database_unit(
                                                 point_to_database_float(p).rotate_around_point(
-                                                    -reference.grid.angle,
+                                                    AngleInRadians(-reference.grid.angle),
                                                     point_to_database_float(origin),
                                                 ),
                                             )
                                         })
-                                        .collect::<Vec<Point<DatabaseUnitT>>>();
+                                        .collect::<Vec<Point<T>>>();
 
                                     reference.grid.origin = rotated_points[0];
 
                                     reference.grid.spacing_x = if reference.grid.columns > 0 {
                                         (rotated_points[1] - rotated_points[0])
-                                            / DatabaseUnitT::from_float(f64::from(
-                                                reference.grid.columns,
-                                            ))
+                                            / T::from_float_value(f64::from(reference.grid.columns))
                                     } else {
-                                        Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
+                                        Point::<T>::zero()
                                     };
                                     reference.grid.spacing_y = if reference.grid.rows > 0 {
                                         (rotated_points[2] - rotated_points[0])
-                                            / DatabaseUnitT::from_float(f64::from(
-                                                reference.grid.rows,
-                                            ))
+                                            / T::from_float_value(f64::from(reference.grid.rows))
                                     } else {
-                                        Point::new(DatabaseUnitT::zero(), DatabaseUnitT::zero())
+                                        Point::<T>::zero()
                                     };
                                 }
                                 _ => {}
@@ -612,12 +605,12 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
     }
 }
 
-pub fn get_points_from_i32_vec<DatabaseUnitT: CoordNum>(vec: &[i32]) -> Vec<Point<DatabaseUnitT>> {
+pub fn get_points_from_i32_vec<T: CoordinateUnit>(vec: &[i32]) -> Vec<Point<T>> {
     vec.chunks(2)
         .map(|chunk| {
             Point::new(
-                DatabaseUnitT::from_float(f64::from(chunk[0])),
-                DatabaseUnitT::from_float(f64::from(chunk[1])),
+                T::from_float_value(f64::from(chunk[0])),
+                T::from_float_value(f64::from(chunk[1])),
             )
         })
         .collect()
