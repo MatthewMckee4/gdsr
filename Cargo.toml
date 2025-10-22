@@ -12,8 +12,9 @@ authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
 [workspace.dependencies]
-
 approx = "0.5"
+quickcheck = "1.0.3"
+quickcheck_macros = "1"
 bytemuck = "1.16.1"
 chrono = "0.4.38"
 gdsr_core = { path = "crates/gdsr_core" }
@@ -37,3 +38,4 @@ cast_sign_loss = "allow"
 missing_errors_doc = "allow"
 float_cmp = "allow"
 cast_possible_wrap = "allow"
+similar_names = "allow"
