@@ -144,6 +144,26 @@ impl Unit {
     }
 }
 
+impl std::fmt::Display for Unit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer { value, db_unit } => {
+                write!(f, "{value}db (db_unit: {db_unit:.3e})")
+            }
+            Self::Float {
+                value,
+                user_unit,
+                db_unit,
+            } => {
+                write!(
+                    f,
+                    "{value:.6}u (user_unit: {user_unit:.3e}, db_unit: {db_unit:.3e})"
+                )
+            }
+        }
+    }
+}
+
 use std::ops::{Add, Div, Mul, Sub};
 
 impl Add for Unit {

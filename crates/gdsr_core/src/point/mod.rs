@@ -8,8 +8,11 @@ pub struct Point {
 
 impl Point {
     #[must_use]
-    pub const fn new(x: Unit, y: Unit) -> Self {
-        Self { x, y }
+    pub fn new(x: impl Into<Unit>, y: impl Into<Unit>) -> Self {
+        Self {
+            x: x.into(),
+            y: y.into(),
+        }
     }
 
     /// Gets the x coordinate of the point.
@@ -25,12 +28,12 @@ impl Point {
     }
 
     /// Gets a mutable reference to the x coordinate of the point.
-    pub fn x_mut(&mut self) -> &mut Unit {
+    pub const fn x_mut(&mut self) -> &mut Unit {
         &mut self.x
     }
 
     /// Gets a mutable reference to the y coordinate of the point.
-    pub fn y_mut(&mut self) -> &mut Unit {
+    pub const fn y_mut(&mut self) -> &mut Unit {
         &mut self.y
     }
 
@@ -114,6 +117,12 @@ impl Point {
             x: Unit::float(new_x_real, 1.0, x_db_unit),
             y: Unit::float(new_y_real, 1.0, y_db_unit),
         }
+    }
+}
+
+impl std::fmt::Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Point({}, {})", self.x, self.y)
     }
 }
 
@@ -386,7 +395,7 @@ mod tests {
                     assert_eq!(value, 100);
                     assert_eq!(db_unit, 1e-6);
                 }
-                _ => panic!("Expected Integer variant"),
+                Unit::Float { .. } => panic!("Expected Integer variant"),
             }
 
             match point.y() {
@@ -394,7 +403,7 @@ mod tests {
                     assert_eq!(value, 200);
                     assert_eq!(db_unit, 1e-3);
                 }
-                _ => panic!("Expected Integer variant"),
+                Unit::Float { .. } => panic!("Expected Integer variant"),
             }
         }
 
@@ -416,7 +425,7 @@ mod tests {
                     assert_eq!(user_unit, 1e-3);
                     assert_eq!(db_unit, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                Unit::Integer { .. } => panic!("Expected Float variant"),
             }
 
             match point.y() {
@@ -429,7 +438,7 @@ mod tests {
                     assert_eq!(user_unit, 1e-6);
                     assert_eq!(db_unit, 1e-12);
                 }
-                _ => panic!("Expected Float variant"),
+                Unit::Integer { .. } => panic!("Expected Float variant"),
             }
         }
     }
@@ -456,7 +465,7 @@ mod tests {
                     assert_eq!(value, 1007);
                     assert_eq!(db_unit, 1e-3);
                 }
-                _ => panic!("Expected Integer variant"),
+                Unit::Float { .. } => panic!("Expected Integer variant"),
             }
 
             match converted.y() {
@@ -464,7 +473,7 @@ mod tests {
                     assert_eq!(value, 2015);
                     assert_eq!(db_unit, 1e-3);
                 }
-                _ => panic!("Expected Integer variant"),
+                Unit::Float { .. } => panic!("Expected Integer variant"),
             }
         }
 
@@ -480,7 +489,7 @@ mod tests {
                     assert_eq!(value, 2500);
                     assert_eq!(db_unit, 1e-9);
                 }
-                _ => panic!("Expected Integer variant"),
+                Unit::Float { .. } => panic!("Expected Integer variant"),
             }
         }
 
@@ -508,7 +517,7 @@ mod tests {
                     assert_eq!(user_unit, 1.0);
                     assert_eq!(db_unit, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                Unit::Integer { .. } => panic!("Expected Float variant"),
             }
 
             match converted.y() {
@@ -521,7 +530,7 @@ mod tests {
                     assert_eq!(user_unit, 1.0);
                     assert_eq!(db_unit, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                Unit::Integer { .. } => panic!("Expected Float variant"),
             }
         }
 
@@ -540,7 +549,7 @@ mod tests {
                     assert_eq!(user_unit, 1.0);
                     assert_eq!(db_unit, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                Unit::Integer { .. } => panic!("Expected Float variant"),
             }
 
             assert_eq!(converted.y(), Unit::float(2.5, 1e-6, 1e-9));

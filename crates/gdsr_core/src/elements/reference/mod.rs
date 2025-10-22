@@ -1,142 +1,68 @@
-use geo::Rotate;
-
-use crate::{
-    CoordNum, DatabaseIntegerUnit, Library, Movable, Point, elements::Element, grid::Grid,
-    traits::Transformable, transformation::Transformation, utils::general::point_to_database_float,
-};
+use crate::Grid;
 
 pub mod instance;
-pub mod io;
+mod io;
 
 pub use instance::Instance;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Reference<DatabaseUnitT: CoordNum = DatabaseIntegerUnit> {
-    pub(crate) instance: Instance<DatabaseUnitT>,
-    pub(crate) grid: Grid<DatabaseUnitT>,
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Reference {
+    pub(crate) instance: Instance,
+    pub(crate) grid: Grid,
 }
 
-impl<DatabaseUnitT: CoordNum> Default for Reference<DatabaseUnitT> {
-    fn default() -> Self {
-        Self {
-            instance: Instance::default(),
-            grid: Grid::default(),
-        }
-    }
-}
-
-impl<DatabaseUnitT: CoordNum> Reference<DatabaseUnitT> {
-    pub fn new(instance: impl Into<Instance<DatabaseUnitT>>, grid: Grid<DatabaseUnitT>) -> Self {
+impl Reference {
+    pub fn new(instance: impl Into<Instance>, grid: Grid) -> Self {
         Self {
             instance: instance.into(),
             grid,
         }
     }
 
-    pub const fn instance(&self) -> &Instance<DatabaseUnitT> {
+    #[must_use]
+    pub const fn instance(&self) -> &Instance {
         &self.instance
     }
 
-    pub const fn grid(&self) -> &Grid<DatabaseUnitT> {
+    #[must_use]
+    pub const fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    pub fn get_elements_in_grid(
-        &self,
-        element: &Element<DatabaseUnitT>,
-    ) -> Vec<Element<DatabaseUnitT>> {
-        let grid = self.grid();
+    // TODO: Re-implement get_elements_in_grid() after transformation traits are updated
+    // pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
+    //     ...
+    // }
 
-        let mut elements: Vec<Element<DatabaseUnitT>> =
-            Vec::with_capacity((grid.columns * grid.rows) as usize);
+    // TODO: Re-implement flatten() after Library is updated
+    // pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
+    //     ...
+    // }
+}
 
-        for column_index in 0..grid.columns {
-            let column_origin = point_to_database_float(grid.origin)
-                + (point_to_database_float(grid.spacing_x) * f64::from(column_index));
-            for row_index in 0..grid.rows {
-                let origin = point_to_database_float(column_origin)
-                    + (point_to_database_float(grid.spacing_y) * f64::from(row_index));
-
-                let mut new_element = element.clone();
-
-                if grid.x_reflection {
-                    new_element = new_element.reflect(0.0, Point::new(1, 0));
-                }
-
-                new_element = new_element.rotate(grid.angle, Point::default());
-                new_element = new_element.scale(grid.magnification, Point::default());
-
-                let move_point = origin.rotate_around_point(
-                    grid.angle,
-                    Point::new(grid.origin.x().to_float(), grid.origin.y().to_float()),
-                );
-
-                new_element = new_element.move_by(Point::new(
-                    DatabaseIntegerUnit::from_float(move_point.x()),
-                    DatabaseIntegerUnit::from_float(move_point.y()),
-                ));
-
-                elements.push(new_element.clone());
-            }
-        }
-
-        elements
-    }
-
-    pub fn flatten(
-        self,
-        depth: Option<usize>,
-        library: &Library<DatabaseUnitT>,
-    ) -> Vec<Element<DatabaseUnitT>> {
-        let depth = depth.unwrap_or(usize::MAX);
-        let mut elements: Vec<Element<DatabaseUnitT>> = Vec::new();
-        if depth == 0 {
-            return [Element::Reference(self)].to_vec();
-        }
-        match &self.instance {
-            Instance::Cell(cell_name) => {
-                if let Some(cell) = library.get_cell(cell_name) {
-                    let flattened_cell_elements = cell.get_elements(Some(depth - 1), library);
-                    for cell_element in flattened_cell_elements {
-                        elements.extend(self.get_elements_in_grid(&cell_element));
-                    }
-                }
-            }
-            Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
-                    elements.extend(self.get_elements_in_grid(element));
-                }
-
-                Element::Reference(reference) => {
-                    let flattened_reference_elements =
-                        reference.clone().flatten(Some(depth - 1), library);
-
-                    for reference_element in flattened_reference_elements {
-                        elements.extend(self.get_elements_in_grid(&reference_element).into_iter());
-                    }
-                }
-            },
-        }
-
-        elements
+impl std::fmt::Display for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Reference to {} with grid {}", self.instance, self.grid)
     }
 }
 
-impl<DatabaseUnitT: CoordNum> Transformable for Reference<DatabaseUnitT> {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
-        let mut new_self = self.clone();
-        new_self.grid = new_self.grid.transform_impl(transformation);
-        new_self
-    }
-}
+// TODO: Re-implement Transformable trait for Reference once traits module is updated
+// impl Transformable for Reference {
+//     fn transform_impl(&self, transformation: &Transformation) -> Self {
+//         let mut new_self = self.clone();
+//         new_self.grid = new_self.grid.transform_impl(transformation);
+//         new_self
+//     }
+// }
 
-impl<DatabaseUnitT: CoordNum> Movable for Reference<DatabaseUnitT> {
-    fn move_to(&self, target: Point<DatabaseIntegerUnit>) -> Self {
-        let mut new_self = self.clone();
-        new_self.grid = new_self.grid.move_to(target);
-        new_self
-    }
-}
+// TODO: Re-implement Movable trait for Reference once traits module is updated
+// impl Movable for Reference {
+//     fn move_to(&self, target: Point) -> Self {
+//         let mut new_self = self.clone();
+//         new_self.grid = new_self.grid.move_to(target);
+//         new_self
+//     }
+// }
 
 // impl<T: CoordNum> Dimensions<T> for Reference<T> {
 //     fn bounding_box(&self) -> (Point<T>, Point<T>) {
@@ -189,3 +115,57 @@ impl<DatabaseUnitT: CoordNum> Movable for Reference<DatabaseUnitT> {
 //         )
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::elements::Polygon;
+
+    #[test]
+    fn test_reference_new() {
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+        let reference = Reference::new(polygon, grid);
+
+        assert_eq!(reference.grid().columns, 2);
+        assert_eq!(reference.grid().rows, 2);
+    }
+
+    #[test]
+    fn test_reference_default() {
+        let reference = Reference::default();
+        assert_eq!(reference.grid().columns, 1);
+        assert_eq!(reference.grid().rows, 1);
+    }
+
+    #[test]
+    fn test_reference_from_cell_name() {
+        let grid = Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false);
+        let reference = Reference::new("test_cell", grid);
+
+        match reference.instance() {
+            Instance::Cell(name) => assert_eq!(name, "test_cell"),
+            Instance::Element(_) => panic!("Expected Cell instance"),
+        }
+    }
+
+    #[test]
+    fn test_reference_display() {
+        let grid = Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false);
+        let reference = Reference::new("test_cell", grid);
+
+        let display_str = format!("{reference}");
+        assert!(display_str.contains("Reference to"));
+        assert!(display_str.contains("test_cell"));
+    }
+
+    #[test]
+    fn test_reference_clone() {
+        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
+        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+        let reference = Reference::new(polygon, grid);
+
+        let cloned = reference.clone();
+        assert_eq!(reference, cloned);
+    }
+}

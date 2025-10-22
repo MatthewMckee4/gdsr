@@ -9,7 +9,7 @@ use chrono::{Datelike, Local, Timelike};
 use geo::Rotate;
 
 use crate::{
-    CoordNum, DataType, DatabaseIntegerUnit, Instance, Layer, Point, ToGds,
+    Instance, Layer, Point,
     cell::Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
     elements::{
