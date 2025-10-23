@@ -20,7 +20,7 @@ impl Default for Text {
     fn default() -> Self {
         Self {
             text: String::new(),
-            origin: Point::new(0, 0).unwrap(),
+            origin: Point::integer(0, 0, 1e-9),
             layer: 0,
             magnification: 1.0,
             angle: 0.0,
@@ -154,7 +154,7 @@ mod tests {
     fn test_text_creation() {
         let text = Text::new(
             "Hello World".to_string(),
-            Point::new(100, 200).unwrap(),
+            Point::integer(100, 200, 1e-9),
             5,
             2.0,
             45.0,
@@ -164,7 +164,7 @@ mod tests {
         );
 
         assert_eq!(text.text(), "Hello World");
-        assert_eq!(text.origin(), &Point::new(100, 200).unwrap());
+        assert_eq!(text.origin(), &Point::integer(100, 200, 1e-9));
         assert_eq!(text.layer(), 5);
         assert_eq!(text.magnification(), 2.0);
         assert_eq!(text.angle(), 45.0);
@@ -176,7 +176,7 @@ mod tests {
         let text = Text::default();
 
         assert_eq!(text.text(), "");
-        assert_eq!(text.origin(), &Point::new(0, 0).unwrap());
+        assert_eq!(text.origin(), &Point::integer(0, 0, 1e-9));
         assert_eq!(text.layer(), 0);
         assert_eq!(text.magnification(), 1.0);
         assert_eq!(text.angle(), 0.0);
@@ -187,7 +187,7 @@ mod tests {
     fn test_text_display() {
         let text = Text::new(
             "Test Text".to_string(),
-            Point::new(10, 20).unwrap(),
+            Point::integer(10, 20, 1e-9),
             1,
             1.5,
             30.0,
@@ -206,7 +206,7 @@ mod tests {
     fn test_text_clone_and_partial_eq() {
         let text1 = Text::new(
             "Clone Test".to_string(),
-            Point::new(5, 10).unwrap(),
+            Point::integer(5, 10, 1e-9),
             2,
             1.2,
             15.0,
@@ -220,7 +220,7 @@ mod tests {
 
         let text3 = Text::new(
             "Different Text".to_string(),
-            Point::new(5, 10).unwrap(),
+            Point::integer(5, 10, 1e-9),
             2,
             1.2,
             15.0,

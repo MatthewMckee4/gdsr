@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_element_from_path() {
         let path = Path::new(
-            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
             1,
             0,
             None,
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn test_element_clone() {
         let path = Path::new(
-            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
             1,
             0,
             None,

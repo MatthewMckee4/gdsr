@@ -103,11 +103,11 @@ mod tests {
     fn test_grid_new() {
         let grid = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
 
-        assert_eq!(grid.origin, Point::new(10, 20).unwrap());
+        assert_eq!(grid.origin, Point::integer(10, 20, 1e-9));
         assert_eq!(grid.columns, 3);
         assert_eq!(grid.rows, 4);
-        assert_eq!(grid.spacing_x, Point::new(5, 0).unwrap());
-        assert_eq!(grid.spacing_y, Point::new(0, 5).unwrap());
+        assert_eq!(grid.spacing_x, Point::integer(5, 0, 1e-9));
+        assert_eq!(grid.spacing_y, Point::integer(0, 5, 1e-9));
         assert_eq!(grid.magnification, 1.5);
         assert_eq!(grid.angle, 45.0);
         assert!(grid.x_reflection);
@@ -116,11 +116,11 @@ mod tests {
     #[test]
     fn test_grid_default() {
         let grid: Grid = Grid::default();
-        assert_eq!(grid.origin, Point::new(0, 0).unwrap());
+        assert_eq!(grid.origin, Point::integer(0, 0, 1e-9));
         assert_eq!(grid.columns, 1);
         assert_eq!(grid.rows, 1);
-        assert_eq!(grid.spacing_x, Point::new(0, 0).unwrap());
-        assert_eq!(grid.spacing_y, Point::new(0, 0).unwrap());
+        assert_eq!(grid.spacing_x, Point::integer(0, 0, 1e-9));
+        assert_eq!(grid.spacing_y, Point::integer(0, 0, 1e-9));
         assert_eq!(grid.magnification, 1.0);
         assert_eq!(grid.angle, 0.0);
         assert!(!grid.x_reflection);

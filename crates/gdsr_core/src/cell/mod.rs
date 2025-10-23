@@ -234,7 +234,7 @@ mod tests {
     fn test_add_path() {
         let mut cell = Cell::new("test_cell");
         let path = Path::new(
-            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
             1,
             0,
             Some(PathType::Square),
@@ -251,7 +251,7 @@ mod tests {
         let mut cell = Cell::new("test_cell");
         let text = Text::new(
             "Test Text".to_string(),
-            Point::new(5, 5).unwrap(),
+            Point::integer(5, 5, 1e-9),
             1,
             1.0,
             0.0,

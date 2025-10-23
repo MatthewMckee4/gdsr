@@ -11,12 +11,21 @@ fn test_library_roundtrip_mixed_elements() {
 
     let mut cell = Cell::new("mixed_cell");
 
-    let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+    let polygon = Polygon::new(
+        [
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ],
+        1,
+        0,
+    );
     cell.add(polygon);
 
     let text = Text::new(
         "Test Label".to_string(),
-        Point::new(5, 5).unwrap(),
+        Point::integer(5, 5, 1e-9),
         1,
         1.0,
         0.0,
@@ -28,9 +37,9 @@ fn test_library_roundtrip_mixed_elements() {
 
     let path = Path::new(
         vec![
-            Point::new(0, 0).unwrap(),
-            Point::new(5, 5).unwrap(),
-            Point::new(10, 0).unwrap(),
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
+            Point::integer(10, 0, 1e-9),
         ],
         1,
         0,
@@ -39,7 +48,16 @@ fn test_library_roundtrip_mixed_elements() {
     );
     cell.add(path);
 
-    let ref_polygon = Polygon::new([(15, 15), (20, 15), (20, 20), (15, 20)], 2, 0);
+    let ref_polygon = Polygon::new(
+        [
+            Point::integer(15, 15, 1e-9),
+            Point::integer(20, 15, 1e-9),
+            Point::integer(20, 20, 1e-9),
+            Point::integer(15, 20, 1e-9),
+        ],
+        2,
+        0,
+    );
     let reference = Reference::new(
         ref_polygon,
         Grid::new((0, 25), 2, 2, (25, 0), (0, 25), 1.0, 0.0, false),

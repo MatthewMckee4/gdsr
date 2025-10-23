@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn test_apply_to_point_identity() {
         let transformation = Transformation::default();
-        let point = Point::new(5, 10).unwrap();
+        let point = Point::integer(5, 10, 1e-9);
         let result = transformation.apply_to_point(&point);
         assert_eq!(result, point);
     }
@@ -174,9 +174,9 @@ mod tests {
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation));
 
-        let point = Point::new(0, 0).unwrap();
+        let point = Point::integer(0, 0, 1e-9);
         let result = transformation.apply_to_point(&point);
-        assert_eq!(result, Point::new(5, 5).unwrap());
+        assert_eq!(result, Point::integer(5, 5, 1e-9));
     }
 
     #[test]
@@ -185,9 +185,9 @@ mod tests {
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale));
 
-        let point = Point::new(5, 10).unwrap();
+        let point = Point::integer(5, 10, 1e-9);
         let result = transformation.apply_to_point(&point);
-        assert_eq!(result, Point::new(10, 20).unwrap());
+        assert_eq!(result, Point::integer(10, 20, 1e-9));
     }
 
     #[test]

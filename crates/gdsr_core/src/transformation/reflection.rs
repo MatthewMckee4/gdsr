@@ -19,7 +19,7 @@ impl Reflection {
     pub fn new_horizontal() -> Self {
         Self::new(
             0.0,
-            Point::new(Unit::default_integer(0), Unit::default_integer(0)).unwrap(),
+            Point::new(Unit::default_integer(0), Unit::default_integer(0)),
         )
     }
 

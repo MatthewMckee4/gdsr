@@ -156,12 +156,8 @@ mod tests {
     #[test]
     fn test_path_with_different_unit_points() {
         let points = vec![
-            Point::new(Unit::integer(0, 1e-9), Unit::integer(0, 1e-9)).unwrap(),
-            Point::new(
-                Unit::float(100.0, 1e-6, 1e-9),
-                Unit::float(100.0, 1e-6, 1e-9),
-            )
-            .unwrap(),
+            Point::new(Unit::integer(0, 1e-9), Unit::integer(0, 1e-9)),
+            Point::new(Unit::float(100.0, 1e-6), Unit::float(100.0, 1e-6)),
         ];
         let path = Path::new(points, 0, 0, None, None);
         assert_eq!(path.points().len(), 2);

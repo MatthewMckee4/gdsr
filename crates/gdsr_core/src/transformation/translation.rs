@@ -16,7 +16,5 @@ impl Translation {
     #[must_use]
     pub fn apply_to_point(&self, point: &Point) -> Point {
         Point::new(point.x() + self.delta.x(), point.y() + self.delta.y())
-            .unwrap()
-            .set_same_units(point)
     }
 }

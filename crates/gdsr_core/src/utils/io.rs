@@ -228,8 +228,8 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                     if let GDSRecordData::F64(units) = data {
                         let user_units_from_file = units[0];
                         let db_units_from_file = units[1];
-                        println!("User units from file: {}", user_units_from_file);
-                        println!("DB units from file__: {}", db_units_from_file);
+                        println!("User units from file: {user_units_from_file}");
+                        println!("DB units from file__: {db_units_from_file}");
                         // if (unit > 0) {
                         //     scale = db_units / unit;
                         //     library.unit = unit;
@@ -306,7 +306,6 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                                     Unit::integer((p.x().as_float() * scale) as i32, db_units),
                                     Unit::integer((p.y().as_float() * scale) as i32, db_units),
                                 )
-                                .unwrap()
                             })
                             .collect::<Vec<Point>>();
 
@@ -334,7 +333,7 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                                         (rotated_points[1] - rotated_points[0])
                                             / reference.grid.columns
                                     } else {
-                                        Point::new(0, 0).unwrap()
+                                        Point::default()
                                     };
                                     reference.grid.spacing_y = if reference.grid.rows > 0 {
                                         (rotated_points[2] - rotated_points[0])
@@ -344,7 +343,6 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                                             Unit::integer(0, db_units),
                                             Unit::integer(0, db_units),
                                         )
-                                        .unwrap()
                                     };
                                 }
                                 _ => {}
@@ -610,7 +608,6 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
                 Unit::integer(chunk[0], db_units),
                 Unit::integer(chunk[1], db_units),
             )
-            .unwrap()
         })
         .collect()
 }

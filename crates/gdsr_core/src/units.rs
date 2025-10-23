@@ -1,19 +1,12 @@
 /// Represents a unit of measurement.
 ///
 /// Across this crate, if there is any notion of default units, for these types they will be defined as follows:
-/// - Integer: `db_unit` = 1e-9
-/// - Float: `user_unit` = 1e-6, `db_unit` = 1e-9
+/// - Integer: `units` = 1e-9
+/// - Float: `units` = 1e-6
 #[derive(Clone, Copy)]
 pub enum Unit {
-    Integer {
-        value: i32,
-        db_units: f64,
-    },
-    Float {
-        value: f64,
-        user_units: f64,
-        db_units: f64,
-    },
+    Integer { value: i32, units: f64 },
+    Float { value: f64, units: f64 },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -21,25 +14,18 @@ pub enum UnitsError {
     MismatchedUnits(f64, f64),
 }
 
-const DEFAULT_DB_UNIT: f64 = 1e-9;
-const DEFAULT_FLOAT_USER_UNIT: f64 = 1e-6;
+const DEFAULT_INTEGER_UNITS: f64 = 1e-9;
+const DEFAULT_FLOAT_UNITS: f64 = 1e-6;
 
 impl Unit {
     #[must_use]
-    pub const fn integer(value: i32, db_unit: f64) -> Self {
-        Self::Integer {
-            value,
-            db_units: db_unit,
-        }
+    pub const fn integer(value: i32, units: f64) -> Self {
+        Self::Integer { value, units }
     }
 
     #[must_use]
-    pub const fn float(value: f64, user_unit: f64, db_unit: f64) -> Self {
-        Self::Float {
-            value,
-            user_units: user_unit,
-            db_units: db_unit,
-        }
+    pub const fn float(value: f64, units: f64) -> Self {
+        Self::Float { value, units }
     }
 
     #[must_use]
@@ -53,10 +39,8 @@ impl Unit {
     #[must_use]
     pub fn true_value(&self) -> f64 {
         match self {
-            Self::Integer { value, db_units } => f64::from(*value) * db_units,
-            Self::Float {
-                value, user_units, ..
-            } => *value * user_units,
+            Self::Integer { value, units } => f64::from(*value) * units,
+            Self::Float { value, units } => *value * units,
         }
     }
 
@@ -80,7 +64,7 @@ impl Unit {
     pub const fn default_integer(value: i32) -> Self {
         Self::Integer {
             value,
-            db_units: DEFAULT_DB_UNIT,
+            units: DEFAULT_INTEGER_UNITS,
         }
     }
 
@@ -88,8 +72,7 @@ impl Unit {
     pub const fn default_float(value: f64) -> Self {
         Self::Float {
             value,
-            user_units: DEFAULT_FLOAT_USER_UNIT,
-            db_units: DEFAULT_DB_UNIT,
+            units: DEFAULT_FLOAT_UNITS,
         }
     }
 
@@ -97,132 +80,60 @@ impl Unit {
     pub fn to_integer_unit(&self) -> Self {
         match self {
             Self::Integer { .. } => *self,
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => {
-                let scale = user_units / db_units;
-                let value = (value * scale).round() as i32;
+            Self::Float { value, units } => {
+                // Convert float value (in units) to integer
+                let value = value.round() as i32;
                 Self::Integer {
                     value,
-                    db_units: *db_units,
+                    units: *units,
                 }
             }
         }
     }
 
     #[must_use]
-    pub fn to_float_unit(&self, user_units: f64) -> Self {
+    pub fn to_float_unit(&self, units: f64) -> Self {
         match self {
-            Self::Integer { value, db_units } => {
-                let scale = user_units / db_units;
-                let value = f64::from(*value) / scale;
-                Self::Float {
-                    value,
-                    user_units,
-                    db_units: *db_units,
-                }
+            Self::Integer {
+                value,
+                units: current_units,
+            } => {
+                // Convert integer value to float with new units
+                let real_value = f64::from(*value) * current_units;
+                let value = real_value / units;
+                Self::Float { value, units }
             }
             Self::Float { .. } => *self,
         }
     }
 
-    /// Sets the database unit for this Unit.
-    /// For Integer variants, this changes the `db_unit`.
-    /// For Float variants, this changes the `db_unit`.
-    pub const fn set_db_units(&mut self, new_db_unit: f64) {
-        match self {
-            Self::Integer {
-                db_units: db_unit, ..
-            }
-            | Self::Float {
-                db_units: db_unit, ..
-            } => *db_unit = new_db_unit,
-        }
-    }
-
-    /// Sets the user units for this Unit.
-    /// For Integer variants, this changes the `db_unit` (integers use `db_unit` as their unit).
-    /// For Float variants, this changes the `user_unit`.
-    pub const fn set_user_units(&mut self, new_user_unit: f64) {
-        match self {
-            Self::Integer {
-                db_units: db_unit, ..
-            } => *db_unit = new_user_unit,
-            Self::Float {
-                user_units: user_unit,
-                ..
-            } => *user_unit = new_user_unit,
-        }
-    }
-
-    /// Returns a copy of this Unit with the specified database unit.
-    /// For Integer variants, this changes the `db_unit`.
-    /// For Float variants, this changes the `db_unit`.
+    /// Sets the units for this Unit.
     #[must_use]
-    pub const fn with_db_units(&self, new_db_unit: f64) -> Self {
+    pub const fn units(&self) -> f64 {
+        match self {
+            Self::Integer { units, .. } | Self::Float { units, .. } => *units,
+        }
+    }
+
+    /// Sets the units for this Unit (mutable).
+    pub const fn set_units(&mut self, new_units: f64) {
+        match self {
+            Self::Integer { units, .. } | Self::Float { units, .. } => *units = new_units,
+        }
+    }
+
+    /// Returns a copy of this Unit with the specified units.
+    #[must_use]
+    pub const fn with_units(&self, new_units: f64) -> Self {
         match self {
             Self::Integer { value, .. } => Self::Integer {
                 value: *value,
-                db_units: new_db_unit,
+                units: new_units,
             },
-            Self::Float {
-                value,
-                user_units: user_unit,
-                ..
-            } => Self::Float {
+            Self::Float { value, .. } => Self::Float {
                 value: *value,
-                user_units: *user_unit,
-                db_units: new_db_unit,
+                units: new_units,
             },
-        }
-    }
-
-    /// Returns a copy of this Unit with the specified user unit.
-    /// For Integer variants, this changes the `db_unit` (integers use `db_unit` as their unit).
-    /// For Float variants, this changes the `user_unit`.
-    #[must_use]
-    pub const fn with_user_units(&self, new_user_unit: f64) -> Self {
-        match self {
-            Self::Integer { value, .. } => Self::Integer {
-                value: *value,
-                db_units: new_user_unit,
-            },
-            Self::Float {
-                value,
-                db_units: db_unit,
-                ..
-            } => Self::Float {
-                value: *value,
-                user_units: new_user_unit,
-                db_units: *db_unit,
-            },
-        }
-    }
-
-    #[must_use]
-    pub const fn user_unit(&self) -> f64 {
-        match self {
-            Self::Integer {
-                db_units: db_unit, ..
-            } => *db_unit,
-            Self::Float {
-                user_units: user_unit,
-                ..
-            } => *user_unit,
-        }
-    }
-
-    #[must_use]
-    pub const fn db_unit(&self) -> f64 {
-        match self {
-            Self::Integer {
-                db_units: db_unit, ..
-            }
-            | Self::Float {
-                db_units: db_unit, ..
-            } => *db_unit,
         }
     }
 }
@@ -230,21 +141,11 @@ impl Unit {
 impl std::fmt::Display for Unit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Integer {
-                value,
-                db_units: db_unit,
-            } => {
-                write!(f, "{value}db (db_unit: {db_unit:.3e})")
+            Self::Integer { value, units } => {
+                write!(f, "{value}i (units: {units:.3e})")
             }
-            Self::Float {
-                value,
-                user_units: user_unit,
-                db_units: db_unit,
-            } => {
-                write!(
-                    f,
-                    "{value:.6}u (user_unit: {user_unit:.3e}, db_unit: {db_unit:.3e})"
-                )
+            Self::Float { value, units } => {
+                write!(f, "{value:.6}f (units: {units:.3e})")
             }
         }
     }
@@ -253,21 +154,11 @@ impl std::fmt::Display for Unit {
 impl Debug for Unit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Integer {
-                value,
-                db_units: db_unit,
-            } => {
-                write!(f, "{value} (db_unit: {db_unit:.3e})")
+            Self::Integer { value, units } => {
+                write!(f, "{value} (units: {units:.3e})")
             }
-            Self::Float {
-                value,
-                user_units: user_unit,
-                db_units: db_unit,
-            } => {
-                write!(
-                    f,
-                    "{value:.6} (user_unit: {user_unit:.3e}, db_unit: {db_unit:.3e})"
-                )
+            Self::Float { value, units } => {
+                write!(f, "{value:.6} (units: {units:.3e})")
             }
         }
     }
@@ -283,96 +174,77 @@ impl Add for Unit {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            // Integer + Integer: use left's db_unit, convert right if needed
+            // Integer + Integer: always return Integer with self's units
             (
                 Self::Integer {
                     value: v1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                if db1 == db2 {
-                    Self::Integer {
-                        value: v1 + v2,
-                        db_units: db1,
-                    }
-                } else {
-                    // Convert v2 to real units, then to db1 units
-                    let v2_real = f64::from(v2) * db2;
-                    let v2_in_db1 = (v2_real / db1).round() as i32;
-                    Self::Integer {
-                        value: v1 + v2_in_db1,
-                        db_units: db1,
-                    }
+                // Convert v2 to real units, then to self's units
+                let v2_real = f64::from(v2) * u2;
+                let v2_in_u1 = (v2_real / u1).round() as i32;
+                Self::Integer {
+                    value: v1 + v2_in_u1,
+                    units: u1,
                 }
             }
-            // Float + Float: use left's units, convert right if needed
+            // Integer + Float: always return Integer with self's units
             (
-                Self::Float {
+                Self::Integer {
                     value: v1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Float {
                     value: v2,
-                    user_units: u2,
-                    db_units: _,
+                    units: u2,
                 },
             ) => {
-                // Convert both to real units for addition
-                let v1_real = v1 * u1;
                 let v2_real = v2 * u2;
-                let sum_real = v1_real + v2_real;
-                // Express result in left's user_unit
-                let result_value = sum_real / u1;
-                Self::Float {
-                    value: result_value,
-                    user_units: u1,
-                    db_units: db1,
-                }
-            }
-            // Integer + Float: convert both to Float using left's units
-            (
+                let v2_in_u1 = (v2_real / u1).round() as i32;
                 Self::Integer {
-                    value: v1,
-                    db_units: db1,
-                },
-                Self::Float {
-                    value: v2,
-                    user_units: u2,
-                    ..
-                },
-            ) => {
-                let v1_real = f64::from(v1) * db1;
-                let v2_real = v2 * u2;
-                let value = (v1_real + v2_real) / db1;
-                Self::Float {
-                    value,
-                    user_units: db1,
-                    db_units: db1,
+                    value: v1 + v2_in_u1,
+                    units: u1,
                 }
             }
-            // Float + Integer: convert Integer to Float using left's units
+            // Float + Integer: always return Float with self's units
             (
                 Self::Float {
                     value: v1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                let v2_real = f64::from(v2) * db2;
+                let v2_real = f64::from(v2) * u2;
                 let v2_in_u1 = v2_real / u1;
                 Self::Float {
                     value: v1 + v2_in_u1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
+                }
+            }
+            // Float + Float: always return Float with self's units
+            (
+                Self::Float {
+                    value: v1,
+                    units: u1,
+                },
+                Self::Float {
+                    value: v2,
+                    units: u2,
+                },
+            ) => {
+                let v2_real = v2 * u2;
+                let v2_in_u1 = v2_real / u1;
+                Self::Float {
+                    value: v1 + v2_in_u1,
+                    units: u1,
                 }
             }
         }
@@ -384,95 +256,76 @@ impl Sub for Unit {
 
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            // Integer - Integer: use left's db_unit, convert right if needed
+            // Integer - Integer: always return Integer with self's units
             (
                 Self::Integer {
                     value: v1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                if db1 == db2 {
-                    Self::Integer {
-                        value: v1 - v2,
-                        db_units: db1,
-                    }
-                } else {
-                    // Convert v2 to real units, then to db1 units
-                    let v2_real = f64::from(v2) * db2;
-                    let v2_in_db1 = (v2_real / db1).round() as i32;
-                    Self::Integer {
-                        value: v1 - v2_in_db1,
-                        db_units: db1,
-                    }
+                let v2_real = f64::from(v2) * u2;
+                let v2_in_u1 = (v2_real / u1).round() as i32;
+                Self::Integer {
+                    value: v1 - v2_in_u1,
+                    units: u1,
                 }
             }
-            // Float - Float: use left's units, convert right if needed
+            // Integer - Float: always return Integer with self's units
             (
-                Self::Float {
+                Self::Integer {
                     value: v1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Float {
                     value: v2,
-                    user_units: u2,
-                    db_units: _,
+                    units: u2,
                 },
             ) => {
-                // Convert both to real units for subtraction
-                let v1_real = v1 * u1;
                 let v2_real = v2 * u2;
-                let diff_real = v1_real - v2_real;
-                // Express result in left's user_unit
-                let result_value = diff_real / u1;
-                Self::Float {
-                    value: result_value,
-                    user_units: u1,
-                    db_units: db1,
-                }
-            }
-            // Integer - Float: convert both to Float using left's units
-            (
+                let v2_in_u1 = (v2_real / u1).round() as i32;
                 Self::Integer {
-                    value: v1,
-                    db_units: db1,
-                },
-                Self::Float {
-                    value: v2,
-                    user_units: u2,
-                    ..
-                },
-            ) => {
-                let v1_real = f64::from(v1) * db1;
-                let v2_real = v2 * u2;
-                Self::Float {
-                    value: v1_real - v2_real,
-                    user_units: db1,
-                    db_units: db1,
+                    value: v1 - v2_in_u1,
+                    units: u1,
                 }
             }
-            // Float - Integer: convert Integer to Float using left's units
+            // Float - Integer: always return Float with self's units
             (
                 Self::Float {
                     value: v1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                let v2_real = f64::from(v2) * db2;
+                let v2_real = f64::from(v2) * u2;
                 let v2_in_u1 = v2_real / u1;
                 Self::Float {
                     value: v1 - v2_in_u1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
+                }
+            }
+            // Float - Float: always return Float with self's units
+            (
+                Self::Float {
+                    value: v1,
+                    units: u1,
+                },
+                Self::Float {
+                    value: v2,
+                    units: u2,
+                },
+            ) => {
+                let v2_real = v2 * u2;
+                let v2_in_u1 = v2_real / u1;
+                Self::Float {
+                    value: v1 - v2_in_u1,
+                    units: u1,
                 }
             }
         }
@@ -484,19 +337,13 @@ impl Mul<f64> for Unit {
 
     fn mul(self, scalar: f64) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => Self::Float {
-                value: f64::from(value) * scalar,
-                user_units: db_units,
-                db_units,
+            Self::Integer { value, units } => Self::Integer {
+                value: (f64::from(value) * scalar).round() as i32,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value * scalar,
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -507,21 +354,13 @@ impl Mul<i32> for Unit {
 
     fn mul(self, scalar: i32) -> Self::Output {
         match self {
-            Self::Integer {
-                value,
-                db_units: db_unit,
-            } => Self::Integer {
+            Self::Integer { value, units } => Self::Integer {
                 value: value * scalar,
-                db_units: db_unit,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value * f64::from(scalar),
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -532,21 +371,13 @@ impl Mul<u32> for Unit {
 
     fn mul(self, scalar: u32) -> Self::Output {
         match self {
-            Self::Integer {
-                value,
-                db_units: db_unit,
-            } => Self::Integer {
+            Self::Integer { value, units } => Self::Integer {
                 value: value * scalar as i32,
-                db_units: db_unit,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value * f64::from(scalar),
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -557,19 +388,13 @@ impl Div<f64> for Unit {
 
     fn div(self, scalar: f64) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => Self::Float {
-                value: f64::from(value) / scalar,
-                user_units: db_units,
-                db_units,
+            Self::Integer { value, units } => Self::Integer {
+                value: (f64::from(value) / scalar).round() as i32,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value / scalar,
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -580,28 +405,22 @@ impl Div<i32> for Unit {
 
     fn div(self, scalar: i32) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => {
+            Self::Integer { value, units } => {
                 if value % scalar == 0 {
                     Self::Integer {
                         value: value / scalar,
-                        db_units,
+                        units,
                     }
                 } else {
-                    Self::Float {
-                        value: f64::from(value) / f64::from(scalar),
-                        user_units: db_units,
-                        db_units,
+                    Self::Integer {
+                        value: (f64::from(value) / f64::from(scalar)).round() as i32,
+                        units,
                     }
                 }
             }
-            Self::Float {
-                value,
-                user_units: user_unit,
-                db_units: db_unit,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value / f64::from(scalar),
-                user_units: user_unit,
-                db_units: db_unit,
+                units,
             },
         }
     }
@@ -612,19 +431,13 @@ impl Div<u32> for Unit {
 
     fn div(self, scalar: u32) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => Self::Float {
-                value: f64::from(value) / f64::from(scalar),
-                user_units: db_units,
-                db_units,
+            Self::Integer { value, units } => Self::Integer {
+                value: (f64::from(value) / f64::from(scalar)).round() as i32,
+                units,
             },
-            Self::Float {
-                value,
-                user_units: user_unit,
-                db_units: db_unit,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value / f64::from(scalar),
-                user_units: user_unit,
-                db_units: db_unit,
+                units,
             },
         }
     }
@@ -634,24 +447,13 @@ impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
         // Convert both to real-world values and compare
         let self_real = match self {
-            Self::Integer {
-                value,
-                db_units: db_unit,
-            } => f64::from(*value) * db_unit,
-            Self::Float {
-                value,
-                user_units,
-                db_units: _,
-            } => value * user_units,
+            Self::Integer { value, units } => f64::from(*value) * units,
+            Self::Float { value, units } => value * units,
         };
 
         let other_real = match other {
-            Self::Integer { value, db_units } => f64::from(*value) * db_units,
-            Self::Float {
-                value,
-                user_units,
-                db_units: _,
-            } => value * user_units,
+            Self::Integer { value, units } => f64::from(*value) * units,
+            Self::Float { value, units } => value * units,
         };
 
         // Use a small epsilon for floating point comparison
@@ -683,18 +485,13 @@ impl Sub<i32> for Unit {
 
     fn sub(self, scalar: i32) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => Self::Integer {
+            Self::Integer { value, units } => Self::Integer {
                 value: value - scalar,
-                db_units,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value - f64::from(scalar),
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -705,19 +502,13 @@ impl Sub<f64> for Unit {
 
     fn sub(self, scalar: f64) -> Self::Output {
         match self {
-            Self::Integer { value, db_units } => Self::Float {
-                value: f64::from(value) - scalar,
-                user_units: db_units,
-                db_units,
+            Self::Integer { value, units } => Self::Integer {
+                value: (f64::from(value) - scalar).round() as i32,
+                units,
             },
-            Self::Float {
-                value,
-                user_units,
-                db_units,
-            } => Self::Float {
+            Self::Float { value, units } => Self::Float {
                 value: value - scalar,
-                user_units,
-                db_units,
+                units,
             },
         }
     }
@@ -728,80 +519,83 @@ impl Mul for Unit {
 
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
+            // Integer * Integer: always return Integer with self's units
             (
                 Self::Integer {
                     value: v1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                let real1 = f64::from(v1) * db1;
-                let real2 = f64::from(v2) * db2;
-                Self::Float {
-                    value: real1 * real2,
-                    user_units: db1,
-                    db_units: db1,
+                let real1 = f64::from(v1) * u1;
+                let real2 = f64::from(v2) * u2;
+                let result = (real1 * real2) / u1;
+                Self::Integer {
+                    value: result.round() as i32,
+                    units: u1,
                 }
             }
-            (
-                Self::Float {
-                    value: v1,
-                    user_units: u1,
-                    db_units: db1,
-                },
-                Self::Float {
-                    value: v2,
-                    user_units: u2,
-                    ..
-                },
-            ) => {
-                let real1 = v1 * u1;
-                let real2 = v2 * u2;
-                Self::Float {
-                    value: real1 * real2,
-                    user_units: u1,
-                    db_units: db1,
-                }
-            }
+            // Integer * Float: always return Integer with self's units
             (
                 Self::Integer {
                     value: v1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Float {
                     value: v2,
-                    user_units: u2,
-                    ..
+                    units: u2,
                 },
             ) => {
-                let real1 = f64::from(v1) * db1;
-                let real2 = v2 * u2;
-                Self::Float {
-                    value: real1 * real2,
-                    user_units: db1,
-                    db_units: db1,
+                let scale = u1 / u2;
+                let real1 = f64::from(v1);
+                let real2 = v2 * scale;
+                let result = (real1 * real2) / scale;
+                Self::Integer {
+                    value: result.round() as i32,
+                    units: u1,
                 }
             }
+            // Float * Integer: always return Float with self's units
             (
                 Self::Float {
                     value: v1,
-                    user_units: u1,
-                    db_units: db1,
+                    units: u1,
                 },
                 Self::Integer {
                     value: v2,
-                    db_units: db2,
+                    units: u2,
                 },
             ) => {
-                let real1 = v1 * u1;
-                let real2 = f64::from(v2) * db2;
+                let scale = u1 / u2;
+                let real1 = v1;
+                let real2 = f64::from(v2) * scale;
+                let result = (real1 * real2) / scale;
                 Self::Float {
-                    value: real1 * real2,
-                    user_units: u1,
-                    db_units: db1,
+                    value: result,
+                    units: u1,
+                }
+            }
+            // Float * Float: always return Float with self's units
+            (
+                Self::Float {
+                    value: v1,
+                    units: u1,
+                },
+                Self::Float {
+                    value: v2,
+                    units: u2,
+                },
+            ) => {
+                let scale = u1 / u2;
+                let real1 = v1;
+                let real2 = v2 * scale;
+                let result = (real1 * real2) / scale;
+                Self::Float {
+                    value: result,
+                    units: u1,
                 }
             }
         }
@@ -818,27 +612,18 @@ mod tests {
 
     impl Arbitrary for Unit {
         fn arbitrary(g: &mut Gen) -> Self {
-            let db_exponent = (i32::arbitrary(g) % 10) - 12;
-            let db_unit = 10_f64.powi(db_exponent);
+            let units_exponent = (i32::arbitrary(g) % 10) - 12;
+            let units = 10_f64.powi(units_exponent);
 
             if bool::arbitrary(g) {
                 let value = (i32::arbitrary(g) % 1_000_000) - 500_000;
-                Self::Integer {
-                    value,
-                    db_units: db_unit,
-                }
+                Self::Integer { value, units }
             } else {
-                let user_exponent = (i32::arbitrary(g) % 10) - 12;
-                let user_unit = 10_f64.powi(user_exponent);
                 let mut value = f64::arbitrary(g);
                 if !value.is_finite() || value.abs() > 1e100 {
                     value = f64::from(i32::arbitrary(g) % 1_000_000) / 1000.0;
                 }
-                Self::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                }
+                Self::Float { value, units }
             }
         }
     }
@@ -850,12 +635,9 @@ mod tests {
         fn integer() {
             let unit = Unit::integer(100, 0.001);
             match unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 100);
-                    assert_eq!(db_unit, 0.001);
+                    assert_eq!(units, 0.001);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -863,16 +645,11 @@ mod tests {
 
         #[test]
         fn float() {
-            let unit = Unit::float(100.5, 1.0, 0.001);
+            let unit = Unit::float(100.5, 1.0);
             match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 100.5);
-                    assert_eq!(user_unit, 1.0);
-                    assert_eq!(db_unit, 0.001);
+                    assert_eq!(units, 1.0);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -891,8 +668,8 @@ mod tests {
 
         #[test]
         fn same_float_same_units() {
-            let a = Unit::float(100.5, 1e-6, 1e-9);
-            let b = Unit::float(100.5, 1e-6, 1e-9);
+            let a = Unit::float(100.5, 1e-6);
+            let b = Unit::float(100.5, 1e-6);
             assert_eq!(a, b);
         }
 
@@ -905,15 +682,15 @@ mod tests {
 
         #[test]
         fn float_different_scales_equal() {
-            let a = Unit::float(1000.0, 1e-9, 1e-12); // 1000 * 1e-9 = 1e-6
-            let b = Unit::float(1.0, 1e-6, 1e-12); // 1 * 1e-6 = 1e-6
+            let a = Unit::float(1000.0, 1e-9); // 1000 * 1e-9 = 1e-6
+            let b = Unit::float(1.0, 1e-6); // 1 * 1e-6 = 1e-6
             assert_eq!(a, b);
         }
 
         #[test]
         fn integer_and_float_equal() {
             let a = Unit::integer(1000, 1e-9); // 1000 * 1e-9 = 1e-6
-            let b = Unit::float(1.0, 1e-6, 1e-9); // 1 * 1e-6 = 1e-6
+            let b = Unit::float(1.0, 1e-6); // 1 * 1e-6 = 1e-6
             assert_eq!(a, b);
         }
 
@@ -956,25 +733,25 @@ mod tests {
         #[test]
         fn from_f64() {
             let unit = Unit::from(1.5);
-            assert_eq!(unit, Unit::float(1.5, 1e-6, 1e-9));
+            assert_eq!(unit, Unit::float(1.5, 1e-6));
         }
 
         #[test]
         fn from_f64_negative() {
             let unit = Unit::from(-3.5);
-            assert_eq!(unit, Unit::float(-3.5, 1e-6, 1e-9));
+            assert_eq!(unit, Unit::float(-3.5, 1e-6));
         }
 
         #[test]
         fn from_f64_zero() {
             let unit = Unit::from(0.0);
-            assert_eq!(unit, Unit::float(0.0, 1e-6, 1e-9));
+            assert_eq!(unit, Unit::float(0.0, 1e-6));
         }
 
         #[test]
         fn from_f64_large() {
             let unit = Unit::from(1000.0);
-            assert_eq!(unit, Unit::float(1000.0, 1e-6, 1e-9));
+            assert_eq!(unit, Unit::float(1000.0, 1e-6));
         }
 
         #[test]
@@ -983,7 +760,7 @@ mod tests {
             assert_eq!(unit, Unit::integer(100, 1e-9));
 
             let unit: Unit = 1.5.into();
-            assert_eq!(unit, Unit::float(1.5, 1e-6, 1e-9));
+            assert_eq!(unit, Unit::float(1.5, 1e-6));
         }
     }
 
@@ -991,237 +768,86 @@ mod tests {
         use super::*;
 
         #[test]
-        fn set_db_units_integer() {
+        fn set_unitss_integer() {
             let mut unit = Unit::integer(100, 1e-9);
-            unit.set_db_units(1e-6);
+            unit.set_units(1e-6);
 
             match unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-6);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
-        fn set_db_units_float() {
-            let mut unit = Unit::float(1.5, 1e-6, 1e-9);
-            unit.set_db_units(1e-12);
+        fn set_unitss_float() {
+            let mut unit = Unit::float(1.5, 1e-6);
+            unit.set_units(1e-12);
 
             match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-12);
+                    assert_eq!(units, 1e-12);
                 }
                 _ => panic!("Expected Float variant"),
             }
         }
 
         #[test]
-        fn set_user_units_integer() {
-            let mut unit = Unit::integer(100, 1e-9);
-            unit.set_user_units(1e-6);
-
-            match unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
-        }
-
-        #[test]
-        fn set_user_units_float() {
-            let mut unit = Unit::float(1.5, 1e-6, 1e-9);
-            unit.set_user_units(1e-3);
-
-            match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-3);
-                    assert_eq!(db_unit, 1e-9);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-        }
-
-        #[test]
-        fn with_db_units_integer() {
+        fn with_units_integer() {
             let unit = Unit::integer(100, 1e-9);
-            let new_unit = unit.with_db_units(1e-6);
+            let new_unit = unit.with_units(1e-6);
 
-            // Original should be unchanged
             match unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
 
-            // New unit should have new db_unit
             match new_unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-6);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
-        fn with_db_units_float() {
-            let unit = Unit::float(1.5, 1e-6, 1e-9);
-            let new_unit = unit.with_db_units(1e-12);
+        fn with_units_float() {
+            let unit = Unit::float(1.5, 1e-6);
+            let new_unit = unit.with_units(1e-12);
 
-            // Original should be unchanged
             match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
 
-            // New unit should have new db_unit
             match new_unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-12);
+                    assert_eq!(units, 1e-12);
                 }
                 _ => panic!("Expected Float variant"),
-            }
-        }
-
-        #[test]
-        fn with_user_units_integer() {
-            let unit = Unit::integer(100, 1e-9);
-            let new_unit = unit.with_user_units(1e-6);
-
-            // Original should be unchanged
-            match unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-9);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
-
-            // New unit should have new db_unit
-            match new_unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
-        }
-
-        #[test]
-        fn with_user_units_float() {
-            let unit = Unit::float(1.5, 1e-6, 1e-9);
-            let new_unit = unit.with_user_units(1e-3);
-
-            // Original should be unchanged
-            match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-
-            // New unit should have new user_unit
-            match new_unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(user_unit, 1e-3);
-                    assert_eq!(db_unit, 1e-9);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-        }
-
-        #[test]
-        fn chaining_with_methods() {
-            let unit = Unit::integer(100, 1e-9);
-            let new_unit = unit.with_db_units(1e-6).with_user_units(1e-3);
-
-            match new_unit {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-3);
-                }
-                _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
         fn set_methods_modify_in_place() {
-            let mut unit = Unit::float(2.5, 1e-6, 1e-9);
-            unit.set_user_units(1e-3);
-            unit.set_db_units(1e-12);
+            let mut unit = Unit::float(2.5, 1e-6);
+            unit.set_units(1e-3);
 
             match unit {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 2.5);
-                    assert_eq!(user_unit, 1e-3);
-                    assert_eq!(db_unit, 1e-12);
+                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1235,7 +861,7 @@ mod tests {
 
         #[test]
         fn as_true_float_value() {
-            let unit = Unit::float(2.5, 1e-6, 1e-9);
+            let unit = Unit::float(2.5, 1e-6);
             let result = unit.true_value();
             assert_relative_eq!(result, 2.5 * 1e-6);
         }
@@ -1249,16 +875,13 @@ mod tests {
 
         #[test]
         fn to_integer_from_float() {
-            let unit = Unit::float(1.007, 1.0, 0.001);
+            let unit = Unit::float(1.007, 1e-6);
             let result = unit.to_integer_unit();
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 1007);
-                    assert_eq!(db_unit, 0.001);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 1);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1266,16 +889,13 @@ mod tests {
 
         #[test]
         fn to_integer_with_user_unit() {
-            let unit = Unit::float(100.0, 0.001, 1e-6);
+            let unit = Unit::float(100.0, 0.001);
             let result = unit.to_integer_unit();
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 100_000);
-                    assert_eq!(db_unit, 1e-6);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 100);
+                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1283,7 +903,7 @@ mod tests {
 
         #[test]
         fn to_float_from_float() {
-            let unit = Unit::float(100.5, 1e-6, 1e-9);
+            let unit = Unit::float(100.5, 1e-6);
             let result = unit.to_float_unit(1e-6);
             assert_eq!(result, unit);
         }
@@ -1294,14 +914,9 @@ mod tests {
             let result = unit.to_float_unit(1e-6);
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units,
-                    db_units,
-                } => {
-                    assert_eq!(value, 0.1);
-                    assert_eq!(user_units, 1e-6);
-                    assert_eq!(db_units, 1e-9);
+                Unit::Float { value, units } => {
+                    assert_relative_eq!(value, 0.1);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1314,9 +929,9 @@ mod tests {
             let back_to_int = as_float.to_integer_unit();
 
             match back_to_int {
-                Unit::Integer { value, db_units } => {
-                    assert_eq!(value, 100);
-                    assert_eq!(db_units, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 0);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1324,16 +939,13 @@ mod tests {
 
         #[test]
         fn negative_values() {
-            let unit = Unit::float(-100.5, 1e-6, 1e-9);
+            let unit = Unit::float(-100.5, 1e-6);
             let result = unit.to_integer_unit();
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, -100_500);
-                    assert_eq!(db_unit, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, -101);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1341,16 +953,13 @@ mod tests {
 
         #[test]
         fn zero_value() {
-            let unit = Unit::float(0.0, 1e-6, 1e-9);
+            let unit = Unit::float(0.0, 1e-6);
             let result = unit.to_integer_unit();
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 0);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1358,6 +967,8 @@ mod tests {
     }
 
     mod addition {
+        use approx::assert_relative_eq;
+
         use super::*;
 
         #[test]
@@ -1367,12 +978,9 @@ mod tests {
             let result = u1 + u2;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 150);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1380,37 +988,29 @@ mod tests {
 
         #[test]
         fn floats() {
-            let u1 = Unit::float(100.5, 1e-6, 1e-9);
-            let u2 = Unit::float(50.3, 1e-6, 1e-9);
+            let u1 = Unit::float(100.5, 1e-6);
+            let u2 = Unit::float(50.3, 1e-6);
             let result = u1 + u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 150.8).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
         }
 
         #[test]
-        fn different_db_units() {
+        fn different_unitss() {
             let u1 = Unit::integer(100, 1e-9);
             let u2 = Unit::integer(50, 1e-6);
             let result = u1 + u2;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 50100);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1419,18 +1019,13 @@ mod tests {
         #[test]
         fn integer_and_float() {
             let u1 = Unit::integer(100, 1e-9);
-            let u2 = Unit::float(50.5, 1e-6, 1e-9);
+            let u2 = Unit::float(50.5, 1e-6);
             let result = u1 + u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert!((value - 50600.0).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-9);
-                    assert_eq!(db_unit, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 50600);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1438,19 +1033,14 @@ mod tests {
 
         #[test]
         fn float_and_integer() {
-            let u1 = Unit::float(50.5, 1e-6, 1e-9);
+            let u1 = Unit::float(50.5, 1e-6);
             let u2 = Unit::integer(100, 1e-9);
             let result = u1 + u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 50.6).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1458,19 +1048,14 @@ mod tests {
 
         #[test]
         fn different_user_units() {
-            let u1 = Unit::float(100.0, 1e-6, 1e-9);
-            let u2 = Unit::float(50.0, 1e-3, 1e-9);
+            let u1 = Unit::float(100.0, 1e-6);
+            let u2 = Unit::float(50.0, 1e-3);
             let result = u1 + u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 50100.0).abs() < 1e-6);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1487,12 +1072,9 @@ mod tests {
             let result = u1 - u2;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 70);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1500,37 +1082,29 @@ mod tests {
 
         #[test]
         fn floats() {
-            let u1 = Unit::float(100.5, 1e-6, 1e-9);
-            let u2 = Unit::float(50.3, 1e-6, 1e-9);
+            let u1 = Unit::float(100.5, 1e-6);
+            let u2 = Unit::float(50.3, 1e-6);
             let result = u1 - u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 50.2).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
         }
 
         #[test]
-        fn different_db_units() {
+        fn different_units() {
             let u1 = Unit::integer(100, 1e-6);
             let u2 = Unit::integer(50, 1e-9);
             let result = u1 - u2;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 100);
-                    assert_eq!(db_unit, 1e-6);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1538,19 +1112,14 @@ mod tests {
 
         #[test]
         fn float_and_integer() {
-            let u1 = Unit::float(100.5, 1e-6, 1e-9);
+            let u1 = Unit::float(100.5, 1e-6);
             let u2 = Unit::integer(50, 1e-9);
             let result = u1 - u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 100.45).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1562,12 +1131,9 @@ mod tests {
             let result = u - 30;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 70);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1575,18 +1141,13 @@ mod tests {
 
         #[test]
         fn float_by_i32() {
-            let u = Unit::float(100.5, 1e-6, 1e-9);
+            let u = Unit::float(100.5, 1e-6);
             let result = u - 10;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 90.5).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1598,33 +1159,24 @@ mod tests {
             let result = u - 25.5;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert!((value - 74.5).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-9);
-                    assert_eq!(db_unit, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 75);
+                    assert_eq!(units, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
         fn float_by_f64() {
-            let u = Unit::float(100.5, 1e-6, 1e-9);
+            let u = Unit::float(100.5, 1e-6);
             let result = u - 25.5;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert!((value - 75.0).abs() < 1e-10);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1640,12 +1192,9 @@ mod tests {
             let result = u * 3;
 
             match result {
-                Unit::Integer {
-                    value,
-                    db_units: db_unit,
-                } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 300);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1657,33 +1206,23 @@ mod tests {
             let result = u * 2.5;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 250.0);
-                    assert_eq!(user_unit, 1e-9);
-                    assert_eq!(db_unit, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 250);
+                    assert_eq!(units, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
         fn float_by_f64() {
-            let u = Unit::float(100.5, 1e-6, 1e-9);
+            let u = Unit::float(100.5, 1e-6);
             let result = u * 2.0;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units,
-                    db_units,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 201.0);
-                    assert_eq!(user_units, 1e-6);
-                    assert_eq!(db_units, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1696,34 +1235,24 @@ mod tests {
             let result = u1 * u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units,
-                    db_units,
-                } => {
-                    assert!((value - 5e-8).abs() < 1e-15);
-                    assert_eq!(user_units, 1e-3);
-                    assert_eq!(db_units, 1e-3);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 0);
+                    assert_eq!(units, 1e-3);
                 }
-                _ => panic!("Expected Float variant"),
+                _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
         fn floats() {
-            let u1 = Unit::float(2.0, 1e-3, 1e-6);
-            let u2 = Unit::float(3.0, 1e-3, 1e-6);
+            let u1 = Unit::float(2.0, 1e-3);
+            let u2 = Unit::float(3.0, 1e-3);
             let result = u1 * u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units,
-                    db_units,
-                } => {
-                    assert!((value - 6e-6).abs() < 1e-15);
-                    assert_eq!(user_units, 1e-3);
-                    assert_eq!(db_units, 1e-6);
+                Unit::Float { value, units } => {
+                    assert_eq!(value, 6.0);
+                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1732,18 +1261,13 @@ mod tests {
         #[test]
         fn integer_and_float() {
             let u1 = Unit::integer(10, 1e-3);
-            let u2 = Unit::float(5.0, 1e-3, 1e-6);
+            let u2 = Unit::float(5.0, 1e-3);
             let result = u1 * u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units,
-                    db_units,
-                } => {
-                    assert!((value - 5e-5).abs() < 1e-15);
-                    assert_eq!(user_units, 1e-3);
-                    assert_eq!(db_units, 1e-3);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 50);
+                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1751,19 +1275,14 @@ mod tests {
 
         #[test]
         fn float_and_integer() {
-            let u1 = Unit::float(5.0, 1e-3, 1e-6);
+            let u1 = Unit::float(5.0, 1e-3);
             let u2 = Unit::integer(10, 1e-3);
             let result = u1 * u2;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert!((value - 5e-5).abs() < 1e-15);
-                    assert_eq!(user_unit, 1e-3);
-                    assert_eq!(db_unit, 1e-6);
+                Unit::Float { value, units } => {
+                    assert_eq!(value, 50.0);
+                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1779,9 +1298,9 @@ mod tests {
             let result = u / 4;
 
             match result {
-                Unit::Integer { value, db_units } => {
+                Unit::Integer { value, units } => {
                     assert_eq!(value, 25);
-                    assert_eq!(db_units, 1e-9);
+                    assert_eq!(units, 1e-9);
                 }
                 _ => panic!("Expected Integer variant"),
             }
@@ -1793,33 +1312,23 @@ mod tests {
             let result = u / 2.5;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
-                    assert_eq!(value, 40.0);
-                    assert_eq!(user_unit, 1e-9);
-                    assert_eq!(db_unit, 1e-9);
+                Unit::Integer { value, units } => {
+                    assert_eq!(value, 40);
+                    assert_eq!(units, 1e-9);
                 }
-                _ => panic!("Expected Float variant"),
+                _ => panic!("Expected Integer variant"),
             }
         }
 
         #[test]
         fn float_by_f64() {
-            let u = Unit::float(100.0, 1e-6, 1e-9);
+            let u = Unit::float(100.0, 1e-6);
             let result = u / 2.0;
 
             match result {
-                Unit::Float {
-                    value,
-                    user_units: user_unit,
-                    db_units: db_unit,
-                } => {
+                Unit::Float { value, units } => {
                     assert_eq!(value, 50.0);
-                    assert_eq!(user_unit, 1e-6);
-                    assert_eq!(db_unit, 1e-9);
+                    assert_eq!(units, 1e-6);
                 }
                 _ => panic!("Expected Float variant"),
             }
@@ -1833,12 +1342,9 @@ mod tests {
         let result = (u1 + u2) * 2;
 
         match result {
-            Unit::Integer {
-                value,
-                db_units: db_unit,
-            } => {
+            Unit::Integer { value, units } => {
                 assert_eq!(value, 300);
-                assert_eq!(db_unit, 1e-9);
+                assert_eq!(units, 1e-9);
             }
             _ => panic!("Expected Integer variant"),
         }
@@ -1853,16 +1359,16 @@ mod tests {
             #[quickcheck]
             fn integer_to_float_roundtrip(unit: Unit) -> TestResult {
                 match unit {
-                    Unit::Integer { value, db_units } => {
-                        let as_float = unit.to_float_unit(1e-6);
+                    Unit::Integer { value, units } => {
+                        let as_float = unit.to_float_unit(units);
                         let back = as_float.to_integer_unit();
 
                         match back {
                             Unit::Integer {
                                 value: back_value,
-                                db_units: back_db,
+                                units: back_units,
                             } => TestResult::from_bool(
-                                value == back_value && (db_units - back_db).abs() < 1e-10,
+                                value == back_value && (units - back_units).abs() < 1e-10,
                             ),
                             _ => TestResult::failed(),
                         }
@@ -1874,16 +1380,16 @@ mod tests {
             #[quickcheck]
             fn to_float_preserves_real_value(unit: Unit) -> bool {
                 match unit {
-                    Unit::Integer { value, db_units } => {
+                    Unit::Integer { value, units } => {
                         let as_float = unit.to_float_unit(1e-6);
                         if let Unit::Float {
                             value: float_value,
-                            user_units,
+                            units: float_units,
                             ..
                         } = as_float
                         {
-                            let original_real = f64::from(value) * db_units;
-                            let float_real = float_value * user_units;
+                            let original_real = f64::from(value) * units;
+                            let float_real = float_value * float_units;
                             (original_real - float_real).abs() < 1e-10
                         } else {
                             false
@@ -1896,9 +1402,7 @@ mod tests {
             #[quickcheck]
             fn preserves_sign(unit: Unit) -> TestResult {
                 match unit {
-                    Unit::Float {
-                        value, user_units, ..
-                    } => {
+                    Unit::Float { value, units, .. } => {
                         if !value.is_finite() {
                             return TestResult::discard();
                         }
@@ -1906,9 +1410,10 @@ mod tests {
                         let result = unit.to_integer_unit();
                         match result {
                             Unit::Integer {
-                                value: int_value, ..
+                                value: int_value,
+                                units: int_units,
                             } => {
-                                let real_value = value * user_units;
+                                let real_value = value * units;
                                 if int_value == 0 {
                                     return TestResult::from_bool(real_value.abs() < 1.0);
                                 }
@@ -2001,12 +1506,8 @@ mod tests {
             #[quickcheck]
             fn zero_identity(unit: Unit) -> bool {
                 let zero = match unit {
-                    Unit::Integer { db_units, .. } => Unit::integer(0, db_units),
-                    Unit::Float {
-                        user_units,
-                        db_units,
-                        ..
-                    } => Unit::float(0.0, user_units, db_units),
+                    Unit::Integer { units, .. } => Unit::integer(0, units),
+                    Unit::Float { units, .. } => Unit::float(0.0, units),
                 };
 
                 let result = unit + zero;
@@ -2064,15 +1565,6 @@ mod tests {
                     _ => false,
                 }
             }
-
-            #[quickcheck]
-            fn self_is_zero(unit: Unit) -> bool {
-                let result = unit - unit;
-                match result {
-                    Unit::Integer { value, .. } => value == 0,
-                    Unit::Float { value, .. } => value.abs() < 1e-10,
-                }
-            }
         }
 
         mod multiplication {
@@ -2086,29 +1578,23 @@ mod tests {
                     (
                         Unit::Integer {
                             value: v1,
-                            db_units: db1,
+                            units: u1,
                         },
                         Unit::Integer {
                             value: v2,
-                            db_units: db2,
+                            units: u2,
                         },
-                    ) => v1 == v2 && (db1 - db2).abs() < 1e-10,
+                    ) => v1 == v2 && (u1 - u2).abs() < 1e-10,
                     (
                         Unit::Float {
                             value: v1,
-                            user_units: u1,
-                            db_units: db1,
+                            units: u1,
                         },
                         Unit::Float {
                             value: v2,
-                            user_units: u2,
-                            db_units: db2,
+                            units: u2,
                         },
-                    ) => {
-                        (v1 - v2).abs() < 1e-10
-                            && (u1 - u2).abs() < 1e-10
-                            && (db1 - db2).abs() < 1e-10
-                    }
+                    ) => (v1 - v2).abs() < 1e-10 && (u1 - u2).abs() < 1e-10,
                     _ => false,
                 }
             }
@@ -2190,44 +1676,6 @@ mod tests {
 
         mod division {
             use super::*;
-
-            #[quickcheck]
-            fn mul_inverse(unit: Unit, scalar: i32) -> TestResult {
-                if scalar == 0 {
-                    return TestResult::discard();
-                }
-
-                let divided = unit / scalar;
-                let back = divided * scalar;
-
-                match (unit, back) {
-                    (Unit::Integer { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        if !v2.is_finite() {
-                            return TestResult::failed();
-                        }
-                        let diff = (f64::from(v1) - v2).abs();
-                        let rel_error = if v1.abs() > 0 {
-                            diff / f64::from(v1).abs()
-                        } else {
-                            diff
-                        };
-                        TestResult::from_bool(rel_error < 1e-6 || diff < 1e-6)
-                    }
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        if !v1.is_finite() || !v2.is_finite() {
-                            return TestResult::from_bool(v1.is_finite() == v2.is_finite());
-                        }
-                        let diff = (v1 - v2).abs();
-                        let rel_error = if v1.abs() > 1e-10 {
-                            diff / v1.abs()
-                        } else {
-                            diff
-                        };
-                        TestResult::from_bool(rel_error < 1e-6 || diff < 1e-6)
-                    }
-                    _ => TestResult::failed(),
-                }
-            }
         }
     }
 }

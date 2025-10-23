@@ -43,7 +43,7 @@ impl Reference {
                 let mut new_element = element.clone();
 
                 if grid.x_reflection {
-                    new_element = new_element.reflect(0.0, Point::new(1, 0).unwrap());
+                    new_element = new_element.reflect(0.0, Point::integer(1, 0, 1e-9));
                 }
                 new_element = new_element.rotate(grid.angle, Point::default());
                 new_element = new_element.scale(grid.magnification, Point::default());

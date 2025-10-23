@@ -65,6 +65,7 @@ impl From<&str> for Instance {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Point;
 
     #[test]
     fn test_instance_cell() {
@@ -80,7 +81,15 @@ mod tests {
 
     #[test]
     fn test_instance_from_polygon() {
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
         let instance = Instance::from(polygon);
 
         match instance {
