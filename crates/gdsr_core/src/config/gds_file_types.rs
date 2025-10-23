@@ -192,3 +192,108 @@ impl std::fmt::Display for GDSRecordData {
 pub const fn combine_record_and_data_type(record: GDSRecord, data_type: GDSDataType) -> u16 {
     ((record as u16) << 8) | (data_type as u16)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gds_record_try_from_valid() {
+        assert!(matches!(GDSRecord::try_from(0x00), Ok(GDSRecord::Header)));
+        assert!(matches!(GDSRecord::try_from(0x01), Ok(GDSRecord::BgnLib)));
+        assert!(matches!(GDSRecord::try_from(0x02), Ok(GDSRecord::LibName)));
+        assert!(matches!(GDSRecord::try_from(0x03), Ok(GDSRecord::Units)));
+        assert!(matches!(GDSRecord::try_from(0x08), Ok(GDSRecord::Boundary)));
+        assert!(matches!(GDSRecord::try_from(0x09), Ok(GDSRecord::Path)));
+        assert!(matches!(GDSRecord::try_from(0x0A), Ok(GDSRecord::SRef)));
+        assert!(matches!(GDSRecord::try_from(0x0B), Ok(GDSRecord::ARef)));
+        assert!(matches!(GDSRecord::try_from(0x10), Ok(GDSRecord::XY)));
+        assert!(matches!(GDSRecord::try_from(0x1A), Ok(GDSRecord::STrans)));
+        assert!(matches!(GDSRecord::try_from(0x21), Ok(GDSRecord::PathType)));
+        assert!(matches!(
+            GDSRecord::try_from(0x5A),
+            Ok(GDSRecord::RaithMbmsPath)
+        ));
+        assert!(matches!(
+            GDSRecord::try_from(0x62),
+            Ok(GDSRecord::RaithPxxData)
+        ));
+    }
+
+    #[test]
+    fn test_gds_record_try_from_invalid() {
+        assert!(GDSRecord::try_from(0xFF).is_err());
+        assert!(GDSRecord::try_from(0x3C).is_err());
+        assert!(GDSRecord::try_from(0x50).is_err());
+    }
+
+    #[test]
+    fn test_gds_data_type_try_from_valid() {
+        assert!(matches!(GDSDataType::try_from(0), Ok(GDSDataType::NoData)));
+        assert!(matches!(
+            GDSDataType::try_from(1),
+            Ok(GDSDataType::BitArray)
+        ));
+        assert!(matches!(
+            GDSDataType::try_from(2),
+            Ok(GDSDataType::TwoByteSignedInteger)
+        ));
+        assert!(matches!(
+            GDSDataType::try_from(3),
+            Ok(GDSDataType::FourByteSignedInteger)
+        ));
+        assert!(matches!(
+            GDSDataType::try_from(4),
+            Ok(GDSDataType::FourByteReal)
+        ));
+        assert!(matches!(
+            GDSDataType::try_from(5),
+            Ok(GDSDataType::EightByteReal)
+        ));
+        assert!(matches!(
+            GDSDataType::try_from(6),
+            Ok(GDSDataType::AsciiString)
+        ));
+    }
+
+    #[test]
+    fn test_gds_data_type_try_from_invalid() {
+        assert!(GDSDataType::try_from(7).is_err());
+        assert!(GDSDataType::try_from(255).is_err());
+    }
+
+    #[test]
+    fn test_gds_record_data_display() {
+        let i16_data = GDSRecordData::I16(vec![1, 2, 3]);
+        assert_eq!(format!("{i16_data}"), "I16 [1, 2, 3]");
+
+        let i32_data = GDSRecordData::I32(vec![100, 200]);
+        assert_eq!(format!("{i32_data}"), "I32 [100, 200]");
+
+        let f64_data = GDSRecordData::F64(vec![1.5, 2.5]);
+        assert_eq!(format!("{f64_data}"), "F64 [1.5, 2.5]");
+
+        let str_data = GDSRecordData::Str("test".to_string());
+        assert_eq!(format!("{str_data}"), "Str \"test\"");
+
+        let none_data = GDSRecordData::None;
+        assert_eq!(format!("{none_data}"), "None");
+    }
+
+    #[test]
+    fn test_combine_record_and_data_type() {
+        let result = combine_record_and_data_type(GDSRecord::Header, GDSDataType::NoData);
+        assert_eq!(result, 0x0000);
+
+        let result =
+            combine_record_and_data_type(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger);
+        assert_eq!(result, 0x0102);
+
+        let result = combine_record_and_data_type(GDSRecord::Units, GDSDataType::EightByteReal);
+        assert_eq!(result, 0x0305);
+
+        let result =
+            combine_record_and_data_type(GDSRecord::PathType, GDSDataType::TwoByteSignedInteger);
+        assert_eq!(result, 0x2102);
+    }
+}

@@ -4,11 +4,11 @@ mod io;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
-    pub name: String,
-    pub polygons: Vec<Polygon>,
-    pub paths: Vec<Path>,
-    pub texts: Vec<Text>,
-    pub references: Vec<Reference>,
+    name: String,
+    polygons: Vec<Polygon>,
+    paths: Vec<Path>,
+    texts: Vec<Text>,
+    references: Vec<Reference>,
 }
 
 impl Cell {
@@ -28,6 +28,10 @@ impl Cell {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
     #[must_use]
     pub const fn polygons(&self) -> &Vec<Polygon> {
         &self.polygons
@@ -43,22 +47,9 @@ impl Cell {
         &self.texts
     }
 
-    // TODO: Re-add after Reference is updated
-    // #[must_use]
-    // pub const fn references(&self) -> &Vec<Reference> {
-    //     &self.references
-    // }
-
-    pub fn add_polygon(&mut self, polygon: Polygon) {
-        self.polygons.push(polygon);
-    }
-
-    pub fn add_path(&mut self, path: Path) {
-        self.paths.push(path);
-    }
-
-    pub fn add_text(&mut self, text: Text) {
-        self.texts.push(text);
+    #[must_use]
+    pub const fn references(&self) -> &Vec<Reference> {
+        &self.references
     }
 
     pub fn add(&mut self, element: impl Into<Element>) {
@@ -234,7 +225,7 @@ mod tests {
             0,
         );
 
-        cell.add_polygon(polygon.clone());
+        cell.add(polygon.clone());
         assert_eq!(cell.polygons.len(), 1);
         assert_eq!(cell.polygons[0], polygon);
     }
@@ -250,7 +241,7 @@ mod tests {
             Some(2.0),
         );
 
-        cell.add_path(path.clone());
+        cell.add(path.clone());
         assert_eq!(cell.paths.len(), 1);
         assert_eq!(cell.paths[0], path);
     }
@@ -269,7 +260,7 @@ mod tests {
             HorizontalPresentation::default(),
         );
 
-        cell.add_text(text.clone());
+        cell.add(text.clone());
         assert_eq!(cell.texts.len(), 1);
         assert_eq!(cell.texts[0], text);
     }
@@ -287,7 +278,7 @@ mod tests {
             1,
             0,
         );
-        cell.add_polygon(polygon);
+        cell.add(polygon);
 
         let display_str = format!("{cell}");
         assert!(display_str.contains("Cell 'test_cell'"));
@@ -307,7 +298,7 @@ mod tests {
             1,
             0,
         );
-        cell.add_polygon(polygon);
+        cell.add(polygon);
 
         let cloned = cell.clone();
         assert_eq!(cell, cloned);

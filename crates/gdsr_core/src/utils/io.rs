@@ -200,7 +200,7 @@ pub fn write_transformation_to_file(
     Ok(())
 }
 
-#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
+#[allow(clippy::too_many_lines)]
 pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
     let mut library = Library::new("Library");
 
@@ -248,13 +248,13 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                 GDSRecord::StrName => {
                     if let GDSRecordData::Str(cell_name) = data {
                         if let Some(cell) = &mut cell {
-                            cell.name = cell_name;
+                            cell.set_name(&cell_name);
                         }
                     }
                 }
                 GDSRecord::EndStr => {
                     if let Some(cell) = cell.take() {
-                        library.cells.insert(cell.name.clone(), cell);
+                        library.cells.insert(cell.name().to_string(), cell);
                     }
                 }
                 GDSRecord::Boundary | GDSRecord::Box => {
@@ -361,13 +361,13 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                 GDSRecord::EndEl => {
                     if let Some(cell) = &mut cell {
                         if let Some(polygon) = polygon.take() {
-                            cell.polygons.push(polygon);
+                            cell.add(polygon);
                         } else if let Some(path) = path.take() {
-                            cell.paths.push(path);
+                            cell.add(path);
                         } else if let Some(reference) = reference.take() {
-                            cell.references.push(reference);
+                            cell.add(reference);
                         } else if let Some(text) = text.take() {
-                            cell.texts.push(text);
+                            cell.add(text);
                         }
                     }
                     polygon = None;

@@ -13,15 +13,15 @@ license = "MIT"
 
 [workspace.dependencies]
 approx = "0.5"
-quickcheck = "1.0.3"
-quickcheck_macros = "1"
 bytemuck = "1.16.1"
 chrono = "0.4.38"
 gdsr_core = { path = "crates/gdsr_core" }
 geo = "0.28"
+insta = { version = "1.35.1" }
+quickcheck = "1.0.3"
+quickcheck_macros = "1"
 rstest = "0.23.0"
 tempfile = "3.8"
-insta = { version = "1.35.1" }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -41,3 +41,4 @@ float_cmp = "allow"
 cast_possible_wrap = "allow"
 similar_names = "allow"
 missing_panics_doc = "allow"
+cognitive_complexity = "allow"

@@ -8,9 +8,7 @@ pub struct Translation {
 impl Translation {
     #[must_use]
     pub const fn new(delta: Point) -> Self {
-        Self {
-            delta,
-        }
+        Self { delta }
     }
 
     #[must_use]

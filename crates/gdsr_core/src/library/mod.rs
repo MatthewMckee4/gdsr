@@ -21,12 +21,12 @@ impl Library {
     }
 
     pub fn add(&mut self, cell: Cell) {
-        self.cells.insert(cell.name.clone(), cell);
+        self.cells.insert(cell.name().to_string(), cell);
     }
 
     pub fn remove(&mut self, cells: Vec<Cell>) {
         for cell in cells {
-            self.cells.remove(&cell.name);
+            self.cells.remove(cell.name());
         }
     }
 
@@ -37,7 +37,7 @@ impl Library {
 
     #[must_use]
     pub fn contains(&self, cell: &Cell) -> bool {
-        self.cells.contains_key(&cell.name)
+        self.cells.contains_key(cell.name())
     }
 
     pub fn to_gds(&self, file_name: &str, user_units: f64, database_units: f64) -> io::Result<()> {

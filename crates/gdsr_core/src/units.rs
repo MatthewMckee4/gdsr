@@ -746,7 +746,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn set_unitss_integer() {
+        fn set_units_integer() {
             let mut unit = Unit::integer(100, 1e-9);
             unit.set_units(1e-6);
 
@@ -760,7 +760,7 @@ mod tests {
         }
 
         #[test]
-        fn set_unitss_float() {
+        fn set_units_float() {
             let mut unit = Unit::float(1.5, 1e-6);
             unit.set_units(1e-12);
 
@@ -979,7 +979,7 @@ mod tests {
         }
 
         #[test]
-        fn different_unitss() {
+        fn different_units() {
             let u1 = Unit::integer(100, 1e-9);
             let u2 = Unit::integer(50, 1e-6);
             let result = u1 + u2;
