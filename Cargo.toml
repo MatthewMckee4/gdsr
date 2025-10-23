@@ -21,6 +21,7 @@ gdsr_core = { path = "crates/gdsr_core" }
 geo = "0.28"
 rstest = "0.23.0"
 tempfile = "3.8"
+insta = { version = "1.35.1" }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

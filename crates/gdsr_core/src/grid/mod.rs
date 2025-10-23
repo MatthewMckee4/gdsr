@@ -14,22 +14,23 @@ pub struct Grid {
 
 impl Grid {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        origin: impl Into<Point>,
+    #[must_use]
+    pub const fn new(
+        origin: Point,
         columns: u32,
         rows: u32,
-        spacing_x: impl Into<Point>,
-        spacing_y: impl Into<Point>,
+        spacing_x: Point,
+        spacing_y: Point,
         magnification: f64,
         angle: f64,
         x_reflection: bool,
     ) -> Self {
         Self {
-            origin: origin.into(),
+            origin,
             columns,
             rows,
-            spacing_x: spacing_x.into(),
-            spacing_y: spacing_y.into(),
+            spacing_x,
+            spacing_y,
             magnification,
             angle,
             x_reflection,
@@ -39,7 +40,16 @@ impl Grid {
 
 impl Default for Grid {
     fn default() -> Self {
-        Self::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false)
+        Self::new(
+            Point::integer(0, 0, 1e-9),
+            1,
+            1,
+            Point::integer(0, 0, 1e-9),
+            Point::integer(0, 0, 1e-9),
+            1.0,
+            0.0,
+            false,
+        )
     }
 }
 
@@ -47,7 +57,7 @@ impl std::fmt::Display for Grid {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Grid at {:?} with {} columns and {} rows, spacing ({:?}, {:?}), magnification {:?}, angle {:?}, x_reflection {}",
+            "Grid at {} with {} columns and {} rows, spacing ({}, {}), magnification {:?}, angle {:?}, x_reflection {}",
             self.origin,
             self.columns,
             self.rows,
@@ -97,11 +107,22 @@ impl Movable for Grid {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use super::*;
 
     #[test]
     fn test_grid_new() {
-        let grid = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            3,
+            4,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.5,
+            45.0,
+            true,
+        );
 
         assert_eq!(grid.origin, Point::integer(10, 20, 1e-9));
         assert_eq!(grid.columns, 3);
@@ -128,20 +149,32 @@ mod tests {
 
     #[test]
     fn test_grid_display() {
-        let grid = Grid::new((10, 20), 2, 3, (5, 0), (0, 5), 1.0, 0.0, false);
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            3,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
 
-        let display_str = format!("{grid}");
-        assert!(display_str.contains("Grid at"));
-        assert!(display_str.contains("2 columns"));
-        assert!(display_str.contains("3 rows"));
-        assert!(display_str.contains("magnification 1"));
-        assert!(display_str.contains("angle 0"));
-        assert!(display_str.contains("x_reflection false"));
+        assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (Point(5 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 5 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
 
     #[test]
     fn test_grid_clone() {
-        let grid = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            3,
+            4,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.5,
+            45.0,
+            true,
+        );
 
         let cloned = grid.clone();
         assert_eq!(grid, cloned);
@@ -149,9 +182,36 @@ mod tests {
 
     #[test]
     fn test_grid_partial_eq() {
-        let grid1 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
-        let grid2 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, true);
-        let grid3 = Grid::new((10, 20), 3, 4, (5, 0), (0, 5), 1.5, 45.0, false);
+        let grid1 = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            3,
+            4,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.5,
+            45.0,
+            true,
+        );
+        let grid2 = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            3,
+            4,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.5,
+            45.0,
+            true,
+        );
+        let grid3 = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            3,
+            4,
+            Point::integer(5, 0, 1e-9),
+            Point::integer(0, 5, 1e-9),
+            1.5,
+            45.0,
+            false,
+        );
 
         assert_eq!(grid1, grid2);
         assert_ne!(grid1, grid3);

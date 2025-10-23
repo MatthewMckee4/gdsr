@@ -8,10 +8,10 @@ pub struct Scale {
 
 impl Scale {
     #[must_use]
-    pub fn new(factor: f64, centre: impl Into<Point>) -> Self {
+    pub const fn new(factor: f64, centre: Point) -> Self {
         Self {
             factor,
-            centre: centre.into(),
+            centre,
         }
     }
 
@@ -36,6 +36,6 @@ impl Scale {
         let new_x = (dx * self.factor) + self_center_x;
         let new_y = (dy * self.factor) + self_center_y;
 
-        (new_x, new_y).into()
+        Point::new(new_x, new_y)
     }
 }

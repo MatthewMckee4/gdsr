@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_reflection() {
-        let reflection = Reflection::new(0.0, (0, 0));
+        let reflection = Reflection::new(0.0, Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_reflection(Some(reflection.clone()));
 
@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_rotation() {
-        let rotation = Rotation::new(45.0, (0, 0));
+        let rotation = Rotation::new(45.0, Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_rotation(Some(rotation.clone()));
 
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_scale() {
-        let scale = Scale::new(2.0, (0, 0));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale.clone()));
 
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_translation() {
-        let translation = Translation::new((10, 20));
+        let translation = Translation::new(Point::integer(10, 20, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation.clone()));
 
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_apply_to_point_translation() {
-        let translation = Translation::new((5, 5));
+        let translation = Translation::new(Point::integer(5, 5, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation));
 
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_apply_to_point_scale() {
-        let scale = Scale::new(2.0, (0, 0));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale));
 
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_from_reflection() {
-        let reflection = Reflection::new(0.0, (0, 0));
+        let reflection = Reflection::new(0.0, Point::integer(0, 0, 1e-9));
         let transformation: Transformation = reflection.clone().into();
 
         assert!(transformation.reflection.is_some());
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_from_rotation() {
-        let rotation = Rotation::new(45.0, (0, 0));
+        let rotation = Rotation::new(45.0, Point::integer(0, 0, 1e-9));
         let transformation: Transformation = rotation.clone().into();
 
         assert!(transformation.rotation.is_some());
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_from_scale() {
-        let scale = Scale::new(2.0, (0, 0));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
         let transformation: Transformation = scale.clone().into();
 
         assert!(transformation.scale.is_some());
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_from_translation() {
-        let translation = Translation::new((10, 20));
+        let translation = Translation::new(Point::integer(10, 20, 1e-9));
         let transformation: Transformation = translation.clone().into();
 
         assert!(transformation.translation.is_some());
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_clone() {
-        let translation = Translation::new((10, 20));
+        let translation = Translation::new(Point::integer(10, 20, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation));
 

@@ -1,4 +1,4 @@
-use crate::{AngleInDegrees, Point, Unit};
+use crate::{AngleInDegrees, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reflection {
@@ -8,19 +8,13 @@ pub struct Reflection {
 
 impl Reflection {
     #[must_use]
-    pub fn new(angle: AngleInDegrees, centre: impl Into<Point>) -> Self {
-        Self {
-            angle,
-            centre: centre.into(),
-        }
+    pub const fn new(angle: AngleInDegrees, centre: Point) -> Self {
+        Self { angle, centre }
     }
 
     #[must_use]
-    pub fn new_horizontal() -> Self {
-        Self::new(
-            0.0,
-            Point::new(Unit::default_integer(0), Unit::default_integer(0)),
-        )
+    pub const fn new_horizontal() -> Self {
+        Self::new(0.0, Point::integer(0, 1, 1e-9))
     }
 
     pub fn from_line(_point1: &Point, _point2: &Point) {
@@ -41,6 +35,6 @@ impl Reflection {
         let new_x = (dx * cos_2angle) + (dy * sin_2angle) + self_center_x;
         let new_y = (dx * sin_2angle) - (dy * cos_2angle) + self_center_y;
 
-        (new_x, new_y).into()
+        Point::new(new_x, new_y)
     }
 }

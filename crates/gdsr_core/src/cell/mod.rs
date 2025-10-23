@@ -223,7 +223,16 @@ mod tests {
     #[test]
     fn test_add_polygon() {
         let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+                Point::integer(0, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
 
         cell.add_polygon(polygon.clone());
         assert_eq!(cell.polygons.len(), 1);
@@ -268,7 +277,16 @@ mod tests {
     #[test]
     fn test_cell_display() {
         let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+                Point::integer(0, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
         cell.add_polygon(polygon);
 
         let display_str = format!("{cell}");
@@ -279,7 +297,16 @@ mod tests {
     #[test]
     fn test_cell_clone() {
         let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10), (0, 10)], 1, 0);
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+                Point::integer(0, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
         cell.add_polygon(polygon);
 
         let cloned = cell.clone();

@@ -8,11 +8,8 @@ pub struct Rotation {
 
 impl Rotation {
     #[must_use]
-    pub fn new(angle: AngleInDegrees, centre: impl Into<Point>) -> Self {
-        Self {
-            angle,
-            centre: centre.into(),
-        }
+    pub const fn new(angle: AngleInDegrees, centre: Point) -> Self {
+        Self { angle, centre }
     }
 
     #[must_use]
@@ -39,6 +36,6 @@ impl Rotation {
         let new_x = (dy * -sin_angle) + (dx * cos_angle) + self_center_x;
         let new_y = (dy * cos_angle) + (dx * sin_angle) + self_center_y;
 
-        (new_x, new_y).into()
+        Point::new(new_x, new_y)
     }
 }

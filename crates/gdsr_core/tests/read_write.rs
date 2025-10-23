@@ -7,16 +7,18 @@ fn test_library_roundtrip_mixed_elements() {
     let temp_dir = tempdir().unwrap();
     let gds_path = temp_dir.path().join("main_mixed.gds");
 
+    let units = 1e-9;
+
     let mut library = Library::new("mixed_elements");
 
     let mut cell = Cell::new("mixed_cell");
 
     let polygon = Polygon::new(
         [
-            Point::integer(0, 0, 1e-9),
-            Point::integer(10, 0, 1e-9),
-            Point::integer(10, 10, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
         ],
         1,
         0,
@@ -25,7 +27,7 @@ fn test_library_roundtrip_mixed_elements() {
 
     let text = Text::new(
         "Test Label".to_string(),
-        Point::integer(5, 5, 1e-9),
+        Point::integer(5, 5, units),
         1,
         1.0,
         0.0,
@@ -37,9 +39,9 @@ fn test_library_roundtrip_mixed_elements() {
 
     let path = Path::new(
         vec![
-            Point::integer(0, 0, 1e-9),
-            Point::integer(5, 5, 1e-9),
-            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 0, units),
+            Point::integer(5, 5, units),
+            Point::integer(10, 0, units),
         ],
         1,
         0,
@@ -50,17 +52,26 @@ fn test_library_roundtrip_mixed_elements() {
 
     let ref_polygon = Polygon::new(
         [
-            Point::integer(15, 15, 1e-9),
-            Point::integer(20, 15, 1e-9),
-            Point::integer(20, 20, 1e-9),
-            Point::integer(15, 20, 1e-9),
+            Point::integer(15, 15, units),
+            Point::integer(20, 15, units),
+            Point::integer(20, 20, units),
+            Point::integer(15, 20, units),
         ],
         2,
         0,
     );
     let reference = Reference::new(
         ref_polygon,
-        Grid::new((0, 25), 2, 2, (25, 0), (0, 25), 1.0, 0.0, false),
+        Grid::new(
+            Point::integer(0, 25, units),
+            2,
+            2,
+            Point::integer(25, 0, units),
+            Point::integer(0, 25, units),
+            1.0,
+            0.0,
+            false,
+        ),
     );
 
     let elements = reference.flatten(None, &library);
@@ -73,7 +84,8 @@ fn test_library_roundtrip_mixed_elements() {
 
     let _res = library.to_gds(gds_path.to_str().unwrap(), 1e-9, 1e-9);
 
-    let new_library: Library = Library::from_gds(gds_path.to_str().unwrap()).unwrap();
+    let new_library: Library =
+        Library::from_gds(gds_path.to_str().unwrap(), Some(DEFAULT_INTEGER_UNITS)).unwrap();
 
     assert_eq!(library, new_library, "{library:#?}\n{new_library:#?}");
 }
@@ -164,7 +176,8 @@ fn test_library_roundtrip_different_precision(
 
     let _res = library.to_gds(gds_path.to_str().unwrap(), user_units, database_units);
 
-    let new_library: Library = Library::from_gds(gds_path.to_str().unwrap()).unwrap();
+    let new_library: Library =
+        Library::from_gds(gds_path.to_str().unwrap(), Some(DEFAULT_INTEGER_UNITS)).unwrap();
 
     assert_eq!(library, new_library, "{library:#?}\n{new_library:#?}");
 }
@@ -178,7 +191,8 @@ fn test_empty_library_roundtrip() {
 
     let _res = library.to_gds(gds_path.to_str().unwrap(), 1e-9, 1e-10);
 
-    let new_library: Library = Library::from_gds(gds_path.to_str().unwrap()).unwrap();
+    let new_library: Library =
+        Library::from_gds(gds_path.to_str().unwrap(), Some(DEFAULT_INTEGER_UNITS)).unwrap();
 
     assert_eq!(library, new_library);
 }

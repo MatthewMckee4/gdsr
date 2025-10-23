@@ -106,7 +106,15 @@ mod tests {
 
     #[test]
     fn test_element_from_polygon() {
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
         let element: Element = polygon.clone().into();
 
         match element {
@@ -117,7 +125,15 @@ mod tests {
 
     #[test]
     fn test_element_display() {
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
         let element: Element = polygon.into();
 
         let display_str = format!("{element}");

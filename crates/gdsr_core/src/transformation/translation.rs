@@ -7,14 +7,14 @@ pub struct Translation {
 
 impl Translation {
     #[must_use]
-    pub fn new(delta: impl Into<Point>) -> Self {
+    pub const fn new(delta: Point) -> Self {
         Self {
-            delta: delta.into(),
+            delta,
         }
     }
 
     #[must_use]
     pub fn apply_to_point(&self, point: &Point) -> Point {
-        Point::new(point.x() + self.delta.x(), point.y() + self.delta.y())
+        point + self.delta
     }
 }

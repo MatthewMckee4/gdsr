@@ -103,11 +103,10 @@ impl Movable for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Unit;
 
     #[test]
     fn test_path_creation() {
-        let points = vec![Point::from([0, 0]), Point::from([100, 100])];
+        let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
         let path = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(10.0));
 
         assert_eq!(path.points(), &points);
@@ -130,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_path_display() {
-        let points = vec![Point::from([0, 0]), Point::from([100, 100])];
+        let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
         let path = Path::new(points, 5, 10, Some(PathType::Square), Some(20.0));
 
         let display_str = format!("{path}");
@@ -143,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_path_clone_and_partial_eq() {
-        let points = vec![Point::from([0, 0]), Point::from([10, 10])];
+        let points = vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)];
         let path1 = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(5.0));
         let path2 = path1.clone();
 
@@ -155,10 +154,7 @@ mod tests {
 
     #[test]
     fn test_path_with_different_unit_points() {
-        let points = vec![
-            Point::new(Unit::integer(0, 1e-9), Unit::integer(0, 1e-9)),
-            Point::new(Unit::float(100.0, 1e-6), Unit::float(100.0, 1e-6)),
-        ];
+        let points = vec![Point::integer(0, 0, 1e-9), Point::float(100.0, 100.0, 1e-6)];
         let path = Path::new(points, 0, 0, None, None);
         assert_eq!(path.points().len(), 2);
     }

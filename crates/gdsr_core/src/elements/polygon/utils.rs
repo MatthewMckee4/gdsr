@@ -8,10 +8,8 @@ fn are_points_closed(points: &[Point]) -> bool {
     points_vec.first() == points_vec.last()
 }
 
-pub fn close_points(
-    points: impl IntoIterator<Item = impl Into<Point>>,
-) -> Vec<Point> {
-    let mut points_vec = points.into_iter().map(Into::into).collect::<Vec<_>>();
+pub fn close_points(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
+    let mut points_vec = points.into_iter().collect::<Vec<_>>();
     if !are_points_closed(&points_vec) {
         if let Some(first) = points_vec.first().copied() {
             points_vec.push(first);
@@ -20,9 +18,7 @@ pub fn close_points(
     points_vec
 }
 
-pub fn get_correct_polygon_points_format(
-    points: impl IntoIterator<Item = impl Into<Point>>,
-) -> Vec<Point> {
+pub fn get_correct_polygon_points_format(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
     close_points(points)
 }
 
@@ -33,29 +29,27 @@ mod tests {
     #[test]
     fn test_close_points_not_closed() {
         let points = vec![
-            Point::from([0, 0]),
-            Point::from([5, 0]),
-            Point::from([5, 5]),
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
         ];
         let closed = close_points(points.clone());
 
-        // Should add closing point
         assert_eq!(closed.len(), 4);
         assert_eq!(closed[0], points[0]);
-        assert_eq!(closed[closed.len() - 1], points[0]); // Last point should match first
+        assert_eq!(closed[closed.len() - 1], points[0]);
     }
 
     #[test]
     fn test_close_points_already_closed() {
         let points = vec![
-            Point::from([0, 0]),
-            Point::from([5, 0]),
-            Point::from([5, 5]),
-            Point::from([0, 0]), // Already closed
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
+            Point::integer(0, 0, 1e-9),
         ];
         let closed = close_points(points.clone());
 
-        // Should return same points since already closed
         assert_eq!(closed.len(), points.len());
     }
 
@@ -64,7 +58,6 @@ mod tests {
         let points: Vec<Point> = vec![];
         let closed = close_points(points);
 
-        // Empty should remain empty
         assert_eq!(closed.len(), 0);
     }
 }

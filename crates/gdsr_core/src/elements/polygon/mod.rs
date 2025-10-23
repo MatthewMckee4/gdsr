@@ -12,11 +12,7 @@ pub struct Polygon {
 
 impl Polygon {
     #[must_use]
-    pub fn new(
-        points: impl IntoIterator<Item = impl Into<Point>>,
-        layer: Layer,
-        data_type: DataType,
-    ) -> Self {
+    pub fn new(points: impl IntoIterator<Item = Point>, layer: Layer, data_type: DataType) -> Self {
         Self {
             points: utils::get_correct_polygon_points_format(points),
             layer,
@@ -96,9 +92,9 @@ mod tests {
     #[test]
     fn test_polygon_creation() {
         let points = vec![
-            Point::from([0, 0]),
-            Point::from([10, 0]),
-            Point::from([10, 10]),
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
         ];
         let polygon = Polygon::new(points, 1, 0);
 
@@ -119,9 +115,9 @@ mod tests {
     #[test]
     fn test_polygon_display() {
         let points = vec![
-            Point::from([0, 0]),
-            Point::from([5, 0]),
-            Point::from([5, 5]),
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
         ];
         let polygon = Polygon::new(points, 2, 1);
 
@@ -134,9 +130,9 @@ mod tests {
     #[test]
     fn test_polygon_clone_and_eq() {
         let points = vec![
-            Point::from([0, 0]),
-            Point::from([10, 0]),
-            Point::from([10, 10]),
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
         ];
         let polygon1 = Polygon::new(points, 1, 0);
         let polygon2 = polygon1.clone();

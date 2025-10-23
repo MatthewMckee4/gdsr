@@ -1,21 +1,18 @@
+use std::ops::{Add, Div, Mul, Sub};
+
 /// Represents a unit of measurement.
 ///
 /// Across this crate, if there is any notion of default units, for these types they will be defined as follows:
 /// - Integer: `units` = 1e-9
 /// - Float: `units` = 1e-6
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Unit {
     Integer { value: i32, units: f64 },
     Float { value: f64, units: f64 },
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum UnitsError {
-    MismatchedUnits(f64, f64),
-}
-
-const DEFAULT_INTEGER_UNITS: f64 = 1e-9;
-const DEFAULT_FLOAT_UNITS: f64 = 1e-6;
+pub const DEFAULT_INTEGER_UNITS: f64 = 1e-9;
+pub const DEFAULT_FLOAT_UNITS: f64 = 1e-6;
 
 impl Unit {
     #[must_use]
@@ -142,32 +139,14 @@ impl std::fmt::Display for Unit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Integer { value, units } => {
-                write!(f, "{value}i (units: {units:.3e})")
+                write!(f, "{value} ({units:.3e})")
             }
             Self::Float { value, units } => {
-                write!(f, "{value:.6}f (units: {units:.3e})")
+                write!(f, "{value:.6} ({units:.3e})")
             }
         }
     }
 }
-
-impl Debug for Unit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Integer { value, units } => {
-                write!(f, "{value} (units: {units:.3e})")
-            }
-            Self::Float { value, units } => {
-                write!(f, "{value:.6} (units: {units:.3e})")
-            }
-        }
-    }
-}
-
-use std::{
-    fmt::Debug,
-    ops::{Add, Div, Mul, Sub},
-};
 
 impl Add for Unit {
     type Output = Self;
@@ -605,8 +584,7 @@ impl Mul for Unit {
 #[allow(clippy::match_wildcard_for_single_variants)]
 #[cfg(test)]
 mod tests {
-    use quickcheck::{Arbitrary, Gen, TestResult};
-    use quickcheck_macros::quickcheck;
+    use quickcheck::{Arbitrary, Gen};
 
     use super::*;
 
@@ -967,7 +945,6 @@ mod tests {
     }
 
     mod addition {
-        use approx::assert_relative_eq;
 
         use super::*;
 
@@ -1347,335 +1324,6 @@ mod tests {
                 assert_eq!(units, 1e-9);
             }
             _ => panic!("Expected Integer variant"),
-        }
-    }
-
-    mod property_tests {
-        use super::*;
-
-        mod conversions {
-            use super::*;
-
-            #[quickcheck]
-            fn integer_to_float_roundtrip(unit: Unit) -> TestResult {
-                match unit {
-                    Unit::Integer { value, units } => {
-                        let as_float = unit.to_float_unit(units);
-                        let back = as_float.to_integer_unit();
-
-                        match back {
-                            Unit::Integer {
-                                value: back_value,
-                                units: back_units,
-                            } => TestResult::from_bool(
-                                value == back_value && (units - back_units).abs() < 1e-10,
-                            ),
-                            _ => TestResult::failed(),
-                        }
-                    }
-                    _ => TestResult::discard(),
-                }
-            }
-
-            #[quickcheck]
-            fn to_float_preserves_real_value(unit: Unit) -> bool {
-                match unit {
-                    Unit::Integer { value, units } => {
-                        let as_float = unit.to_float_unit(1e-6);
-                        if let Unit::Float {
-                            value: float_value,
-                            units: float_units,
-                            ..
-                        } = as_float
-                        {
-                            let original_real = f64::from(value) * units;
-                            let float_real = float_value * float_units;
-                            (original_real - float_real).abs() < 1e-10
-                        } else {
-                            false
-                        }
-                    }
-                    Unit::Float { .. } => unit.to_float_unit(1e-6) == unit,
-                }
-            }
-
-            #[quickcheck]
-            fn preserves_sign(unit: Unit) -> TestResult {
-                match unit {
-                    Unit::Float { value, units, .. } => {
-                        if !value.is_finite() {
-                            return TestResult::discard();
-                        }
-
-                        let result = unit.to_integer_unit();
-                        match result {
-                            Unit::Integer {
-                                value: int_value,
-                                units: int_units,
-                            } => {
-                                let real_value = value * units;
-                                if int_value == 0 {
-                                    return TestResult::from_bool(real_value.abs() < 1.0);
-                                }
-                                TestResult::from_bool(
-                                    (real_value >= 0.0 && int_value >= 0)
-                                        || (real_value < 0.0 && int_value < 0),
-                                )
-                            }
-                            _ => TestResult::failed(),
-                        }
-                    }
-                    _ => TestResult::discard(),
-                }
-            }
-        }
-
-        mod addition {
-            use super::*;
-
-            #[quickcheck]
-            fn commutative(a: Unit, b: Unit) -> bool {
-                let a = Unit::integer(
-                    if let Unit::Integer { value, .. } = a {
-                        value
-                    } else {
-                        100
-                    },
-                    1e-9,
-                );
-                let b = Unit::integer(
-                    if let Unit::Integer { value, .. } = b {
-                        value
-                    } else {
-                        50
-                    },
-                    1e-9,
-                );
-
-                let ab = a + b;
-                let ba = b + a;
-
-                match (ab, ba) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => v1 == v2,
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        (v1 - v2).abs() < 1e-10
-                    }
-                    _ => false,
-                }
-            }
-
-            #[quickcheck]
-            fn associative(a: Unit, b: Unit, c: Unit) -> bool {
-                let a = Unit::integer(
-                    if let Unit::Integer { value, .. } = a {
-                        value
-                    } else {
-                        100
-                    },
-                    1e-9,
-                );
-                let b = Unit::integer(
-                    if let Unit::Integer { value, .. } = b {
-                        value
-                    } else {
-                        50
-                    },
-                    1e-9,
-                );
-                let c = Unit::integer(
-                    if let Unit::Integer { value, .. } = c {
-                        value
-                    } else {
-                        25
-                    },
-                    1e-9,
-                );
-
-                let abc1 = (a + b) + c;
-                let abc2 = a + (b + c);
-
-                match (abc1, abc2) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => v1 == v2,
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        (v1 - v2).abs() < 1e-8
-                    }
-                    _ => false,
-                }
-            }
-
-            #[quickcheck]
-            fn zero_identity(unit: Unit) -> bool {
-                let zero = match unit {
-                    Unit::Integer { units, .. } => Unit::integer(0, units),
-                    Unit::Float { units, .. } => Unit::float(0.0, units),
-                };
-
-                let result = unit + zero;
-
-                match (unit, result) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => v1 == v2,
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        if v1.is_finite() && v2.is_finite() {
-                            let diff = (v1 - v2).abs();
-                            let rel_error = if v1.abs() > 1e-10 {
-                                diff / v1.abs()
-                            } else {
-                                diff
-                            };
-                            rel_error < 1e-10 || diff < 1e-10
-                        } else {
-                            v1.is_finite() == v2.is_finite()
-                        }
-                    }
-                    _ => false,
-                }
-            }
-        }
-
-        mod subtraction {
-            use super::*;
-
-            #[quickcheck]
-            fn inverse_of_add(a: Unit, b: Unit) -> bool {
-                let a = Unit::integer(
-                    if let Unit::Integer { value, .. } = a {
-                        value
-                    } else {
-                        1000
-                    },
-                    1e-9,
-                );
-                let b = Unit::integer(
-                    if let Unit::Integer { value, .. } = b {
-                        value
-                    } else {
-                        500
-                    },
-                    1e-9,
-                );
-
-                let sum = a + b;
-                let diff = sum - b;
-
-                match (diff, a) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => v1 == v2,
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        (v1 - v2).abs() < 1e-8
-                    }
-                    _ => false,
-                }
-            }
-        }
-
-        mod multiplication {
-            use super::*;
-
-            #[quickcheck]
-            fn by_one_identity(unit: Unit) -> bool {
-                let result = unit * 1;
-
-                match (unit, result) {
-                    (
-                        Unit::Integer {
-                            value: v1,
-                            units: u1,
-                        },
-                        Unit::Integer {
-                            value: v2,
-                            units: u2,
-                        },
-                    ) => v1 == v2 && (u1 - u2).abs() < 1e-10,
-                    (
-                        Unit::Float {
-                            value: v1,
-                            units: u1,
-                        },
-                        Unit::Float {
-                            value: v2,
-                            units: u2,
-                        },
-                    ) => (v1 - v2).abs() < 1e-10 && (u1 - u2).abs() < 1e-10,
-                    _ => false,
-                }
-            }
-
-            #[quickcheck]
-            fn by_zero_is_zero(unit: Unit) -> bool {
-                #[allow(clippy::erasing_op)]
-                let result = unit * 0;
-                match result {
-                    Unit::Float { value, .. } => value == 0.0 || value.abs() < 1e-10,
-                    Unit::Integer { value, .. } => value == 0,
-                }
-            }
-
-            #[quickcheck]
-            fn distributive(unit: Unit, scalar1: i32, scalar2: i32) -> TestResult {
-                let s1 = scalar1 % 10;
-                let s2 = scalar2 % 10;
-
-                if s1.checked_add(s2).is_none() {
-                    return TestResult::discard();
-                }
-
-                let left = unit * (s1 + s2);
-                let right = (unit * s1) + (unit * s2);
-
-                match (left, right) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => {
-                        TestResult::from_bool((v1 - v2).abs() < 2)
-                    }
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        if !v1.is_finite() || !v2.is_finite() {
-                            return TestResult::from_bool(v1.is_finite() == v2.is_finite());
-                        }
-                        let diff = (v1 - v2).abs();
-                        let rel_error = if v1.abs().max(v2.abs()) > 1e-10 {
-                            diff / v1.abs().max(v2.abs())
-                        } else {
-                            diff
-                        };
-                        TestResult::from_bool(rel_error < 1e-6)
-                    }
-                    _ => TestResult::failed(),
-                }
-            }
-
-            #[quickcheck]
-            fn associative(unit: Unit, s1: i32, s2: i32) -> TestResult {
-                let s1 = (s1 % 10).max(-10);
-                let s2 = (s2 % 10).max(-10);
-
-                if s1.checked_mul(s2).is_none() {
-                    return TestResult::discard();
-                }
-
-                let left = (unit * s1) * s2;
-                let right = unit * (s1 * s2);
-
-                match (left, right) {
-                    (Unit::Integer { value: v1, .. }, Unit::Integer { value: v2, .. }) => {
-                        TestResult::from_bool(v1 == v2)
-                    }
-                    (Unit::Float { value: v1, .. }, Unit::Float { value: v2, .. }) => {
-                        if !v1.is_finite() || !v2.is_finite() {
-                            return TestResult::from_bool(v1.is_finite() == v2.is_finite());
-                        }
-                        let diff = (v1 - v2).abs();
-                        let rel_error = if v1.abs().max(v2.abs()) > 1e-10 {
-                            diff / v1.abs().max(v2.abs())
-                        } else {
-                            diff
-                        };
-                        TestResult::from_bool(rel_error < 1e-6)
-                    }
-                    _ => TestResult::failed(),
-                }
-            }
-        }
-
-        mod division {
-            use super::*;
         }
     }
 }

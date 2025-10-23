@@ -21,4 +21,4 @@ pub use point::Point;
 pub use traits::{Dimensions, Movable, ToGds, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub(crate) use types::{AngleInDegrees, DataType, Layer};
-pub use units::Unit;
+pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Unit};

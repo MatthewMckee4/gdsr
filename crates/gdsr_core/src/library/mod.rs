@@ -50,8 +50,8 @@ impl Library {
         )
     }
 
-    pub fn from_gds(file_name: &str) -> io::Result<Self> {
-        from_gds(file_name.to_string())
+    pub fn from_gds(file_name: &str, units: Option<f64>) -> io::Result<Self> {
+        from_gds(file_name.to_string(), units)
     }
 }
 

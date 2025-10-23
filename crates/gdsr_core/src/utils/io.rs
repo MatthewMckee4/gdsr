@@ -8,7 +8,7 @@ use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 
 use crate::{
-    DataType, Instance, Layer, Point, ToGds, Unit,
+    DataType, Instance, Layer, Point, ToGds,
     cell::Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
     elements::{
@@ -201,7 +201,7 @@ pub fn write_transformation_to_file(
 }
 
 #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
-pub fn from_gds(file_name: String) -> io::Result<Library> {
+pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
     let mut library = Library::new("Library");
 
     let file = File::open(file_name)?;
@@ -214,7 +214,7 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
     let mut reference: Option<Reference> = None;
 
     let mut scale = 1.0;
-    let mut db_units = 1.0;
+    let mut db_units = units.unwrap_or(1.0);
 
     for record in reader {
         match record {
@@ -225,9 +225,9 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                     }
                 }
                 GDSRecord::Units => {
-                    if let GDSRecordData::F64(units) = data {
-                        let user_units_from_file = units[0];
-                        let db_units_from_file = units[1];
+                    if let GDSRecordData::F64(units_vec) = data {
+                        let user_units_from_file = units_vec[0];
+                        let db_units_from_file = units_vec[1];
                         println!("User units from file: {user_units_from_file}");
                         println!("DB units from file__: {db_units_from_file}");
                         // if (unit > 0) {
@@ -235,7 +235,9 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                         //     library.unit = unit;
                         // } else {
                         scale = db_units_from_file / user_units_from_file;
-                        db_units = db_units_from_file; // user_units_from_file;
+                        if units.is_none() {
+                            db_units = db_units_from_file; // user_units_from_file;
+                        }
                         // }
                         // user_units = db_units;
                     }
@@ -302,9 +304,10 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                         let points = get_points_from_i32_vec(&xy, db_units)
                             .iter()
                             .map(|p| {
-                                Point::new(
-                                    Unit::integer((p.x().as_float() * scale) as i32, db_units),
-                                    Unit::integer((p.y().as_float() * scale) as i32, db_units),
+                                Point::integer(
+                                    (p.x().as_float() * scale).round() as i32,
+                                    (p.y().as_float() * scale).round() as i32,
+                                    db_units,
                                 )
                             })
                             .collect::<Vec<Point>>();
@@ -343,10 +346,7 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                                         (rotated_points[2] - rotated_points[0])
                                             / reference.grid.rows
                                     } else {
-                                        Point::new(
-                                            Unit::integer(0, db_units),
-                                            Unit::integer(0, db_units),
-                                        )
+                                        Point::integer(0, 0, db_units)
                                     };
                                 }
                                 _ => {}
@@ -607,11 +607,6 @@ fn eight_byte_real_to_float(bytes: u64) -> f64 {
 
 pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
     vec.chunks(2)
-        .map(|chunk| {
-            Point::new(
-                Unit::integer(chunk[0], db_units),
-                Unit::integer(chunk[1], db_units),
-            )
-        })
+        .map(|chunk| Point::integer(chunk[0], chunk[1], db_units))
         .collect()
 }

@@ -176,8 +176,25 @@ mod tests {
 
     #[test]
     fn test_reference_new() {
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
-        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
         let reference = Reference::new(polygon, grid);
 
         assert_eq!(reference.grid().columns, 2);
@@ -193,7 +210,16 @@ mod tests {
 
     #[test]
     fn test_reference_from_cell_name() {
-        let grid = Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false);
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            1,
+            1,
+            Point::integer(0, 0, 1e-9),
+            Point::integer(0, 0, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
         let reference = Reference::new("test_cell", grid);
 
         match reference.instance() {
@@ -204,7 +230,16 @@ mod tests {
 
     #[test]
     fn test_reference_display() {
-        let grid = Grid::new((0, 0), 1, 1, (0, 0), (0, 0), 1.0, 0.0, false);
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            1,
+            1,
+            Point::integer(0, 0, 1e-9),
+            Point::integer(0, 0, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
         let reference = Reference::new("test_cell", grid);
 
         let display_str = format!("{reference}");
@@ -214,8 +249,25 @@ mod tests {
 
     #[test]
     fn test_reference_clone() {
-        let polygon = Polygon::new([(0, 0), (10, 0), (10, 10)], 1, 0);
-        let grid = Grid::new((0, 0), 2, 2, (10, 0), (0, 10), 1.0, 0.0, false);
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
         let reference = Reference::new(polygon, grid);
 
         let cloned = reference.clone();
