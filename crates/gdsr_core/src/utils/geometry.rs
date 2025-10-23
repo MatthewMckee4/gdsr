@@ -1,39 +1,57 @@
-use geo::{Area, BoundingRect, Contains, Coord, EuclideanLength, Line, LineString, Point, Polygon};
+use geo::{
+    Area, BoundingRect, Contains, Coord, EuclideanLength, Line, LineString, Point as GeoPoint,
+    Polygon,
+};
 
-use crate::{CoordNum, DatabaseFloatUnit, utils::general::point_to_database_float};
+use crate::Point;
 
-fn to_float_coords<DatabaseUnitT: CoordNum>(
-    points: &[Point<DatabaseUnitT>],
-) -> Vec<Coord<DatabaseFloatUnit>> {
-    points
-        .iter()
-        .map(|p| Coord {
-            x: p.x().to_float(),
-            y: p.y().to_float(),
-        })
-        .collect()
+fn to_geo_float_coords(points: impl IntoIterator<Item = impl Into<Point>>) -> Vec<Coord<f64>> {
+    points.into_iter().map(to_geo_float_coord).collect()
+}
+
+fn to_geo_float_coord(point: impl Into<Point>) -> Coord<f64> {
+    let point: Point = point.into();
+    Coord {
+        x: point.x().as_float(),
+        y: point.y().as_float(),
+    }
+}
+
+fn to_geo_float_points(points: impl IntoIterator<Item = impl Into<Point>>) -> Vec<GeoPoint<f64>> {
+    points.into_iter().map(to_geo_float_point).collect()
+}
+
+fn to_geo_float_point(point: impl Into<Point>) -> GeoPoint<f64> {
+    to_geo_float_coord(point.into()).into()
 }
 
 /// Calculate the bounding box of a collection of points
 /// Returns (`min_point`, `max_point`) representing the bottom-left and top-right corners
-pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
+pub fn bounding_box(points: impl IntoIterator<Item = impl Into<Point>>) -> (Point, Point) {
+    let points = points.into_iter().map(|p| p.into()).collect::<Vec<Point>>();
+
     if points.is_empty() {
-        return (
-            Point::new(T::zero(), T::zero()),
-            Point::new(T::zero(), T::zero()),
-        );
+        return (Point::default(), Point::default());
     }
 
     // Use geo's BoundingRect trait for robust calculation
-    let multipoint = geo::MultiPoint::new(points.to_vec());
+    let multipoint = geo::MultiPoint::new(to_geo_float_points(&points));
     multipoint.bounding_rect().map_or_else(
         || {
             let first = points[0];
             (first, first)
         },
         |rect| {
-            let min_point = Point::new(rect.min().x, rect.min().y);
-            let max_point = Point::new(rect.max().x, rect.max().y);
+            let first_point = points[0];
+
+            let min_point = Point::new(rect.min().x, rect.min().y)
+                .unwrap()
+                .with_db_unit(first_point.db_unit())
+                .with_user_unit(first_point.user_unit());
+            let max_point = Point::new(rect.max().x, rect.max().y)
+                .unwrap()
+                .with_db_unit(first_point.db_unit())
+                .with_user_unit(first_point.user_unit());
             (min_point, max_point)
         },
     )
@@ -41,12 +59,13 @@ pub fn bounding_box<T: CoordNum>(points: &[Point<T>]) -> (Point<T>, Point<T>) {
 
 /// Calculate the area of a polygon defined by points using the shoelace formula
 /// Points should be in order (clockwise or counter-clockwise)
-pub fn area<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> DatabaseUnitT {
+pub fn area(points: impl IntoIterator<Item = impl Into<Point>>) -> f64 {
+    let points = points.into_iter().map(Into::into).collect::<Vec<Point>>();
     if points.len() < 3 {
-        return DatabaseUnitT::zero();
+        return 0.0;
     }
 
-    let coords = to_float_coords(points);
+    let coords = to_geo_float_coords(points);
 
     // Close the polygon by adding the first point at the end if not already closed
     let mut closed_coords = coords;
@@ -59,35 +78,34 @@ pub fn area<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> Databas
     let linestring = LineString::new(closed_coords);
     let polygon = Polygon::new(linestring, vec![]);
 
-    DatabaseUnitT::from_float(polygon.unsigned_area().abs())
+    polygon.unsigned_area().abs()
 }
 
 /// Calculate the perimeter of a polygon defined by points
 /// For open polygons, calculates the total length of all segments
 /// For closed polygons, includes the segment from last to first point
-pub fn perimeter<DatabaseUnitT: CoordNum>(points: &[Point<DatabaseUnitT>]) -> DatabaseUnitT {
+pub fn perimeter(points: impl IntoIterator<Item = impl Into<Point>>) -> f64 {
+    let points = points.into_iter().map(|p| p.into()).collect::<Vec<Point>>();
     if points.len() < 2 {
-        return DatabaseUnitT::zero();
+        return 0.0;
     }
 
-    let coords = to_float_coords(points);
+    let coords = to_geo_float_coords(points);
 
     let linestring = LineString::new(coords);
 
-    DatabaseUnitT::from_float(linestring.euclidean_length())
+    linestring.euclidean_length()
 }
 
 /// Check if a point is inside a polygon using the ray casting algorithm
 /// The polygon is defined by an ordered list of points
-pub fn is_point_inside<DatabaseUnitT: CoordNum>(
-    point: &Point<DatabaseUnitT>,
-    polygon_points: &[Point<DatabaseUnitT>],
-) -> bool {
-    if polygon_points.len() < 3 {
+pub fn is_point_inside(point: &Point, points: impl IntoIterator<Item = impl Into<Point>>) -> bool {
+    let points = points.into_iter().map(|p| p.into()).collect::<Vec<Point>>();
+    if points.len() < 3 {
         return false;
     }
 
-    let coords = to_float_coords(polygon_points);
+    let coords = to_geo_float_coords(points);
 
     // Ensure the polygon is closed
     let mut closed_coords = coords;
@@ -100,19 +118,20 @@ pub fn is_point_inside<DatabaseUnitT: CoordNum>(
     let linestring = LineString::new(closed_coords);
     let polygon = Polygon::new(linestring, vec![]);
 
-    polygon.contains(&point_to_database_float(*point))
+    polygon.contains(&to_geo_float_coord(point))
 }
 
 /// Check if a point lies on the edge of a polygon
-pub fn is_point_on_edge<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T>]) -> bool {
-    if polygon_points.len() < 2 {
+pub fn is_point_on_edge(point: &Point, points: impl IntoIterator<Item = impl Into<Point>>) -> bool {
+    let points = points.into_iter().map(|p| p.into()).collect::<Vec<Point>>();
+    if points.len() < 2 {
         return false;
     }
 
-    let num_points = polygon_points.len();
+    let num_points = points.len();
     for i in 0..num_points {
-        let start = &polygon_points[i];
-        let end = &polygon_points[(i + 1) % num_points];
+        let start = &points[i];
+        let end = &points[(i + 1) % num_points];
 
         if is_point_on_line_segment(point, start, end) {
             return true;
@@ -122,18 +141,9 @@ pub fn is_point_on_edge<T: CoordNum>(point: &Point<T>, polygon_points: &[Point<T
 }
 
 /// Check if a point lies on a line segment
-pub fn is_point_on_line_segment<T: CoordNum>(point: &Point<T>, a: &Point<T>, b: &Point<T>) -> bool {
-    let line_segment = Line::new(
-        Coord {
-            x: a.x().to_float(),
-            y: a.y().to_float(),
-        },
-        Coord {
-            x: b.x().to_float(),
-            y: b.y().to_float(),
-        },
-    );
-    line_segment.contains(&point_to_database_float(*point))
+pub fn is_point_on_line_segment(point: &Point, a: &Point, b: &Point) -> bool {
+    let line_segment = Line::new(to_geo_float_coord(a), to_geo_float_coord(b));
+    line_segment.contains(&to_geo_float_coord(point))
 }
 
 /// Round a floating point value to a specified number of decimal places
@@ -150,54 +160,41 @@ mod tests {
 
     #[test]
     fn test_bounding_box() {
-        let points = vec![
-            Point::new(1.0, 2.0),
-            Point::new(4.0, 6.0),
-            Point::new(-1.0, 3.0),
-            Point::new(2.0, -1.0),
-        ];
+        let points = vec![(1.0, 2.0), (4.0, 6.0), (-1.0, 3.0), (2.0, -1.0)];
 
-        let (min_point, max_point) = bounding_box(&points);
-        assert_eq!(min_point, Point::new(-1.0, -1.0));
-        assert_eq!(max_point, Point::new(4.0, 6.0));
+        let (min_point, max_point) = bounding_box(points);
+        assert_eq!(min_point, Point::new(-1.0, -1.0).unwrap());
+        assert_eq!(max_point, Point::new(4.0, 6.0).unwrap());
     }
 
     #[test]
     fn test_area() {
         // Square with side length 2
-        let square = vec![
-            Point::new(0.0, 0.0),
-            Point::new(2.0, 0.0),
-            Point::new(2.0, 2.0),
-            Point::new(0.0, 2.0),
-        ];
+        let square = vec![(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)];
 
-        let area_result = area(&square);
+        let area_result = area(square);
         assert_relative_eq!(area_result, 4.0, epsilon = 1e-10);
     }
 
     #[test]
     fn test_point_inside() {
-        let square = vec![
-            Point::new(0.0, 0.0),
-            Point::new(2.0, 0.0),
-            Point::new(2.0, 2.0),
-            Point::new(0.0, 2.0),
-        ];
+        let square = vec![(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)];
 
-        assert!(is_point_inside(&Point::new(1.0, 1.0), &square));
-        assert!(!is_point_inside(&Point::new(3.0, 3.0), &square));
+        assert!(is_point_inside(
+            &Point::new(1.0, 1.0).unwrap(),
+            square.clone()
+        ));
+        assert!(!is_point_inside(&Point::new(3.0, 3.0).unwrap(), square));
     }
 
     #[test]
     fn test_point_on_edge() {
-        let triangle = vec![
-            Point::new(0.0, 0.0),
-            Point::new(2.0, 0.0),
-            Point::new(1.0, 2.0),
-        ];
+        let triangle = vec![(0.0, 0.0), (2.0, 0.0), (1.0, 2.0)];
 
-        assert!(is_point_on_edge(&Point::new(1.0, 0.0), &triangle));
-        assert!(!is_point_on_edge(&Point::new(1.0, 1.0), &triangle));
+        assert!(is_point_on_edge(
+            &Point::new(1.0, 0.0).unwrap(),
+            triangle.clone()
+        ));
+        assert!(!is_point_on_edge(&Point::new(1.0, 1.0).unwrap(), triangle));
     }
 }

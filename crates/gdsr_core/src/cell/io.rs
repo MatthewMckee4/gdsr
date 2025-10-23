@@ -3,13 +3,13 @@ use std::{fs::File, io};
 use chrono::{Datelike, Local, Timelike};
 
 use crate::{
-    Cell, CoordNum,
+    Cell,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
     traits::ToGds,
     utils::io::{write_string_with_record_to_file, write_u16_array_to_file},
 };
 
-impl<DatabaseUnitT: CoordNum> ToGds for Cell<DatabaseUnitT> {
+impl ToGds for Cell {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         let now = Local::now();
         let timestamp = now.naive_utc();

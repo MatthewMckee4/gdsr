@@ -1,8 +1,8 @@
-pub(crate) mod element;
-pub(crate) mod path;
-pub(crate) mod polygon;
-pub(crate) mod reference;
-pub(crate) mod text;
+pub mod element;
+pub mod path;
+pub mod polygon;
+pub mod reference;
+pub mod text;
 
 pub use element::Element;
 pub use path::{Path, PathType};

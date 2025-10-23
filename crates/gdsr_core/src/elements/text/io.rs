@@ -2,7 +2,6 @@ use std::{fs::File, io};
 
 use super::{Text, utils::get_presentation_value};
 use crate::{
-    CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
     traits::ToGds,
     utils::io::{
@@ -11,7 +10,7 @@ use crate::{
     },
 };
 
-impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
+impl ToGds for Text {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         let buffer_start = vec![
             4,
@@ -39,7 +38,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Text<DatabaseUnitT> {
             self.x_reflection(),
         )?;
 
-        write_points_to_file(file, &[*self.origin()], scale, &|val| val.to_integer())?;
+        write_points_to_file(file, &[*self.origin()], scale)?;
 
         write_string_with_record_to_file(file, GDSRecord::String, self.text())?;
 

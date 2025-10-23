@@ -1,18 +1,15 @@
-use crate::elements::{Path, Polygon, Text};
+use crate::{Element, Library, Path, Polygon, Reference, Text};
 
-// mod io;  // TODO: Re-enable after updating IO module
+mod io;
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
-    pub(crate) name: String,
-    pub(crate) polygons: Vec<Polygon>,
-    pub(crate) paths: Vec<Path>,
-    pub(crate) texts: Vec<Text>,
-    // TODO: Re-add references after Reference is updated
-    // pub(crate) references: Vec<Reference>,
+    pub name: String,
+    pub polygons: Vec<Polygon>,
+    pub paths: Vec<Path>,
+    pub texts: Vec<Text>,
+    pub references: Vec<Reference>,
 }
-
 
 impl Cell {
     #[must_use]
@@ -22,7 +19,7 @@ impl Cell {
             polygons: Vec::new(),
             paths: Vec::new(),
             texts: Vec::new(),
-            // references: Vec::new(),  // TODO: Re-add after Reference is updated
+            references: Vec::new(),
         }
     }
 
@@ -64,24 +61,40 @@ impl Cell {
         self.texts.push(text);
     }
 
-    // TODO: Re-implement add() method after Element enum is re-created
-    // pub fn add(&mut self, element: impl Into<Element>) {
-    //     match element.into() {
-    //         Element::Path(path) => self.paths.push(path),
-    //         Element::Polygon(polygon) => self.polygons.push(polygon),
-    //         Element::Reference(reference) => self.references.push(reference),
-    //         Element::Text(text) => self.texts.push(text),
-    //     }
-    // }
+    pub fn add(&mut self, element: impl Into<Element>) {
+        match element.into() {
+            Element::Path(path) => self.paths.push(path),
+            Element::Polygon(polygon) => self.polygons.push(polygon),
+            Element::Reference(reference) => self.references.push(reference),
+            Element::Text(text) => self.texts.push(text),
+        }
+    }
 
-    // TODO: Re-implement get_elements() after Element enum and Library are updated
-    // pub(crate) fn get_elements(
-    //     &self,
-    //     depth: Option<usize>,
-    //     library: &Library,
-    // ) -> Vec<Element> {
-    //     ...
-    // }
+    pub(crate) fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
+        let depth = depth.unwrap_or(usize::MAX);
+        let mut elements: Vec<Element> = Vec::new();
+
+        for polygon in &self.polygons {
+            elements.push(Element::Polygon(polygon.clone()));
+        }
+
+        for path in &self.paths {
+            elements.push(Element::Path(path.clone()));
+        }
+
+        for text in &self.texts {
+            elements.push(Element::Text(text.clone()));
+        }
+
+        for reference in &self.references {
+            let reference_elements = reference.clone().flatten(Some(depth), library);
+            for referenced_element in reference_elements {
+                elements.push(referenced_element);
+            }
+        }
+
+        elements
+    }
 }
 
 impl std::fmt::Display for Cell {
@@ -179,9 +192,13 @@ impl std::fmt::Display for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Point;
-    use crate::elements::path::PathType;
-    use crate::elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
+    use crate::{
+        Point,
+        elements::{
+            path::PathType,
+            text::presentation::{HorizontalPresentation, VerticalPresentation},
+        },
+    };
 
     #[test]
     fn test_cell_new() {
@@ -217,7 +234,7 @@ mod tests {
     fn test_add_path() {
         let mut cell = Cell::new("test_cell");
         let path = Path::new(
-            vec![Point::new(0, 0), Point::new(10, 10)],
+            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
             1,
             0,
             Some(PathType::Square),
@@ -234,7 +251,7 @@ mod tests {
         let mut cell = Cell::new("test_cell");
         let text = Text::new(
             "Test Text".to_string(),
-            Point::new(5, 5),
+            Point::new(5, 5).unwrap(),
             1,
             1.0,
             0.0,

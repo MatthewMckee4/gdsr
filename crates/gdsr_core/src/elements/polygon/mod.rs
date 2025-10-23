@@ -1,10 +1,7 @@
-use crate::Point;
+use crate::{DataType, Layer, Movable, Point, Transformable};
 
-// mod io;
+mod io;
 mod utils;
-
-pub type Layer = u16;
-pub type DataType = u16;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Polygon {
@@ -68,7 +65,29 @@ impl std::fmt::Display for Polygon {
     }
 }
 
-// TODO: Implement Transformable, Movable, and Dimensions traits
+impl Transformable for Polygon {
+    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
+        let points: Vec<Point> = self
+            .points()
+            .iter()
+            .map(|point| point.transform(transformation))
+            .collect();
+
+        Self::new(points, self.layer(), self.data_type())
+    }
+}
+
+impl Movable for Polygon {
+    fn move_to(&self, target: Point) -> Self {
+        let points: Vec<Point> = self
+            .points()
+            .iter()
+            .map(|point| point.move_to(target))
+            .collect();
+
+        Self::new(points, self.layer(), self.data_type())
+    }
+}
 
 #[cfg(test)]
 mod tests {

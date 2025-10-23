@@ -1,24 +1,20 @@
-use crate::Point;
+use crate::{DataType, Layer, Movable, Point, Transformable};
 
-// mod io;
+mod io;
 mod path_type;
 
 pub use path_type::PathType;
 
 pub type Width = f64;
-pub type Layer = u16;
-pub type DataType = u16;
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Path {
-    pub(crate) points: Vec<Point>,
-    pub(crate) layer: Layer,
-    pub(crate) data_type: DataType,
-    pub(crate) r#type: Option<PathType>,
-    pub(crate) width: Option<Width>,
+    pub points: Vec<Point>,
+    pub layer: Layer,
+    pub data_type: DataType,
+    pub r#type: Option<PathType>,
+    pub width: Option<Width>,
 }
-
 
 impl Path {
     #[must_use]
@@ -78,7 +74,31 @@ impl std::fmt::Display for Path {
     }
 }
 
-// TODO: Implement Transformable, Movable, and Dimensions traits
+impl Transformable for Path {
+    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
+        let points = self
+            .points()
+            .iter()
+            .map(|point| point.transform(transformation))
+            .collect();
+
+        Self::new(
+            points,
+            self.layer(),
+            self.data_type(),
+            *self.path_type(),
+            self.width(),
+        )
+    }
+}
+
+impl Movable for Path {
+    fn move_to(&self, target: Point) -> Self {
+        let first_point = &self.points()[0];
+        let delta = target - *first_point;
+        self.move_by(delta)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -87,10 +107,7 @@ mod tests {
 
     #[test]
     fn test_path_creation() {
-        let points = vec![
-            Point::from([0, 0]),
-            Point::from([100, 100]),
-        ];
+        let points = vec![Point::from([0, 0]), Point::from([100, 100])];
         let path = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(10.0));
 
         assert_eq!(path.points(), &points);
@@ -113,10 +130,7 @@ mod tests {
 
     #[test]
     fn test_path_display() {
-        let points = vec![
-            Point::from([0, 0]),
-            Point::from([100, 100]),
-        ];
+        let points = vec![Point::from([0, 0]), Point::from([100, 100])];
         let path = Path::new(points, 5, 10, Some(PathType::Square), Some(20.0));
 
         let display_str = format!("{path}");
@@ -129,10 +143,7 @@ mod tests {
 
     #[test]
     fn test_path_clone_and_partial_eq() {
-        let points = vec![
-            Point::from([0, 0]),
-            Point::from([10, 10]),
-        ];
+        let points = vec![Point::from([0, 0]), Point::from([10, 10])];
         let path1 = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(5.0));
         let path2 = path1.clone();
 
@@ -145,8 +156,12 @@ mod tests {
     #[test]
     fn test_path_with_different_unit_points() {
         let points = vec![
-            Point::new(Unit::integer(0, 1e-9), Unit::integer(0, 1e-9)),
-            Point::new(Unit::float(100.0, 1e-6, 1e-9), Unit::float(100.0, 1e-6, 1e-9)),
+            Point::new(Unit::integer(0, 1e-9), Unit::integer(0, 1e-9)).unwrap(),
+            Point::new(
+                Unit::float(100.0, 1e-6, 1e-9),
+                Unit::float(100.0, 1e-6, 1e-9),
+            )
+            .unwrap(),
         ];
         let path = Path::new(points, 0, 0, None, None);
         assert_eq!(path.points().len(), 2);

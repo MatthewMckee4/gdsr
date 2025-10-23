@@ -1,43 +1,41 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Point};
+use crate::Point;
 
 #[derive(Clone, Debug, PartialEq)]
-struct ScaleInner<DatabaseUnitT: CoordNum, ScaleT: CoordNum> {
-    factor: ScaleT,
-    centre: Point<DatabaseUnitT>,
+pub struct Scale {
+    factor: f64,
+    centre: Point,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Scale(ScaleInner<DatabaseIntegerUnit, f64>);
-
 impl Scale {
-    pub const fn new(factor: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
-        Self(ScaleInner { factor, centre })
+    #[must_use]
+    pub fn new(factor: f64, centre: impl Into<Point>) -> Self {
+        Self {
+            factor,
+            centre: centre.into(),
+        }
     }
 
+    #[must_use]
     pub const fn factor(&self) -> f64 {
-        self.0.factor
+        self.factor
     }
 
-    pub const fn centre(&self) -> &Point<DatabaseIntegerUnit> {
-        &self.0.centre
+    #[must_use]
+    pub const fn centre(&self) -> &Point {
+        &self.centre
     }
 
-    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
-        &self,
-        point: &Point<DatabaseUnitT>,
-    ) -> Point<DatabaseUnitT> {
-        let self_center_x = self.0.centre.x() as f64;
-        let self_center_y = self.0.centre.y() as f64;
+    #[must_use]
+    pub fn apply_to_point(&self, point: &Point) -> Point {
+        let self_center_x = self.centre.x();
+        let self_center_y = self.centre.y();
 
-        let dx = (point.x().to_float()) - self_center_x;
-        let dy = (point.y().to_float()) - self_center_y;
+        let dx = point.x() - self_center_x;
+        let dy = point.y() - self_center_y;
 
-        let new_x = dx.mul_add(self.0.factor, self_center_x);
-        let new_y = dy.mul_add(self.0.factor, self_center_y);
+        let new_x = (dx * self.factor) + self_center_x;
+        let new_y = (dy * self.factor) + self_center_y;
 
-        Point::new(
-            DatabaseUnitT::from_float(new_x),
-            DatabaseUnitT::from_float(new_y),
-        )
+        (new_x, new_y).into()
     }
 }

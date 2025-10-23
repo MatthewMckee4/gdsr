@@ -1,4 +1,4 @@
-use crate::Grid;
+use crate::{Element, Grid, Library, Movable, Point, Transformable, Transformation};
 
 pub mod instance;
 mod io;
@@ -29,15 +29,70 @@ impl Reference {
         &self.grid
     }
 
-    // TODO: Re-implement get_elements_in_grid() after transformation traits are updated
-    // pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
-    //     ...
-    // }
+    #[must_use]
+    pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
+        let grid = self.grid();
 
-    // TODO: Re-implement flatten() after Library is updated
-    // pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
-    //     ...
-    // }
+        let mut elements: Vec<Element> = Vec::with_capacity((grid.columns * grid.rows) as usize);
+
+        for column_index in 0..grid.columns {
+            let column_origin = grid.origin + (grid.spacing_x * column_index);
+            for row_index in 0..grid.rows {
+                let origin = column_origin + (grid.spacing_y * row_index);
+
+                let mut new_element = element.clone();
+
+                if grid.x_reflection {
+                    new_element = new_element.reflect(0.0, Point::new(1, 0).unwrap());
+                }
+                new_element = new_element.rotate(grid.angle, Point::default());
+                new_element = new_element.scale(grid.magnification, Point::default());
+
+                let move_point = origin.rotate_around_point(grid.angle, grid.origin);
+
+                new_element = new_element.move_by(move_point);
+
+                elements.push(new_element.clone());
+            }
+        }
+
+        elements
+    }
+
+    #[must_use]
+    pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
+        let depth = depth.unwrap_or(usize::MAX);
+        let mut elements: Vec<Element> = Vec::new();
+        if depth == 0 {
+            return [Element::Reference(self)].to_vec();
+        }
+        match &self.instance {
+            Instance::Cell(cell_name) => {
+                if let Some(cell) = library.get_cell(cell_name) {
+                    let flattened_cell_elements = cell.get_elements(Some(depth - 1), library);
+                    for cell_element in flattened_cell_elements {
+                        elements.extend(self.get_elements_in_grid(&cell_element));
+                    }
+                }
+            }
+            Instance::Element(element) => match element.as_ref().as_ref() {
+                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                    elements.extend(self.get_elements_in_grid(element));
+                }
+
+                Element::Reference(reference) => {
+                    let flattened_reference_elements =
+                        reference.clone().flatten(Some(depth - 1), library);
+
+                    for reference_element in flattened_reference_elements {
+                        elements.extend(self.get_elements_in_grid(&reference_element).into_iter());
+                    }
+                }
+            },
+        }
+
+        elements
+    }
 }
 
 impl std::fmt::Display for Reference {
@@ -46,23 +101,21 @@ impl std::fmt::Display for Reference {
     }
 }
 
-// TODO: Re-implement Transformable trait for Reference once traits module is updated
-// impl Transformable for Reference {
-//     fn transform_impl(&self, transformation: &Transformation) -> Self {
-//         let mut new_self = self.clone();
-//         new_self.grid = new_self.grid.transform_impl(transformation);
-//         new_self
-//     }
-// }
+impl Transformable for Reference {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
+        let mut new_self = self.clone();
+        new_self.grid = new_self.grid.transform_impl(transformation);
+        new_self
+    }
+}
 
-// TODO: Re-implement Movable trait for Reference once traits module is updated
-// impl Movable for Reference {
-//     fn move_to(&self, target: Point) -> Self {
-//         let mut new_self = self.clone();
-//         new_self.grid = new_self.grid.move_to(target);
-//         new_self
-//     }
-// }
+impl Movable for Reference {
+    fn move_to(&self, target: Point) -> Self {
+        let mut new_self = self.clone();
+        new_self.grid = new_self.grid.move_to(target);
+        new_self
+    }
+}
 
 // impl<T: CoordNum> Dimensions<T> for Reference<T> {
 //     fn bounding_box(&self) -> (Point<T>, Point<T>) {

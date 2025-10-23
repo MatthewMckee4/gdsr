@@ -1,4 +1,8 @@
-use crate::elements::{Path, Polygon, Reference, Text};
+use crate::{
+    Movable, Point, Transformable, Transformation,
+    elements::{Path, Polygon, Reference, Text},
+    traits::ToGds,
+};
 
 /// Represents a GDSII element
 #[derive(Clone, Debug, PartialEq)]
@@ -45,6 +49,39 @@ impl From<Reference> for Element {
     }
 }
 
+impl ToGds for Element {
+    fn to_gds_impl(&self, file: &mut std::fs::File, scale: f64) -> std::io::Result<()> {
+        match self {
+            Self::Path(path) => path.to_gds_impl(file, scale),
+            Self::Polygon(polygon) => polygon.to_gds_impl(file, scale),
+            Self::Reference(reference) => reference.to_gds_impl(file, scale),
+            Self::Text(text) => text.to_gds_impl(file, scale),
+        }
+    }
+}
+
+impl Transformable for Element {
+    fn transform_impl(&self, transformation: &Transformation) -> Self {
+        match self {
+            Self::Path(path) => Self::Path(path.transform_impl(transformation)),
+            Self::Polygon(polygon) => Self::Polygon(polygon.transform_impl(transformation)),
+            Self::Reference(reference) => Self::Reference(reference.transform_impl(transformation)),
+            Self::Text(text) => Self::Text(text.transform_impl(transformation)),
+        }
+    }
+}
+
+impl Movable for Element {
+    fn move_to(&self, target: Point) -> Self {
+        match self {
+            Self::Path(path) => Self::Path(path.move_to(target)),
+            Self::Polygon(polygon) => Self::Polygon(polygon.move_to(target)),
+            Self::Reference(reference) => Self::Reference(reference.move_to(target)),
+            Self::Text(text) => Self::Text(text.move_to(target)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,7 +89,13 @@ mod tests {
 
     #[test]
     fn test_element_from_path() {
-        let path = Path::new(vec![Point::new(0, 0), Point::new(10, 10)], 1, 0, None, None);
+        let path = Path::new(
+            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
+            1,
+            0,
+            None,
+            None,
+        );
         let element: Element = path.clone().into();
 
         match element {
@@ -83,7 +126,13 @@ mod tests {
 
     #[test]
     fn test_element_clone() {
-        let path = Path::new(vec![Point::new(0, 0), Point::new(10, 10)], 1, 0, None, None);
+        let path = Path::new(
+            vec![Point::new(0, 0).unwrap(), Point::new(10, 10).unwrap()],
+            1,
+            0,
+            None,
+            None,
+        );
         let element: Element = path.into();
         let cloned = element.clone();
 

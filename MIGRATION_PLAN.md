@@ -1,7 +1,7 @@
 # GDSR Migration Plan: Generic Point to Non-Generic Point
 
 ## Overview
-This document tracks the migration from a generic `Point<DatabaseUnitT>` to a non-generic `Point` that uses the `Unit` enum internally.
+This document tracks the migration from a generic `Point` to a non-generic `Point` that uses the `Unit` enum internally.
 
 ## Status: In Progress
 
@@ -28,7 +28,7 @@ This document tracks the migration from a generic `Point<DatabaseUnitT>` to a no
 ### Phase 3: Core Structures ✅ COMPLETED
 - [x] Update Cell struct to work with new Point
   - Location: `crates/gdsr_core/src/cell/mod.rs`
-  - Removed generic `<DatabaseUnitT: CoordNum>` parameter
+  - Removed generic `` parameter
   - Updated all collections to use non-generic types
   - Temporarily removed references field (will be re-added after Reference is updated)
   - Added Display implementation
@@ -49,7 +49,7 @@ This document tracks the migration from a generic `Point<DatabaseUnitT>` to a no
 ### Phase 4: Reference Structure ✅ COMPLETED
 - [x] Update Instance enum to work with new Point
   - Location: `crates/gdsr_core/src/elements/reference/instance/mod.rs`
-  - Removed generic `<DatabaseUnitT: CoordNum>` parameter
+  - Removed generic `` parameter
   - Updated to use non-generic Element enum
   - Updated From implementations for Path, Polygon, Text
   - Added Display implementation

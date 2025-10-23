@@ -2,13 +2,12 @@ use std::{fs::File, io};
 
 use super::Polygon;
 use crate::{
-    CoordNum,
     config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
     traits::ToGds,
     utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
 };
 
-impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
+impl ToGds for Polygon {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
         if self.points().len() > 8191 {
             return Ok(());
@@ -27,7 +26,7 @@ impl<DatabaseUnitT: CoordNum> ToGds for Polygon<DatabaseUnitT> {
 
         write_u16_array_to_file(file, &polygon_head)?;
 
-        write_points_to_file(file, self.points(), scale, &|val| val.to_integer())?;
+        write_points_to_file(file, self.points(), scale)?;
 
         write_element_tail_to_file(file)
     }

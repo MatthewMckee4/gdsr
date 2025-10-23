@@ -1,4 +1,4 @@
-use crate::{CoordNum, Point};
+use crate::Point;
 
 mod reflection;
 mod rotation;
@@ -39,10 +39,8 @@ impl Transformation {
         self
     }
 
-    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
-        &self,
-        point: &Point<DatabaseUnitT>,
-    ) -> Point<DatabaseUnitT> {
+    #[must_use]
+    pub fn apply_to_point(&self, point: &Point) -> Point {
         let mut new_point = *point;
 
         if let Some(reflection) = &self.reflection {
@@ -124,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_reflection() {
-        let reflection = Reflection::new(0.0, Point::new(0, 0));
+        let reflection = Reflection::new(0.0, (0, 0));
         let mut transformation = Transformation::default();
         transformation.with_reflection(Some(reflection.clone()));
 
@@ -134,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_rotation() {
-        let rotation = Rotation::new(45.0, Point::new(0, 0));
+        let rotation = Rotation::new(45.0, (0, 0));
         let mut transformation = Transformation::default();
         transformation.with_rotation(Some(rotation.clone()));
 
@@ -144,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_scale() {
-        let scale = Scale::new(2.0, Point::new(0, 0));
+        let scale = Scale::new(2.0, (0, 0));
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale.clone()));
 
@@ -154,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_translation() {
-        let translation = Translation::new(Point::new(10, 20));
+        let translation = Translation::new((10, 20));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation.clone()));
 
@@ -165,36 +163,36 @@ mod tests {
     #[test]
     fn test_apply_to_point_identity() {
         let transformation = Transformation::default();
-        let point = Point::new(5, 10);
+        let point = Point::new(5, 10).unwrap();
         let result = transformation.apply_to_point(&point);
         assert_eq!(result, point);
     }
 
     #[test]
     fn test_apply_to_point_translation() {
-        let translation = Translation::new(Point::new(5, 5));
+        let translation = Translation::new((5, 5));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation));
 
-        let point = Point::new(0, 0);
+        let point = Point::new(0, 0).unwrap();
         let result = transformation.apply_to_point(&point);
-        assert_eq!(result, Point::new(5, 5));
+        assert_eq!(result, Point::new(5, 5).unwrap());
     }
 
     #[test]
     fn test_apply_to_point_scale() {
-        let scale = Scale::new(2.0, Point::new(0, 0));
+        let scale = Scale::new(2.0, (0, 0));
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale));
 
-        let point = Point::new(5, 10);
+        let point = Point::new(5, 10).unwrap();
         let result = transformation.apply_to_point(&point);
-        assert_eq!(result, Point::new(10, 20));
+        assert_eq!(result, Point::new(10, 20).unwrap());
     }
 
     #[test]
     fn test_from_reflection() {
-        let reflection = Reflection::new(0.0, Point::new(0, 0));
+        let reflection = Reflection::new(0.0, (0, 0));
         let transformation: Transformation = reflection.clone().into();
 
         assert!(transformation.reflection.is_some());
@@ -206,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_from_rotation() {
-        let rotation = Rotation::new(45.0, Point::new(0, 0));
+        let rotation = Rotation::new(45.0, (0, 0));
         let transformation: Transformation = rotation.clone().into();
 
         assert!(transformation.rotation.is_some());
@@ -218,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_from_scale() {
-        let scale = Scale::new(2.0, Point::new(0, 0));
+        let scale = Scale::new(2.0, (0, 0));
         let transformation: Transformation = scale.clone().into();
 
         assert!(transformation.scale.is_some());
@@ -230,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_from_translation() {
-        let translation = Translation::new(Point::new(10, 20));
+        let translation = Translation::new((10, 20));
         let transformation: Transformation = translation.clone().into();
 
         assert!(transformation.translation.is_some());
@@ -242,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_clone() {
-        let translation = Translation::new(Point::new(10, 20));
+        let translation = Translation::new((10, 20));
         let mut transformation = Transformation::default();
         transformation.with_translation(Some(translation));
 

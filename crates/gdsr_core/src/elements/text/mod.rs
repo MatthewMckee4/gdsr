@@ -1,10 +1,8 @@
-use crate::Point;
+use crate::{Layer, Movable, Point, Transformable};
 
-// pub mod io;
+pub mod io;
 pub mod presentation;
 pub mod utils;
-
-pub type Layer = u16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Text {
@@ -22,7 +20,7 @@ impl Default for Text {
     fn default() -> Self {
         Self {
             text: String::new(),
-            origin: Point::new(0, 0),
+            origin: Point::new(0, 0).unwrap(),
             layer: 0,
             magnification: 1.0,
             angle: 0.0,
@@ -116,7 +114,37 @@ impl std::fmt::Display for Text {
     }
 }
 
-// TODO: Implement Transformable and Movable traits
+impl Transformable for Text {
+    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
+        let mut new_self = self.clone();
+
+        if let Some(translation) = &transformation.translation {
+            new_self.origin = translation.apply_to_point(new_self.origin());
+        }
+
+        if let Some(scale) = &transformation.scale {
+            new_self.magnification *= scale.factor();
+        }
+
+        if let Some(rotation) = &transformation.rotation {
+            if *rotation.centre() == Point::default() {
+                new_self.angle += rotation.angle();
+            } else {
+                todo!()
+            }
+        }
+
+        new_self
+    }
+}
+
+impl Movable for Text {
+    fn move_to(&self, target: Point) -> Self {
+        let mut new_self = self.clone();
+        new_self.set_origin(target);
+        new_self
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -126,7 +154,7 @@ mod tests {
     fn test_text_creation() {
         let text = Text::new(
             "Hello World".to_string(),
-            Point::new(100, 200),
+            Point::new(100, 200).unwrap(),
             5,
             2.0,
             45.0,
@@ -136,7 +164,7 @@ mod tests {
         );
 
         assert_eq!(text.text(), "Hello World");
-        assert_eq!(text.origin(), &Point::new(100, 200));
+        assert_eq!(text.origin(), &Point::new(100, 200).unwrap());
         assert_eq!(text.layer(), 5);
         assert_eq!(text.magnification(), 2.0);
         assert_eq!(text.angle(), 45.0);
@@ -148,7 +176,7 @@ mod tests {
         let text = Text::default();
 
         assert_eq!(text.text(), "");
-        assert_eq!(text.origin(), &Point::new(0, 0));
+        assert_eq!(text.origin(), &Point::new(0, 0).unwrap());
         assert_eq!(text.layer(), 0);
         assert_eq!(text.magnification(), 1.0);
         assert_eq!(text.angle(), 0.0);
@@ -159,7 +187,7 @@ mod tests {
     fn test_text_display() {
         let text = Text::new(
             "Test Text".to_string(),
-            Point::new(10, 20),
+            Point::new(10, 20).unwrap(),
             1,
             1.5,
             30.0,
@@ -178,7 +206,7 @@ mod tests {
     fn test_text_clone_and_partial_eq() {
         let text1 = Text::new(
             "Clone Test".to_string(),
-            Point::new(5, 10),
+            Point::new(5, 10).unwrap(),
             2,
             1.2,
             15.0,
@@ -192,7 +220,7 @@ mod tests {
 
         let text3 = Text::new(
             "Different Text".to_string(),
-            Point::new(5, 10),
+            Point::new(5, 10).unwrap(),
             2,
             1.2,
             15.0,

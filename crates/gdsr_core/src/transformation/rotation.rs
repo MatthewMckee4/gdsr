@@ -1,49 +1,44 @@
-use crate::{CoordNum, DatabaseIntegerUnit, Point};
+use crate::{AngleInDegrees, Point};
 
 #[derive(Clone, Debug, PartialEq)]
-struct RotationInner<DatabaseUnitT: CoordNum, AngleT: CoordNum> {
-    angle: AngleT,
-    centre: Point<DatabaseUnitT>,
+pub struct Rotation {
+    angle: AngleInDegrees,
+    centre: Point,
 }
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Rotation(RotationInner<DatabaseIntegerUnit, f64>);
 
 impl Rotation {
     #[must_use]
-    pub const fn new(angle: f64, centre: Point<DatabaseIntegerUnit>) -> Self {
-        Self(RotationInner { angle, centre })
+    pub fn new(angle: AngleInDegrees, centre: impl Into<Point>) -> Self {
+        Self {
+            angle,
+            centre: centre.into(),
+        }
     }
 
     #[must_use]
-    pub const fn angle(&self) -> f64 {
-        self.0.angle
+    pub const fn angle(&self) -> AngleInDegrees {
+        self.angle
     }
 
     #[must_use]
-    pub const fn centre(&self) -> &Point<DatabaseIntegerUnit> {
-        &self.0.centre
+    pub const fn centre(&self) -> &Point {
+        &self.centre
     }
 
-    pub fn apply_to_point<DatabaseUnitT: CoordNum>(
-        &self,
-        point: &Point<DatabaseUnitT>,
-    ) -> Point<DatabaseUnitT> {
-        let cos_angle = self.0.angle.cos();
-        let sin_angle = self.0.angle.sin();
+    #[must_use]
+    pub fn apply_to_point(&self, point: &Point) -> Point {
+        let cos_angle = self.angle.cos();
+        let sin_angle = self.angle.sin();
 
-        let self_center_x = self.0.centre.x() as f64;
-        let self_center_y = self.0.centre.y() as f64;
+        let self_center_x = self.centre.x();
+        let self_center_y = self.centre.y();
 
-        let dx = (point.x().to_float()) - self_center_x;
-        let dy = (point.y().to_float()) - self_center_y;
+        let dx = point.x() - self_center_x;
+        let dy = point.y() - self_center_y;
 
-        let new_x = dy.mul_add(-sin_angle, dx.mul_add(cos_angle, self_center_x));
-        let new_y = dy.mul_add(cos_angle, dx.mul_add(sin_angle, self_center_y));
+        let new_x = (dy * -sin_angle) + (dx * cos_angle) + self_center_x;
+        let new_y = (dy * cos_angle) + (dx * sin_angle) + self_center_y;
 
-        Point::new(
-            DatabaseUnitT::from_float(new_x),
-            DatabaseUnitT::from_float(new_y),
-        )
+        (new_x, new_y).into()
     }
 }
