@@ -198,4 +198,150 @@ mod tests {
         assert!(is_point_on_edge(&Point::integer(1, 0, 1e-9), &triangle));
         assert!(!is_point_on_edge(&Point::integer(1, 1, 1e-9), &triangle));
     }
+
+    #[test]
+    fn test_perimeter() {
+        // Closed square with side length 2 (5 points, first point repeated at end)
+        let square = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(2.0, 0.0, 1e-6),
+            Point::float(2.0, 2.0, 1e-6),
+            Point::float(0.0, 2.0, 1e-6),
+            Point::float(0.0, 0.0, 1e-6),
+        ];
+
+        let perimeter_result = perimeter(&square);
+        // Perimeter should be 8.0 (4 sides of length 2)
+        assert_relative_eq!(perimeter_result, 8.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_area_triangle() {
+        // Triangle with base 2 and height 2
+        let triangle = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(2.0, 0.0, 1e-6),
+            Point::float(1.0, 2.0, 1e-6),
+        ];
+
+        let area_result = area(&triangle);
+        // Area should be 2.0 (0.5 * base * height = 0.5 * 2 * 2)
+        assert_relative_eq!(area_result, 2.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_area_empty_polygon() {
+        let empty: [Point; 0] = [];
+        assert_eq!(area(&empty), 0.0);
+
+        let single_point = [Point::float(1.0, 1.0, 1e-6)];
+        assert_eq!(area(&single_point), 0.0);
+
+        let two_points = [Point::float(0.0, 0.0, 1e-6), Point::float(1.0, 1.0, 1e-6)];
+        assert_eq!(area(&two_points), 0.0);
+    }
+
+    #[test]
+    fn test_perimeter_open_polygon() {
+        // Open line with 3 points
+        let line = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(3.0, 0.0, 1e-6),
+            Point::float(3.0, 4.0, 1e-6),
+        ];
+
+        let perimeter_result = perimeter(&line);
+        // Should be 3 + 4 = 7 (just the path length, not closed)
+        assert_relative_eq!(perimeter_result, 7.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_point_inside_edge_cases() {
+        let square = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(2.0, 0.0, 1e-6),
+            Point::float(2.0, 2.0, 1e-6),
+            Point::float(0.0, 2.0, 1e-6),
+        ];
+
+        // Point on corner (treated as on edge, not inside)
+        assert!(!is_point_inside(&Point::float(0.0, 0.0, 1e-6), &square));
+
+        // Point on edge
+        assert!(!is_point_inside(&Point::float(1.0, 0.0, 1e-6), &square));
+
+        // Point clearly inside
+        assert!(is_point_inside(&Point::float(1.0, 1.0, 1e-6), &square));
+
+        // Point clearly outside
+        assert!(!is_point_inside(&Point::float(-1.0, 1.0, 1e-6), &square));
+        assert!(!is_point_inside(&Point::float(3.0, 1.0, 1e-6), &square));
+    }
+
+    #[test]
+    fn test_point_on_edge_midpoint() {
+        let triangle = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(2.0, 0.0, 1e-6),
+            Point::float(1.0, 2.0, 1e-6),
+        ];
+
+        // Midpoint of edge should be on edge
+        assert!(is_point_on_edge(&Point::float(1.0, 0.0, 1e-6), &triangle));
+
+        // Point clearly not on edge
+        assert!(!is_point_on_edge(&Point::float(0.5, 0.5, 1e-6), &triangle));
+    }
+
+    #[test]
+    fn test_is_point_on_line_segment() {
+        let a = Point::float(0.0, 0.0, 1e-6);
+        let b = Point::float(2.0, 2.0, 1e-6);
+
+        // Point on the line (midpoint)
+        assert!(is_point_on_line_segment(
+            &Point::float(1.0, 1.0, 1e-6),
+            &a,
+            &b
+        ));
+
+        // Point not on the line
+        assert!(!is_point_on_line_segment(
+            &Point::float(1.0, 0.0, 1e-6),
+            &a,
+            &b
+        ));
+
+        // Point on line but outside segment
+        assert!(!is_point_on_line_segment(
+            &Point::float(3.0, 3.0, 1e-6),
+            &a,
+            &b
+        ));
+    }
+
+    #[test]
+    fn test_bounding_box_empty() {
+        let empty: [Point; 0] = [];
+        let (min, max) = bounding_box(&empty);
+        assert_eq!(min, Point::default());
+        assert_eq!(max, Point::default());
+    }
+
+    #[test]
+    fn test_bounding_box_single_point() {
+        let points = [Point::integer(5, 3, 1e-9)];
+        let (min, max) = bounding_box(&points);
+        assert_eq!(min, Point::integer(5, 3, 1e-9));
+        assert_eq!(max, Point::integer(5, 3, 1e-9));
+    }
+
+    #[test]
+    #[allow(clippy::approx_constant)]
+    fn test_round_to_decimals() {
+        assert_eq!(round_to_decimals(3.14159, 2), 3.14);
+        assert_eq!(round_to_decimals(3.14159, 3), 3.142);
+        assert_eq!(round_to_decimals(3.14159, 0), 3.0);
+        assert_eq!(round_to_decimals(-2.5678, 2), -2.57);
+    }
 }

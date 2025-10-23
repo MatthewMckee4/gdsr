@@ -1,4 +1,4 @@
-use crate::{DataType, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
 
 mod io;
 mod utils;
@@ -35,7 +35,29 @@ impl Polygon {
         self.data_type
     }
 
-    // TODO: Implement area, perimeter, is_point_inside, is_point_on_edge methods
+    /// Calculate the area of the polygon
+    #[must_use]
+    pub fn area(&self) -> f64 {
+        crate::utils::geometry::area(&self.points)
+    }
+
+    /// Calculate the perimeter of the polygon
+    #[must_use]
+    pub fn perimeter(&self) -> f64 {
+        crate::utils::geometry::perimeter(&self.points)
+    }
+
+    /// Check if a point is inside the polygon
+    #[must_use]
+    pub fn is_point_inside(&self, point: &Point) -> bool {
+        crate::utils::geometry::is_point_inside(point, &self.points)
+    }
+
+    /// Check if a point lies on the edge of the polygon
+    #[must_use]
+    pub fn is_point_on_edge(&self, point: &Point) -> bool {
+        crate::utils::geometry::is_point_on_edge(point, &self.points)
+    }
 }
 
 impl std::fmt::Display for Polygon {
@@ -82,6 +104,12 @@ impl Movable for Polygon {
             .collect();
 
         Self::new(points, self.layer(), self.data_type())
+    }
+}
+
+impl Dimensions for Polygon {
+    fn bounding_box(&self) -> (Point, Point) {
+        crate::utils::geometry::bounding_box(&self.points)
     }
 }
 
