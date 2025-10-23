@@ -73,7 +73,13 @@ impl Reference {
 
         let reference_points: Vec<_> = [origin, point2, point3]
             .iter()
-            .map(|&p| p.rotate_around_point(self.grid.angle, origin))
+            .map(|&p| {
+                if self.grid.angle == 0.0 {
+                    p
+                } else {
+                    p.rotate_around_point(self.grid.angle, origin)
+                }
+            })
             .collect();
 
         write_points_to_file(file, &reference_points, scale)?;

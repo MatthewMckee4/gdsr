@@ -323,7 +323,11 @@ pub fn from_gds(file_name: String) -> io::Result<Library> {
                                     let rotated_points = points
                                         .iter()
                                         .map(|&p| {
-                                            p.rotate_around_point(-reference.grid.angle, origin)
+                                            if reference.grid.angle == 0.0 {
+                                                p
+                                            } else {
+                                                p.rotate_around_point(-reference.grid.angle, origin)
+                                            }
                                         })
                                         .collect::<Vec<Point>>();
 

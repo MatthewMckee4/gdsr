@@ -207,9 +207,11 @@ impl Point {
         let new_x_real = rotated_dx + cx_real;
         let new_y_real = rotated_dy + cy_real;
 
+        let (u1, u2) = self.units();
+
         Self {
-            x: Unit::float(new_x_real, 1.0),
-            y: Unit::float(new_y_real, 1.0),
+            x: Unit::float(new_x_real, u1),
+            y: Unit::float(new_y_real, u2),
         }
     }
 }
