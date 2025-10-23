@@ -1,0 +1,26 @@
+name: Bug report
+description: Report an error or unexpected behavior
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report an issue! We're glad to have you involved with GDSR.
+
+        **Before reporting, please make sure to search through [existing issues](https://github.com/MatthewMckee4/gdsr/issues?q=is:issue+is:open+label:bug) (including [closed](https://github.com/MatthewMckee4/gdsr/issues?q=is:issue%20state:closed%20label:bug)).**
+
+  - type: textarea
+    attributes:
+      label: Summary
+      description: |
+        A clear and concise description of the bug, including a minimal reproducible example.
+
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Version
+      description: What version of GDSR are you using?
+      placeholder: e.g., GDSR 0.1.0
+    validations:
+      required: false
