@@ -1,15 +1,15 @@
-use crate::{Movable, Point, Transformable, Transformation};
+use crate::{AngleInRadians, Movable, Point, Transformable, Transformation};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Grid {
-    pub origin: Point,
-    pub columns: u32,
-    pub rows: u32,
-    pub spacing_x: Point,
-    pub spacing_y: Point,
-    pub magnification: f64,
-    pub angle: f64,
-    pub x_reflection: bool,
+    origin: Point,
+    columns: u32,
+    rows: u32,
+    spacing_x: Point,
+    spacing_y: Point,
+    magnification: f64,
+    angle: AngleInRadians,
+    x_reflection: bool,
 }
 
 impl Grid {
@@ -22,7 +22,7 @@ impl Grid {
         spacing_x: Point,
         spacing_y: Point,
         magnification: f64,
-        angle: f64,
+        angle: AngleInRadians,
         x_reflection: bool,
     ) -> Self {
         Self {
@@ -35,6 +35,78 @@ impl Grid {
             angle,
             x_reflection,
         }
+    }
+
+    #[must_use]
+    pub const fn origin(&self) -> Point {
+        self.origin
+    }
+
+    #[must_use]
+    pub const fn columns(&self) -> u32 {
+        self.columns
+    }
+
+    #[must_use]
+    pub const fn rows(&self) -> u32 {
+        self.rows
+    }
+
+    #[must_use]
+    pub const fn spacing_x(&self) -> Point {
+        self.spacing_x
+    }
+
+    #[must_use]
+    pub const fn spacing_y(&self) -> Point {
+        self.spacing_y
+    }
+
+    #[must_use]
+    pub const fn magnification(&self) -> f64 {
+        self.magnification
+    }
+
+    #[must_use]
+    pub const fn angle(&self) -> f64 {
+        self.angle
+    }
+
+    #[must_use]
+    pub const fn x_reflection(&self) -> bool {
+        self.x_reflection
+    }
+
+    pub const fn set_origin(&mut self, origin: Point) {
+        self.origin = origin;
+    }
+
+    pub const fn set_columns(&mut self, columns: u32) {
+        self.columns = columns;
+    }
+
+    pub const fn set_rows(&mut self, rows: u32) {
+        self.rows = rows;
+    }
+
+    pub const fn set_spacing_x(&mut self, spacing_x: Point) {
+        self.spacing_x = spacing_x;
+    }
+
+    pub const fn set_spacing_y(&mut self, spacing_y: Point) {
+        self.spacing_y = spacing_y;
+    }
+
+    pub const fn set_magnification(&mut self, magnification: f64) {
+        self.magnification = magnification;
+    }
+
+    pub const fn set_angle(&mut self, angle: AngleInRadians) {
+        self.angle = angle;
+    }
+
+    pub const fn set_x_reflection(&mut self, x_reflection: bool) {
+        self.x_reflection = x_reflection;
     }
 }
 

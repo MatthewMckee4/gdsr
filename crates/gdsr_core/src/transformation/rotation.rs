@@ -1,19 +1,19 @@
-use crate::{AngleInDegrees, Point};
+use crate::{AngleInRadians, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rotation {
-    angle: AngleInDegrees,
+    angle: AngleInRadians,
     centre: Point,
 }
 
 impl Rotation {
     #[must_use]
-    pub const fn new(angle: AngleInDegrees, centre: Point) -> Self {
+    pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
     #[must_use]
-    pub const fn angle(&self) -> AngleInDegrees {
+    pub const fn angle(&self) -> AngleInRadians {
         self.angle
     }
 

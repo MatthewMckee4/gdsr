@@ -33,22 +33,23 @@ impl Reference {
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
         let grid = self.grid();
 
-        let mut elements: Vec<Element> = Vec::with_capacity((grid.columns * grid.rows) as usize);
+        let mut elements: Vec<Element> =
+            Vec::with_capacity((grid.columns() * grid.rows()) as usize);
 
-        for column_index in 0..grid.columns {
-            let column_origin = grid.origin + (grid.spacing_x * column_index);
-            for row_index in 0..grid.rows {
-                let origin = column_origin + (grid.spacing_y * row_index);
+        for column_index in 0..grid.columns() {
+            let column_origin = grid.origin() + (grid.spacing_x() * column_index);
+            for row_index in 0..grid.rows() {
+                let origin = column_origin + (grid.spacing_y() * row_index);
 
                 let mut new_element = element.clone();
 
-                if grid.x_reflection {
+                if grid.x_reflection() {
                     new_element = new_element.reflect(0.0, Point::integer(1, 0, 1e-9));
                 }
-                new_element = new_element.rotate(grid.angle, Point::default());
-                new_element = new_element.scale(grid.magnification, Point::default());
+                new_element = new_element.rotate(grid.angle(), Point::default());
+                new_element = new_element.scale(grid.magnification(), Point::default());
 
-                let move_point = origin.rotate_around_point(grid.angle, grid.origin);
+                let move_point = origin.rotate_around_point(grid.angle(), &grid.origin());
 
                 new_element = new_element.move_by(move_point);
 
@@ -197,15 +198,15 @@ mod tests {
         );
         let reference = Reference::new(polygon, grid);
 
-        assert_eq!(reference.grid().columns, 2);
-        assert_eq!(reference.grid().rows, 2);
+        assert_eq!(reference.grid().columns(), 2);
+        assert_eq!(reference.grid().rows(), 2);
     }
 
     #[test]
     fn test_reference_default() {
         let reference = Reference::default();
-        assert_eq!(reference.grid().columns, 1);
-        assert_eq!(reference.grid().rows, 1);
+        assert_eq!(reference.grid().columns(), 1);
+        assert_eq!(reference.grid().rows(), 1);
     }
 
     #[test]

@@ -4,7 +4,6 @@ use crate::{
     traits::ToGds,
 };
 
-/// Represents a GDSII element
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
     Path(Path),

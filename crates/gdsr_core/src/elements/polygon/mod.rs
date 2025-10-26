@@ -35,13 +35,11 @@ impl Polygon {
         self.data_type
     }
 
-    /// Calculate the area of the polygon
     #[must_use]
     pub fn area(&self) -> f64 {
         crate::utils::geometry::area(&self.points)
     }
 
-    /// Calculate the perimeter of the polygon
     #[must_use]
     pub fn perimeter(&self) -> f64 {
         crate::utils::geometry::perimeter(&self.points)

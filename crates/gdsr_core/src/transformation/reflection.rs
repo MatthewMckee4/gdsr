@@ -1,14 +1,14 @@
-use crate::{AngleInDegrees, Point};
+use crate::{AngleInRadians, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reflection {
-    angle: AngleInDegrees,
+    angle: AngleInRadians,
     centre: Point,
 }
 
 impl Reflection {
     #[must_use]
-    pub const fn new(angle: AngleInDegrees, centre: Point) -> Self {
+    pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 

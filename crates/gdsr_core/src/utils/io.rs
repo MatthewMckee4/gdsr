@@ -319,35 +319,33 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                         } else if let Some(reference) = &mut reference {
                             match points.len() {
                                 1 => {
-                                    reference.grid.origin = points[0];
+                                    reference.grid.set_origin(points[0]);
                                 }
                                 3 => {
                                     let origin = points[0];
                                     let rotated_points = points
                                         .iter()
                                         .map(|&p| {
-                                            if reference.grid.angle == 0.0 {
-                                                p
-                                            } else {
-                                                p.rotate_around_point(-reference.grid.angle, origin)
-                                            }
+                                            p.rotate_around_point(-reference.grid.angle(), &origin)
                                         })
                                         .collect::<Vec<Point>>();
 
-                                    reference.grid.origin = rotated_points[0];
+                                    reference.grid.set_origin(rotated_points[0]);
 
-                                    reference.grid.spacing_x = if reference.grid.columns > 0 {
-                                        (rotated_points[1] - rotated_points[0])
-                                            / reference.grid.columns
-                                    } else {
-                                        Point::default()
-                                    };
-                                    reference.grid.spacing_y = if reference.grid.rows > 0 {
+                                    reference
+                                        .grid
+                                        .set_spacing_x(if reference.grid.columns() > 0 {
+                                            (rotated_points[1] - rotated_points[0])
+                                                / reference.grid.columns()
+                                        } else {
+                                            Point::default()
+                                        });
+                                    reference.grid.set_spacing_y(if reference.grid.rows() > 0 {
                                         (rotated_points[2] - rotated_points[0])
-                                            / reference.grid.rows
+                                            / reference.grid.rows()
                                     } else {
                                         Point::integer(0, 0, db_units)
-                                    };
+                                    });
                                 }
                                 _ => {}
                             }
@@ -387,8 +385,8 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                 GDSRecord::ColRow => {
                     if let GDSRecordData::I16(col_row) = data {
                         if let Some(reference) = &mut reference {
-                            reference.grid.columns = col_row[0] as u32;
-                            reference.grid.rows = col_row[1] as u32;
+                            reference.grid.set_columns(col_row[0] as u32);
+                            reference.grid.set_rows(col_row[1] as u32);
                         }
                     }
                 }
@@ -418,7 +416,7 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                             text.x_reflection = x_reflection;
                         }
                         if let Some(reference) = &mut reference {
-                            reference.grid.x_reflection = x_reflection;
+                            reference.grid.set_x_reflection(x_reflection);
                         }
                     }
                 }
@@ -427,7 +425,7 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                         if let Some(text) = &mut text {
                             text.magnification = magnification[0];
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.magnification = magnification[0];
+                            reference.grid.set_magnification(magnification[0]);
                         }
                     }
                 }
@@ -436,7 +434,7 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                         if let Some(text) = &mut text {
                             text.angle = angle[0];
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.angle = angle[0];
+                            reference.grid.set_angle(angle[0]);
                         }
                     }
                 }

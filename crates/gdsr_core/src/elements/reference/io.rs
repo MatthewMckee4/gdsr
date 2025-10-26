@@ -53,33 +53,27 @@ impl Reference {
 
         write_transformation_to_file(
             file,
-            self.grid.angle,
-            self.grid.magnification,
-            self.grid.x_reflection,
+            self.grid().angle(),
+            self.grid().magnification(),
+            self.grid().x_reflection(),
         )?;
 
         let buffer_array = [
             8,
             combine_record_and_data_type(GDSRecord::ColRow, GDSDataType::TwoByteSignedInteger),
-            self.grid.columns as u16,
-            self.grid.rows as u16,
+            self.grid().columns() as u16,
+            self.grid().rows() as u16,
         ];
 
         write_u16_array_to_file(file, &buffer_array)?;
 
-        let origin = self.grid.origin.to_integer_unit();
-        let point2 = (self.grid.origin + self.grid.spacing_x) * self.grid.columns;
-        let point3 = (self.grid.origin + self.grid.spacing_y) * self.grid.rows;
+        let origin = self.grid().origin().to_integer_unit();
+        let point2 = (self.grid().origin() + self.grid().spacing_x()) * self.grid().columns();
+        let point3 = (self.grid().origin() + self.grid().spacing_y()) * self.grid().rows();
 
         let reference_points: Vec<_> = [origin, point2, point3]
             .iter()
-            .map(|&p| {
-                if self.grid.angle == 0.0 {
-                    p
-                } else {
-                    p.rotate_around_point(self.grid.angle, origin)
-                }
-            })
+            .map(|&p| p.rotate_around_point(self.grid().angle(), &origin))
             .collect();
 
         write_points_to_file(file, &reference_points, scale)?;
