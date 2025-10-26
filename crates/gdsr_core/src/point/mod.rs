@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::{Movable, Transformable, Transformation, units::Unit};
+use crate::{AngleInRadians, Movable, Transformable, Transformation, units::Unit};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
@@ -101,7 +101,7 @@ impl Point {
     /// # Returns
     /// A new `Point` representing the rotated position
     #[must_use]
-    pub fn rotate(&self, angle: f64) -> Self {
+    pub fn rotate(&self, angle: AngleInRadians) -> Self {
         let cos_a = angle.cos();
         let sin_a = angle.sin();
 
@@ -148,7 +148,7 @@ impl Point {
     /// # Returns
     /// A new `Point` representing the rotated position
     #[must_use]
-    pub fn rotate_around_point(&self, angle: f64, center: &Self) -> Self {
+    pub fn rotate_around_point(&self, angle: AngleInRadians, center: &Self) -> Self {
         if angle == 0.0 {
             return *self;
         }
