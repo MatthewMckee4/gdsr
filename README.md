@@ -53,7 +53,7 @@ fn main() {
             5,
             Point::integer(2, 0, units),
             Point::integer(0, 2, units),
-            2.0,
+            1.0,
             0.0,
             false,
         ),
@@ -64,17 +64,26 @@ fn main() {
     library.add(cell);
 
     library.to_gds("main.gds", 1e-9, 1e-9).unwrap();
-
-    let library = Library::from_gds("main.gds", Some(1e-9));
 }
-
 ```
 
 This gives us the following GDS file:
 
 ![5-5-grid.png](assets/5-5-grid.png)
 
+## Documentation
+
+seal's documentation is available at [matthewmckee4.github.io/gdsr](https://matthewmckee4.github.io/gdsr/)
+
 ## Need help?
 
 Head over to the [discussions page](https://github.com/MatthewMckee4/gdsr/discussions)
 and create a new discussion there or have a look at the [issues page](https://github.com/MatthewMckee4/gdsr/issues) to see if anyone has had the same issue as you.
+
+## Contributing
+
+Contributions are welcome! Please see the [contributing guide](CONTRIBUTING.md) for more information.
+
+## License
+
+gdsr is licensed under the MIT License.

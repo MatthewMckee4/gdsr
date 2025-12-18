@@ -1,0 +1,51 @@
+[project]
+site_name = "gdsr"
+site_url = "https://matthewmckee4.github.io/gdsr"
+site_description = "A GDSII editor, written in Rust"
+site_author = "Matthew McKee"
+repo_url = "https://github.com/MatthewMckee4/gdsr"
+repo_name = "MatthewMckee4/gdsr"
+
+docs_dir = "docs"
+site_dir = "site"
+dev_addr = "localhost:3000"
+
+nav = [
+    { "Home" = "index.md"},
+]
+
+[project.theme]
+language = "en"
+features = [
+    "navigation.instant",
+    "search.highlight",
+    "navigation.sections"
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+primary = "cyan"
+accent = "cyan"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+primary = "cyan"
+accent = "cyan"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions.pymdownx.highlight]
+linenums = true
+auto_title = true
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.superfences]
+
+[project.markdown_extensions.pymdownx.tabbed.slugify]
+object = "pymdownx.slugs.slugify"
+kwds = { case = "lower" }
