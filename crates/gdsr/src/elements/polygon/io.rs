@@ -7,7 +7,7 @@ use crate::traits::ToGds;
 use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
 
 impl ToGds for Polygon {
-    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
         if self.points().len() > 8191 {
             return Ok(());
         }
@@ -25,7 +25,7 @@ impl ToGds for Polygon {
 
         write_u16_array_to_file(file, &polygon_head)?;
 
-        write_points_to_file(file, self.points(), scale)?;
+        write_points_to_file(file, self.points(), database_units)?;
 
         write_element_tail_to_file(file)
     }

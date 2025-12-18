@@ -11,7 +11,7 @@ use crate::utils::io::{
 };
 
 impl ToGds for Text {
-    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
         let buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
@@ -38,7 +38,7 @@ impl ToGds for Text {
             self.x_reflection(),
         )?;
 
-        write_points_to_file(file, &[*self.origin()], scale)?;
+        write_points_to_file(file, &[*self.origin()], database_units)?;
 
         write_string_with_record_to_file(file, GDSRecord::String, self.text())?;
 

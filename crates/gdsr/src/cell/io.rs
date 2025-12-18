@@ -9,7 +9,7 @@ use crate::traits::ToGds;
 use crate::utils::io::{write_string_with_record_to_file, write_u16_array_to_file};
 
 impl ToGds for Cell {
-    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
         let now = Local::now();
         let timestamp = now.naive_utc();
 
@@ -35,19 +35,19 @@ impl ToGds for Cell {
         write_string_with_record_to_file(file, GDSRecord::StrName, &self.name)?;
 
         for path in &self.paths {
-            path.to_gds_impl(file, scale)?;
+            path.to_gds_impl(file, database_units)?;
         }
 
         for polygon in &self.polygons {
-            polygon.to_gds_impl(file, scale)?;
+            polygon.to_gds_impl(file, database_units)?;
         }
 
         for text in &self.texts {
-            text.to_gds_impl(file, scale)?;
+            text.to_gds_impl(file, database_units)?;
         }
 
         for reference in &self.references {
-            reference.to_gds_impl(file, scale)?;
+            reference.to_gds_impl(file, database_units)?;
         }
 
         let cell_tail = [

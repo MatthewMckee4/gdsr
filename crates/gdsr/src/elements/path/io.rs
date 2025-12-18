@@ -7,7 +7,7 @@ use crate::traits::ToGds;
 use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
 
 impl ToGds for Path {
-    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
         if self.points().len() < 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -44,7 +44,8 @@ impl ToGds for Path {
         }
 
         if let Some(width) = self.width() {
-            let width_value = (width * scale).round() as u32;
+            let scaled_width = width.scale_units(database_units);
+            let width_value = scaled_width.to_integer_unit().expect_integer_value() as u32;
 
             let width_head = [
                 8,
@@ -58,7 +59,7 @@ impl ToGds for Path {
             file.write_all(&bytes)?;
         }
 
-        write_points_to_file(file, self.points(), scale)?;
+        write_points_to_file(file, self.points(), database_units)?;
 
         write_element_tail_to_file(file)
     }

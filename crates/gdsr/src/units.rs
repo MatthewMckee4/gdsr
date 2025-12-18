@@ -66,33 +66,29 @@ impl Unit {
     }
 
     #[must_use]
-    pub fn to_integer_unit(&self) -> Self {
+    pub fn to_integer_unit(self) -> Self {
         match self {
-            Self::Integer { .. } => *self,
+            Self::Integer { .. } => self,
             Self::Float { value, units } => {
                 // Convert float value (in units) to integer
                 let value = value.round() as i32;
-                Self::Integer {
-                    value,
-                    units: *units,
-                }
+                Self::Integer { value, units }
             }
         }
     }
 
     #[must_use]
-    pub fn to_float_unit(&self, units: f64) -> Self {
+    pub fn to_float_unit(self) -> Self {
         match self {
-            Self::Integer {
-                value,
-                units: current_units,
-            } => {
+            Self::Integer { value, units } => {
                 // Convert integer value to float with new units
-                let real_value = f64::from(*value) * current_units;
-                let value = real_value / units;
-                Self::Float { value, units }
+                let real_value = f64::from(value);
+                Self::Float {
+                    value: real_value,
+                    units,
+                }
             }
-            Self::Float { .. } => *self,
+            Self::Float { .. } => self,
         }
     }
 
@@ -124,6 +120,24 @@ impl Unit {
             },
         }
     }
+
+    /// Returns a copy of this Unit with the specified units.
+    /// The units of the new `Unit` are equal to `new_units`,
+    /// and the value is scaled accordingly.
+    #[must_use]
+    pub const fn scale_units(&self, new_units: f64) -> Self {
+        let scale_factor = self.units() / new_units;
+        match self {
+            Self::Integer { value, .. } => Self::Integer {
+                value: (*value as f64 * scale_factor) as i32,
+                units: new_units,
+            },
+            Self::Float { value, .. } => Self::Float {
+                value: *value * scale_factor,
+                units: new_units,
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for Unit {
@@ -136,6 +150,12 @@ impl std::fmt::Display for Unit {
                 write!(f, "{value:.6} ({units:.3e})")
             }
         }
+    }
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Self::default_integer(0)
     }
 }
 
@@ -853,14 +873,14 @@ mod tests {
         #[test]
         fn to_float_from_float() {
             let unit = Unit::float(100.5, 1e-6);
-            let result = unit.to_float_unit(1e-6);
+            let result = unit.to_float_unit();
             assert_eq!(result, unit);
         }
 
         #[test]
         fn to_float_from_integer() {
             let unit = Unit::integer(100, 1e-9);
-            let result = unit.to_float_unit(1e-6);
+            let result = unit.to_float_unit().scale_units(1e-6);
 
             match result {
                 Unit::Float { value, units } => {
@@ -874,7 +894,7 @@ mod tests {
         #[test]
         fn roundtrip() {
             let original = Unit::integer(100, 1e-9);
-            let as_float = original.to_float_unit(1e-6);
+            let as_float = original.to_float_unit().scale_units(1e-6);
             let back_to_int = as_float.to_integer_unit();
 
             match back_to_int {

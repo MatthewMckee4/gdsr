@@ -11,11 +11,13 @@ use crate::utils::io::{
 };
 
 impl ToGds for Reference {
-    fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
         match &self.instance {
-            Instance::Cell(cell_name) => self.to_gds_impl_with_cell(file, scale, cell_name),
+            Instance::Cell(cell_name) => {
+                self.to_gds_impl_with_cell(file, database_units, cell_name)
+            }
             Instance::Element(element) => {
-                self.to_gds_impl_with_element(file, scale, element.as_ref().as_ref())
+                self.to_gds_impl_with_element(file, database_units, element.as_ref().as_ref())
             }
         }
     }
@@ -25,11 +27,11 @@ impl Reference {
     fn to_gds_impl_with_element(
         &self,
         file: &mut File,
-        scale: f64,
+        database_units: f64,
         element: &Element,
     ) -> io::Result<()> {
         for element in self.get_elements_in_grid(element) {
-            element.to_gds_impl(file, scale)?;
+            element.to_gds_impl(file, database_units)?;
         }
 
         Ok(())
@@ -38,7 +40,7 @@ impl Reference {
     fn to_gds_impl_with_cell(
         &self,
         file: &mut File,
-        scale: f64,
+        database_units: f64,
         cell_name: &str,
     ) -> io::Result<()> {
         let buffer_start = [
@@ -75,7 +77,7 @@ impl Reference {
             .map(|&p| p.rotate_around_point(self.grid().angle(), &origin))
             .collect();
 
-        write_points_to_file(file, &reference_points, scale)?;
+        write_points_to_file(file, &reference_points, database_units)?;
 
         write_element_tail_to_file(file)
     }

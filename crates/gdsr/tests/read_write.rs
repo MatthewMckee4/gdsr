@@ -46,7 +46,7 @@ fn test_library_roundtrip_mixed_elements() {
         1,
         0,
         Some(PathType::Square),
-        Some(2.0),
+        Some(Unit::float(2.0, units)),
     );
     cell.add(path);
 
@@ -176,8 +176,13 @@ fn test_library_roundtrip_different_precision(
 
     let _res = library.to_gds(gds_path.to_str().unwrap(), user_units, database_units);
 
-    let new_library: Library =
-        Library::from_gds(gds_path.to_str().unwrap(), Some(DEFAULT_INTEGER_UNITS)).unwrap();
+    library.to_gds(
+        &format!("main_{}_{}.gds", user_units, database_units),
+        user_units,
+        database_units,
+    );
+
+    let new_library = Library::from_gds(gds_path.to_str().unwrap(), Some(units)).unwrap();
 
     assert_eq!(library, new_library, "{library:#?}\n{new_library:#?}");
 }
@@ -216,7 +221,7 @@ fn test_complex_path_types_roundtrip() {
         1,
         0,
         Some(PathType::Square),
-        Some(5.0),
+        Some(Unit::float(5.0, units)),
     );
     cell.add(path1);
 
@@ -230,7 +235,7 @@ fn test_complex_path_types_roundtrip() {
         2,
         0,
         Some(PathType::Round),
-        Some(3.0),
+        Some(Unit::float(3.0, units)),
     );
     cell.add(path2);
 
@@ -240,7 +245,7 @@ fn test_complex_path_types_roundtrip() {
         3,
         0,
         Some(PathType::Overlap),
-        Some(4.0),
+        Some(Unit::float(4.0, units)),
     );
     cell.add(path3);
 
@@ -441,7 +446,7 @@ fn test_float_coordinates() {
         2,
         0,
         Some(PathType::Round),
-        Some(1.5),
+        Some(Unit::float(1.5, units)),
     );
     cell.add(path);
 
@@ -531,7 +536,7 @@ fn test_single_cell_with_all_element_types() {
         2,
         0,
         Some(PathType::Round),
-        Some(5.0),
+        Some(Unit::float(5.0, units)),
     ));
 
     // Add text

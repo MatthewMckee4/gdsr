@@ -162,7 +162,7 @@ mod tests {
     use super::*;
     use crate::elements::path::PathType;
     use crate::elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
-    use crate::{Grid, Point};
+    use crate::{Grid, Point, Unit};
 
     #[test]
     fn test_cell_new() {
@@ -211,7 +211,7 @@ mod tests {
             1,
             0,
             Some(PathType::Square),
-            Some(2.0),
+            Some(Unit::default_integer(2)),
         );
 
         cell.add(path.clone());

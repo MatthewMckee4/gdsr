@@ -11,7 +11,8 @@ site_dir = "site"
 dev_addr = "localhost:3000"
 
 nav = [
-    { "Home" = "index.md"},
+    { "Home" = "index.md" },
+    { "Units" = "units.md" }
 ]
 
 [project.theme]

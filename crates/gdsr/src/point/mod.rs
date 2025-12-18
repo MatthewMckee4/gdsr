@@ -24,6 +24,20 @@ impl Point {
         }
     }
 
+    pub const fn default_integer(x: i32, y: i32) -> Self {
+        Self {
+            x: Unit::default_integer(x),
+            y: Unit::default_integer(y),
+        }
+    }
+
+    pub const fn default_float(x: f64, y: f64) -> Self {
+        Self {
+            x: Unit::default_float(x),
+            y: Unit::default_float(y),
+        }
+    }
+
     /// Create a point with two arbitrary units.
     ///
     /// This is useful for when you want to create a point with different units.
@@ -41,6 +55,14 @@ impl Point {
         Self {
             x: self.x.with_units(units),
             y: self.y.with_units(units),
+        }
+    }
+
+    #[must_use]
+    pub const fn scale_units(&self, new_units: f64) -> Self {
+        Self {
+            x: self.x.scale_units(new_units),
+            y: self.y.scale_units(new_units),
         }
     }
 
@@ -81,10 +103,10 @@ impl Point {
     /// # Returns
     /// A new `Point` with both x and y coordinates converted to `Unit::Float`
     #[must_use]
-    pub fn to_float_unit(&self, user_units: f64) -> Self {
+    pub fn to_float_unit(&self) -> Self {
         Self {
-            x: self.x.to_float_unit(user_units),
-            y: self.y.to_float_unit(user_units),
+            x: self.x.to_float_unit(),
+            y: self.y.to_float_unit(),
         }
     }
 
@@ -106,10 +128,10 @@ impl Point {
         let sin_a = angle.sin();
 
         // Convert to float units and extract values
-        let x_float = self.x.to_float_unit(1e-6);
-        let y_float = self.y.to_float_unit(1e-6);
-        let cx_float = center.x.to_float_unit(1e-6);
-        let cy_float = center.y.to_float_unit(1e-6);
+        let x_float = self.x.to_float_unit();
+        let y_float = self.y.to_float_unit();
+        let cx_float = center.x.to_float_unit();
+        let cy_float = center.y.to_float_unit();
 
         let Unit::Float {
             value: x_val,
@@ -339,6 +361,20 @@ mod tests {
         }
 
         #[test]
+        fn with_defaults() {
+            let point = Point::default_integer(100, 200);
+            assert_eq!(point.x(), Unit::integer(100, 1e-9));
+            assert_eq!(point.y(), Unit::integer(200, 1e-9));
+        }
+
+        #[test]
+        fn with_defaults_float() {
+            let point = Point::default_float(1.5, 2.5);
+            assert_eq!(point.x(), Unit::float(1.5, 1e-6));
+            assert_eq!(point.y(), Unit::float(2.5, 1e-6));
+        }
+
+        #[test]
         fn with_floats() {
             let point = Point::float(1.5, 2.5, 1e-6);
             assert_eq!(point.x(), Unit::float(1.5, 1e-6));
@@ -408,11 +444,11 @@ mod tests {
             assert_eq!(point.y(), Unit::integer(200, 1e-9));
 
             // Rotated point should be approximately (-100, -200) in real units
-            let x_real = match rotated.x().to_float_unit(1e-6) {
+            let x_real = match rotated.x().to_float_unit() {
                 Unit::Float { value, units } => value * units,
                 Unit::Integer { .. } => unreachable!(),
             };
-            let y_real = match rotated.y().to_float_unit(1e-6) {
+            let y_real = match rotated.y().to_float_unit() {
                 Unit::Float { value, units } => value * units,
                 Unit::Integer { .. } => unreachable!(),
             };
@@ -477,7 +513,7 @@ mod tests {
         #[test]
         fn to_float_unit_from_floats() {
             let point = Point::float(1.5, 2.5, 1e-6);
-            let converted = point.to_float_unit(1e-6);
+            let converted = point.to_float_unit();
 
             assert_eq!(converted.x(), Unit::float(1.5, 1e-6));
             assert_eq!(converted.y(), Unit::float(2.5, 1e-6));
@@ -486,7 +522,7 @@ mod tests {
         #[test]
         fn to_float_unit_from_integers() {
             let point = Point::integer(100, 200, 1e-9);
-            let converted = point.to_float_unit(1e-6);
+            let converted = point.to_float_unit().scale_units(1e-6);
 
             match converted.x() {
                 Unit::Float { value, units } => {
@@ -508,7 +544,7 @@ mod tests {
         #[test]
         fn roundtrip_integer_to_float_to_integer() {
             let original = Point::integer(100, 200, 1e-9);
-            let as_float = original.to_float_unit(1e-9);
+            let as_float = original.to_float_unit();
             let back_to_int = as_float.to_integer_unit();
 
             assert_eq!(back_to_int.x(), original.x());
@@ -518,7 +554,7 @@ mod tests {
         #[test]
         fn conversion_preserves_equality() {
             let point1 = Point::integer(1000, 2000, 1e-9);
-            let point2 = point1.to_float_unit(1e-6);
+            let point2 = point1.to_float_unit();
 
             assert_eq!(point1.x(), point2.x());
             assert_eq!(point1.y(), point2.y());
@@ -531,7 +567,7 @@ mod tests {
         use super::*;
 
         fn extract_real_value(unit: Unit) -> f64 {
-            match unit.to_float_unit(1e-6) {
+            match unit.to_float_unit().scale_units(1e-6) {
                 Unit::Float { value, units } => value * units,
                 Unit::Integer { .. } => unreachable!(),
             }

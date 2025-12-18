@@ -137,7 +137,7 @@ mod tests {
 
         assert_eq!(p, path);
 
-        insta::assert_snapshot!(element.to_string(), @"Path with 2 points on layer 1 with data type 0, Square and width 0");
+        insta::assert_snapshot!(element.to_string(), @"Path with 2 points on layer 1 with data type 0, Square and width 0 (1.000e-9)");
     }
 
     #[test]

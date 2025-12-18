@@ -1,11 +1,9 @@
-use crate::{DataType, Layer, Movable, Point, Transformable};
+use crate::{DataType, Layer, Movable, Point, Transformable, Unit};
 
 mod io;
 mod path_type;
 
 pub use path_type::PathType;
-
-pub type Width = f64;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Path {
@@ -13,7 +11,7 @@ pub struct Path {
     pub layer: Layer,
     pub data_type: DataType,
     pub r#type: Option<PathType>,
-    pub width: Option<Width>,
+    pub width: Option<Unit>,
 }
 
 impl Path {
@@ -22,7 +20,7 @@ impl Path {
         layer: Layer,
         data_type: DataType,
         path_type: Option<PathType>,
-        width: Option<Width>,
+        width: Option<Unit>,
     ) -> Self {
         Self {
             points: points.into_iter().collect(),
@@ -49,7 +47,7 @@ impl Path {
         &self.r#type
     }
 
-    pub const fn width(&self) -> Option<Width> {
+    pub const fn width(&self) -> Option<Unit> {
         self.width
     }
 }
@@ -95,13 +93,19 @@ mod tests {
     #[test]
     fn test_path_creation() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
-        let path = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(10.0));
+        let path = Path::new(
+            points.clone(),
+            1,
+            2,
+            Some(PathType::Round),
+            Some(Unit::default_integer(10)),
+        );
 
         assert_eq!(path.points(), &points);
         assert_eq!(path.layer(), 1);
         assert_eq!(path.data_type(), 2);
         assert_eq!(path.path_type(), &Some(PathType::Round));
-        assert_eq!(path.width(), Some(10.0));
+        assert_eq!(path.width(), Some(Unit::default_integer(10)));
     }
 
     #[test]
@@ -118,25 +122,38 @@ mod tests {
     #[test]
     fn test_path_display() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
-        let path = Path::new(points, 5, 10, Some(PathType::Square), Some(20.0));
+        let path = Path::new(
+            points,
+            5,
+            10,
+            Some(PathType::Square),
+            Some(Unit::default_integer(20)),
+        );
 
-        let display_str = format!("{path}");
-        assert!(display_str.contains("Path with 2 points"));
-        assert!(display_str.contains("layer 5"));
-        assert!(display_str.contains("data type 10"));
-        assert!(display_str.contains("Square"));
-        assert!(display_str.contains("width 20"));
+        insta::assert_snapshot!(path.to_string(), @"Path with 2 points on layer 5 with data type 10, Square and width 20 (1.000e-9)");
     }
 
     #[test]
     fn test_path_clone_and_partial_eq() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)];
-        let path1 = Path::new(points.clone(), 1, 2, Some(PathType::Round), Some(5.0));
+        let path1 = Path::new(
+            points.clone(),
+            1,
+            2,
+            Some(PathType::Round),
+            Some(Unit::default_integer(5)),
+        );
         let path2 = path1.clone();
 
         assert_eq!(path1, path2);
 
-        let path3 = Path::new(points, 1, 2, Some(PathType::Square), Some(5.0));
+        let path3 = Path::new(
+            points,
+            1,
+            2,
+            Some(PathType::Square),
+            Some(Unit::default_integer(5)),
+        );
         assert_ne!(path1, path3);
     }
 
