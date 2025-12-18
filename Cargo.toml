@@ -13,14 +13,14 @@ license = "MIT"
 
 [workspace.dependencies]
 approx = "0.5"
-bytemuck = "1.16.1"
-chrono = "0.4.38"
+bytemuck = "1.24.0"
+chrono = "0.4.42"
 geo = "0.28"
-insta = { version = "1.35.1" }
+insta = { version = "1.44.3" }
 quickcheck = "1.0.3"
 quickcheck_macros = "1"
 rstest = "0.23.0"
-tempfile = "3.8"
+tempfile = "3.23"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
