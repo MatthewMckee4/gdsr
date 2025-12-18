@@ -61,7 +61,7 @@ pub enum GDSRecord {
     EndMasks = 0x38,
     LibDirSize = 0x39,
     SrfName = 0x3A,
-    LibSecur = 0x3B,
+    LibSecure = 0x3B,
     RaithMbmsPath = 0x5A,
     RaithPxxData = 0x62,
 }
@@ -130,7 +130,7 @@ impl TryFrom<u8> for GDSRecord {
             0x38 => Ok(Self::EndMasks),
             0x39 => Ok(Self::LibDirSize),
             0x3A => Ok(Self::SrfName),
-            0x3B => Ok(Self::LibSecur),
+            0x3B => Ok(Self::LibSecure),
             0x5A => Ok(Self::RaithMbmsPath),
             0x62 => Ok(Self::RaithPxxData),
             _ => Err(()),

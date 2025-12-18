@@ -1,18 +1,16 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
       - id: check-yaml
-      - id: check-json
       - id: check-toml
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
-      - id: trailing-whitespace
       - id: detect-private-key
 
   - repo: https://github.com/abravalheri/validate-pyproject
@@ -21,9 +19,19 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.32.0
+    rev: v1.40.0
     hooks:
       - id: typos
+
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.46.0
+    hooks:
+      - id: markdownlint-fix
 
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
@@ -37,25 +45,31 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: cargo +nightly fmt --
+        entry: cargo fmt --
         language: system
         types: [rust]
         pass_filenames: false
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         types_or: [yaml, toml]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.11
+    rev: v0.14.7
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.18.0
+    hooks:
+      - id: zizmor
+
   - repo: https://github.com/DevinR528/cargo-sort
-    rev: v2.0.1
+    rev: v2.0.2
     hooks:
       - id: cargo-sort
+        args: ["-g", "-w"]

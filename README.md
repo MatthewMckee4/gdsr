@@ -1,4 +1,5 @@
 # GDSR
+
 GDSII manipulation, written in rust.
 
 > [!WARNING]
@@ -8,9 +9,12 @@ gdsr is currently being repurposed to being a rust crate at the core. Python bin
 
 ## Inspiration
 
-My main inspiration comes from [gdstk](https://github.com/heitzmann/gdstk). If you are looking for an extremely fast gds manipulation python package then i would strongly recommend heading over and having a look at his work.
+My main inspiration comes from [gdstk](https://github.com/heitzmann/gdstk).
+If you are looking for an extremely fast gds manipulation python package
+then i would strongly recommend heading over and having a look at his work.
 
 Other inspirations include:
+
 - [gdsfactory](https://github.com/gdsfactory/gdsfactory)
 - [klayout](https://www.klayout.org/klayout-pypi/)
 
@@ -71,4 +75,5 @@ This gives us the following GDS file:
 
 ## Need help?
 
-Head over to the [discussions page](https://github.com/MatthewMckee4/gdsr/discussions) and create a new discussion there or have a look at the [issues page](https://github.com/MatthewMckee4/gdsr/issues) to see if anyone has had the same issue as you.
+Head over to the [discussions page](https://github.com/MatthewMckee4/gdsr/discussions)
+and create a new discussion there or have a look at the [issues page](https://github.com/MatthewMckee4/gdsr/issues) to see if anyone has had the same issue as you.
