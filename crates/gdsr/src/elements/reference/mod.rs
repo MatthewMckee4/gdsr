@@ -376,7 +376,7 @@ mod tests {
             2,
             Point::integer(10, 0, 1e-9),
             Point::integer(0, 10, 1e-9),
-            2.0, // magnification
+            2.0,                        // magnification
             std::f64::consts::PI / 2.0, // 90 degree rotation
             false,
         );
