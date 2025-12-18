@@ -1,8 +1,107 @@
 ---
-source: crates/gdsr_core/src/elements/reference/mod.rs
-expression: flattened
+source: crates/gdsr/src/cell/mod.rs
+expression: elements
 ---
 [
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+    Path(
+        Path {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+            type: None,
+            width: None,
+        },
+    ),
+    Text(
+        Text {
+            text: "text",
+            origin: Point {
+                x: Integer {
+                    value: 0,
+                    units: 1e-9,
+                },
+                y: Integer {
+                    value: 0,
+                    units: 1e-9,
+                },
+            },
+            layer: 1,
+            magnification: 1.0,
+            angle: 0.0,
+            x_reflection: false,
+            vertical_presentation: Middle,
+            horizontal_presentation: Centre,
+        },
+    ),
     Polygon(
         Polygon {
             points: [

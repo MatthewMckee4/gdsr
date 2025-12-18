@@ -1,4 +1,4 @@
-use gdsr_core::*;
+use gdsr::*;
 use rstest::rstest;
 use tempfile::tempdir;
 
@@ -32,8 +32,8 @@ fn test_library_roundtrip_mixed_elements() {
         1.0,
         0.0,
         false,
-        gdsr_core::VerticalPresentation::default(),
-        gdsr_core::HorizontalPresentation::default(),
+        gdsr::VerticalPresentation::default(),
+        gdsr::HorizontalPresentation::default(),
     );
     cell.add(text);
 
@@ -271,8 +271,8 @@ fn test_text_with_various_presentations() {
         1.0,
         0.0,
         false,
-        gdsr_core::VerticalPresentation::Top,
-        gdsr_core::HorizontalPresentation::Left,
+        gdsr::VerticalPresentation::Top,
+        gdsr::HorizontalPresentation::Left,
     );
     cell.add(text1);
 
@@ -283,8 +283,8 @@ fn test_text_with_various_presentations() {
         1.5,
         45.0,
         false,
-        gdsr_core::VerticalPresentation::Middle,
-        gdsr_core::HorizontalPresentation::Centre,
+        gdsr::VerticalPresentation::Middle,
+        gdsr::HorizontalPresentation::Centre,
     );
     cell.add(text2);
 
@@ -295,8 +295,8 @@ fn test_text_with_various_presentations() {
         2.0,
         90.0,
         true,
-        gdsr_core::VerticalPresentation::Bottom,
-        gdsr_core::HorizontalPresentation::Right,
+        gdsr::VerticalPresentation::Bottom,
+        gdsr::HorizontalPresentation::Right,
     );
     cell.add(text3);
 
@@ -542,8 +542,8 @@ fn test_single_cell_with_all_element_types() {
         2.0,
         0.0,
         false,
-        gdsr_core::VerticalPresentation::Middle,
-        gdsr_core::HorizontalPresentation::Centre,
+        gdsr::VerticalPresentation::Middle,
+        gdsr::HorizontalPresentation::Centre,
     ));
 
     // Add a reference to a simple cell

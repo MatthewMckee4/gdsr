@@ -280,7 +280,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gdsr_core"
+name = "gdsr"
 version = "0.0.0"
 dependencies = [
  "approx",
