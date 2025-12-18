@@ -125,11 +125,11 @@ impl Unit {
     /// The units of the new `Unit` are equal to `new_units`,
     /// and the value is scaled accordingly.
     #[must_use]
-    pub const fn scale_units(&self, new_units: f64) -> Self {
+    pub fn scale_units(&self, new_units: f64) -> Self {
         let scale_factor = self.units() / new_units;
         match self {
             Self::Integer { value, .. } => Self::Integer {
-                value: (*value as f64 * scale_factor) as i32,
+                value: (f64::from(*value) * scale_factor).round() as i32,
                 units: new_units,
             },
             Self::Float { value, .. } => Self::Float {

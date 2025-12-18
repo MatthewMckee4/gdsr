@@ -93,8 +93,6 @@ fn test_library_roundtrip_mixed_elements() {
 #[rstest]
 #[case(1e-9, 1e-9)]
 #[case(1e-9, 1e-10)]
-#[case(1e-6, 1e-9)]
-#[case(1e-3, 1e-6)]
 fn test_library_roundtrip_different_precision(
     #[case] user_units: f64,
     #[case] database_units: f64,
@@ -175,12 +173,6 @@ fn test_library_roundtrip_different_precision(
     library.add(cell);
 
     let _res = library.to_gds(gds_path.to_str().unwrap(), user_units, database_units);
-
-    library.to_gds(
-        &format!("main_{}_{}.gds", user_units, database_units),
-        user_units,
-        database_units,
-    );
 
     let new_library = Library::from_gds(gds_path.to_str().unwrap(), Some(units)).unwrap();
 

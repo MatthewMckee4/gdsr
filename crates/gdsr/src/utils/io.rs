@@ -86,7 +86,7 @@ pub fn write_points_to_file(
 ) -> io::Result<()> {
     let integer_points: Vec<Point> = points.iter().map(Point::to_integer_unit).collect();
 
-    let points_to_write = integer_points.get(..MAX_POINTS).unwrap_or(points);
+    let points_to_write = integer_points.get(..MAX_POINTS).unwrap_or(&integer_points);
 
     let record_size = 4 + (points.len() * 8) as u16;
     let xy_header_buffer = [
@@ -97,18 +97,11 @@ pub fn write_points_to_file(
     write_u16_array_to_file(file, &xy_header_buffer)?;
 
     for point in points_to_write {
-        let x = point
-            .x()
-            .scale_units(database_units)
-            .to_float_unit()
-            .expect_float_value();
-        let y = point
-            .y()
-            .scale_units(database_units)
-            .to_float_unit()
-            .expect_float_value();
-        let scaled_x = x.round() as i32;
-        let scaled_y = y.round() as i32;
+        let x_real = point.x().true_value();
+        let y_real = point.y().true_value();
+
+        let scaled_x = (x_real / database_units).round() as i32;
+        let scaled_y = (y_real / database_units).round() as i32;
 
         file.write_all(&scaled_x.to_be_bytes())?;
         file.write_all(&scaled_y.to_be_bytes())?;
@@ -151,8 +144,8 @@ pub fn write_string_with_record_to_file(
     file.write_all(&lib_name_bytes)
 }
 
-pub fn write_gds<'a>(
-    file_name: String,
+pub fn write_gds<'a, P: AsRef<std::path::Path>>(
+    file_name: P,
     library_name: &str,
     user_units: f64,
     database_units: f64,
@@ -210,7 +203,10 @@ pub fn write_transformation_to_file(
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
+pub fn from_gds<P: AsRef<std::path::Path>>(
+    file_name: P,
+    units: Option<f64>,
+) -> io::Result<Library> {
     let mut library = Library::new("Library");
 
     let file = File::open(file_name)?;
@@ -235,13 +231,12 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                 }
                 GDSRecord::Units => {
                     if let GDSRecordData::F64(units_vec) = data {
-                        let user_units_from_file = units_vec[0];
                         let db_units_from_file = units_vec[1];
 
                         if units.is_none() {
                             db_units = db_units_from_file;
                         }
-                        scale = db_units_from_file / user_units_from_file;
+                        scale = db_units_from_file / db_units;
                     }
                 }
                 GDSRecord::BgnStr => {

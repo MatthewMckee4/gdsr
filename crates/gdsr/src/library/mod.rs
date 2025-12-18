@@ -36,9 +36,23 @@ impl Library {
         self.cells.contains_key(cell.name())
     }
 
-    pub fn to_gds(&self, file_name: &str, user_units: f64, database_units: f64) -> io::Result<()> {
+    /// Write the library to a GDS file.
+    ///
+    /// The given user units are only used when writing the GDSII header.
+    /// So, when you open the GDSII file you see values in these units.
+    ///
+    /// The database units are used when scaling values before writing.
+    ///
+    /// If you have a unit value 10 with units 1e-9, and database units are 1e-10,
+    /// then the scaled value will be 100.
+    pub fn to_gds<P: AsRef<std::path::Path>>(
+        &self,
+        file_name: P,
+        user_units: f64,
+        database_units: f64,
+    ) -> io::Result<()> {
         write_gds(
-            file_name.to_string(),
+            file_name,
             &self.name,
             user_units,
             database_units,
@@ -46,8 +60,17 @@ impl Library {
         )
     }
 
-    pub fn from_gds(file_name: &str, units: Option<f64>) -> io::Result<Self> {
-        from_gds(file_name.to_string(), units)
+    /// Read a library from a GDS file.
+    ///
+    /// The given units are not required they are used to normalize the database units
+    /// to some more readable values. For example a unit value of 10 with units 1e-9
+    /// and database units of 1e-10 will result in a scaled value of 100.
+    /// This means you can work with the values in a more human-readable format.
+    pub fn from_gds<P: AsRef<std::path::Path>>(
+        file_name: P,
+        units: Option<f64>,
+    ) -> io::Result<Self> {
+        from_gds(file_name, units)
     }
 }
 

@@ -59,7 +59,7 @@ impl Point {
     }
 
     #[must_use]
-    pub const fn scale_units(&self, new_units: f64) -> Self {
+    pub fn scale_units(&self, new_units: f64) -> Self {
         Self {
             x: self.x.scale_units(new_units),
             y: self.y.scale_units(new_units),
