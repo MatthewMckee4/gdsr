@@ -19,19 +19,22 @@ Other inspirations include:
 A simple program below shows the easy to use interface.
 
 ```rust
+
 use gdsr_core::{Cell, Grid, Library, Point, Polygon, Reference};
 
 fn main() {
+    let units = 1e-9;
+
     let mut library = Library::new("main");
 
     let mut cell = Cell::new("main_cell");
 
     let polygon = Polygon::new(
         [
-            Point::integer(0, 0, 1e-9),
-            Point::integer(1, 0, 1e-9),
-            Point::integer(1, 1, 1e-9),
-            Point::integer(0, 1, 1e-9),
+            Point::integer(0, 0, units),
+            Point::integer(1, 0, units),
+            Point::integer(1, 1, units),
+            Point::integer(0, 1, units),
         ],
         1,
         0,
@@ -40,12 +43,12 @@ fn main() {
     let reference = Reference::new(
         polygon,
         Grid::new(
-            Point::integer(0, 0, 1e-9),
+            Point::integer(0, 0, units),
             5,
             5,
-            Point::integer(2, 0, 1e-9),
-            Point::integer(0, 2, 1e-9),
-            1.0,
+            Point::integer(2, 0, units),
+            Point::integer(0, 2, units),
+            2.0,
             0.0,
             false,
         ),
@@ -55,8 +58,11 @@ fn main() {
 
     library.add(cell);
 
-    let _res = library.to_gds("main.gds", 1e-6, 1e-9);
+    library.to_gds("main.gds", 1e-9, 1e-9).unwrap();
+
+    let library = Library::from_gds("main.gds", Some(1e-9));
 }
+
 ```
 
 This gives us the following GDS file:

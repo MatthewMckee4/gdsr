@@ -228,18 +228,11 @@ pub fn from_gds(file_name: String, units: Option<f64>) -> io::Result<Library> {
                     if let GDSRecordData::F64(units_vec) = data {
                         let user_units_from_file = units_vec[0];
                         let db_units_from_file = units_vec[1];
-                        println!("User units from file: {user_units_from_file}");
-                        println!("DB units from file__: {db_units_from_file}");
-                        // if (unit > 0) {
-                        //     scale = db_units / unit;
-                        //     library.unit = unit;
-                        // } else {
-                        scale = db_units_from_file / user_units_from_file;
+
                         if units.is_none() {
-                            db_units = db_units_from_file; // user_units_from_file;
+                            db_units = db_units_from_file;
                         }
-                        // }
-                        // user_units = db_units;
+                        scale = db_units_from_file / user_units_from_file;
                     }
                 }
                 GDSRecord::BgnStr => {
