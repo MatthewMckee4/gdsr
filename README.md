@@ -63,7 +63,7 @@ fn main() {
 
     library.add(cell);
 
-    library.to_gds("main.gds", 1e-9, 1e-9).unwrap();
+    library.write_file("main.gds", 1e-9, 1e-9).unwrap();
 }
 ```
 
