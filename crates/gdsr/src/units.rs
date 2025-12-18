@@ -575,27 +575,7 @@ impl Mul for Unit {
 #[allow(clippy::match_wildcard_for_single_variants)]
 #[cfg(test)]
 mod tests {
-    use quickcheck::{Arbitrary, Gen};
-
     use super::*;
-
-    impl Arbitrary for Unit {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let units_exponent = (i32::arbitrary(g) % 10) - 12;
-            let units = 10_f64.powi(units_exponent);
-
-            if bool::arbitrary(g) {
-                let value = (i32::arbitrary(g) % 1_000_000) - 500_000;
-                Self::Integer { value, units }
-            } else {
-                let mut value = f64::arbitrary(g);
-                if !value.is_finite() || value.abs() > 1e100 {
-                    value = f64::from(i32::arbitrary(g) % 1_000_000) / 1000.0;
-                }
-                Self::Float { value, units }
-            }
-        }
-    }
 
     mod creation {
         use super::*;
