@@ -98,79 +98,71 @@ impl std::fmt::Display for Cell {
 }
 
 impl Transformable for Cell {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
-        let mut new_self = self.clone();
-
-        new_self.polygons = new_self
+    fn transform_impl(mut self, transformation: &Transformation) -> Self {
+        self.polygons = self
             .polygons
             .into_iter()
             .map(|polygon| polygon.transform_impl(transformation))
             .collect();
 
-        new_self.paths = new_self
+        self.paths = self
             .paths
             .into_iter()
             .map(|path| path.transform_impl(transformation))
             .collect();
 
-        new_self.texts = new_self
+        self.texts = self
             .texts
             .into_iter()
             .map(|text| text.transform_impl(transformation))
             .collect();
 
-        new_self.references = new_self
+        self.references = self
             .references
             .into_iter()
             .map(|reference| reference.transform_impl(transformation))
             .collect();
 
-        new_self
+        self
     }
 }
 
 impl Movable for Cell {
-    fn move_to(&self, target: crate::Point) -> Self {
-        let mut new_self = self.clone();
-
-        new_self.polygons = new_self
+    fn move_to(mut self, target: crate::Point) -> Self {
+        self.polygons = self
             .polygons
             .into_iter()
             .map(|polygon| polygon.move_to(target))
             .collect();
 
-        new_self.paths = new_self
+        self.paths = self
             .paths
             .into_iter()
             .map(|path| path.move_to(target))
             .collect();
 
-        new_self.texts = new_self
+        self.texts = self
             .texts
             .into_iter()
             .map(|text| text.move_to(target))
             .collect();
 
-        new_self.references = new_self
+        self.references = self
             .references
             .into_iter()
             .map(|reference| reference.move_to(target))
             .collect();
 
-        new_self
+        self
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        Grid, Point,
-        elements::{
-            path::PathType,
-            text::presentation::{HorizontalPresentation, VerticalPresentation},
-        },
-    };
+    use crate::elements::path::PathType;
+    use crate::elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
+    use crate::{Grid, Point};
 
     #[test]
     fn test_cell_new() {

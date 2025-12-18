@@ -1,14 +1,13 @@
-use std::{fs::File, io};
+use std::fs::File;
+use std::io;
 
 use super::{Instance, Reference};
-use crate::{
-    config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
-    elements::Element,
-    traits::ToGds,
-    utils::io::{
-        write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
-        write_transformation_to_file, write_u16_array_to_file,
-    },
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::elements::Element;
+use crate::traits::ToGds;
+use crate::utils::io::{
+    write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
+    write_transformation_to_file, write_u16_array_to_file,
 };
 
 impl ToGds for Reference {

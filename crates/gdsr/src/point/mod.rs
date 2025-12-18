@@ -1,6 +1,7 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::{AngleInRadians, Movable, Transformable, Transformation, units::Unit};
+use crate::units::Unit;
+use crate::{AngleInRadians, Movable, Transformable, Transformation};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
@@ -84,52 +85,6 @@ impl Point {
         Self {
             x: self.x.to_float_unit(user_units),
             y: self.y.to_float_unit(user_units),
-        }
-    }
-
-    /// Rotates the point around the origin (0, 0) by the given angle in radians.
-    ///
-    /// # Arguments
-    /// * `angle` - The rotation angle in radians (positive = counter-clockwise)
-    ///
-    /// # Returns
-    /// A new `Point` representing the rotated position
-    #[must_use]
-    pub fn rotate(&self, angle: AngleInRadians) -> Self {
-        let cos_a = angle.cos();
-        let sin_a = angle.sin();
-
-        // Convert to float units and extract values
-        let x_float = self.x.to_float_unit(1e-6);
-        let y_float = self.y.to_float_unit(1e-6);
-
-        let Unit::Float {
-            value: x_val,
-            units: x_units,
-        } = x_float
-        else {
-            unreachable!("to_float_unit should always return Float variant");
-        };
-
-        let Unit::Float {
-            value: y_val,
-            units: y_units,
-        } = y_float
-        else {
-            unreachable!("to_float_unit should always return Float variant");
-        };
-
-        // Calculate real world values
-        let x_real = x_val * x_units;
-        let y_real = y_val * y_units;
-
-        // Apply rotation transformation
-        let new_x_real = x_real.mul_add(cos_a, -(y_real * sin_a));
-        let new_y_real = x_real.mul_add(sin_a, y_real * cos_a);
-
-        Self {
-            x: Unit::float(new_x_real, 1.0),
-            y: Unit::float(new_y_real, 1.0),
         }
     }
 
@@ -231,13 +186,13 @@ impl std::fmt::Display for Point {
 }
 
 impl Transformable for Point {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
-        transformation.apply_to_point(self)
+    fn transform_impl(self, transformation: &Transformation) -> Self {
+        transformation.apply_to_point(&self)
     }
 }
 
 impl Movable for Point {
-    fn move_to(&self, target: Point) -> Self {
+    fn move_to(self, target: Point) -> Self {
         target
     }
 }
@@ -446,7 +401,7 @@ mod tests {
         #[test]
         fn chaining_from_and_methods() {
             let point = Point::integer(100, 200, 1e-9);
-            let rotated = point.rotate(std::f64::consts::PI);
+            let rotated = point.rotate(std::f64::consts::PI, Point::integer(0, 0, 1e-9));
 
             // Original point should be unchanged
             assert_eq!(point.x(), Unit::integer(100, 1e-9));
@@ -585,7 +540,7 @@ mod tests {
         #[test]
         fn rotate_90_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(PI / 2.0);
+            let rotated = point.rotate(PI / 2.0, Point::float(0.0, 0.0, 1e-6));
 
             assert!((extract_real_value(rotated.x()) - 0.0).abs() < 1e-15);
             assert!((extract_real_value(rotated.y()) - 1e-6).abs() < 1e-15);
@@ -594,7 +549,7 @@ mod tests {
         #[test]
         fn rotate_180_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(PI);
+            let rotated = point.rotate(PI, Point::float(0.0, 0.0, 1e-6));
 
             assert!((extract_real_value(rotated.x()) - (-1e-6)).abs() < 1e-15);
             assert!((extract_real_value(rotated.y()) - 0.0).abs() < 1e-15);
@@ -603,7 +558,7 @@ mod tests {
         #[test]
         fn rotate_270_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(3.0 * PI / 2.0);
+            let rotated = point.rotate(3.0 * PI / 2.0, Point::float(0.0, 0.0, 1e-6));
 
             assert!((extract_real_value(rotated.x()) - 0.0).abs() < 1e-15);
             assert!((extract_real_value(rotated.y()) - (-1e-6)).abs() < 1e-15);
@@ -612,7 +567,7 @@ mod tests {
         #[test]
         fn rotate_360_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(2.0 * PI);
+            let rotated = point.rotate(2.0 * PI, Point::float(0.0, 0.0, 1e-6));
 
             assert!((extract_real_value(rotated.x()) - 1e-6).abs() < 1e-15);
             assert!((extract_real_value(rotated.y()) - 0.0).abs() < 1e-15);
@@ -621,7 +576,7 @@ mod tests {
         #[test]
         fn rotate_arbitrary_point() {
             let point = Point::float(3.0, 4.0, 1e-6);
-            let rotated = point.rotate(PI / 4.0); // 45 degrees
+            let rotated = point.rotate(PI / 4.0, Point::float(0.0, 0.0, 1e-6)); // 45 degrees
 
             let expected_x = 3e-6f64.mul_add((PI / 4.0).cos(), -(4e-6 * (PI / 4.0).sin()));
             let expected_y = 3e-6f64.mul_add((PI / 4.0).sin(), 4e-6 * (PI / 4.0).cos());

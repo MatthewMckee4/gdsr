@@ -99,18 +99,16 @@ impl std::fmt::Display for Reference {
 }
 
 impl Transformable for Reference {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
-        let mut new_self = self.clone();
-        new_self.grid = new_self.grid.transform_impl(transformation);
-        new_self
+    fn transform_impl(mut self, transformation: &Transformation) -> Self {
+        self.grid = self.grid.transform_impl(transformation);
+        self
     }
 }
 
 impl Movable for Reference {
-    fn move_to(&self, target: Point) -> Self {
-        let mut new_self = self.clone();
-        new_self.grid = new_self.grid.move_to(target);
-        new_self
+    fn move_to(mut self, target: Point) -> Self {
+        self.grid = self.grid.move_to(target);
+        self
     }
 }
 

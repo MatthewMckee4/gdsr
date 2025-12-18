@@ -134,37 +134,35 @@ impl std::fmt::Display for Grid {
 }
 
 impl Transformable for Grid {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
-        let mut new_self = self.clone();
-        new_self.origin = transformation.apply_to_point(&new_self.origin);
-        new_self.spacing_x = transformation.apply_to_point(&new_self.spacing_x);
-        new_self.spacing_y = transformation.apply_to_point(&new_self.spacing_y);
+    fn transform_impl(mut self, transformation: &Transformation) -> Self {
+        self.origin = transformation.apply_to_point(&self.origin);
+        self.spacing_x = transformation.apply_to_point(&self.spacing_x);
+        self.spacing_y = transformation.apply_to_point(&self.spacing_y);
 
         // Apply scale and rotation to grid properties
         if let Some(scale) = &transformation.scale {
-            new_self.magnification *= scale.factor();
+            self.magnification *= scale.factor();
         }
 
         if let Some(rotation) = &transformation.rotation {
-            new_self.angle += rotation.angle();
-            let result = new_self.angle % 360.0;
-            new_self.angle = if result < 0.0 { result + 360.0 } else { result };
+            self.angle += rotation.angle();
+            let result = self.angle % 360.0;
+            self.angle = if result < 0.0 { result + 360.0 } else { result };
         }
 
         // Handle reflection
         if transformation.reflection.is_some() {
-            new_self.x_reflection = !new_self.x_reflection;
+            self.x_reflection = !self.x_reflection;
         }
 
-        new_self
+        self
     }
 }
 
 impl Movable for Grid {
-    fn move_to(&self, target: Point) -> Self {
-        let mut new_self = self.clone();
-        new_self.origin = target;
-        new_self
+    fn move_to(mut self, target: Point) -> Self {
+        self.origin = target;
+        self
     }
 }
 

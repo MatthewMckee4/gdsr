@@ -1,14 +1,10 @@
-use std::{
-    fs::File,
-    io::{self, Write},
-};
+use std::fs::File;
+use std::io::{self, Write};
 
 use super::Path;
-use crate::{
-    config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
-    traits::ToGds,
-    utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
-};
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::traits::ToGds;
+use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
 
 impl ToGds for Path {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {

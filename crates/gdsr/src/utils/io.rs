@@ -1,25 +1,20 @@
-use std::{
-    convert::TryFrom,
-    fs::File,
-    io::{self, BufReader, Read, Write},
-};
+use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{self, BufReader, Read, Write};
 
 use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 
-use crate::{
-    DataType, Instance, Layer, Point, ToGds,
-    cell::Cell,
-    config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type},
-    elements::{
-        Path, PathType, Polygon, Reference, Text, text::utils::get_presentations_from_value,
-    },
-    library::Library,
-    utils::{
-        gds_format::{eight_byte_real, u16_array_to_big_endian},
-        geometry::round_to_decimals,
-    },
+use crate::cell::Cell;
+use crate::config::gds_file_types::{
+    GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type,
 };
+use crate::elements::text::utils::get_presentations_from_value;
+use crate::elements::{Path, PathType, Polygon, Reference, Text};
+use crate::library::Library;
+use crate::utils::gds_format::{eight_byte_real, u16_array_to_big_endian};
+use crate::utils::geometry::round_to_decimals;
+use crate::{DataType, Instance, Layer, Point, ToGds};
 
 pub fn write_gds_head_to_file(
     library_name: &str,

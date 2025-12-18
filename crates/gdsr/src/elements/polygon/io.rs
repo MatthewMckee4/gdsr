@@ -1,11 +1,10 @@
-use std::{fs::File, io};
+use std::fs::File;
+use std::io;
 
 use super::Polygon;
-use crate::{
-    config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type},
-    traits::ToGds,
-    utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file},
-};
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::traits::ToGds;
+use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
 
 impl ToGds for Polygon {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()> {

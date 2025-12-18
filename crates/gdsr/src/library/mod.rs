@@ -1,9 +1,8 @@
-use std::{collections::HashMap, io};
+use std::collections::HashMap;
+use std::io;
 
-use crate::{
-    cell::Cell,
-    utils::io::{from_gds, write_gds},
-};
+use crate::cell::Cell;
+use crate::utils::io::{from_gds, write_gds};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Library {

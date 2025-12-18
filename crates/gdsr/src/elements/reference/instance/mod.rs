@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use crate::{
-    Cell,
-    elements::{Element, Path, Polygon, Text},
-};
+use crate::Cell;
+use crate::elements::{Element, Path, Polygon, Text};
 // Note: Reference is defined in parent module, so we can't import it here to avoid circular dependency
 
 #[derive(Clone, Debug, PartialEq)]

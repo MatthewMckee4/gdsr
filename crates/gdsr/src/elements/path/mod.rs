@@ -69,24 +69,19 @@ impl std::fmt::Display for Path {
 }
 
 impl Transformable for Path {
-    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
-        let points = self
+    fn transform_impl(mut self, transformation: &crate::Transformation) -> Self {
+        self.points = self
             .points()
             .iter()
-            .map(|point| point.transform(transformation));
+            .map(|point| point.transform(transformation))
+            .collect();
 
-        Self::new(
-            points,
-            self.layer(),
-            self.data_type(),
-            *self.path_type(),
-            self.width(),
-        )
+        self
     }
 }
 
 impl Movable for Path {
-    fn move_to(&self, target: Point) -> Self {
+    fn move_to(self, target: Point) -> Self {
         let first_point = &self.points()[0];
         let delta = target - *first_point;
         self.move_by(delta)

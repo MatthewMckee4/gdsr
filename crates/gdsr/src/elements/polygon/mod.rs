@@ -74,26 +74,25 @@ impl std::fmt::Display for Polygon {
 }
 
 impl Transformable for Polygon {
-    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
-        let points: Vec<Point> = self
+    fn transform_impl(mut self, transformation: &crate::Transformation) -> Self {
+        self.points = self
             .points()
             .iter()
             .map(|point| point.transform(transformation))
             .collect();
 
-        Self::new(points, self.layer(), self.data_type())
+        self
     }
 }
 
 impl Movable for Polygon {
-    fn move_to(&self, target: Point) -> Self {
-        let points: Vec<Point> = self
+    fn move_to(mut self, target: Point) -> Self {
+        self.points = self
             .points()
             .iter()
             .map(|point| point.move_to(target))
             .collect();
-
-        Self::new(points, self.layer(), self.data_type())
+        self
     }
 }
 

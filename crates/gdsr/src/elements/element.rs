@@ -1,8 +1,6 @@
-use crate::{
-    Movable, Point, Transformable, Transformation,
-    elements::{Path, Polygon, Reference, Text},
-    traits::ToGds,
-};
+use crate::elements::{Path, Polygon, Reference, Text};
+use crate::traits::ToGds;
+use crate::{Movable, Point, Transformable, Transformation};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
@@ -94,7 +92,7 @@ impl ToGds for Element {
 }
 
 impl Transformable for Element {
-    fn transform_impl(&self, transformation: &Transformation) -> Self {
+    fn transform_impl(self, transformation: &Transformation) -> Self {
         match self {
             Self::Path(path) => Self::Path(path.transform_impl(transformation)),
             Self::Polygon(polygon) => Self::Polygon(polygon.transform_impl(transformation)),
@@ -105,7 +103,7 @@ impl Transformable for Element {
 }
 
 impl Movable for Element {
-    fn move_to(&self, target: Point) -> Self {
+    fn move_to(self, target: Point) -> Self {
         match self {
             Self::Path(path) => Self::Path(path.move_to(target)),
             Self::Polygon(polygon) => Self::Polygon(polygon.move_to(target)),

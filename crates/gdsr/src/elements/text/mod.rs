@@ -106,37 +106,34 @@ impl std::fmt::Display for Text {
 }
 
 impl Transformable for Text {
-    fn transform_impl(&self, transformation: &crate::Transformation) -> Self {
-        let mut new_self = self.clone();
-
+    fn transform_impl(mut self, transformation: &crate::Transformation) -> Self {
         if let Some(translation) = &transformation.translation {
-            new_self.origin = translation.apply_to_point(new_self.origin());
+            self.origin = translation.apply_to_point(self.origin());
         }
 
         if let Some(scale) = &transformation.scale {
-            new_self.magnification *= scale.factor();
+            self.magnification *= scale.factor();
         }
 
         if let Some(rotation) = &transformation.rotation {
             if *rotation.centre() == Point::default() {
-                new_self.angle += rotation.angle();
+                self.angle += rotation.angle();
             } else {
-                new_self.origin = new_self
+                self.origin = self
                     .origin
                     .rotate_around_point(rotation.angle(), rotation.centre());
-                new_self.angle += rotation.angle();
+                self.angle += rotation.angle();
             }
         }
 
-        new_self
+        self
     }
 }
 
 impl Movable for Text {
-    fn move_to(&self, target: Point) -> Self {
-        let mut new_self = self.clone();
-        new_self.set_origin(target);
-        new_self
+    fn move_to(mut self, target: Point) -> Self {
+        self.origin = target;
+        self
     }
 }
 
