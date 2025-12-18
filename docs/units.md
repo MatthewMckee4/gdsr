@@ -52,3 +52,43 @@ For most users I would imagine that they would want to use micrometers (`um`) fo
 
 When reading a GDSII file into a `Library`, with `Library::read_file`, you can only specify the "user" units.
 These units are what is used when creating `Point`s and `Unit`s. This allows you to work with these values in a consistent way. If you do not provide this, then values will be with units of 1, which is not recommended, though it is fine to work with these values.
+
+## Important
+
+I'd like to first show a scenario, and explain why it may result in unexpected behavior.
+
+```rs
+use gdsr::{Cell, Grid, Library, Point, Polygon, Reference};
+
+fn main() {
+    let units = 1e-9;
+
+    let mut library = Library::new("main");
+
+    let mut cell = Cell::new("main_cell");
+
+    let polygon = Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(1, 0, units),
+            Point::integer(1, 1, units),
+            Point::integer(0, 1, units),
+        ],
+        1,
+        0,
+    );
+
+    cell.add(polygon);
+
+    library.add(cell);
+
+    library.write_file("main.gds", 1e-6, 1e-6).unwrap();
+}
+```
+
+Note here we are writing with user units `1e-3` and database units `1e-6`.
+
+But `1e-6` is greater than `1e-9`, which is the units we are using for our `Point`s and `Unit`s.
+
+When we set database units, this is setting the minimal value that we can see in our GDSII, 
+since all values are less than that, all values in the polygon will be scaled to 0.
