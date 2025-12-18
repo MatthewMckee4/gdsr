@@ -19,7 +19,10 @@ impl Reflection {
         let dx = point2.x().true_value() - point1.x().true_value();
         let dy = point2.y().true_value() - point1.y().true_value();
         let angle = dy.atan2(dx);
-        let centre = Point::new((point1.x() + point2.x()) / 2.0, (point1.y() + point2.y()) / 2.0);
+        let centre = Point::new(
+            (point1.x() + point2.x()) / 2.0,
+            (point1.y() + point2.y()) / 2.0,
+        );
         Self { angle, centre }
     }
 

@@ -271,4 +271,212 @@ mod tests {
 
         insta::assert_debug_snapshot!(flattened);
     }
+
+    #[test]
+    fn test_reference_flatten_with_depth() {
+        let library = Library::new("main");
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+        let reference = Reference::new(polygon, grid);
+
+        let flattened = reference.flatten(Some(0), &library);
+        // Depth 0 should return the reference itself
+        assert_eq!(flattened.len(), 1);
+    }
+
+    #[test]
+    fn test_reference_get_elements_in_grid() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            3,
+            3,
+            Point::integer(20, 0, 1e-9),
+            Point::integer(0, 20, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+        let reference = Reference::new(polygon.clone(), grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 9); // 3x3 grid
+    }
+
+    #[test]
+    fn test_reference_with_x_reflection() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            true, // x_reflection enabled
+        );
+        let reference = Reference::new(polygon.clone(), grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 4);
+    }
+
+    #[test]
+    fn test_reference_with_rotation_and_magnification() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            2.0, // magnification
+            std::f64::consts::PI / 2.0, // 90 degree rotation
+            false,
+        );
+        let reference = Reference::new(polygon.clone(), grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 4);
+    }
+
+    #[test]
+    fn test_reference_transform() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+        let reference = Reference::new(polygon, grid);
+
+        let centre = Point::integer(5, 5, 1e-9);
+        let transformed = reference.rotate(std::f64::consts::PI / 2.0, centre);
+
+        assert!(transformed.grid().angle() != 0.0);
+    }
+
+    #[test]
+    fn test_reference_move_to() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+        let reference = Reference::new(polygon, grid);
+
+        let target = Point::integer(20, 20, 1e-9);
+        let moved = reference.move_to(target);
+
+        assert_eq!(moved.grid().origin(), target);
+    }
+
+    #[test]
+    fn test_reference_flatten_cell_reference() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let mut cell = crate::Cell::new("test_cell");
+        cell.add(polygon);
+        library.add(cell);
+
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+        let reference = Reference::new("test_cell", grid);
+
+        let flattened = reference.flatten(None, &library);
+        assert_eq!(flattened.len(), 4); // 2x2 grid
+    }
 }

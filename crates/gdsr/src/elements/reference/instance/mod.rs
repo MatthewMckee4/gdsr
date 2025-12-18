@@ -125,4 +125,72 @@ mod tests {
         let cloned = instance.clone();
         assert_eq!(instance, cloned);
     }
+
+    #[test]
+    fn test_instance_from_path() {
+        let path = Path::new(
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        );
+        let instance = Instance::from(path);
+
+        match instance {
+            Instance::Element(arc) => {
+                assert!(matches!(**arc, Element::Path(_)));
+            }
+            Instance::Cell(_) => panic!("Expected Element variant"),
+        }
+    }
+
+    #[test]
+    fn test_instance_from_text() {
+        use crate::{HorizontalPresentation, VerticalPresentation};
+
+        let text = Text::new(
+            "test",
+            Point::integer(0, 0, 1e-9),
+            1,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::Middle,
+            HorizontalPresentation::Centre,
+        );
+        let instance = Instance::from(text);
+
+        match instance {
+            Instance::Element(arc) => {
+                assert!(matches!(**arc, Element::Text(_)));
+            }
+            Instance::Cell(_) => panic!("Expected Element variant"),
+        }
+    }
+
+    #[test]
+    fn test_instance_from_cell() {
+        let cell = Cell::new("my_cell");
+        let instance = Instance::from(&cell);
+
+        assert_eq!(instance, Instance::Cell("my_cell".to_string()));
+    }
+
+    #[test]
+    fn test_instance_display_element() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let instance = Instance::from(polygon);
+        let display_str = format!("{instance}");
+        assert!(display_str.contains("Element instance"));
+        assert!(display_str.contains("Polygon"));
+    }
 }
