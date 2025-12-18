@@ -7,12 +7,10 @@ pub struct Reflection {
 }
 
 impl Reflection {
-    #[must_use]
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
-    #[must_use]
     pub const fn new_horizontal() -> Self {
         Self::new(0.0, Point::integer(0, 1, 1e-9))
     }
@@ -21,7 +19,6 @@ impl Reflection {
         todo!()
     }
 
-    #[must_use]
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let cos_2angle = (2.0 * self.angle).cos();
         let sin_2angle = (2.0 * self.angle).sin();

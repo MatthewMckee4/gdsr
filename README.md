@@ -25,7 +25,6 @@ Other inspirations include:
 A simple program below shows the easy to use interface.
 
 ```rust
-
 use gdsr_core::{Cell, Grid, Library, Point, Polygon, Reference};
 
 fn main() {

@@ -1,0 +1,198 @@
+---
+source: crates/gdsr_core/src/elements/reference/mod.rs
+expression: flattened
+---
+[
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                },
+                Point {
+                    x: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                    y: Integer {
+                        value: 10,
+                        units: 1e-9,
+                    },
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+]

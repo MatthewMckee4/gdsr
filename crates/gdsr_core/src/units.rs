@@ -15,17 +15,14 @@ pub const DEFAULT_INTEGER_UNITS: f64 = 1e-9;
 pub const DEFAULT_FLOAT_UNITS: f64 = 1e-6;
 
 impl Unit {
-    #[must_use]
     pub const fn integer(value: i32, units: f64) -> Self {
         Self::Integer { value, units }
     }
 
-    #[must_use]
     pub const fn float(value: f64, units: f64) -> Self {
         Self::Float { value, units }
     }
 
-    #[must_use]
     pub const fn as_float(&self) -> f64 {
         match self {
             Self::Integer { value, .. } => *value as f64,
@@ -33,7 +30,6 @@ impl Unit {
         }
     }
 
-    #[must_use]
     pub fn true_value(&self) -> f64 {
         match self {
             Self::Integer { value, units } => f64::from(*value) * units,
@@ -41,7 +37,6 @@ impl Unit {
         }
     }
 
-    #[must_use]
     pub const fn expect_integer_value(&self) -> i32 {
         match self {
             Self::Integer { value, .. } => *value,
@@ -49,7 +44,6 @@ impl Unit {
         }
     }
 
-    #[must_use]
     pub const fn expect_float_value(&self) -> f64 {
         match self {
             Self::Integer { value, .. } => *value as f64,
@@ -57,7 +51,6 @@ impl Unit {
         }
     }
 
-    #[must_use]
     pub const fn default_integer(value: i32) -> Self {
         Self::Integer {
             value,
@@ -65,7 +58,6 @@ impl Unit {
         }
     }
 
-    #[must_use]
     pub const fn default_float(value: f64) -> Self {
         Self::Float {
             value,
@@ -105,7 +97,6 @@ impl Unit {
     }
 
     /// Sets the units for this Unit.
-    #[must_use]
     pub const fn units(&self) -> f64 {
         match self {
             Self::Integer { units, .. } | Self::Float { units, .. } => *units,

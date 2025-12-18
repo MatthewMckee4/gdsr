@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::elements::{Element, Path, Polygon, Text};
+use crate::{
+    Cell,
+    elements::{Element, Path, Polygon, Text},
+};
 // Note: Reference is defined in parent module, so we can't import it here to avoid circular dependency
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,6 +52,12 @@ impl From<Text> for Instance {
 //         Instance::Element(Arc::new(Box::new(Element::Reference(value))))
 //     }
 // }
+
+impl From<&Cell> for Instance {
+    fn from(value: &Cell) -> Self {
+        Self::Cell(value.name().to_string())
+    }
+}
 
 impl From<String> for Instance {
     fn from(value: String) -> Self {

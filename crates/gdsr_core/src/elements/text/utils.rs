@@ -1,6 +1,5 @@
 use super::presentation::{HorizontalPresentation, VerticalPresentation};
 
-#[must_use]
 pub const fn get_presentation_value(
     vertical_presentation: VerticalPresentation,
     horizontal_presentation: HorizontalPresentation,

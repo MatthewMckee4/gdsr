@@ -7,7 +7,6 @@ pub enum PathType {
 }
 
 impl PathType {
-    #[must_use]
     pub const fn new(value: i32) -> Self {
         match value {
             1 => Self::Round,
@@ -16,12 +15,10 @@ impl PathType {
         }
     }
 
-    #[must_use]
     pub const fn value(&self) -> u16 {
         *self as u16
     }
 
-    #[must_use]
     pub fn values() -> Vec<Self> {
         vec![Self::Square, Self::Round, Self::Overlap]
     }

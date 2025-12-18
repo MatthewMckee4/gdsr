@@ -17,16 +17,15 @@ pub struct Path {
 }
 
 impl Path {
-    #[must_use]
-    pub const fn new(
-        points: Vec<Point>,
+    pub fn new(
+        points: impl IntoIterator<Item = Point>,
         layer: Layer,
         data_type: DataType,
         path_type: Option<PathType>,
         width: Option<Width>,
     ) -> Self {
         Self {
-            points,
+            points: points.into_iter().collect(),
             layer,
             data_type,
             r#type: path_type,
@@ -34,27 +33,22 @@ impl Path {
         }
     }
 
-    #[must_use]
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
-    #[must_use]
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    #[must_use]
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
-    #[must_use]
     pub const fn path_type(&self) -> &Option<PathType> {
         &self.r#type
     }
 
-    #[must_use]
     pub const fn width(&self) -> Option<Width> {
         self.width
     }
@@ -79,8 +73,7 @@ impl Transformable for Path {
         let points = self
             .points()
             .iter()
-            .map(|point| point.transform(transformation))
-            .collect();
+            .map(|point| point.transform(transformation));
 
         Self::new(
             points,

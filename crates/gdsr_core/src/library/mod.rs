@@ -12,7 +12,6 @@ pub struct Library {
 }
 
 impl Library {
-    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -30,12 +29,10 @@ impl Library {
         }
     }
 
-    #[must_use]
     pub fn get_cell(&self, name: &str) -> Option<&Cell> {
         self.cells.get(name)
     }
 
-    #[must_use]
     pub fn contains(&self, cell: &Cell) -> bool {
         self.cells.contains_key(cell.name())
     }

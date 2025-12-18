@@ -7,22 +7,18 @@ pub struct Rotation {
 }
 
 impl Rotation {
-    #[must_use]
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
-    #[must_use]
     pub const fn angle(&self) -> AngleInRadians {
         self.angle
     }
 
-    #[must_use]
     pub const fn centre(&self) -> &Point {
         &self.centre
     }
 
-    #[must_use]
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let cos_angle = self.angle.cos();
         let sin_angle = self.angle.sin();

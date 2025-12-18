@@ -19,17 +19,14 @@ impl Reference {
         }
     }
 
-    #[must_use]
     pub const fn instance(&self) -> &Instance {
         &self.instance
     }
 
-    #[must_use]
     pub const fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    #[must_use]
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
         let grid = self.grid();
 
@@ -60,7 +57,6 @@ impl Reference {
         elements
     }
 
-    #[must_use]
     pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();
@@ -249,7 +245,8 @@ mod tests {
     }
 
     #[test]
-    fn test_reference_clone() {
+    fn test_reference_flatten() {
+        let library = Library::new("main");
         let polygon = Polygon::new(
             [
                 Point::integer(0, 0, 1e-9),
@@ -271,7 +268,9 @@ mod tests {
         );
         let reference = Reference::new(polygon, grid);
 
-        let cloned = reference.clone();
-        assert_eq!(reference, cloned);
+        let flattened = reference.flatten(None, &library);
+        assert_eq!(flattened.len(), 4);
+
+        insta::assert_debug_snapshot!(flattened);
     }
 }

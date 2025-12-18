@@ -33,9 +33,8 @@ impl Default for Text {
 
 impl Text {
     #[allow(clippy::too_many_arguments)]
-    #[must_use]
-    pub const fn new(
-        text: String,
+    pub fn new(
+        text: &str,
         origin: Point,
         layer: Layer,
         magnification: f64,
@@ -45,7 +44,7 @@ impl Text {
         horizontal_presentation: presentation::HorizontalPresentation,
     ) -> Self {
         Self {
-            text,
+            text: text.to_string(),
             origin,
             layer,
             magnification,
@@ -56,12 +55,10 @@ impl Text {
         }
     }
 
-    #[must_use]
     pub const fn text(&self) -> &String {
         &self.text
     }
 
-    #[must_use]
     pub const fn origin(&self) -> &Point {
         &self.origin
     }
@@ -70,32 +67,26 @@ impl Text {
         self.origin = origin;
     }
 
-    #[must_use]
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    #[must_use]
     pub const fn magnification(&self) -> f64 {
         self.magnification
     }
 
-    #[must_use]
     pub const fn angle(&self) -> f64 {
         self.angle
     }
 
-    #[must_use]
     pub const fn x_reflection(&self) -> bool {
         self.x_reflection
     }
 
-    #[must_use]
     pub const fn vertical_presentation(&self) -> &presentation::VerticalPresentation {
         &self.vertical_presentation
     }
 
-    #[must_use]
     pub const fn horizontal_presentation(&self) -> &presentation::HorizontalPresentation {
         &self.horizontal_presentation
     }
@@ -130,7 +121,10 @@ impl Transformable for Text {
             if *rotation.centre() == Point::default() {
                 new_self.angle += rotation.angle();
             } else {
-                todo!()
+                new_self.origin = new_self
+                    .origin
+                    .rotate_around_point(rotation.angle(), rotation.centre());
+                new_self.angle += rotation.angle();
             }
         }
 
@@ -153,7 +147,7 @@ mod tests {
     #[test]
     fn test_text_creation() {
         let text = Text::new(
-            "Hello World".to_string(),
+            "Hello World",
             Point::integer(100, 200, 1e-9),
             5,
             2.0,
@@ -186,7 +180,7 @@ mod tests {
     #[test]
     fn test_text_display() {
         let text = Text::new(
-            "Test Text".to_string(),
+            "Test Text",
             Point::integer(10, 20, 1e-9),
             1,
             1.5,
@@ -205,7 +199,7 @@ mod tests {
     #[test]
     fn test_text_clone_and_partial_eq() {
         let text1 = Text::new(
-            "Clone Test".to_string(),
+            "Clone Test",
             Point::integer(5, 10, 1e-9),
             2,
             1.2,
@@ -219,7 +213,7 @@ mod tests {
         assert_eq!(text1, text2);
 
         let text3 = Text::new(
-            "Different Text".to_string(),
+            "Different Text",
             Point::integer(5, 10, 1e-9),
             2,
             1.2,

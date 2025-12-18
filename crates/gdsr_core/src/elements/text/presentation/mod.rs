@@ -28,7 +28,6 @@ impl VerticalPresentation {
         }
     }
 
-    #[must_use]
     pub const fn name(&self) -> &str {
         match self {
             Self::Top => "Top",
@@ -37,12 +36,10 @@ impl VerticalPresentation {
         }
     }
 
-    #[must_use]
     pub const fn value(self) -> i32 {
         self as i32
     }
 
-    #[must_use]
     pub fn values() -> Vec<Self> {
         vec![Self::Top, Self::Middle, Self::Bottom]
     }
@@ -78,7 +75,6 @@ impl HorizontalPresentation {
         }
     }
 
-    #[must_use]
     pub const fn name(&self) -> &str {
         match self {
             Self::Left => "Left",
@@ -87,12 +83,10 @@ impl HorizontalPresentation {
         }
     }
 
-    #[must_use]
     pub const fn value(self) -> i32 {
         self as i32
     }
 
-    #[must_use]
     pub fn values() -> Vec<Self> {
         vec![Self::Left, Self::Centre, Self::Right]
     }

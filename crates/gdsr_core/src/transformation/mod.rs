@@ -39,7 +39,6 @@ impl Transformation {
         self
     }
 
-    #[must_use]
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let mut new_point = *point;
 

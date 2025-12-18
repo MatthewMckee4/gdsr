@@ -1,4 +1,6 @@
-use crate::{Element, Library, Path, Polygon, Reference, Text, Transformable, Transformation};
+use crate::{
+    Element, Library, Movable, Path, Polygon, Reference, Text, Transformable, Transformation,
+};
 
 mod io;
 
@@ -12,7 +14,6 @@ pub struct Cell {
 }
 
 impl Cell {
-    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -23,7 +24,6 @@ impl Cell {
         }
     }
 
-    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -32,22 +32,18 @@ impl Cell {
         self.name = name.to_string();
     }
 
-    #[must_use]
     pub const fn polygons(&self) -> &Vec<Polygon> {
         &self.polygons
     }
 
-    #[must_use]
     pub const fn paths(&self) -> &Vec<Path> {
         &self.paths
     }
 
-    #[must_use]
     pub const fn texts(&self) -> &Vec<Text> {
         &self.texts
     }
 
-    #[must_use]
     pub const fn references(&self) -> &Vec<Reference> {
         &self.references
     }
@@ -61,7 +57,6 @@ impl Cell {
         }
     }
 
-    #[must_use]
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();
@@ -134,11 +129,43 @@ impl Transformable for Cell {
     }
 }
 
+impl Movable for Cell {
+    fn move_to(&self, target: crate::Point) -> Self {
+        let mut new_self = self.clone();
+
+        new_self.polygons = new_self
+            .polygons
+            .into_iter()
+            .map(|polygon| polygon.move_to(target))
+            .collect();
+
+        new_self.paths = new_self
+            .paths
+            .into_iter()
+            .map(|path| path.move_to(target))
+            .collect();
+
+        new_self.texts = new_self
+            .texts
+            .into_iter()
+            .map(|text| text.move_to(target))
+            .collect();
+
+        new_self.references = new_self
+            .references
+            .into_iter()
+            .map(|reference| reference.move_to(target))
+            .collect();
+
+        new_self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        Point,
+        Grid, Point,
         elements::{
             path::PathType,
             text::presentation::{HorizontalPresentation, VerticalPresentation},
@@ -149,10 +176,10 @@ mod tests {
     fn test_cell_new() {
         let cell: Cell = Cell::new("test_cell");
         assert_eq!(cell.name, "test_cell");
-        assert!(cell.polygons.is_empty());
-        assert!(cell.paths.is_empty());
-        assert!(cell.texts.is_empty());
-        assert!(cell.references.is_empty());
+        assert!(cell.polygons().is_empty());
+        assert!(cell.paths().is_empty());
+        assert!(cell.texts().is_empty());
+        assert!(cell.references().is_empty());
     }
 
     #[test]
@@ -204,7 +231,7 @@ mod tests {
     fn test_add_text() {
         let mut cell = Cell::new("test_cell");
         let text = Text::new(
-            "Test Text".to_string(),
+            "Test Text",
             Point::integer(5, 5, 1e-9),
             1,
             1.0,
@@ -240,21 +267,72 @@ mod tests {
     }
 
     #[test]
-    fn test_cell_clone() {
-        let mut cell = Cell::new("test_cell");
+    fn test_cell_get_elements() {
+        let library = Library::new("main");
+
         let polygon = Polygon::new(
-            vec![
+            [
                 Point::integer(0, 0, 1e-9),
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
-                Point::integer(0, 10, 1e-9),
             ],
             1,
             0,
         );
-        cell.add(polygon);
 
-        let cloned = cell.clone();
-        assert_eq!(cell, cloned);
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let reference = Reference::new(polygon.clone(), grid);
+
+        let mut cell = Cell::new("test_cell");
+
+        let path = Path::new(
+            [Point::integer(0, 0, 1e-9), Point::integer(10, 0, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        );
+
+        let text = Text::new(
+            "text",
+            Point::integer(0, 0, 1e-9),
+            1,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::Middle,
+            HorizontalPresentation::Centre,
+        );
+
+        cell.add(reference);
+        cell.add(polygon);
+        cell.add(path);
+        cell.add(text);
+
+        let elements = cell.get_elements(None, &library);
+
+        insta::assert_debug_snapshot!(elements);
+
+        let moved_cell = cell.move_to(Point::integer(5, 5, 1e-9));
+
+        let moved_elements = moved_cell.get_elements(None, &library);
+
+        insta::assert_debug_snapshot!(moved_elements);
+
+        let rotated_cell = moved_cell.rotate(90.0, Point::integer(5, 5, 1e-9));
+
+        let rotated_elements = rotated_cell.get_elements(None, &library);
+
+        insta::assert_debug_snapshot!(rotated_elements);
     }
 }

@@ -26,7 +26,7 @@ fn test_library_roundtrip_mixed_elements() {
     cell.add(polygon);
 
     let text = Text::new(
-        "Test Label".to_string(),
+        "Test Label",
         Point::integer(5, 5, units),
         1,
         1.0,
@@ -155,7 +155,7 @@ fn test_library_roundtrip_different_precision(
     cell2.add(polygon2);
 
     let reference2 = Reference::new(
-        cell2.name(),
+        &cell2,
         Grid::new(
             Point::integer(0, 0, units),
             3,
@@ -265,7 +265,7 @@ fn test_text_with_various_presentations() {
 
     // Test different text presentations
     let text1 = Text::new(
-        "Top Left".to_string(),
+        "Top Left",
         Point::integer(0, 0, units),
         1,
         1.0,
@@ -277,7 +277,7 @@ fn test_text_with_various_presentations() {
     cell.add(text1);
 
     let text2 = Text::new(
-        "Middle Centre".to_string(),
+        "Middle Centre",
         Point::integer(50, 50, units),
         1,
         1.5,
@@ -289,7 +289,7 @@ fn test_text_with_various_presentations() {
     cell.add(text2);
 
     let text3 = Text::new(
-        "Bottom Right".to_string(),
+        "Bottom Right",
         Point::integer(100, 100, units),
         2,
         2.0,
@@ -536,7 +536,7 @@ fn test_single_cell_with_all_element_types() {
 
     // Add text
     cell.add(Text::new(
-        "All Elements".to_string(),
+        "All Elements",
         Point::integer(250, 50, units),
         3,
         2.0,

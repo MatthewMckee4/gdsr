@@ -14,7 +14,6 @@ pub struct Grid {
 
 impl Grid {
     #[allow(clippy::too_many_arguments)]
-    #[must_use]
     pub const fn new(
         origin: Point,
         columns: u32,
@@ -37,42 +36,34 @@ impl Grid {
         }
     }
 
-    #[must_use]
     pub const fn origin(&self) -> Point {
         self.origin
     }
 
-    #[must_use]
     pub const fn columns(&self) -> u32 {
         self.columns
     }
 
-    #[must_use]
     pub const fn rows(&self) -> u32 {
         self.rows
     }
 
-    #[must_use]
     pub const fn spacing_x(&self) -> Point {
         self.spacing_x
     }
 
-    #[must_use]
     pub const fn spacing_y(&self) -> Point {
         self.spacing_y
     }
 
-    #[must_use]
     pub const fn magnification(&self) -> f64 {
         self.magnification
     }
 
-    #[must_use]
     pub const fn angle(&self) -> f64 {
         self.angle
     }
 
-    #[must_use]
     pub const fn x_reflection(&self) -> bool {
         self.x_reflection
     }

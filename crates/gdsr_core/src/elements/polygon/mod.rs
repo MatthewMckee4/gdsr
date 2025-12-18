@@ -11,7 +11,6 @@ pub struct Polygon {
 }
 
 impl Polygon {
-    #[must_use]
     pub fn new(points: impl IntoIterator<Item = Point>, layer: Layer, data_type: DataType) -> Self {
         Self {
             points: utils::get_correct_polygon_points_format(points),
@@ -20,39 +19,32 @@ impl Polygon {
         }
     }
 
-    #[must_use]
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
-    #[must_use]
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
-    #[must_use]
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
-    #[must_use]
     pub fn area(&self) -> f64 {
         crate::utils::geometry::area(&self.points)
     }
 
-    #[must_use]
     pub fn perimeter(&self) -> f64 {
         crate::utils::geometry::perimeter(&self.points)
     }
 
     /// Check if a point is inside the polygon
-    #[must_use]
     pub fn is_point_inside(&self, point: &Point) -> bool {
         crate::utils::geometry::is_point_inside(point, &self.points)
     }
 
     /// Check if a point lies on the edge of the polygon
-    #[must_use]
     pub fn is_point_on_edge(&self, point: &Point) -> bool {
         crate::utils::geometry::is_point_on_edge(point, &self.points)
     }
@@ -70,7 +62,7 @@ impl std::fmt::Display for Polygon {
         } else {
             write!(
                 f,
-                "Polygon with {} point(s), starting at ({:?}, {:?}) on layer {:?}, data type {:?}",
+                "Polygon with {} point(s), starting at ({}, {}) on layer {:?}, data type {:?}",
                 self.points().len(),
                 self.points()[0].x(),
                 self.points()[0].y(),
@@ -147,22 +139,115 @@ mod tests {
         ];
         let polygon = Polygon::new(points, 2, 1);
 
-        let display_str = format!("{polygon}");
-        assert!(display_str.contains("Polygon with"));
-        assert!(display_str.contains("layer 2"));
-        assert!(display_str.contains("data type 1"));
+        insta::assert_snapshot!(polygon.to_string(), @"Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 2, data type 1");
     }
 
     #[test]
-    fn test_polygon_clone_and_eq() {
+    fn test_polygon_display_empty() {
+        let polygon = Polygon::new(vec![], 1, 0);
+        insta::assert_snapshot!(polygon.to_string());
+    }
+
+    #[test]
+    fn test_polygon_area() {
         let points = vec![
             Point::integer(0, 0, 1e-9),
             Point::integer(10, 0, 1e-9),
             Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
         ];
-        let polygon1 = Polygon::new(points, 1, 0);
-        let polygon2 = polygon1.clone();
+        let polygon = Polygon::new(points, 1, 0);
+        assert_eq!(polygon.area(), 100.0);
 
-        assert_eq!(polygon1, polygon2);
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(5, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        assert_eq!(polygon.area(), 50.0);
+
+        let polygon = Polygon::new(vec![], 1, 0);
+        assert_eq!(polygon.area(), 0.0);
+    }
+
+    #[test]
+    fn test_polygon_perimeter() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        assert_eq!(polygon.perimeter(), 40.0);
+
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(3, 0, 1e-9),
+            Point::integer(0, 4, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        assert_eq!(polygon.perimeter(), 12.0);
+
+        let polygon = Polygon::new(vec![], 1, 0);
+        assert_eq!(polygon.perimeter(), 0.0);
+    }
+
+    #[test]
+    fn test_is_point_inside() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+
+        assert!(polygon.is_point_inside(&Point::integer(5, 5, 1e-9)));
+        assert!(!polygon.is_point_inside(&Point::integer(15, 15, 1e-9)));
+        assert!(!polygon.is_point_inside(&Point::integer(-5, 5, 1e-9)));
+    }
+
+    #[test]
+    fn test_is_point_on_edge() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+
+        assert!(polygon.is_point_on_edge(&Point::integer(5, 0, 1e-9)));
+        assert!(polygon.is_point_on_edge(&Point::integer(10, 5, 1e-9)));
+        assert!(polygon.is_point_on_edge(&Point::integer(0, 0, 1e-9)));
+        assert!(!polygon.is_point_on_edge(&Point::integer(5, 5, 1e-9)));
+        assert!(!polygon.is_point_on_edge(&Point::integer(15, 15, 1e-9)));
+        assert!(!polygon.is_point_on_edge(&Point::integer(-5, 5, 1e-9)));
+    }
+
+    #[test]
+    fn test_polygon_bounding_box() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        let (min, max) = polygon.bounding_box();
+        assert_eq!(min, Point::integer(0, 0, 1e-9));
+        assert_eq!(max, Point::integer(10, 10, 1e-9));
+
+        let points = vec![
+            Point::integer(-5, -3, 1e-9),
+            Point::integer(7, 2, 1e-9),
+            Point::integer(3, 8, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        let (min, max) = polygon.bounding_box();
+        assert_eq!(min, Point::integer(-5, -3, 1e-9));
+        assert_eq!(max, Point::integer(7, 8, 1e-9));
     }
 }

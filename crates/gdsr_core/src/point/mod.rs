@@ -9,7 +9,6 @@ pub struct Point {
 }
 
 impl Point {
-    #[must_use]
     pub const fn integer(x: i32, y: i32, units: f64) -> Self {
         Self {
             x: Unit::integer(x, units),
@@ -17,7 +16,6 @@ impl Point {
         }
     }
 
-    #[must_use]
     pub const fn float(x: f64, y: f64, units: f64) -> Self {
         Self {
             x: Unit::float(x, units),
@@ -29,12 +27,10 @@ impl Point {
     ///
     /// This is useful for when you want to create a point with different units.
     /// This is not highly recommended.
-    #[must_use]
     pub const fn new(x: Unit, y: Unit) -> Self {
         Self { x, y }
     }
 
-    #[must_use]
     pub const fn units(&self) -> (f64, f64) {
         (self.x.units(), self.y.units())
     }
@@ -48,13 +44,11 @@ impl Point {
     }
 
     /// Gets the x coordinate of the point.
-    #[must_use]
     pub const fn x(&self) -> Unit {
         self.x
     }
 
     /// Gets the y coordinate of the point.
-    #[must_use]
     pub const fn y(&self) -> Unit {
         self.y
     }

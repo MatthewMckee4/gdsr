@@ -12,6 +12,40 @@ pub enum Element {
     Reference(Reference),
 }
 
+impl Element {
+    pub fn as_path(&self) -> Option<&Path> {
+        if let Self::Path(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_polygon(&self) -> Option<&Polygon> {
+        if let Self::Polygon(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_text(&self) -> Option<&Text> {
+        if let Self::Text(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_reference(&self) -> Option<&Reference> {
+        if let Self::Reference(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 impl std::fmt::Display for Element {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -84,7 +118,7 @@ impl Movable for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Point;
+    use crate::{Grid, HorizontalPresentation, Point, VerticalPresentation};
 
     #[test]
     fn test_element_from_path() {
@@ -97,10 +131,15 @@ mod tests {
         );
         let element: Element = path.clone().into();
 
-        match element {
-            Element::Path(p) => assert_eq!(p, path),
-            _ => panic!("Expected Path element"),
-        }
+        assert!(element.as_polygon().is_none());
+        assert!(element.as_reference().is_none());
+        assert!(element.as_text().is_none());
+
+        let p = element.as_path().unwrap().clone();
+
+        assert_eq!(p, path);
+
+        insta::assert_snapshot!(element.to_string(), @"Path with 2 points on layer 1 with data type 0, Square and width 0");
     }
 
     #[test]
@@ -116,14 +155,38 @@ mod tests {
         );
         let element: Element = polygon.clone().into();
 
-        match element {
-            Element::Polygon(p) => assert_eq!(p, polygon),
-            _ => panic!("Expected Polygon element"),
-        }
+        assert!(element.as_path().is_none());
+
+        let p = element.as_polygon().unwrap().clone();
+
+        assert_eq!(p, polygon);
+
+        insta::assert_snapshot!(element.to_string(), @"Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0");
     }
 
     #[test]
-    fn test_element_display() {
+    fn test_element_from_text() {
+        let text = Text::new(
+            "text",
+            Point::integer(0, 0, 1e-9),
+            1,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::Middle,
+            HorizontalPresentation::Centre,
+        );
+        let element: Element = text.clone().into();
+
+        let t = element.as_text().unwrap().clone();
+
+        assert_eq!(t, text);
+
+        insta::assert_snapshot!(element.to_string(), @"Text 'text' vertical: Middle, horizontal: Centre at Point { x: Integer { value: 0, units: 1e-9 }, y: Integer { value: 0, units: 1e-9 } }");
+    }
+
+    #[test]
+    fn test_element_from_reference() {
         let polygon = Polygon::new(
             [
                 Point::integer(0, 0, 1e-9),
@@ -133,24 +196,26 @@ mod tests {
             1,
             0,
         );
-        let element: Element = polygon.into();
 
-        let display_str = format!("{element}");
-        assert!(display_str.contains("Polygon"));
-    }
-
-    #[test]
-    fn test_element_clone() {
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            None,
-            None,
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
         );
-        let element: Element = path.into();
-        let cloned = element.clone();
 
-        assert_eq!(element, cloned);
+        let reference = Reference::new(polygon.clone(), grid);
+
+        let element: Element = reference.clone().into();
+
+        let r = element.as_reference().unwrap().clone();
+
+        assert_eq!(r, reference);
+
+        insta::assert_snapshot!(element.to_string(), @"Reference to Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0 with grid Grid at Point(0 (1.000e-9), 0 (1.000e-9)) with 2 columns and 2 rows, spacing (Point(10 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 10 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
 }
