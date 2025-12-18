@@ -1,5 +1,7 @@
 # GDSR
 
+[![codecov](https://codecov.io/gh/MatthewMckee4/gdsr/graph/badge.svg?token=O2OQ6OOR9O)](https://codecov.io/gh/MatthewMckee4/gdsr)
+
 GDSII manipulation, written in rust.
 
 > [!WARNING]
