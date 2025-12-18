@@ -44,5 +44,11 @@ let um_point = Point::default_float(10.0, 20.0);
 
 We model units this way so that there is no confusion about what unit is being used.
 
-When writing a `Library`, you must specify two units, the user units, and the database units.
+When writing a `Library`, with `Library::write_file`, you must specify two units, the user units, and the database units.
 This may be slightly confusing, but there is a good reason for it.
+
+The user units are used simply for your GDSII editor, these let you see values in a more human-readable format.
+For most users I would imagine that they would want to use micrometers (`um`) for their user units and nanometers (`nm`) for their database units.
+
+When reading a GDSII file into a `Library`, with `Library::read_file`, you can only specify the "user" units.
+These units are what is used when creating `Point`s and `Unit`s. This allows you to work with these values in a consistent way. If you do not provide this, then values will be with units of 1, which is not recommended, though it is fine to work with these values.

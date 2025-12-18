@@ -45,7 +45,7 @@ impl Library {
     ///
     /// If you have a unit value 10 with units 1e-9, and database units are 1e-10,
     /// then the scaled value will be 100.
-    pub fn to_gds<P: AsRef<std::path::Path>>(
+    pub fn write_file<P: AsRef<std::path::Path>>(
         &self,
         file_name: P,
         user_units: f64,
@@ -66,7 +66,7 @@ impl Library {
     /// to some more readable values. For example a unit value of 10 with units 1e-9
     /// and database units of 1e-10 will result in a scaled value of 100.
     /// This means you can work with the values in a more human-readable format.
-    pub fn from_gds<P: AsRef<std::path::Path>>(
+    pub fn read_file<P: AsRef<std::path::Path>>(
         file_name: P,
         units: Option<f64>,
     ) -> io::Result<Self> {
