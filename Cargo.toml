@@ -12,10 +12,11 @@ authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
 [workspace.dependencies]
+gdsr_core = { path = "crates/gdsr_core" }
+
 approx = "0.5"
 bytemuck = "1.16.1"
 chrono = "0.4.38"
-gdsr_core = { path = "crates/gdsr_core" }
 geo = "0.28"
 insta = { version = "1.35.1" }
 quickcheck = "1.0.3"
