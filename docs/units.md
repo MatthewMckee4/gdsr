@@ -90,5 +90,5 @@ Note here we are writing with user units `1e-3` and database units `1e-6`.
 
 But `1e-6` is greater than `1e-9`, which is the units we are using for our `Point`s and `Unit`s.
 
-When we set database units, this is setting the minimal value that we can see in our GDSII, 
+When we set database units, this is setting the minimal value that we can see in our GDSII,
 since all values are less than that, all values in the polygon will be scaled to 0.
