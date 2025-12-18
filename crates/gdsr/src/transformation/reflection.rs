@@ -15,8 +15,12 @@ impl Reflection {
         Self::new(0.0, Point::integer(0, 1, 1e-9))
     }
 
-    pub fn from_line(_point1: &Point, _point2: &Point) {
-        todo!()
+    pub fn from_line(point1: &Point, point2: &Point) -> Self {
+        let dx = point2.x().true_value() - point1.x().true_value();
+        let dy = point2.y().true_value() - point1.y().true_value();
+        let angle = dy.atan2(dx);
+        let centre = Point::new((point1.x() + point2.x()) / 2.0, (point1.y() + point2.y()) / 2.0);
+        Self { angle, centre }
     }
 
     pub fn apply_to_point(&self, point: &Point) -> Point {
@@ -82,5 +86,58 @@ mod tests {
 
         // Point at centre should remain unchanged
         assert_eq!(reflected, centre);
+    }
+
+    #[test]
+    fn test_reflection_from_line_horizontal() {
+        let point1 = Point::integer(0, 5, 1e-9);
+        let point2 = Point::integer(10, 5, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        // Horizontal line should have angle 0
+        assert_eq!(reflection.angle, 0.0);
+        // Centre should be midpoint
+        assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_reflection_from_line_vertical() {
+        let point1 = Point::integer(5, 0, 1e-9);
+        let point2 = Point::integer(5, 10, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        // Vertical line should have angle π/2
+        let expected_angle = std::f64::consts::FRAC_PI_2;
+        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        // Centre should be midpoint
+        assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_reflection_from_line_diagonal() {
+        let point1 = Point::integer(0, 0, 1e-9);
+        let point2 = Point::integer(10, 10, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        // Diagonal line (45 degrees) should have angle π/4
+        let expected_angle = std::f64::consts::FRAC_PI_4;
+        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        // Centre should be midpoint
+        assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_reflection_from_line_apply() {
+        let point1 = Point::integer(0, 0, 1e-9);
+        let point2 = Point::integer(10, 0, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        let test_point = Point::integer(5, 3, 1e-9);
+        let reflected = reflection.apply_to_point(&test_point);
+
+        // Reflecting across horizontal line at y=0 should flip y
+        assert_eq!(reflected.x(), test_point.x());
+        let sum = (reflected.y() + test_point.y()).true_value();
+        assert!(sum.abs() < 1e-9);
     }
 }

@@ -257,7 +257,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 GDSRecord::Boundary | GDSRecord::Box => {
                     polygon = Some(Polygon::default());
                 }
-                GDSRecord::Path | GDSRecord::RaithMbmsPath => {
+                GDSRecord::Path => {
                     path = Some(Path::default());
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {

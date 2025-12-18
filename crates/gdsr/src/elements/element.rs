@@ -216,4 +216,128 @@ mod tests {
 
         insta::assert_snapshot!(element.to_string(), @"Reference to Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0 with grid Grid at Point(0 (1.000e-9), 0 (1.000e-9)) with 2 columns and 2 rows, spacing (Point(10 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 10 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
+
+    #[test]
+    fn test_element_transform_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let element: Element = polygon.into();
+
+        let centre = Point::integer(5, 5, 1e-9);
+        let transformed = element.clone().rotate(std::f64::consts::PI / 2.0, centre);
+
+        assert!(transformed.as_polygon().is_some());
+    }
+
+    #[test]
+    fn test_element_transform_path() {
+        let path = Path::new(
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        );
+        let element: Element = path.into();
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = element.clone().scale(2.0, centre);
+
+        assert!(transformed.as_path().is_some());
+    }
+
+    #[test]
+    fn test_element_transform_text() {
+        let text = Text::new(
+            "text",
+            Point::integer(0, 0, 1e-9),
+            1,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::Middle,
+            HorizontalPresentation::Centre,
+        );
+        let element: Element = text.into();
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = element.clone().reflect(0.0, centre);
+
+        assert!(transformed.as_text().is_some());
+    }
+
+    #[test]
+    fn test_element_transform_reference() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Point::integer(10, 0, 1e-9),
+            Point::integer(0, 10, 1e-9),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let reference = Reference::new(polygon, grid);
+        let element: Element = reference.into();
+
+        let delta = Point::integer(5, 5, 1e-9);
+        let transformed = element.clone().translate(delta);
+
+        assert!(transformed.as_reference().is_some());
+    }
+
+    #[test]
+    fn test_element_move_to() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let element: Element = polygon.into();
+
+        let target = Point::integer(20, 20, 1e-9);
+        let moved = element.move_to(target);
+
+        assert!(moved.as_polygon().is_some());
+    }
+
+    #[test]
+    fn test_element_move_by() {
+        let path = Path::new(
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        );
+        let element: Element = path.into();
+
+        let delta = Point::integer(5, 5, 1e-9);
+        let moved = element.move_by(delta);
+
+        assert!(moved.as_path().is_some());
+    }
 }
