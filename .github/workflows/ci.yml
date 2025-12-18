@@ -1,44 +1,142 @@
 name: Continuous Integration
 
 on:
-  pull_request:
   push:
     branches:
       - main
+
+  pull_request:
+
   workflow_dispatch:
 
+permissions: {}
+
+env:
+  PYTHON_VERSION: "3.10"
+
 jobs:
-  pre-commit:
+  determine_changes:
+    name: "determine changes"
+
     runs-on: ubuntu-latest
+
+    outputs:
+      # Flag that is raised when any code is changed
+      code: ${{ steps.check_code.outputs.changed }}
+
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v3
-
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
-          toolchain: stable
-          override: true
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Install Rustfmt nightly
+      - name: Determine merge base
+        id: merge_base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
         run: |
-          rustup component add rustfmt --toolchain nightly
+          sha=$(git merge-base HEAD "origin/${BASE_REF}")
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      - uses: pre-commit/action@v3.0.1
+      - name: Check if there was any code related change
+        id: check_code
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            . \
+            ':!docs/' \
+            ':!CODE_OF_CONDUCT.md' \
+            ':!CONTRIBUTING.md' \
+            ':!LICENSE' \
+            ':!pyproject.toml' \
+            ':!README.md' \
+            ':!zensical.toml' \
+          ; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  pre-commit:
+    name: "pre commit"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@3542bca2639a428e1796aaa6a2ffef0c0f575566 # v3.1.4
+
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   cargo-test:
+    name: "cargo test (${{ matrix.os }})"
+
     runs-on: ${{ matrix.os }}
+
+    needs: determine_changes
+
+    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+
     strategy:
-      max-parallel: 12
+      max-parallel: 18
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
 
-      - name: Update Rust toolchain
-        run: rustup update
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
 
-      - name: Run tests
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@a416ddeedbd372e614cc1386e8b642692f66865e # v2.57.1
+        with:
+          tool: cargo-nextest
+
+      - name: "Cargo test"
         run: |
-          cargo test
+          cargo nextest run --no-fail-fast
+
+  coverage:
+    name: "coverage"
+
+    runs-on: ubuntu-latest
+
+    needs: determine_changes
+
+    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@62da238c048aa0f865cc5a322082957d34e7fc1a # v2.62.54
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Generate code coverage
+        run: cargo llvm-cov nextest --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          slug: MatthewMckee4/gdsr
+          fail_ci_if_error: true
