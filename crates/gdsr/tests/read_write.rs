@@ -699,51 +699,47 @@ fn get_elements(units: f64) -> Vec<Element> {
             false,
         ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(20, 0, units),
-                    Point::integer(20, 20, units),
-                    Point::integer(0, 20, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                2,
-                None,
-                Some(Point::integer(10, 10, units)),
-                1.0,
-                0.0,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            2,
+            None,
+            Some(Point::integer(10, 10, units)),
+            1.0,
+            0.0,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(20, 0, units),
-                    Point::integer(20, 20, units),
-                    Point::integer(0, 20, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                2,
-                1,
-                Some(Point::integer(10, 10, units)),
-                None,
-                1.0,
-                0.0,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            2,
+            1,
+            Some(Point::integer(10, 10, units)),
+            None,
+            1.0,
+            0.0,
+            false,
+        ))
         .into(),
     ]
 }

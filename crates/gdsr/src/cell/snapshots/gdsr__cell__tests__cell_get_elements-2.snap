@@ -21,7 +21,7 @@ expression: moved_elements
     ),
     Text(
         Text {
-            text: "",
+            value: "",
             origin: Point {
                 x: Integer(
                     Integer {
