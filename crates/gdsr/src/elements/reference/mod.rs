@@ -33,10 +33,13 @@ impl Reference {
         let mut elements: Vec<Element> =
             Vec::with_capacity((grid.columns() * grid.rows()) as usize);
 
+        let spacing_x = grid.spacing_x().unwrap_or_default();
+        let spacing_y = grid.spacing_y().unwrap_or_default();
+
         for column_index in 0..grid.columns() {
-            let column_origin = grid.origin() + (grid.spacing_x() * column_index);
+            let column_origin = grid.origin() + (spacing_x * column_index);
             for row_index in 0..grid.rows() {
-                let origin = column_origin + (grid.spacing_y() * row_index);
+                let origin = column_origin + (spacing_y * row_index);
 
                 let mut new_element = element.clone();
 
@@ -46,11 +49,11 @@ impl Reference {
                 new_element = new_element.rotate(grid.angle(), Point::default());
                 new_element = new_element.scale(grid.magnification(), Point::default());
 
-                let move_point = origin.rotate_around_point(grid.angle(), &grid.origin());
+                let move_point = origin.rotate_around_point(grid.angle(), &origin);
 
                 new_element = new_element.move_by(move_point);
 
-                elements.push(new_element.clone());
+                elements.push(new_element);
             }
         }
 
@@ -184,8 +187,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -209,8 +212,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             1,
             1,
-            Point::integer(0, 0, 1e-9),
-            Point::integer(0, 0, 1e-9),
+            Some(Point::integer(0, 0, 1e-9)),
+            Some(Point::integer(0, 0, 1e-9)),
             1.0,
             0.0,
             false,
@@ -229,8 +232,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             1,
             1,
-            Point::integer(0, 0, 1e-9),
-            Point::integer(0, 0, 1e-9),
+            Some(Point::integer(0, 0, 1e-9)),
+            Some(Point::integer(0, 0, 1e-9)),
             1.0,
             0.0,
             false,
@@ -258,8 +261,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -288,8 +291,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -316,8 +319,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             3,
             3,
-            Point::integer(20, 0, 1e-9),
-            Point::integer(0, 20, 1e-9),
+            Some(Point::integer(20, 0, 1e-9)),
+            Some(Point::integer(0, 20, 1e-9)),
             1.0,
             0.0,
             false,
@@ -345,8 +348,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             true, // x_reflection enabled
@@ -374,8 +377,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             2.0,                        // magnification
             std::f64::consts::PI / 2.0, // 90 degree rotation
             false,
@@ -403,8 +406,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -432,8 +435,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -468,8 +471,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,

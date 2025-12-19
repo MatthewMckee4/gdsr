@@ -94,12 +94,6 @@ impl From<Translation> for Transformation {
     }
 }
 
-impl From<&mut Self> for Transformation {
-    fn from(value: &mut Self) -> Self {
-        value.clone()
-    }
-}
-
 impl From<&Self> for Transformation {
     fn from(value: &Self) -> Self {
         value.clone()

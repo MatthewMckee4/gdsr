@@ -1,7 +1,9 @@
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 
 mod io;
 mod utils;
+
+pub use utils::get_correct_polygon_points_format;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Polygon {
@@ -31,11 +33,11 @@ impl Polygon {
         self.data_type
     }
 
-    pub fn area(&self) -> f64 {
+    pub fn area(&self) -> Unit {
         crate::utils::geometry::area(&self.points)
     }
 
-    pub fn perimeter(&self) -> f64 {
+    pub fn perimeter(&self) -> Unit {
         crate::utils::geometry::perimeter(&self.points)
     }
 
@@ -156,7 +158,7 @@ mod tests {
             Point::integer(0, 10, 1e-9),
         ];
         let polygon = Polygon::new(points, 1, 0);
-        assert_eq!(polygon.area(), 100.0);
+        assert_eq!(polygon.area(), Unit::float(100.0, 1e-9));
 
         let points = vec![
             Point::integer(0, 0, 1e-9),
@@ -164,10 +166,10 @@ mod tests {
             Point::integer(5, 10, 1e-9),
         ];
         let polygon = Polygon::new(points, 1, 0);
-        assert_eq!(polygon.area(), 50.0);
+        assert_eq!(polygon.area(), Unit::float(50.0, 1e-9));
 
         let polygon = Polygon::new(vec![], 1, 0);
-        assert_eq!(polygon.area(), 0.0);
+        assert_eq!(polygon.area(), Unit::float(0.0, 1e-9));
     }
 
     #[test]
@@ -179,7 +181,7 @@ mod tests {
             Point::integer(0, 10, 1e-9),
         ];
         let polygon = Polygon::new(points, 1, 0);
-        assert_eq!(polygon.perimeter(), 40.0);
+        assert_eq!(polygon.perimeter(), Unit::float(40.0, 1e-9));
 
         let points = vec![
             Point::integer(0, 0, 1e-9),
@@ -187,10 +189,10 @@ mod tests {
             Point::integer(0, 4, 1e-9),
         ];
         let polygon = Polygon::new(points, 1, 0);
-        assert_eq!(polygon.perimeter(), 12.0);
+        assert_eq!(polygon.perimeter(), Unit::float(12.0, 1e-9));
 
         let polygon = Polygon::new(vec![], 1, 0);
-        assert_eq!(polygon.perimeter(), 0.0);
+        assert_eq!(polygon.perimeter(), Unit::float(0.0, 1e-9));
     }
 
     #[test]

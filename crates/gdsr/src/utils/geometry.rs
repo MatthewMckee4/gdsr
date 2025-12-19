@@ -3,16 +3,24 @@ use geo::{
     Polygon,
 };
 
-use crate::Point;
+use crate::{Point, Unit, elements::polygon::get_correct_polygon_points_format};
+
+/// Ensure all points have the same units
+fn ensure_points_same_units(points: &[Point], new_units: f64) -> Vec<Point> {
+    points
+        .iter()
+        .map(|point| point.scale_units(new_units))
+        .collect()
+}
 
 fn to_geo_float_coords(points: &[Point]) -> Vec<Coord<f64>> {
     points.iter().map(to_geo_float_coord).collect()
 }
 
-const fn to_geo_float_coord(point: &Point) -> Coord<f64> {
+fn to_geo_float_coord(point: &Point) -> Coord<f64> {
     Coord {
-        x: point.x().as_float(),
-        y: point.y().as_float(),
+        x: point.x().as_float_value(),
+        y: point.y().as_float_value(),
     }
 }
 
@@ -33,58 +41,57 @@ pub fn bounding_box(points: &[Point]) -> (Point, Point) {
 
     // Use geo's BoundingRect trait for robust calculation
     let multipoint = geo::MultiPoint::new(to_geo_float_points(points));
-    multipoint.bounding_rect().map_or_else(
-        || {
-            let first = points[0];
-            (first, first)
-        },
-        |rect| {
-            let first_point = points[0];
+    let rect = multipoint.bounding_rect().unwrap();
+    let first_point = points[0];
 
-            let (x_units, y_units) = first_point.units();
-            let min_point = Point::float(rect.min().x, rect.min().y, x_units);
-            let max_point = Point::float(rect.max().x, rect.max().y, y_units);
-            (min_point, max_point)
-        },
-    )
+    let (x_units, y_units) = first_point.units();
+    let min_point = Point::float(rect.min().x, rect.min().y, x_units);
+    let max_point = Point::float(rect.max().x, rect.max().y, y_units);
+    (min_point, max_point)
 }
 
 /// Calculate the area of a polygon defined by points using the shoelace formula
 /// Points should be in order (clockwise or counter-clockwise)
-pub fn area(points: &[Point]) -> f64 {
+pub fn area(points: &[Point]) -> Unit {
     if points.len() < 3 {
-        return 0.0;
+        return Unit::default_integer(0);
     }
 
-    let coords = to_geo_float_coords(points);
+    let first_point = points[0];
+    let units = first_point.units().0;
 
-    // Close the polygon by adding the first point at the end if not already closed
-    let mut closed_coords = coords;
-    if let (Some(first), Some(last)) = (closed_coords.first(), closed_coords.last()) {
-        if first != last {
-            closed_coords.push(*first);
-        }
-    }
+    let points = ensure_points_same_units(points, units);
 
-    let linestring = LineString::new(closed_coords);
+    let points_coords = get_correct_polygon_points_format(points.clone());
+
+    let coords = to_geo_float_coords(&points_coords);
+
+    let linestring = LineString::new(coords);
     let polygon = Polygon::new(linestring, vec![]);
 
-    polygon.unsigned_area().abs()
+    Unit::float(polygon.unsigned_area().abs(), units)
 }
 
 /// Calculate the perimeter of a polygon defined by points
 /// For open polygons, calculates the total length of all segments
 /// For closed polygons, includes the segment from last to first point
-pub fn perimeter(points: &[Point]) -> f64 {
+pub fn perimeter(points: &[Point]) -> Unit {
     if points.len() < 2 {
-        return 0.0;
+        return Unit::default_integer(0);
     }
 
-    let coords = to_geo_float_coords(points);
+    let first_point = points[0];
+    let units = first_point.units().0;
+
+    let points = ensure_points_same_units(points, units);
+
+    let coords = to_geo_float_coords(&points);
 
     let linestring = LineString::new(coords);
 
-    linestring.euclidean_length()
+    let length = linestring.euclidean_length();
+
+    Unit::float(length, units)
 }
 
 /// Check if a point is inside a polygon using the ray casting algorithm
@@ -94,17 +101,13 @@ pub fn is_point_inside(point: &Point, points: &[Point]) -> bool {
         return false;
     }
 
-    let coords = to_geo_float_coords(points);
+    let points = points.to_vec();
 
-    // Ensure the polygon is closed
-    let mut closed_coords = coords;
-    if let (Some(first), Some(last)) = (closed_coords.first(), closed_coords.last()) {
-        if first != last {
-            closed_coords.push(*first);
-        }
-    }
+    let points_coords = get_correct_polygon_points_format(points.clone());
 
-    let linestring = LineString::new(closed_coords);
+    let coords = to_geo_float_coords(&points_coords);
+
+    let linestring = LineString::new(coords);
     let polygon = Polygon::new(linestring, vec![]);
 
     polygon.contains(&to_geo_float_coord(point))
@@ -142,7 +145,6 @@ pub fn round_to_decimals(value: f64, ndigits: u32) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use approx::assert_relative_eq;
 
     use super::*;
 
@@ -171,7 +173,7 @@ mod tests {
         ];
 
         let area_result = area(&square);
-        assert_relative_eq!(area_result, 4.0, epsilon = 1e-10);
+        assert_eq!(area_result, Unit::float(4.0, 1e-6));
     }
 
     #[test]
@@ -188,6 +190,13 @@ mod tests {
     }
 
     #[test]
+    fn test_point_inside_too_few_points() {
+        let square = [Point::float(0.0, 0.0, 1e-6), Point::float(2.0, 0.0, 1e-6)];
+
+        assert!(!is_point_inside(&Point::integer(0, 0, 1e-9), &square));
+    }
+
+    #[test]
     fn test_point_on_edge() {
         let triangle = [
             Point::float(0.0, 0.0, 1e-6),
@@ -197,6 +206,13 @@ mod tests {
 
         assert!(is_point_on_edge(&Point::integer(1, 0, 1e-9), &triangle));
         assert!(!is_point_on_edge(&Point::integer(1, 1, 1e-9), &triangle));
+    }
+
+    #[test]
+    fn test_point_on_edge_too_few_points() {
+        let triangle = [Point::float(0.0, 0.0, 1e-6)];
+
+        assert!(!is_point_on_edge(&Point::integer(0, 0, 1e-9), &triangle));
     }
 
     #[test]
@@ -212,7 +228,7 @@ mod tests {
 
         let perimeter_result = perimeter(&square);
         // Perimeter should be 8.0 (4 sides of length 2)
-        assert_relative_eq!(perimeter_result, 8.0, epsilon = 1e-10);
+        assert_eq!(perimeter_result, Unit::float(8.0, 1e-6));
     }
 
     #[test]
@@ -226,19 +242,19 @@ mod tests {
 
         let area_result = area(&triangle);
         // Area should be 2.0 (0.5 * base * height = 0.5 * 2 * 2)
-        assert_relative_eq!(area_result, 2.0, epsilon = 1e-10);
+        assert_eq!(area_result, Unit::float(2.0, 1e-6));
     }
 
     #[test]
     fn test_area_empty_polygon() {
         let empty: [Point; 0] = [];
-        assert_eq!(area(&empty), 0.0);
+        assert_eq!(area(&empty), Unit::float(0.0, 1e-6));
 
         let single_point = [Point::float(1.0, 1.0, 1e-6)];
-        assert_eq!(area(&single_point), 0.0);
+        assert_eq!(area(&single_point), Unit::float(0.0, 1e-6));
 
         let two_points = [Point::float(0.0, 0.0, 1e-6), Point::float(1.0, 1.0, 1e-6)];
-        assert_eq!(area(&two_points), 0.0);
+        assert_eq!(area(&two_points), Unit::float(0.0, 1e-6));
     }
 
     #[test]
@@ -252,7 +268,7 @@ mod tests {
 
         let perimeter_result = perimeter(&line);
         // Should be 3 + 4 = 7 (just the path length, not closed)
-        assert_relative_eq!(perimeter_result, 7.0, epsilon = 1e-10);
+        assert_eq!(perimeter_result, Unit::float(7.0, 1e-6));
     }
 
     #[test]

@@ -175,7 +175,7 @@ mod tests {
 
         assert_eq!(t, text);
 
-        insta::assert_snapshot!(element.to_string(), @"Text '' vertical: Middle, horizontal: Centre at Point { x: Integer { value: 0, units: 1e-9 }, y: Integer { value: 0, units: 1e-9 } }");
+        insta::assert_snapshot!(element.to_string(), @"Text '' vertical: Middle, horizontal: Centre at Point(0 (1.000e-9), 0 (1.000e-9))");
     }
 
     #[test]
@@ -194,8 +194,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,
@@ -275,8 +275,8 @@ mod tests {
             Point::integer(0, 0, 1e-9),
             2,
             2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
             1.0,
             0.0,
             false,

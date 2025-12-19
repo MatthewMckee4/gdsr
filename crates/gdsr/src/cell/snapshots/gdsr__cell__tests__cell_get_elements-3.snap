@@ -23,14 +23,18 @@ expression: rotated_elements
         Text {
             text: "",
             origin: Point {
-                x: Float {
-                    value: 5e-9,
-                    units: 1e-9,
-                },
-                y: Float {
-                    value: 5e-9,
-                    units: 1e-9,
-                },
+                x: Float(
+                    Float {
+                        value: 5e-9,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    Float {
+                        value: 5e-9,
+                        units: 1e-9,
+                    },
+                ),
             },
             layer: 0,
             datatype: 0,

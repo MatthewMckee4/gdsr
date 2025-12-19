@@ -303,8 +303,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                             .iter()
                             .map(|p| {
                                 Point::integer(
-                                    (p.x().as_float() * scale).round() as i32,
-                                    (p.y().as_float() * scale).round() as i32,
+                                    (p.x().as_float_value() * scale).round() as i32,
+                                    (p.y().as_float_value() * scale).round() as i32,
                                     db_units,
                                 )
                             })
@@ -333,16 +333,20 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                                     reference
                                         .grid
                                         .set_spacing_x(if reference.grid.columns() > 0 {
-                                            (rotated_points[1] - rotated_points[0])
-                                                / reference.grid.columns()
+                                            Some(
+                                                (rotated_points[1] - rotated_points[0])
+                                                    / reference.grid.columns(),
+                                            )
                                         } else {
-                                            Point::default()
+                                            Some(Point::default())
                                         });
                                     reference.grid.set_spacing_y(if reference.grid.rows() > 0 {
-                                        (rotated_points[2] - rotated_points[0])
-                                            / reference.grid.rows()
+                                        Some(
+                                            (rotated_points[2] - rotated_points[0])
+                                                / reference.grid.rows(),
+                                        )
                                     } else {
-                                        Point::integer(0, 0, db_units)
+                                        Some(Point::integer(0, 0, db_units))
                                     });
                                 }
                                 _ => {}

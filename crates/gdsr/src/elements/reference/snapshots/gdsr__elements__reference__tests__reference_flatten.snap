@@ -7,92 +7,60 @@ expression: flattened
         Polygon {
             points: [
                 Point {
-                    x: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
-                },
-            ],
-            layer: 1,
-            data_type: 0,
-        },
-    ),
-    Polygon(
-        Polygon {
-            points: [
-                Point {
-                    x: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                },
-                Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                },
-                Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
-                },
-                Point {
-                    x: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
                 },
             ],
             layer: 1,
@@ -103,44 +71,60 @@ expression: flattened
         Polygon {
             points: [
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 0,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
             ],
             layer: 1,
@@ -151,44 +135,124 @@ expression: flattened
         Polygon {
             points: [
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 20,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
                 Point {
-                    x: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
-                    y: Integer {
-                        value: 10,
-                        units: 1e-9,
-                    },
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+            ],
+            layer: 1,
+            data_type: 0,
+        },
+    ),
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        Integer {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
                 },
             ],
             layer: 1,

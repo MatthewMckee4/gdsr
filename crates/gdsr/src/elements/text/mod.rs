@@ -149,7 +149,7 @@ impl std::fmt::Display for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Text '{}' vertical: {:?}, horizontal: {:?} at {:?}",
+            "Text '{}' vertical: {:?}, horizontal: {:?} at {}",
             self.text(),
             self.vertical_presentation(),
             self.horizontal_presentation(),

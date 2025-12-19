@@ -68,8 +68,8 @@ fn test_library_roundtrip_mixed_elements() {
             Point::integer(0, 25, units),
             2,
             2,
-            Point::integer(25, 0, units),
-            Point::integer(0, 25, units),
+            Some(Point::integer(25, 0, units)),
+            Some(Point::integer(0, 25, units)),
             1.0,
             0.0,
             false,
@@ -124,8 +124,8 @@ fn test_library_roundtrip_different_units(#[case] user_units: f64, #[case] datab
             Point::integer(0, 0, units),
             3,
             3,
-            Point::integer(150, 0, units),
-            Point::integer(0, 150, units),
+            Some(Point::integer(150, 0, units)),
+            Some(Point::integer(0, 150, units)),
             1.5,
             45.0,
             true,
@@ -159,8 +159,8 @@ fn test_library_roundtrip_different_units(#[case] user_units: f64, #[case] datab
             Point::integer(0, 0, units),
             3,
             3,
-            Point::integer(150, 0, units),
-            Point::integer(0, 150, units),
+            Some(Point::integer(150, 0, units)),
+            Some(Point::integer(0, 150, units)),
             1.0,
             0.0,
             false,
@@ -333,8 +333,8 @@ fn test_nested_references() {
             Point::integer(0, 0, units),
             2,
             2,
-            Point::integer(20, 0, units),
-            Point::integer(0, 20, units),
+            Some(Point::integer(20, 0, units)),
+            Some(Point::integer(0, 20, units)),
             1.0,
             0.0,
             false,
@@ -349,8 +349,8 @@ fn test_nested_references() {
             Point::integer(50, 50, units),
             1,
             1,
-            Point::integer(0, 0, units),
-            Point::integer(0, 0, units),
+            Some(Point::integer(0, 0, units)),
+            Some(Point::integer(0, 0, units)),
             1.0,
             0.0,
             false,
@@ -548,8 +548,8 @@ fn test_single_cell_with_all_element_types() {
             Point::integer(300, 50, units),
             1,
             1,
-            Point::integer(0, 0, units),
-            Point::integer(0, 0, units),
+            Some(Point::integer(0, 0, units)),
+            Some(Point::integer(0, 0, units)),
             1.0,
             0.0,
             false,
@@ -606,6 +606,28 @@ fn get_elements(units: f64) -> Vec<Element> {
             Polygon::new(
                 [
                     Point::integer(0, 0, units),
+                    Point::integer(10, 0, units),
+                    Point::integer(10, 10, units),
+                ],
+                4,
+                0,
+            ),
+            Grid::new(
+                Point::integer(300, 50, units),
+                2,
+                2,
+                Some(Point::integer(0, 10, units)),
+                Some(Point::integer(10, 0, units)),
+                1.0,
+                0.0,
+                false,
+            ),
+        )
+        .into(),
+        Reference::new(
+            Polygon::new(
+                [
+                    Point::integer(0, 0, units),
                     Point::integer(20, 0, units),
                     Point::integer(20, 20, units),
                     Point::integer(0, 20, units),
@@ -617,8 +639,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(300, 50, units),
                 1,
                 1,
-                Point::integer(0, 0, units),
-                Point::integer(0, 0, units),
+                None,
+                None,
                 1.0,
                 0.0,
                 false,
@@ -630,53 +652,43 @@ fn get_elements(units: f64) -> Vec<Element> {
 
 #[test]
 fn test_element_reference() {
-    for element in get_elements(DEFAULT_INTEGER_UNITS) {
+    let units = DEFAULT_INTEGER_UNITS;
+
+    for element in get_elements(units) {
         let temp_dir = tempdir().unwrap();
         let gds_path = temp_dir.path().join("all_elements.gds");
-
-        let units = DEFAULT_INTEGER_UNITS;
 
         let mut library = Library::new("reference_test");
         let mut cell = Cell::new("cell");
 
         let element = element.move_to(Point::integer(100, 100, units));
 
-        cell.add(Reference::new(
+        let reference = Reference::new(
             element.clone(),
             Grid::new(
-                Point::integer(300, 50, units),
+                Point::integer(10, 0, units),
                 1,
-                1,
-                Point::integer(0, 0, units),
-                Point::integer(0, 0, units),
-                1.0,
-                0.0,
-                false,
-            ),
-        ));
-
-        library.add_cell(cell);
-
-        let _res = library.write_file(&gds_path, 1e-9, 1e-9);
-
-        let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
-
-        let mut expected_library = Library::new("reference_test");
-        let mut cell = Cell::new("cell");
-
-        let reference = Reference::new(
-            element,
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                1,
-                Point::integer(0, 0, units),
-                Point::integer(0, 0, units),
+                2,
+                Some(Point::integer(10, 10, units)),
+                Some(Point::integer(10, 10, units)),
                 1.0,
                 0.0,
                 false,
             ),
         );
+
+        cell.add(reference.clone());
+
+        library.add_cell(cell);
+
+        let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+        library.write_file("main.gds", 1e-9, 1e-9);
+
+        let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+        let mut expected_library = Library::new("reference_test");
+        let mut cell = Cell::new("cell");
 
         for element in reference.flatten(None, &expected_library) {
             cell.add(element);
