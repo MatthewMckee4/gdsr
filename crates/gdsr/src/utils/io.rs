@@ -331,21 +331,21 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
 
                                     reference
                                         .grid
-                                        .set_spacing_x(if reference.grid.columns() > 0 {
+                                        .set_spacing_x(if reference.grid.columns() > 1 {
                                             Some(
                                                 (unrotated_points[1] / reference.grid.columns())
                                                     - unrotated_points[0],
                                             )
                                         } else {
-                                            Some(Point::default())
+                                            None
                                         });
-                                    reference.grid.set_spacing_y(if reference.grid.rows() > 0 {
+                                    reference.grid.set_spacing_y(if reference.grid.rows() > 1 {
                                         Some(
                                             (unrotated_points[2] / reference.grid.rows())
                                                 - unrotated_points[0],
                                         )
                                     } else {
-                                        Some(Point::integer(0, 0, db_units))
+                                        None
                                     });
                                 }
                                 _ => {}

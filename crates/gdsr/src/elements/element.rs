@@ -190,18 +190,13 @@ mod tests {
             0,
         );
 
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
 
-        let reference = Reference::new(polygon.clone(), grid);
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
 
         let element: Element = reference.clone().into();
 
@@ -271,18 +266,13 @@ mod tests {
             0,
         );
 
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
 
-        let reference = Reference::new(polygon, grid);
+        let reference = Reference::new(polygon).with_grid(grid);
         let element: Element = reference.into();
 
         let delta = Point::integer(5, 5, 1e-9);

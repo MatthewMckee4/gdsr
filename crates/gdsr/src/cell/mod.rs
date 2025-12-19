@@ -160,7 +160,7 @@ impl Movable for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Grid, Point};
+    use crate::Point;
 
     #[test]
     fn test_cell_new() {
@@ -229,9 +229,7 @@ mod tests {
 
         let polygon = Polygon::default();
 
-        let grid = Grid::default();
-
-        let reference = Reference::new(polygon.clone(), grid);
+        let reference = Reference::new(polygon.clone());
 
         let mut cell = Cell::new("test_cell");
 

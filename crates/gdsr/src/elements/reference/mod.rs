@@ -12,10 +12,10 @@ pub struct Reference {
 }
 
 impl Reference {
-    pub fn new(instance: impl Into<Instance>, grid: Grid) -> Self {
+    pub fn new(instance: impl Into<Instance>) -> Self {
         Self {
             instance: instance.into(),
-            grid,
+            grid: Grid::default(),
         }
     }
 
@@ -25,6 +25,12 @@ impl Reference {
 
     pub const fn grid(&self) -> &Grid {
         &self.grid
+    }
+
+    #[must_use]
+    pub const fn with_grid(mut self, grid: Grid) -> Self {
+        self.grid = grid;
+        self
     }
 
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
@@ -190,17 +196,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon, grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
 
         assert_eq!(reference.grid().columns(), 2);
         assert_eq!(reference.grid().rows(), 2);
@@ -215,17 +217,9 @@ mod tests {
 
     #[test]
     fn test_reference_from_cell_name() {
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            1,
-            1,
-            Some(Point::integer(0, 0, 1e-9)),
-            Some(Point::integer(0, 0, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new("test_cell", grid);
+        let grid = Grid::default();
+
+        let reference = Reference::new("test_cell").with_grid(grid);
 
         match reference.instance() {
             Instance::Cell(name) => assert_eq!(name, "test_cell"),
@@ -235,17 +229,9 @@ mod tests {
 
     #[test]
     fn test_reference_display() {
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            1,
-            1,
-            Some(Point::integer(0, 0, 1e-9)),
-            Some(Point::integer(0, 0, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new("test_cell", grid);
+        let grid = Grid::default();
+
+        let reference = Reference::new("test_cell").with_grid(grid);
 
         let display_str = format!("{reference}");
         assert!(display_str.contains("Reference to"));
@@ -264,17 +250,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon, grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
 
         let flattened = reference.flatten(None, &library);
         assert_eq!(flattened.len(), 4);
@@ -294,17 +276,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon, grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
 
         let flattened = reference.flatten(Some(0), &library);
         // Depth 0 should return the reference itself
@@ -322,17 +300,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            3,
-            3,
-            Some(Point::integer(20, 0, 1e-9)),
-            Some(Point::integer(0, 20, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon.clone(), grid);
+        let grid = Grid::default()
+            .with_columns(3)
+            .with_rows(3)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 20, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
 
         let element = Element::Polygon(polygon);
         let elements = reference.get_elements_in_grid(&element);
@@ -351,17 +325,14 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            true, // x_reflection enabled
-        );
-        let reference = Reference::new(polygon.clone(), grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)))
+            .with_x_reflection(true);
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
 
         let element = Element::Polygon(polygon);
         let elements = reference.get_elements_in_grid(&element);
@@ -380,17 +351,16 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            2.0,                        // magnification
-            std::f64::consts::PI / 2.0, // 90 degree rotation
-            false,
-        );
-        let reference = Reference::new(polygon.clone(), grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)))
+            .with_magnification(2.0)
+            .with_angle(std::f64::consts::PI / 2.0)
+            .with_x_reflection(false);
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
 
         let element = Element::Polygon(polygon);
         let elements = reference.get_elements_in_grid(&element);
@@ -409,17 +379,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon, grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
 
         let centre = Point::integer(5, 5, 1e-9);
         let transformed = reference.rotate(std::f64::consts::PI / 2.0, centre);
@@ -438,17 +404,13 @@ mod tests {
             1,
             0,
         );
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new(polygon, grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
 
         let target = Point::integer(20, 20, 1e-9);
         let moved = reference.move_to(target);
@@ -474,17 +436,13 @@ mod tests {
         cell.add(polygon);
         library.add_cell(cell);
 
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Some(Point::integer(10, 0, 1e-9)),
-            Some(Point::integer(0, 10, 1e-9)),
-            1.0,
-            0.0,
-            false,
-        );
-        let reference = Reference::new("test_cell", grid);
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new("test_cell").with_grid(grid);
 
         let flattened = reference.flatten(None, &library);
         assert_eq!(flattened.len(), 4); // 2x2 grid

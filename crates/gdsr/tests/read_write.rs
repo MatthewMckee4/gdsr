@@ -64,18 +64,13 @@ fn test_library_roundtrip_mixed_elements() {
         0,
     );
 
-    let reference = Reference::new(
-        ref_polygon,
-        Grid::new(
-            Point::integer(0, 25, units),
-            2,
-            2,
-            Some(Point::integer(25, 0, units)),
-            Some(Point::integer(0, 25, units)),
-            1.0,
-            0.0,
-            false,
-        ),
+    let reference = Reference::new(ref_polygon.clone()).with_grid(
+        Grid::default()
+            .with_origin(Point::integer(0, 25, units))
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(25, 0, units)))
+            .with_spacing_y(Some(Point::integer(0, 25, units))),
     );
 
     let elements = reference.flatten(None, &library);
@@ -120,19 +115,16 @@ fn test_library_roundtrip_different_units(#[case] user_units: f64, #[case] datab
         0,
     );
 
-    let reference = Reference::new(
-        polygon,
-        Grid::new(
-            Point::integer(0, 0, units),
-            3,
-            3,
-            Some(Point::integer(150, 0, units)),
-            Some(Point::integer(0, 150, units)),
-            1.5,
-            45.0,
-            true,
-        ),
-    );
+    let reference = Reference::new(polygon.clone()).with_grid(Grid::new(
+        Point::integer(0, 0, units),
+        3,
+        3,
+        Some(Point::integer(150, 0, units)),
+        Some(Point::integer(0, 150, units)),
+        1.5,
+        45.0,
+        true,
+    ));
 
     let elements = reference.flatten(None, &library);
 
@@ -155,18 +147,12 @@ fn test_library_roundtrip_different_units(#[case] user_units: f64, #[case] datab
 
     cell2.add(polygon2);
 
-    let reference2 = Reference::new(
-        &cell2,
-        Grid::new(
-            Point::integer(0, 0, units),
-            3,
-            3,
-            Some(Point::integer(150, 0, units)),
-            Some(Point::integer(0, 150, units)),
-            1.0,
-            0.0,
-            false,
-        ),
+    let reference2 = Reference::new(&cell2).with_grid(
+        Grid::default()
+            .with_columns(3)
+            .with_rows(3)
+            .with_spacing_x(Some(Point::integer(150, 0, units)))
+            .with_spacing_y(Some(Point::integer(0, 150, units))),
     );
 
     cell.add(reference2);
@@ -329,35 +315,18 @@ fn test_nested_references() {
     cell1.add(polygon1);
 
     let mut cell2 = Cell::new("mid_cell");
-    let reference1 = Reference::new(
-        "base_cell".to_string(),
-        Grid::new(
-            Point::integer(0, 0, units),
-            2,
-            2,
-            Some(Point::integer(20, 0, units)),
-            Some(Point::integer(0, 20, units)),
-            1.0,
-            0.0,
-            false,
-        ),
+    let reference1 = Reference::new("base_cell".to_string()).with_grid(
+        Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(20, 0, units)))
+            .with_spacing_y(Some(Point::integer(0, 20, units))),
     );
     cell2.add(reference1);
 
     let mut cell3 = Cell::new("top_cell");
-    let reference2 = Reference::new(
-        "mid_cell".to_string(),
-        Grid::new(
-            Point::integer(50, 50, units),
-            1,
-            1,
-            Some(Point::integer(0, 0, units)),
-            Some(Point::integer(0, 0, units)),
-            1.0,
-            0.0,
-            false,
-        ),
-    );
+    let reference2 = Reference::new("mid_cell".to_string())
+        .with_grid(Grid::default().with_origin(Point::integer(50, 50, units)));
     cell3.add(reference2);
 
     library.add_cell(cell1);
@@ -544,19 +513,10 @@ fn test_single_cell_with_all_element_types() {
     ));
     library.add_cell(ref_cell);
 
-    cell.add(Reference::new(
-        "ref_cell".to_string(),
-        Grid::new(
-            Point::integer(300, 50, units),
-            1,
-            1,
-            Some(Point::integer(0, 0, units)),
-            Some(Point::integer(0, 0, units)),
-            1.0,
-            0.0,
-            false,
-        ),
-    ));
+    cell.add(
+        Reference::new("ref_cell".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(300, 50, units))),
+    );
 
     library.add_cell(cell);
 
@@ -616,140 +576,128 @@ fn get_elements(units: f64) -> Vec<Element> {
             None,
         )
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(10, 0, units),
-                    Point::integer(10, 10, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                2,
-                2,
-                Some(Point::integer(0, 10, units)),
-                Some(Point::integer(10, 0, units)),
-                1.0,
-                FRAC_PI_4,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            2,
+            2,
+            Some(Point::integer(0, 10, units)),
+            Some(Point::integer(10, 0, units)),
+            1.0,
+            FRAC_PI_4,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(10, 0, units),
-                    Point::integer(10, 10, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                1,
-                None,
-                None,
-                2.0,
-                FRAC_PI_4,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            1,
+            None,
+            None,
+            2.0,
+            FRAC_PI_4,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(10, 0, units),
-                    Point::integer(10, 10, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                1,
-                None,
-                None,
-                2.0,
-                -FRAC_PI_4,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            1,
+            None,
+            None,
+            2.0,
+            -FRAC_PI_4,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(20, 0, units),
-                    Point::integer(20, 20, units),
-                    Point::integer(0, 20, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                1,
-                None,
-                None,
-                1.0,
-                0.0,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            1,
+            None,
+            None,
+            1.0,
+            0.0,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(20, 0, units),
-                    Point::integer(20, 20, units),
-                    Point::integer(0, 20, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                1,
-                2,
-                None,
-                Some(Point::integer(10, 10, units)),
-                1.0,
-                0.0,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            2,
+            None,
+            Some(Point::integer(10, 10, units)),
+            1.0,
+            0.0,
+            false,
+        ))
         .into(),
-        Reference::new(
-            Polygon::new(
-                [
-                    Point::integer(0, 0, units),
-                    Point::integer(20, 0, units),
-                    Point::integer(20, 20, units),
-                    Point::integer(0, 20, units),
-                ],
-                4,
-                0,
-            ),
-            Grid::new(
-                Point::integer(300, 50, units),
-                2,
-                1,
-                Some(Point::integer(10, 10, units)),
-                None,
-                1.0,
-                0.0,
-                false,
-            ),
-        )
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            4,
+            0,
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            2,
+            1,
+            Some(Point::integer(10, 10, units)),
+            None,
+            1.0,
+            0.0,
+            false,
+        ))
         .into(),
     ]
 }
@@ -768,19 +716,16 @@ fn test_element_reference() {
 
         let element = element.move_to(Point::integer(100, 100, units));
 
-        let reference = Reference::new(
-            element.clone(),
-            Grid::new(
-                Point::integer(10, 0, units),
-                1,
-                1,
-                Some(Point::integer(10, 10, units)),
-                Some(Point::integer(10, 10, units)),
-                1.0,
-                0.0,
-                false,
-            ),
-        );
+        let reference = Reference::new(element.clone()).with_grid(Grid::new(
+            Point::integer(10, 0, units),
+            1,
+            1,
+            Some(Point::integer(10, 10, units)),
+            Some(Point::integer(10, 10, units)),
+            1.0,
+            0.0,
+            false,
+        ));
 
         cell.add(reference.clone());
 
@@ -821,19 +766,42 @@ fn test_cell_reference() {
 
         ref_cell.add(element.clone());
 
-        let reference = Reference::new(
-            "ref_cell",
-            Grid::new(
-                Point::integer(00, 0, units),
-                2,
-                2,
-                Some(Point::integer(10, 10, units)),
-                Some(Point::integer(10, 10, units)),
-                2.0,
-                FRAC_PI_2,
-                true,
-            ),
-        );
+        let reference = Reference::new("ref_cell").with_grid(Grid::new(
+            Point::integer(0, 0, units),
+            2,
+            2,
+            Some(Point::integer(10, 10, units)),
+            Some(Point::integer(10, 10, units)),
+            2.0,
+            FRAC_PI_2,
+            true,
+        ));
+
+        cell.add(reference.clone());
+
+        let reference = Reference::new("ref_cell").with_grid(Grid::new(
+            Point::integer(0, 0, units),
+            2,
+            1,
+            Some(Point::integer(10, 10, units)),
+            None,
+            2.0,
+            FRAC_PI_2,
+            true,
+        ));
+
+        cell.add(reference.clone());
+
+        let reference = Reference::new("ref_cell").with_grid(Grid::new(
+            Point::integer(0, 0, units),
+            1,
+            2,
+            None,
+            Some(Point::integer(10, 10, units)),
+            2.0,
+            FRAC_PI_2,
+            true,
+        ));
 
         cell.add(reference.clone());
 
@@ -919,7 +887,7 @@ fn test_invalid_no_cell() {
 
     let mut cell = Cell::new("cell");
 
-    let elements = Reference::new("random_cell", Grid::default()).flatten(None, &library);
+    let elements = Reference::new("random_cell").flatten(None, &library);
 
     for element in elements {
         cell.add(element);

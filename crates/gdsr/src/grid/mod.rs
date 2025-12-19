@@ -74,32 +74,80 @@ impl Grid {
         self.origin = origin;
     }
 
+    #[must_use]
+    pub const fn with_origin(mut self, origin: Point) -> Self {
+        self.origin = origin;
+        self
+    }
+
     pub const fn set_columns(&mut self, columns: u32) {
         self.columns = columns;
+    }
+
+    #[must_use]
+    pub const fn with_columns(mut self, columns: u32) -> Self {
+        self.columns = columns;
+        self
     }
 
     pub const fn set_rows(&mut self, rows: u32) {
         self.rows = rows;
     }
 
+    #[must_use]
+    pub const fn with_rows(mut self, rows: u32) -> Self {
+        self.rows = rows;
+        self
+    }
+
     pub const fn set_spacing_x(&mut self, spacing_x: Option<Point>) {
         self.spacing_x = spacing_x;
+    }
+
+    #[must_use]
+    pub const fn with_spacing_x(mut self, spacing_x: Option<Point>) -> Self {
+        self.spacing_x = spacing_x;
+        self
     }
 
     pub const fn set_spacing_y(&mut self, spacing_y: Option<Point>) {
         self.spacing_y = spacing_y;
     }
 
+    #[must_use]
+    pub const fn with_spacing_y(mut self, spacing_y: Option<Point>) -> Self {
+        self.spacing_y = spacing_y;
+        self
+    }
+
     pub const fn set_magnification(&mut self, magnification: f64) {
         self.magnification = magnification;
+    }
+
+    #[must_use]
+    pub const fn with_magnification(mut self, magnification: f64) -> Self {
+        self.magnification = magnification;
+        self
     }
 
     pub const fn set_angle(&mut self, angle: AngleInRadians) {
         self.angle = angle;
     }
 
+    #[must_use]
+    pub const fn with_angle(mut self, angle: AngleInRadians) -> Self {
+        self.angle = angle;
+        self
+    }
+
     pub const fn set_x_reflection(&mut self, x_reflection: bool) {
         self.x_reflection = x_reflection;
+    }
+
+    #[must_use]
+    pub const fn with_x_reflection(mut self, x_reflection: bool) -> Self {
+        self.x_reflection = x_reflection;
+        self
     }
 }
 
@@ -477,6 +525,36 @@ mod tests {
         grid.set_magnification(2.0);
         grid.set_angle(90.0);
         grid.set_x_reflection(true);
+
+        assert_eq!(grid.origin, Point::integer(100, 200, 1e-9));
+        assert_eq!(grid.columns, 5);
+        assert_eq!(grid.rows, 6);
+        assert_eq!(grid.spacing_x, Some(Point::integer(10, 0, 1e-9)));
+        assert_eq!(grid.spacing_y, Some(Point::integer(0, 10, 1e-9)));
+        assert_eq!(grid.magnification, 2.0);
+        assert_eq!(grid.angle, 90.0);
+        assert!(grid.x_reflection);
+    }
+    #[test]
+    fn test_grid_with_setters() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            2,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        )
+        .with_origin(Point::integer(100, 200, 1e-9))
+        .with_columns(5)
+        .with_rows(6)
+        .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+        .with_spacing_y(Some(Point::integer(0, 10, 1e-9)))
+        .with_magnification(2.0)
+        .with_angle(90.0)
+        .with_x_reflection(true);
 
         assert_eq!(grid.origin, Point::integer(100, 200, 1e-9));
         assert_eq!(grid.columns, 5);
