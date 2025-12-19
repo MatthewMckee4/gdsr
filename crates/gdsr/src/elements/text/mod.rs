@@ -6,21 +6,21 @@ pub mod utils;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Text {
-    pub text: String,
-    pub origin: Point,
-    pub layer: Layer,
-    pub datatype: DataType,
-    pub magnification: f64,
-    pub angle: f64,
-    pub x_reflection: bool,
-    pub vertical_presentation: presentation::VerticalPresentation,
-    pub horizontal_presentation: presentation::HorizontalPresentation,
+    pub(crate) value: String,
+    pub(crate) origin: Point,
+    pub(crate) layer: Layer,
+    pub(crate) datatype: DataType,
+    pub(crate) magnification: f64,
+    pub(crate) angle: f64,
+    pub(crate) x_reflection: bool,
+    pub(crate) vertical_presentation: presentation::VerticalPresentation,
+    pub(crate) horizontal_presentation: presentation::HorizontalPresentation,
 }
 
 impl Default for Text {
     fn default() -> Self {
         Self {
-            text: String::new(),
+            value: String::new(),
             origin: Point::integer(0, 0, 1e-9),
             layer: 0,
             datatype: 0,
@@ -46,7 +46,7 @@ impl Text {
         horizontal_presentation: presentation::HorizontalPresentation,
     ) -> Self {
         Self {
-            text: text.to_string(),
+            value: text.to_string(),
             origin,
             layer,
             datatype,
@@ -59,12 +59,12 @@ impl Text {
     }
 
     pub const fn text(&self) -> &String {
-        &self.text
+        &self.value
     }
 
     #[must_use]
     pub fn set_text(mut self, text: String) -> Self {
-        self.text = text;
+        self.value = text;
         self
     }
 

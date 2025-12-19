@@ -406,7 +406,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 GDSRecord::String => {
                     if let GDSRecordData::Str(string) = data {
                         if let Some(text) = &mut text {
-                            text.text = string;
+                            text.value = string;
                         }
                     }
                 }

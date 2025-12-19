@@ -7,11 +7,11 @@ pub use path_type::PathType;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Path {
-    pub points: Vec<Point>,
-    pub layer: Layer,
-    pub data_type: DataType,
-    pub r#type: Option<PathType>,
-    pub width: Option<Unit>,
+    pub(crate) points: Vec<Point>,
+    pub(crate) layer: Layer,
+    pub(crate) data_type: DataType,
+    pub(crate) r#type: Option<PathType>,
+    pub(crate) width: Option<Unit>,
 }
 
 impl Path {
