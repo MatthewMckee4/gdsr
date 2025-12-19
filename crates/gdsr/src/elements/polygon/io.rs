@@ -4,11 +4,13 @@ use std::io;
 use super::Polygon;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
 use crate::traits::ToGds;
-use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
+use crate::utils::io::{
+    MAX_POINTS, write_element_tail_to_file, write_points_to_file, write_u16_array_to_file,
+};
 
 impl ToGds for Polygon {
     fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
-        if self.points().len() > 8191 {
+        if self.points().len() > MAX_POINTS {
             return Ok(());
         }
 

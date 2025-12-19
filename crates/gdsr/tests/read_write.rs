@@ -604,6 +604,18 @@ fn get_elements(units: f64) -> Vec<Element> {
             Some(Unit::float(5.0, units)),
         )
         .into(),
+        Path::new(
+            vec![
+                Point::integer(150, 50, units),
+                Point::integer(200, 50, units),
+                Point::integer(200, 100, units),
+            ],
+            2,
+            0,
+            None,
+            None,
+        )
+        .into(),
         Reference::new(
             Polygon::new(
                 [
@@ -686,6 +698,52 @@ fn get_elements(units: f64) -> Vec<Element> {
                 1,
                 1,
                 None,
+                None,
+                1.0,
+                0.0,
+                false,
+            ),
+        )
+        .into(),
+        Reference::new(
+            Polygon::new(
+                [
+                    Point::integer(0, 0, units),
+                    Point::integer(20, 0, units),
+                    Point::integer(20, 20, units),
+                    Point::integer(0, 20, units),
+                ],
+                4,
+                0,
+            ),
+            Grid::new(
+                Point::integer(300, 50, units),
+                1,
+                2,
+                None,
+                Some(Point::integer(10, 10, units)),
+                1.0,
+                0.0,
+                false,
+            ),
+        )
+        .into(),
+        Reference::new(
+            Polygon::new(
+                [
+                    Point::integer(0, 0, units),
+                    Point::integer(20, 0, units),
+                    Point::integer(20, 20, units),
+                    Point::integer(0, 20, units),
+                ],
+                4,
+                0,
+            ),
+            Grid::new(
+                Point::integer(300, 50, units),
+                2,
+                1,
+                Some(Point::integer(10, 10, units)),
                 None,
                 1.0,
                 0.0,
@@ -787,4 +845,97 @@ fn test_cell_reference() {
 
         assert_eq!(library, new_library);
     }
+}
+
+#[test]
+fn test_invalid_path() {
+    let units = DEFAULT_INTEGER_UNITS;
+
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("all_elements.gds");
+
+    let mut library = Library::new("reference_test");
+
+    let mut cell = Cell::new("cell");
+
+    let path = Path::new(
+        vec![Point::integer(150, 50, units)],
+        2,
+        0,
+        Some(PathType::Round),
+        Some(Unit::float(5.0, units)),
+    );
+
+    cell.add(path);
+
+    library.add_cell(cell);
+
+    let res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    assert!(res.is_err());
+}
+
+#[test]
+fn test_invalid_polygon() {
+    let units = DEFAULT_INTEGER_UNITS;
+
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("all_elements.gds");
+
+    let mut library = Library::new("reference_test");
+
+    let mut cell = Cell::new("cell");
+
+    let mut polygon_points = Vec::new();
+    for i in 0..8192 {
+        polygon_points.push(Point::integer(i, 0, units));
+    }
+
+    let polygon = Polygon::new(polygon_points, 1, 0);
+
+    cell.add(polygon);
+
+    library.add_cell(cell);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    let mut expected_library = Library::new("reference_test");
+
+    let cell = Cell::new("cell");
+
+    expected_library.add_cell(cell);
+
+    assert_eq!(expected_library, new_library);
+}
+
+#[test]
+fn test_invalid_no_cell() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("all_elements.gds");
+
+    let mut library = Library::new("reference_test");
+
+    let mut cell = Cell::new("cell");
+
+    let elements = Reference::new("random_cell", Grid::default()).flatten(None, &library);
+
+    for element in elements {
+        cell.add(element);
+    }
+
+    library.add_cell(cell);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    let mut expected_library = Library::new("reference_test");
+
+    let cell = Cell::new("cell");
+
+    expected_library.add_cell(cell);
+
+    assert_eq!(expected_library, new_library);
 }

@@ -77,7 +77,7 @@ pub fn write_float_to_eight_byte_real_to_file(file: &mut File, value: f64) -> io
     file.write_all(&value)
 }
 
-const MAX_POINTS: usize = 8191;
+pub const MAX_POINTS: usize = 8191;
 
 pub fn write_points_to_file(
     file: &mut File,
