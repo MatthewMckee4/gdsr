@@ -45,23 +45,17 @@ fn main() {
         0,
     );
 
-    let reference = Reference::new(
-        polygon,
-        Grid::new(
-            Point::integer(0, 0, units),
-            5,
-            5,
-            Point::integer(2, 0, units),
-            Point::integer(0, 2, units),
-            1.0,
-            0.0,
-            false,
-        ),
+    let reference = Reference::new(polygon).with_grid(
+        Grid::default()
+            .with_columns(5)
+            .with_rows(5)
+            .with_spacing_x(Some(Point::integer(2, 0, units)))
+            .with_spacing_y(Some(Point::integer(0, 2, units))),
     );
 
     cell.add(reference);
 
-    library.add(cell);
+    library.add_cell(cell);
 
     library.write_file("main.gds", 1e-9, 1e-9).unwrap();
 }
