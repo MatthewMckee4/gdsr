@@ -99,16 +99,9 @@ impl Unit {
         }
     }
 
-    /// Sets the units for this Unit (mutable).
-    pub const fn set_units(&mut self, new_units: f64) {
-        match self {
-            Self::Integer { units, .. } | Self::Float { units, .. } => *units = new_units,
-        }
-    }
-
     /// Returns a copy of this Unit with the specified units.
     #[must_use]
-    pub const fn with_units(&self, new_units: f64) -> Self {
+    pub const fn set_units(&self, new_units: f64) -> Self {
         match self {
             Self::Integer { value, .. } => Self::Integer {
                 value: *value,
@@ -738,8 +731,7 @@ mod tests {
 
         #[test]
         fn set_units_integer() {
-            let mut unit = Unit::integer(100, 1e-9);
-            unit.set_units(1e-6);
+            let unit = Unit::integer(100, 1e-9).set_units(1e-6);
 
             match unit {
                 Unit::Integer { value, units } => {
@@ -752,8 +744,7 @@ mod tests {
 
         #[test]
         fn set_units_float() {
-            let mut unit = Unit::float(1.5, 1e-6);
-            unit.set_units(1e-12);
+            let unit = Unit::float(1.5, 1e-6).set_units(1e-12);
 
             match unit {
                 Unit::Float { value, units } => {
@@ -767,7 +758,7 @@ mod tests {
         #[test]
         fn with_units_integer() {
             let unit = Unit::integer(100, 1e-9);
-            let new_unit = unit.with_units(1e-6);
+            let new_unit = unit.set_units(1e-6);
 
             match unit {
                 Unit::Integer { value, units } => {
@@ -789,7 +780,7 @@ mod tests {
         #[test]
         fn with_units_float() {
             let unit = Unit::float(1.5, 1e-6);
-            let new_unit = unit.with_units(1e-12);
+            let new_unit = unit.set_units(1e-12);
 
             match unit {
                 Unit::Float { value, units } => {
@@ -803,20 +794,6 @@ mod tests {
                 Unit::Float { value, units } => {
                     assert_eq!(value, 1.5);
                     assert_eq!(units, 1e-12);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-        }
-
-        #[test]
-        fn set_methods_modify_in_place() {
-            let mut unit = Unit::float(2.5, 1e-6);
-            unit.set_units(1e-3);
-
-            match unit {
-                Unit::Float { value, units } => {
-                    assert_eq!(value, 2.5);
-                    assert_eq!(units, 1e-3);
                 }
                 _ => panic!("Expected Float variant"),
             }

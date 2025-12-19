@@ -462,7 +462,7 @@ mod tests {
 
         let mut cell = crate::Cell::new("test_cell");
         cell.add(polygon);
-        library.add(cell);
+        library.add_cell(cell);
 
         let grid = Grid::new(
             Point::integer(0, 0, 1e-9),

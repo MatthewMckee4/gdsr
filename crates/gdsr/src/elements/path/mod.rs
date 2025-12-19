@@ -80,7 +80,9 @@ impl Transformable for Path {
 
 impl Movable for Path {
     fn move_to(self, target: Point) -> Self {
-        let first_point = &self.points()[0];
+        let Some(first_point) = self.points().first() else {
+            return self;
+        };
         let delta = target - *first_point;
         self.move_by(delta)
     }

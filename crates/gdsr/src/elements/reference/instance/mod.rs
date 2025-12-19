@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::Cell;
-use crate::elements::{Element, Path, Polygon, Text};
+use crate::elements::Element;
 // Note: Reference is defined in parent module, so we can't import it here to avoid circular dependency
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,31 +26,6 @@ impl std::fmt::Display for Instance {
 }
 
 // From implementations for common element types
-impl From<Polygon> for Instance {
-    fn from(value: Polygon) -> Self {
-        Self::Element(Arc::new(Box::new(Element::Polygon(value))))
-    }
-}
-
-impl From<Path> for Instance {
-    fn from(value: Path) -> Self {
-        Self::Element(Arc::new(Box::new(Element::Path(value))))
-    }
-}
-
-impl From<Text> for Instance {
-    fn from(value: Text) -> Self {
-        Self::Element(Arc::new(Box::new(Element::Text(value))))
-    }
-}
-
-// TODO: Re-add after Reference is updated
-// impl From<Reference> for Instance {
-//     fn from(value: Reference) -> Self {
-//         Instance::Element(Arc::new(Box::new(Element::Reference(value))))
-//     }
-// }
-
 impl From<&Cell> for Instance {
     fn from(value: &Cell) -> Self {
         Self::Cell(value.name().to_string())
@@ -72,7 +47,7 @@ impl From<&str> for Instance {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Point;
+    use crate::{Path, Point, Polygon, Text};
 
     #[test]
     fn test_instance_cell() {
@@ -153,6 +128,7 @@ mod tests {
             "test",
             Point::integer(0, 0, 1e-9),
             1,
+            0,
             1.0,
             0.0,
             false,

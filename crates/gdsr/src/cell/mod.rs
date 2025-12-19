@@ -160,9 +160,7 @@ impl Movable for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elements::path::PathType;
-    use crate::elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
-    use crate::{Grid, Point, Unit};
+    use crate::{Grid, Point};
 
     #[test]
     fn test_cell_new() {
@@ -187,16 +185,7 @@ mod tests {
     #[test]
     fn test_add_polygon() {
         let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new(
-            vec![
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-                Point::integer(0, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
+        let polygon = Polygon::default();
 
         cell.add(polygon.clone());
         assert_eq!(cell.polygons.len(), 1);
@@ -206,13 +195,7 @@ mod tests {
     #[test]
     fn test_add_path() {
         let mut cell = Cell::new("test_cell");
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            Some(PathType::Square),
-            Some(Unit::default_integer(2)),
-        );
+        let path = Path::default();
 
         cell.add(path.clone());
         assert_eq!(cell.paths.len(), 1);
@@ -222,16 +205,7 @@ mod tests {
     #[test]
     fn test_add_text() {
         let mut cell = Cell::new("test_cell");
-        let text = Text::new(
-            "Test Text",
-            Point::integer(5, 5, 1e-9),
-            1,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::default(),
-            HorizontalPresentation::default(),
-        );
+        let text = Text::default();
 
         cell.add(text.clone());
         assert_eq!(cell.texts.len(), 1);
@@ -241,16 +215,7 @@ mod tests {
     #[test]
     fn test_cell_display() {
         let mut cell = Cell::new("test_cell");
-        let polygon = Polygon::new(
-            vec![
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-                Point::integer(0, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
+        let polygon = Polygon::default();
         cell.add(polygon);
 
         let display_str = format!("{cell}");
@@ -262,49 +227,17 @@ mod tests {
     fn test_cell_get_elements() {
         let library = Library::new("main");
 
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
+        let polygon = Polygon::default();
 
-        let grid = Grid::new(
-            Point::integer(0, 0, 1e-9),
-            2,
-            2,
-            Point::integer(10, 0, 1e-9),
-            Point::integer(0, 10, 1e-9),
-            1.0,
-            0.0,
-            false,
-        );
+        let grid = Grid::default();
 
         let reference = Reference::new(polygon.clone(), grid);
 
         let mut cell = Cell::new("test_cell");
 
-        let path = Path::new(
-            [Point::integer(0, 0, 1e-9), Point::integer(10, 0, 1e-9)],
-            1,
-            0,
-            None,
-            None,
-        );
+        let path = Path::default();
 
-        let text = Text::new(
-            "text",
-            Point::integer(0, 0, 1e-9),
-            1,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::Middle,
-            HorizontalPresentation::Centre,
-        );
+        let text = Text::default();
 
         cell.add(reference);
         cell.add(polygon);

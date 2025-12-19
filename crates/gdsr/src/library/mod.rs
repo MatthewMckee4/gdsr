@@ -6,8 +6,8 @@ use crate::utils::io::{from_gds, write_gds};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Library {
-    pub name: String,
-    pub cells: HashMap<String, Cell>,
+    pub(crate) name: String,
+    pub(crate) cells: HashMap<String, Cell>,
 }
 
 impl Library {
@@ -18,11 +18,23 @@ impl Library {
         }
     }
 
-    pub fn add(&mut self, cell: Cell) {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn cells(&self) -> &HashMap<String, Cell> {
+        &self.cells
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+
+    pub fn add_cell(&mut self, cell: Cell) {
         self.cells.insert(cell.name().to_string(), cell);
     }
 
-    pub fn remove(&mut self, cells: Vec<Cell>) {
+    pub fn remove_cell(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.remove(cell.name());
         }
@@ -32,7 +44,7 @@ impl Library {
         self.cells.get(name)
     }
 
-    pub fn contains(&self, cell: &Cell) -> bool {
+    pub fn contains_cell(&self, cell: &Cell) -> bool {
         self.cells.contains_key(cell.name())
     }
 
@@ -86,9 +98,12 @@ mod tests {
 
     #[test]
     fn test_library_new() {
-        let library: Library = Library::new("test_lib");
+        let mut library: Library = Library::new("test_lib");
         assert_eq!(library.name, "test_lib");
         assert!(library.cells.is_empty());
+
+        library.set_name("new_name");
+        assert_eq!(library.name, "new_name");
     }
 
     #[test]
@@ -96,7 +111,7 @@ mod tests {
         let mut library: Library = Library::new("test_lib");
         let cell = Cell::new("test_cell");
 
-        library.add(cell.clone());
+        library.add_cell(cell.clone());
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("test_cell"));
         assert_eq!(library.cells.get("test_cell"), Some(&cell));
@@ -108,8 +123,8 @@ mod tests {
         let cell1 = Cell::new("cell1");
         let cell2 = Cell::new("cell2");
 
-        library.add(cell1);
-        library.add(cell2);
+        library.add_cell(cell1);
+        library.add_cell(cell2);
 
         assert_eq!(library.cells.len(), 2);
         assert!(library.cells.contains_key("cell1"));
@@ -122,8 +137,8 @@ mod tests {
         let cell1 = Cell::new("test_cell");
         let cell2 = Cell::new("test_cell");
 
-        library.add(cell1);
-        library.add(cell2.clone());
+        library.add_cell(cell1);
+        library.add_cell(cell2.clone());
 
         assert_eq!(library.cells.len(), 1);
         assert_eq!(library.cells.get("test_cell"), Some(&cell2));
@@ -135,10 +150,10 @@ mod tests {
         let cell1 = Cell::new("cell1");
         let cell2 = Cell::new("cell2");
 
-        library.add(cell1.clone());
-        library.add(cell2);
+        library.add_cell(cell1.clone());
+        library.add_cell(cell2);
 
-        library.remove(vec![cell1]);
+        library.remove_cell(vec![cell1]);
 
         assert_eq!(library.cells.len(), 1);
         assert!(!library.cells.contains_key("cell1"));
@@ -151,8 +166,8 @@ mod tests {
         let cell1 = Cell::new("cell1");
         let cell2 = Cell::new("cell2");
 
-        library.add(cell1);
-        library.remove(vec![cell2]);
+        library.add_cell(cell1);
+        library.remove_cell(vec![cell2]);
 
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("cell1"));
@@ -164,10 +179,10 @@ mod tests {
         let cell = Cell::new("test_cell");
         let other_cell = Cell::new("other_cell");
 
-        library.add(cell.clone());
+        library.add_cell(cell.clone());
 
-        assert!(library.contains(&cell));
-        assert!(!library.contains(&other_cell));
+        assert!(library.contains_cell(&cell));
+        assert!(!library.contains_cell(&other_cell));
     }
 
     #[test]
@@ -176,8 +191,8 @@ mod tests {
         let cell1 = Cell::new("cell1");
         let cell2 = Cell::new("cell2");
 
-        library.add(cell1);
-        library.add(cell2);
+        library.add_cell(cell1);
+        library.add_cell(cell2);
 
         let display_str = format!("{library}");
         assert_eq!(display_str, "Library 'my_library' with 2 cells");
@@ -194,7 +209,7 @@ mod tests {
     fn test_library_clone() {
         let mut library: Library = Library::new("test_lib");
         let cell = Cell::new("test_cell");
-        library.add(cell);
+        library.add_cell(cell);
 
         let cloned = library.clone();
         assert_eq!(library, cloned);

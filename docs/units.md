@@ -51,7 +51,7 @@ The user units are used simply for your GDSII editor, these let you see values i
 For most users I would imagine that they would want to use micrometers (`um`) for their user units and nanometers (`nm`) for their database units.
 
 When reading a GDSII file into a `Library`, with `Library::read_file`, you can only specify the "user" units.
-These units are what is used when creating `Point`s and `Unit`s. This allows you to work with these values in a consistent way. If you do not provide this, then values will be with units of 1, which is not recommended, though it is fine to work with these values.
+These units are what is used when creating `Point`s and `Unit`s. This allows you to work with these values in a consistent way. If you do not provide this, then values will be with units of 1e-9, which is not recommended, though it is fine to work with these values.
 
 ## Important
 

@@ -14,7 +14,7 @@ use crate::elements::{Path, PathType, Polygon, Reference, Text};
 use crate::library::Library;
 use crate::utils::gds_format::{eight_byte_real, u16_array_to_big_endian};
 use crate::utils::geometry::round_to_decimals;
-use crate::{DataType, Instance, Layer, Point, ToGds, Unit};
+use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, ToGds, Unit};
 
 pub fn write_gds_head_to_file(
     library_name: &str,
@@ -219,7 +219,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
     let mut reference: Option<Reference> = None;
 
     let mut scale = 1.0;
-    let mut db_units = units.unwrap_or(1.0);
+    let mut db_units = units.unwrap_or(DEFAULT_INTEGER_UNITS);
 
     for record in reader {
         match record {

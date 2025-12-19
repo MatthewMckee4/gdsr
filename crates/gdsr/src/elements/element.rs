@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::elements::{Path, Polygon, Reference, Text};
 use crate::traits::ToGds;
-use crate::{Movable, Point, Transformable, Transformation};
+use crate::{Instance, Movable, Point, Transformable, Transformation};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
@@ -55,28 +57,29 @@ impl std::fmt::Display for Element {
     }
 }
 
-// From implementations for ergonomic construction
-impl From<Path> for Element {
-    fn from(path: Path) -> Self {
-        Self::Path(path)
-    }
+macro_rules! impl_from_element_reference {
+    ($($type:ident),*) => {
+        $(
+            impl From<$type> for Element {
+                fn from(value: $type) -> Self {
+                    Element::$type(value)
+                }
+            }
+
+            impl From<$type> for Instance {
+                fn from(value: $type) -> Self {
+                    Element::from(value).into()
+                }
+            }
+        )*
+    };
 }
 
-impl From<Polygon> for Element {
-    fn from(polygon: Polygon) -> Self {
-        Self::Polygon(polygon)
-    }
-}
+impl_from_element_reference!(Path, Polygon, Text, Reference);
 
-impl From<Text> for Element {
-    fn from(text: Text) -> Self {
-        Self::Text(text)
-    }
-}
-
-impl From<Reference> for Element {
-    fn from(reference: Reference) -> Self {
-        Self::Reference(reference)
+impl From<Element> for Instance {
+    fn from(v: Element) -> Self {
+        Self::Element(Arc::new(Box::new(v)))
     }
 }
 
@@ -116,7 +119,7 @@ impl Movable for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Grid, HorizontalPresentation, Point, VerticalPresentation};
+    use crate::{Grid, Point};
 
     #[test]
     fn test_element_from_path() {
@@ -164,23 +167,15 @@ mod tests {
 
     #[test]
     fn test_element_from_text() {
-        let text = Text::new(
-            "text",
-            Point::integer(0, 0, 1e-9),
-            1,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::Middle,
-            HorizontalPresentation::Centre,
-        );
+        let text = Text::default();
+
         let element: Element = text.clone().into();
 
         let t = element.as_text().unwrap().clone();
 
         assert_eq!(t, text);
 
-        insta::assert_snapshot!(element.to_string(), @"Text 'text' vertical: Middle, horizontal: Centre at Point { x: Integer { value: 0, units: 1e-9 }, y: Integer { value: 0, units: 1e-9 } }");
+        insta::assert_snapshot!(element.to_string(), @"Text '' vertical: Middle, horizontal: Centre at Point { x: Integer { value: 0, units: 1e-9 }, y: Integer { value: 0, units: 1e-9 } }");
     }
 
     #[test]
@@ -255,16 +250,7 @@ mod tests {
 
     #[test]
     fn test_element_transform_text() {
-        let text = Text::new(
-            "text",
-            Point::integer(0, 0, 1e-9),
-            1,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::Middle,
-            HorizontalPresentation::Centre,
-        );
+        let text = Text::default();
         let element: Element = text.into();
 
         let centre = Point::integer(0, 0, 1e-9);

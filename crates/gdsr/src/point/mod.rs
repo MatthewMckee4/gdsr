@@ -51,10 +51,10 @@ impl Point {
     }
 
     #[must_use]
-    pub const fn with_units(&self, units: f64) -> Self {
+    pub const fn set_units(&self, units: f64) -> Self {
         Self {
-            x: self.x.with_units(units),
-            y: self.y.with_units(units),
+            x: self.x.set_units(units),
+            y: self.y.set_units(units),
         }
     }
 
@@ -365,6 +365,14 @@ mod tests {
             let point = Point::default_integer(100, 200);
             assert_eq!(point.x(), Unit::integer(100, 1e-9));
             assert_eq!(point.y(), Unit::integer(200, 1e-9));
+        }
+
+        #[test]
+        fn with_units() {
+            let point =
+                Point::new(Unit::integer(100, 1e-6), Unit::float(2.5, 1e-6)).set_units(1e-9);
+            assert_eq!(point.x(), Unit::integer(100, 1e-9));
+            assert_eq!(point.y(), Unit::float(2.5, 1e-9));
         }
 
         #[test]
