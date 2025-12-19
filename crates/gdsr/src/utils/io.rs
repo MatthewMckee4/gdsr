@@ -315,35 +315,34 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         } else if let Some(path) = &mut path {
                             path.points = points;
                         } else if let Some(reference) = &mut reference {
-                            match points.len() {
-                                1 => {
-                                    reference.grid.set_origin(points[0]);
+                            match points.as_slice() {
+                                [point] => {
+                                    reference.grid.set_origin(*point);
                                 }
-                                3 => {
-                                    let origin = points[0];
-                                    let rotated_points = points
+                                [origin, _, _] => {
+                                    let unrotated_points = points
                                         .iter()
                                         .map(|&p| {
-                                            p.rotate_around_point(-reference.grid.angle(), &origin)
+                                            p.rotate_around_point(-reference.grid.angle(), origin)
                                         })
                                         .collect::<Vec<Point>>();
 
-                                    reference.grid.set_origin(rotated_points[0]);
+                                    reference.grid.set_origin(unrotated_points[0]);
 
                                     reference
                                         .grid
                                         .set_spacing_x(if reference.grid.columns() > 0 {
                                             Some(
-                                                (rotated_points[1] - rotated_points[0])
-                                                    / reference.grid.columns(),
+                                                (unrotated_points[1] / reference.grid.columns())
+                                                    - unrotated_points[0],
                                             )
                                         } else {
                                             Some(Point::default())
                                         });
                                     reference.grid.set_spacing_y(if reference.grid.rows() > 0 {
                                         Some(
-                                            (rotated_points[2] - rotated_points[0])
-                                                / reference.grid.rows(),
+                                            (unrotated_points[2] / reference.grid.rows())
+                                                - unrotated_points[0],
                                         )
                                     } else {
                                         Some(Point::integer(0, 0, db_units))

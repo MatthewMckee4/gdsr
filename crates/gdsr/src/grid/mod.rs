@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use crate::{AngleInRadians, Movable, Point, Transformable, Transformation};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -152,8 +154,12 @@ impl Transformable for Grid {
 
         if let Some(rotation) = &transformation.rotation {
             self.angle += rotation.angle();
-            let result = self.angle % 360.0;
-            self.angle = if result < 0.0 { result + 360.0 } else { result };
+            let result = self.angle % (PI * 2.0);
+            self.angle = if result < 0.0 {
+                result + PI * 2.0
+            } else {
+                result
+            };
         }
 
         // Handle reflection
@@ -174,6 +180,8 @@ impl Movable for Grid {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::FRAC_PI_2;
+
     use insta::assert_snapshot;
 
     use super::*;
@@ -228,6 +236,32 @@ mod tests {
         );
 
         assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (Point(5 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 5 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
+
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            3,
+            Some(Point::integer(5, 0, 1e-9)),
+            None,
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (Point(5 (1.000e-9), 0 (1.000e-9)), None), magnification 1.0, angle 0.0, x_reflection false");
+
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            3,
+            None,
+            Some(Point::integer(0, 5, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (None, Point(0 (1.000e-9), 5 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
 
     #[test]
@@ -317,9 +351,9 @@ mod tests {
         );
 
         let centre = Point::integer(0, 0, 1e-9);
-        let transformed = grid.rotate(90.0, centre);
+        let transformed = grid.rotate(FRAC_PI_2, centre);
 
-        assert_eq!(transformed.angle, 90.0);
+        assert_eq!(transformed.angle, FRAC_PI_2);
     }
 
     #[test]
@@ -388,15 +422,15 @@ mod tests {
             Some(Point::integer(5, 0, 1e-9)),
             Some(Point::integer(0, 5, 1e-9)),
             1.0,
-            350.0,
+            FRAC_PI_2,
             false,
         );
 
         let centre = Point::integer(0, 0, 1e-9);
-        let transformed = grid.rotate(20.0, centre);
+        let transformed = grid.rotate(PI * 2.0, centre);
 
-        // 350 + 20 = 370, which should normalize to 10
-        assert!((transformed.angle - 10.0).abs() < 0.001);
+        // 3/2 * PI + PI = 5/2 * PI, which should normalize to PI
+        assert!((transformed.angle - FRAC_PI_2).abs() < 0.001);
     }
 
     #[test]

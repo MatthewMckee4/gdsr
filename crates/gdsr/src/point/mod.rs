@@ -1,7 +1,7 @@
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::units::Unit;
-use crate::{AngleInRadians, Float, Movable, Transformable, Transformation};
+use crate::{AngleInRadians, Movable, Transformable, Transformation};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
@@ -124,34 +124,15 @@ impl Point {
             return *self;
         }
 
+        let (u1, u2) = self.units();
+
         let cos_a = angle.cos();
         let sin_a = angle.sin();
 
-        let Float {
-            value: x_val,
-            units: x_units,
-        } = self.x.as_float_unit();
-
-        let Float {
-            value: y_val,
-            units: y_units,
-        } = self.y.as_float_unit();
-
-        let Float {
-            value: cx_val,
-            units: cx_units,
-        } = center.x.as_float_unit();
-
-        let Float {
-            value: cy_val,
-            units: cy_units,
-        } = center.y.as_float_unit();
-
-        // Calculate real world values
-        let x_real = x_val * x_units;
-        let y_real = y_val * y_units;
-        let cx_real = cx_val * cx_units;
-        let cy_real = cy_val * cy_units;
+        let x_real = self.x.scale_units(u1).as_float_value();
+        let y_real = self.y.scale_units(u2).as_float_value();
+        let cx_real = center.x.scale_units(u1).as_float_value();
+        let cy_real = center.y.scale_units(u2).as_float_value();
 
         // Translate to origin relative to center
         let dx = x_real - cx_real;
@@ -164,8 +145,6 @@ impl Point {
         // Translate back
         let new_x_real = rotated_dx + cx_real;
         let new_y_real = rotated_dy + cy_real;
-
-        let (u1, u2) = self.units();
 
         Self {
             x: Unit::float(new_x_real, u1),

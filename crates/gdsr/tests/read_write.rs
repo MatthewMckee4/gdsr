@@ -1,3 +1,5 @@
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
+
 use gdsr::*;
 use rstest::rstest;
 use tempfile::tempdir;
@@ -619,7 +621,51 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Some(Point::integer(0, 10, units)),
                 Some(Point::integer(10, 0, units)),
                 1.0,
-                0.0,
+                FRAC_PI_4,
+                false,
+            ),
+        )
+        .into(),
+        Reference::new(
+            Polygon::new(
+                [
+                    Point::integer(0, 0, units),
+                    Point::integer(10, 0, units),
+                    Point::integer(10, 10, units),
+                ],
+                4,
+                0,
+            ),
+            Grid::new(
+                Point::integer(300, 50, units),
+                1,
+                1,
+                None,
+                None,
+                2.0,
+                FRAC_PI_4,
+                false,
+            ),
+        )
+        .into(),
+        Reference::new(
+            Polygon::new(
+                [
+                    Point::integer(0, 0, units),
+                    Point::integer(10, 0, units),
+                    Point::integer(10, 10, units),
+                ],
+                4,
+                0,
+            ),
+            Grid::new(
+                Point::integer(300, 50, units),
+                1,
+                1,
+                None,
+                None,
+                2.0,
+                -FRAC_PI_4,
                 false,
             ),
         )
@@ -659,6 +705,7 @@ fn test_element_reference() {
         let gds_path = temp_dir.path().join("all_elements.gds");
 
         let mut library = Library::new("reference_test");
+
         let mut cell = Cell::new("cell");
 
         let element = element.move_to(Point::integer(100, 100, units));
@@ -668,7 +715,7 @@ fn test_element_reference() {
             Grid::new(
                 Point::integer(10, 0, units),
                 1,
-                2,
+                1,
                 Some(Point::integer(10, 10, units)),
                 Some(Point::integer(10, 10, units)),
                 1.0,
@@ -683,8 +730,6 @@ fn test_element_reference() {
 
         let _res = library.write_file(&gds_path, 1e-9, 1e-9);
 
-        library.write_file("main.gds", 1e-9, 1e-9);
-
         let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
 
         let mut expected_library = Library::new("reference_test");
@@ -697,5 +742,49 @@ fn test_element_reference() {
         expected_library.add_cell(cell);
 
         assert_eq!(expected_library, new_library);
+    }
+}
+
+#[test]
+fn test_cell_reference() {
+    let units = DEFAULT_INTEGER_UNITS;
+
+    for element in get_elements(units) {
+        let temp_dir = tempdir().unwrap();
+        let gds_path = temp_dir.path().join("all_elements.gds");
+
+        let mut library = Library::new("reference_test");
+
+        let mut cell = Cell::new("cell");
+
+        let element = element.move_to(Point::integer(100, 100, units));
+
+        let mut ref_cell = Cell::new("ref_cell");
+
+        ref_cell.add(element.clone());
+
+        let reference = Reference::new(
+            "ref_cell",
+            Grid::new(
+                Point::integer(00, 0, units),
+                2,
+                2,
+                Some(Point::integer(10, 10, units)),
+                Some(Point::integer(10, 10, units)),
+                2.0,
+                FRAC_PI_2,
+                true,
+            ),
+        );
+
+        cell.add(reference.clone());
+
+        library.add_cell(cell);
+
+        let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+        let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+        assert_eq!(library, new_library);
     }
 }

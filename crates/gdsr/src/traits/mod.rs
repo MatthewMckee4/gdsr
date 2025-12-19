@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io;
 
-use crate::Point;
 use crate::transformation::{Reflection, Rotation, Scale, Transformation, Translation};
+use crate::{AngleInRadians, Point};
 
 pub trait ToGds {
     fn to_gds_impl(&self, file: &mut File, scale: f64) -> io::Result<()>;
@@ -18,7 +18,7 @@ pub trait Transformable: Sized {
     fn transform_impl(self, transformation: &Transformation) -> Self;
 
     #[must_use]
-    fn rotate(self, angle: f64, centre: Point) -> Self {
+    fn rotate(self, angle: AngleInRadians, centre: Point) -> Self {
         self.transform_impl(
             Transformation::default().with_rotation(Some(Rotation::new(angle, centre))),
         )

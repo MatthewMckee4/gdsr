@@ -25,13 +25,13 @@ expression: rotated_elements
             origin: Point {
                 x: Float(
                     Float {
-                        value: 5e-9,
+                        value: 5.0,
                         units: 1e-9,
                     },
                 ),
                 y: Float(
                     Float {
-                        value: 5e-9,
+                        value: 5.0,
                         units: 1e-9,
                     },
                 ),

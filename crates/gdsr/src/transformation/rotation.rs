@@ -38,20 +38,22 @@ impl Rotation {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
+
     use super::*;
 
     #[test]
     fn test_rotation_new() {
-        let rotation = Rotation::new(90.0, Point::integer(10, 20, 1e-9));
-        assert_eq!(rotation.angle(), 90.0);
+        let rotation = Rotation::new(FRAC_PI_2, Point::integer(10, 20, 1e-9));
+        assert_eq!(rotation.angle(), FRAC_PI_2);
         assert_eq!(rotation.centre(), &Point::integer(10, 20, 1e-9));
     }
 
     #[test]
     fn test_rotation_getters() {
         let centre = Point::integer(5, 10, 1e-9);
-        let rotation = Rotation::new(45.0, centre);
-        assert_eq!(rotation.angle(), 45.0);
+        let rotation = Rotation::new(FRAC_PI_4, centre);
+        assert_eq!(rotation.angle(), FRAC_PI_4);
         assert_eq!(rotation.centre(), &centre);
     }
 

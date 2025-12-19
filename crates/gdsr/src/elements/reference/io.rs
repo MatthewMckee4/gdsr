@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io;
 
 use super::{Instance, Reference};
-use crate::Point;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
 use crate::elements::Element;
 use crate::traits::ToGds;
@@ -72,22 +71,23 @@ impl Reference {
         let origin = self
             .grid()
             .origin()
-            .to_integer_unit()
             .rotate_around_point(self.grid().angle(), &self.grid().origin());
 
         match (self.grid.spacing_x(), self.grid.spacing_y()) {
             (Some(spacing_x), Some(spacing_y)) => {
                 let point2 = ((origin + spacing_x) * self.grid().columns())
                     .rotate_around_point(self.grid().angle(), &origin);
+
                 let point3 = ((origin + spacing_y) * self.grid().rows())
                     .rotate_around_point(self.grid().angle(), &origin);
+
                 let reference_points = [origin, point2, point3];
                 write_points_to_file(file, &reference_points, database_units)?;
             }
             (Some(spacing_x), None) => {
                 let point2 = ((origin + spacing_x) * self.grid().columns())
                     .rotate_around_point(self.grid().angle(), &origin);
-                let reference_points = [origin, point2, Point::default_integer(0, 0)];
+                let reference_points = [origin, point2, origin];
                 write_points_to_file(file, &reference_points, database_units)?;
             }
             (None, Some(spacing_y)) => {
