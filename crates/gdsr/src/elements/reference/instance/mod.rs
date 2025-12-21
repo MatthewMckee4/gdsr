@@ -10,6 +10,24 @@ pub enum Instance {
     Element(Arc<Box<Element>>),
 }
 
+impl Instance {
+    pub fn as_cell(&self) -> Option<&String> {
+        if let Self::Cell(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_element(&self) -> Option<&Arc<Box<Element>>> {
+        if let Self::Element(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 impl Default for Instance {
     fn default() -> Self {
         Self::Cell(String::new())

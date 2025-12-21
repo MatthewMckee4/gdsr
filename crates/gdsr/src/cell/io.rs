@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io;
-
 use chrono::{Datelike, Local, Timelike};
 
 use crate::Cell;
@@ -9,7 +6,11 @@ use crate::traits::ToGds;
 use crate::utils::io::{write_string_with_record_to_file, write_u16_array_to_file};
 
 impl ToGds for Cell {
-    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
+    fn to_gds_impl(
+        &self,
+        buffer: &mut impl std::io::Write,
+        database_units: f64,
+    ) -> std::io::Result<()> {
         let now = Local::now();
         let timestamp = now.naive_utc();
 
@@ -30,24 +31,24 @@ impl ToGds for Cell {
             timestamp.second() as u16,
         ];
 
-        write_u16_array_to_file(file, &cell_head)?;
+        write_u16_array_to_file(buffer, &cell_head)?;
 
-        write_string_with_record_to_file(file, GDSRecord::StrName, &self.name)?;
+        write_string_with_record_to_file(buffer, GDSRecord::StrName, &self.name)?;
 
         for path in &self.paths {
-            path.to_gds_impl(file, database_units)?;
+            path.to_gds_impl(buffer, database_units)?;
         }
 
         for polygon in &self.polygons {
-            polygon.to_gds_impl(file, database_units)?;
+            polygon.to_gds_impl(buffer, database_units)?;
         }
 
         for text in &self.texts {
-            text.to_gds_impl(file, database_units)?;
+            text.to_gds_impl(buffer, database_units)?;
         }
 
         for reference in &self.references {
-            reference.to_gds_impl(file, database_units)?;
+            reference.to_gds_impl(buffer, database_units)?;
         }
 
         let cell_tail = [
@@ -55,7 +56,7 @@ impl ToGds for Cell {
             combine_record_and_data_type(GDSRecord::EndStr, GDSDataType::NoData),
         ];
 
-        write_u16_array_to_file(file, &cell_tail)?;
+        write_u16_array_to_file(buffer, &cell_tail)?;
 
         Ok(())
     }

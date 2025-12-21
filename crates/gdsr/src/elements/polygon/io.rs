@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io;
 
 use super::Polygon;
@@ -9,7 +8,7 @@ use crate::utils::io::{
 };
 
 impl ToGds for Polygon {
-    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
+    fn to_gds_impl(&self, buffer: &mut impl std::io::Write, database_units: f64) -> io::Result<()> {
         if self.points().len() > MAX_POINTS {
             return Ok(());
         }
@@ -25,10 +24,10 @@ impl ToGds for Polygon {
             self.data_type(),
         ];
 
-        write_u16_array_to_file(file, &polygon_head)?;
+        write_u16_array_to_file(buffer, &polygon_head)?;
 
-        write_points_to_file(file, self.points(), database_units)?;
+        write_points_to_file(buffer, self.points(), database_units)?;
 
-        write_element_tail_to_file(file)
+        write_element_tail_to_file(buffer)
     }
 }

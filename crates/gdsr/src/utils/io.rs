@@ -20,7 +20,7 @@ pub fn write_gds_head_to_file(
     library_name: &str,
     user_units: f64,
     db_units: f64,
-    file: &mut File,
+    buffer: &mut impl std::io::Write,
 ) -> io::Result<()> {
     let now = Local::now();
     let timestamp = now.naive_utc();
@@ -45,42 +45,45 @@ pub fn write_gds_head_to_file(
         timestamp.second() as u16,
     ];
 
-    write_u16_array_to_file(file, &head_start)?;
+    write_u16_array_to_file(buffer, &head_start)?;
 
-    write_string_with_record_to_file(file, GDSRecord::LibName, library_name)?;
+    write_string_with_record_to_file(buffer, GDSRecord::LibName, library_name)?;
 
     let head_units = [
         20,
         combine_record_and_data_type(GDSRecord::Units, GDSDataType::EightByteReal),
     ];
-    write_u16_array_to_file(file, &head_units)?;
+    write_u16_array_to_file(buffer, &head_units)?;
 
-    write_float_to_eight_byte_real_to_file(file, user_units)?;
-    write_float_to_eight_byte_real_to_file(file, db_units)
+    write_float_to_eight_byte_real_to_file(buffer, user_units)?;
+    write_float_to_eight_byte_real_to_file(buffer, db_units)
 }
 
-pub fn write_gds_tail_to_file(file: &mut File) -> io::Result<()> {
+pub fn write_gds_tail_to_file(buffer: &mut impl std::io::Write) -> io::Result<()> {
     let tail = [
         4,
         combine_record_and_data_type(GDSRecord::EndLib, GDSDataType::NoData),
     ];
-    write_u16_array_to_file(file, &tail)
+    write_u16_array_to_file(buffer, &tail)
 }
 
-pub fn write_u16_array_to_file(file: &mut File, array: &[u16]) -> io::Result<()> {
+pub fn write_u16_array_to_file(buffer: &mut impl std::io::Write, array: &[u16]) -> io::Result<()> {
     let u16_array_to_big_endian = u16_array_to_big_endian(array);
-    file.write_all(cast_slice(&u16_array_to_big_endian))
+    buffer.write_all(cast_slice(&u16_array_to_big_endian))
 }
 
-pub fn write_float_to_eight_byte_real_to_file(file: &mut File, value: f64) -> io::Result<()> {
+pub fn write_float_to_eight_byte_real_to_file(
+    buffer: &mut impl std::io::Write,
+    value: f64,
+) -> io::Result<()> {
     let value = eight_byte_real(value);
-    file.write_all(&value)
+    buffer.write_all(&value)
 }
 
 pub const MAX_POINTS: usize = 8191;
 
 pub fn write_points_to_file(
-    file: &mut File,
+    buffer: &mut impl std::io::Write,
     points: &[Point],
     database_units: f64,
 ) -> io::Result<()> {
@@ -94,7 +97,7 @@ pub fn write_points_to_file(
         combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
     ];
 
-    write_u16_array_to_file(file, &xy_header_buffer)?;
+    write_u16_array_to_file(buffer, &xy_header_buffer)?;
 
     for point in points_to_write {
         let x_real = point.x().absolute_value();
@@ -103,23 +106,23 @@ pub fn write_points_to_file(
         let scaled_x = (x_real / database_units).round() as i32;
         let scaled_y = (y_real / database_units).round() as i32;
 
-        file.write_all(&scaled_x.to_be_bytes())?;
-        file.write_all(&scaled_y.to_be_bytes())?;
+        buffer.write_all(&scaled_x.to_be_bytes())?;
+        buffer.write_all(&scaled_y.to_be_bytes())?;
     }
 
     Ok(())
 }
 
-pub fn write_element_tail_to_file(file: &mut File) -> io::Result<()> {
+pub fn write_element_tail_to_file(buffer: &mut impl std::io::Write) -> io::Result<()> {
     let tail = [
         4,
         combine_record_and_data_type(GDSRecord::EndEl, GDSDataType::NoData),
     ];
-    write_u16_array_to_file(file, &tail)
+    write_u16_array_to_file(buffer, &tail)
 }
 
 pub fn write_string_with_record_to_file(
-    file: &mut File,
+    buffer: &mut impl std::io::Write,
     record: GDSRecord,
     string: &str,
 ) -> io::Result<()> {
@@ -139,9 +142,9 @@ pub fn write_string_with_record_to_file(
         combine_record_and_data_type(record, GDSDataType::AsciiString),
     ];
 
-    write_u16_array_to_file(file, &string_start)?;
+    write_u16_array_to_file(buffer, &string_start)?;
 
-    file.write_all(&lib_name_bytes)
+    buffer.write_all(&lib_name_bytes)
 }
 
 pub fn write_gds<'a, P: AsRef<std::path::Path>>(
@@ -165,7 +168,7 @@ pub fn write_gds<'a, P: AsRef<std::path::Path>>(
 }
 
 pub fn write_transformation_to_file(
-    file: &mut File,
+    buffer: &mut impl std::io::Write,
     angle: f64,
     magnification: f64,
     x_reflection: bool,
@@ -178,15 +181,15 @@ pub fn write_transformation_to_file(
             if x_reflection { 0x8000 } else { 0x0000 },
         ];
 
-        write_u16_array_to_file(file, &buffer_flags)?;
+        write_u16_array_to_file(buffer, &buffer_flags)?;
 
         if magnification != 1.0 {
             let buffer_mag = [
                 12,
                 combine_record_and_data_type(GDSRecord::Mag, GDSDataType::EightByteReal),
             ];
-            write_u16_array_to_file(file, &buffer_mag)?;
-            write_float_to_eight_byte_real_to_file(file, magnification)?;
+            write_u16_array_to_file(buffer, &buffer_mag)?;
+            write_float_to_eight_byte_real_to_file(buffer, magnification)?;
         }
 
         if angle != 0.0 {
@@ -194,8 +197,8 @@ pub fn write_transformation_to_file(
                 12,
                 combine_record_and_data_type(GDSRecord::Angle, GDSDataType::EightByteReal),
             ];
-            write_u16_array_to_file(file, &buffer_rot)?;
-            write_float_to_eight_byte_real_to_file(file, angle)?;
+            write_u16_array_to_file(buffer, &buffer_rot)?;
+            write_float_to_eight_byte_real_to_file(buffer, angle)?;
         }
     }
 

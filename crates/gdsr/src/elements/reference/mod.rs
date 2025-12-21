@@ -128,58 +128,6 @@ impl Movable for Reference {
     }
 }
 
-// impl<T: CoordNum> Dimensions<T> for Reference<T> {
-//     fn bounding_box(&self) -> (Point<T>, Point<T>) {
-//         let mut min_x = f64::INFINITY;
-//         let mut min_y = f64::INFINITY;
-//         let mut max_x = f64::NEG_INFINITY;
-//         let mut max_y = f64::NEG_INFINITY;
-
-//         let grid = &self.grid;
-
-//         let corners = vec![
-//             grid.origin,
-//             grid.origin + grid.spacing_x * (grid.columns as f64).into(),
-//             grid.origin + grid.spacing_y * (grid.rows as f64).into(),
-//             grid.origin
-//                 + grid.spacing_x * (grid.columns as f64).into()
-//                 + grid.spacing_y * (grid.rows as f64).into(),
-//         ];
-
-//         for corner in corners {
-//             let new_instance = self.instance.clone();
-
-//             let mut transformation = Transformation::default();
-//             transformation = transformation
-//                 .with_scale(if grid.x_reflection { -1.0 } else { 1.0 }, grid.origin)
-//                 .with_scale(grid.magnification, grid.origin)
-//                 .with_rotation(grid.angle, grid.origin)
-//                 .with_translation(Point::new(
-//                     corner.x() - grid.origin.x(),
-//                     corner.y() - grid.origin.y(),
-//                 ));
-
-//             let mut grid = Grid::default();
-
-//             grid.transform(&transformation);
-
-//             let reference = Reference::new(new_instance, grid);
-
-//             let (new_instance_min, new_instance_max) = reference.bounding_box();
-
-//             min_x = min_x.min(new_instance_min.x().into());
-//             min_y = min_y.min(new_instance_min.y().into());
-//             max_x = max_x.max(new_instance_max.x().into());
-//             max_y = max_y.max(new_instance_max.y().into());
-//         }
-
-//         (
-//             Point::new(min_x.into(), min_y.into()),
-//             Point::new(max_x.into(), max_y.into()),
-//         )
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,10 +169,37 @@ mod tests {
 
         let reference = Reference::new("test_cell").with_grid(grid);
 
-        match reference.instance() {
-            Instance::Cell(name) => assert_eq!(name, "test_cell"),
-            Instance::Element(_) => panic!("Expected Cell instance"),
-        }
+        let cell = reference.instance().as_cell().unwrap();
+        assert_eq!(cell, "test_cell");
+
+        assert!(reference.instance().as_element().is_none());
+    }
+
+    #[test]
+    fn test_reference_from_polygon() {
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let reference = Reference::new(polygon.clone());
+
+        let polygon_from_reference = reference
+            .instance()
+            .as_element()
+            .unwrap()
+            .as_polygon()
+            .unwrap()
+            .clone();
+
+        assert_eq!(polygon, polygon_from_reference);
+
+        assert!(reference.instance().as_cell().is_none());
     }
 
     #[test]

@@ -84,12 +84,12 @@ impl From<Element> for Instance {
 }
 
 impl ToGds for Element {
-    fn to_gds_impl(&self, file: &mut std::fs::File, scale: f64) -> std::io::Result<()> {
+    fn to_gds_impl(&self, buffer: &mut impl std::io::Write, scale: f64) -> std::io::Result<()> {
         match self {
-            Self::Path(path) => path.to_gds_impl(file, scale),
-            Self::Polygon(polygon) => polygon.to_gds_impl(file, scale),
-            Self::Reference(reference) => reference.to_gds_impl(file, scale),
-            Self::Text(text) => text.to_gds_impl(file, scale),
+            Self::Path(path) => path.to_gds_impl(buffer, scale),
+            Self::Polygon(polygon) => polygon.to_gds_impl(buffer, scale),
+            Self::Reference(reference) => reference.to_gds_impl(buffer, scale),
+            Self::Text(text) => text.to_gds_impl(buffer, scale),
         }
     }
 }

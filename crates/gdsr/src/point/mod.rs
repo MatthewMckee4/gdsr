@@ -281,14 +281,10 @@ impl Div<f64> for Point {
 
 #[cfg(test)]
 mod tests {
-    use crate::IntegerUnit;
 
     use super::*;
 
     mod creation {
-
-        use crate::FloatUnit;
-
         use super::*;
 
         #[test]
@@ -385,19 +381,12 @@ mod tests {
             let point = Point::integer(100, 200, 1e-9);
             let rotated = point.rotate(std::f64::consts::PI, Point::integer(0, 0, 1e-9));
 
-            // Original point should be unchanged
             assert_eq!(point.x(), Unit::integer(100, 1e-9));
             assert_eq!(point.y(), Unit::integer(200, 1e-9));
 
-            // Rotated point should be approximately (-100, -200) in real units
-            let x_real = match rotated.x().to_float_unit() {
-                Unit::Float(FloatUnit { value, units }) => value * units,
-                Unit::Integer(IntegerUnit { .. }) => unreachable!(),
-            };
-            let y_real = match rotated.y().to_float_unit() {
-                Unit::Float(FloatUnit { value, units }) => value * units,
-                Unit::Integer(IntegerUnit { .. }) => unreachable!(),
-            };
+            let x_real = rotated.x().absolute_value();
+
+            let y_real = rotated.y().absolute_value();
 
             assert!((x_real - (-100e-9)).abs() < 1e-15);
             assert!((y_real - (-200e-9)).abs() < 1e-15);
@@ -421,9 +410,6 @@ mod tests {
     }
 
     mod conversion {
-        use approx::assert_relative_eq;
-
-        use crate::FloatUnit;
 
         use super::*;
 
@@ -441,21 +427,7 @@ mod tests {
             let point = Point::float(1.007, 2.015, 1e-3);
             let converted = point.to_integer_unit();
 
-            match converted.x() {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 1);
-                    assert_eq!(units, 1e-3);
-                }
-                Unit::Float(FloatUnit { .. }) => panic!("Expected Integer variant"),
-            }
-
-            match converted.y() {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 2);
-                    assert_eq!(units, 1e-3);
-                }
-                Unit::Float(FloatUnit { .. }) => panic!("Expected Integer variant"),
-            }
+            assert_eq!(converted, Point::integer(1, 2, 1e-3));
         }
 
         #[test]
@@ -472,21 +444,7 @@ mod tests {
             let point = Point::integer(100, 200, 1e-9);
             let converted = point.to_float_unit().scale_units(1e-6);
 
-            match converted.x() {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_relative_eq!(value, 0.1);
-                    assert_eq!(units, 1e-6);
-                }
-                Unit::Integer(IntegerUnit { .. }) => panic!("Expected Float variant"),
-            }
-
-            match converted.y() {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_relative_eq!(value, 0.2);
-                    assert_eq!(units, 1e-6);
-                }
-                Unit::Integer(IntegerUnit { .. }) => panic!("Expected Float variant"),
-            }
+            assert_eq!(converted, Point::float(0.1, 0.2, 1e-6));
         }
 
         #[test]
@@ -512,24 +470,15 @@ mod tests {
     mod rotation {
         use std::f64::consts::PI;
 
-        use crate::FloatUnit;
-
         use super::*;
-
-        fn extract_real_value(unit: Unit) -> f64 {
-            match unit.to_float_unit().scale_to(1e-6) {
-                Unit::Float(FloatUnit { value, units }) => value * units,
-                Unit::Integer(IntegerUnit { .. }) => unreachable!(),
-            }
-        }
 
         #[test]
         fn rotate_90_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
             let rotated = point.rotate(PI / 2.0, Point::float(0.0, 0.0, 1e-6));
 
-            assert!((extract_real_value(rotated.x()) - 0.0).abs() < 1e-15);
-            assert!((extract_real_value(rotated.y()) - 1e-6).abs() < 1e-15);
+            assert!((rotated.x().absolute_value() - 0.0) < 1e-15);
+            assert!((rotated.y().absolute_value() - 1e-6) < 1e-15);
         }
 
         #[test]
@@ -537,8 +486,8 @@ mod tests {
             let point = Point::float(1.0, 0.0, 1e-6);
             let rotated = point.rotate(PI, Point::float(0.0, 0.0, 1e-6));
 
-            assert!((extract_real_value(rotated.x()) - (-1e-6)).abs() < 1e-15);
-            assert!((extract_real_value(rotated.y()) - 0.0).abs() < 1e-15);
+            assert!((rotated.x().absolute_value() - (-1e-6)) < 1e-15);
+            assert!((rotated.y().absolute_value() - 0.0) < 1e-15);
         }
 
         #[test]
@@ -546,8 +495,8 @@ mod tests {
             let point = Point::float(1.0, 0.0, 1e-6);
             let rotated = point.rotate(3.0 * PI / 2.0, Point::float(0.0, 0.0, 1e-6));
 
-            assert!((extract_real_value(rotated.x()) - 0.0).abs() < 1e-15);
-            assert!((extract_real_value(rotated.y()) - (-1e-6)).abs() < 1e-15);
+            assert!((rotated.x().absolute_value() - 0.0) < 1e-15);
+            assert!((rotated.y().absolute_value() - (-1e-6)) < 1e-15);
         }
 
         #[test]
@@ -555,8 +504,8 @@ mod tests {
             let point = Point::float(1.0, 0.0, 1e-6);
             let rotated = point.rotate(2.0 * PI, Point::float(0.0, 0.0, 1e-6));
 
-            assert!((extract_real_value(rotated.x()) - 1e-6).abs() < 1e-15);
-            assert!((extract_real_value(rotated.y()) - 0.0).abs() < 1e-15);
+            assert!((rotated.x().absolute_value() - 1e-6) < 1e-15);
+            assert!((rotated.y().absolute_value() - 0.0) < 1e-15);
         }
 
         #[test]
@@ -567,8 +516,8 @@ mod tests {
             let expected_x = 3e-6f64.mul_add((PI / 4.0).cos(), -(4e-6 * (PI / 4.0).sin()));
             let expected_y = 3e-6f64.mul_add((PI / 4.0).sin(), 4e-6 * (PI / 4.0).cos());
 
-            assert!((extract_real_value(rotated.x()) - expected_x).abs() < 1e-15);
-            assert!((extract_real_value(rotated.y()) - expected_y).abs() < 1e-15);
+            assert!((rotated.x().absolute_value() - expected_x) < 1e-15);
+            assert!((rotated.y().absolute_value() - expected_y) < 1e-15);
         }
     }
 

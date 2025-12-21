@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io;
-
 use super::Text;
 use super::utils::get_presentation_value;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
@@ -11,7 +8,11 @@ use crate::utils::io::{
 };
 
 impl ToGds for Text {
-    fn to_gds_impl(&self, file: &mut File, database_units: f64) -> io::Result<()> {
+    fn to_gds_impl(
+        &self,
+        buffer: &mut impl std::io::Write,
+        database_units: f64,
+    ) -> std::io::Result<()> {
         let buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
@@ -29,19 +30,18 @@ impl ToGds for Text {
             ),
         ];
 
-        write_u16_array_to_file(file, &buffer_start)?;
+        write_u16_array_to_file(buffer, &buffer_start)?;
 
-        write_transformation_to_file(
-            file,
-            self.angle(),
-            self.magnification(),
-            self.x_reflection(),
-        )?;
+        let angle = self.angle();
+        let magnification = self.magnification();
+        let x_reflection = self.x_reflection();
 
-        write_points_to_file(file, &[*self.origin()], database_units)?;
+        write_transformation_to_file(buffer, angle, magnification, x_reflection)?;
 
-        write_string_with_record_to_file(file, GDSRecord::String, self.text())?;
+        write_points_to_file(buffer, &[*self.origin()], database_units)?;
 
-        write_element_tail_to_file(file)
+        write_string_with_record_to_file(buffer, GDSRecord::String, self.text())?;
+
+        write_element_tail_to_file(buffer)
     }
 }

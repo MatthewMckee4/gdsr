@@ -321,33 +321,32 @@ mod tests {
     }
 
     mod creation {
-
-        use crate::FloatUnit;
-
         use super::*;
 
         #[test]
         fn integer() {
             let unit = Unit::integer(100, 0.001);
-            match unit {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 100);
-                    assert_eq!(units, 0.001);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+
+            let integer_unit = unit.as_integer_unit();
+            assert_eq!(integer_unit.value, 100);
+            assert_eq!(integer_unit.units, 0.001);
         }
 
         #[test]
         fn float() {
             let unit = Unit::float(100.5, 1.0);
-            match unit {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_eq!(value, 100.5);
-                    assert_eq!(units, 1.0);
-                }
-                _ => panic!("Expected Float variant"),
-            }
+
+            let float_unit = unit.as_float_unit();
+            assert_eq!(float_unit.value, 100.5);
+            assert_eq!(float_unit.units, 1.0);
+        }
+
+        #[test]
+        fn zero() {
+            let unit = Unit::zero();
+
+            assert_eq!(unit, Unit::default_float(0.0));
+            assert_eq!(unit, Unit::default_integer(0));
         }
     }
 
@@ -370,22 +369,22 @@ mod tests {
 
         #[test]
         fn integer_different_scales_equal() {
-            let a = Unit::integer(1000, 1e-9); // 1000 * 1e-9 = 1e-6
-            let b = Unit::integer(1, 1e-6); // 1 * 1e-6 = 1e-6
+            let a = Unit::integer(1000, 1e-9);
+            let b = Unit::integer(1, 1e-6);
             assert_eq!(a, b);
         }
 
         #[test]
         fn float_different_scales_equal() {
-            let a = Unit::float(1000.0, 1e-9); // 1000 * 1e-9 = 1e-6
-            let b = Unit::float(1.0, 1e-6); // 1 * 1e-6 = 1e-6
+            let a = Unit::float(1000.0, 1e-9);
+            let b = Unit::float(1.0, 1e-6);
             assert_eq!(a, b);
         }
 
         #[test]
         fn integer_and_float_equal() {
-            let a = Unit::integer(1000, 1e-9); // 1000 * 1e-9 = 1e-6
-            let b = Unit::float(1.0, 1e-6); // 1 * 1e-6 = 1e-6
+            let a = Unit::integer(1000, 1e-9);
+            let b = Unit::float(1.0, 1e-6);
             assert_eq!(a, b);
         }
 
@@ -398,42 +397,27 @@ mod tests {
 
         #[test]
         fn different_real_values_not_equal() {
-            let a = Unit::integer(1000, 1e-9); // 1e-6
-            let b = Unit::integer(2000, 1e-9); // 2e-6
+            let a = Unit::integer(1000, 1e-9);
+            let b = Unit::integer(2000, 1e-9);
             assert_ne!(a, b);
         }
     }
 
     mod unit_setters {
-
-        use crate::FloatUnit;
-
         use super::*;
 
         #[test]
         fn set_units_integer() {
             let unit = Unit::integer(100, 1e-9).set_units(1e-6);
 
-            match unit {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 100);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(unit, Unit::integer(100, 1e-6));
         }
 
         #[test]
         fn set_units_float() {
             let unit = Unit::float(1.5, 1e-6).set_units(1e-12);
 
-            match unit {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(units, 1e-12);
-                }
-                _ => panic!("Expected Float variant"),
-            }
+            assert_eq!(unit, Unit::float(1.5, 1e-12));
         }
 
         #[test]
@@ -441,21 +425,7 @@ mod tests {
             let unit = Unit::integer(100, 1e-9);
             let new_unit = unit.set_units(1e-6);
 
-            match unit {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 100);
-                    assert_eq!(units, 1e-9);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
-
-            match new_unit {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 100);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(new_unit, Unit::integer(100, 1e-6));
         }
 
         #[test]
@@ -463,21 +433,7 @@ mod tests {
             let unit = Unit::float(1.5, 1e-6);
             let new_unit = unit.set_units(1e-12);
 
-            match unit {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-
-            match new_unit {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_eq!(value, 1.5);
-                    assert_eq!(units, 1e-12);
-                }
-                _ => panic!("Expected Float variant"),
-            }
+            assert_eq!(new_unit, Unit::float(1.5, 1e-12));
         }
     }
 
@@ -489,10 +445,21 @@ mod tests {
         use super::*;
 
         #[test]
-        fn as_true_float_value() {
+        fn absolute_value() {
             let unit = Unit::float(2.5, 1e-6);
             let result = unit.absolute_value();
             assert_relative_eq!(result, 2.5 * 1e-6);
+        }
+
+        #[test]
+        fn integer_value() {
+            let unit = Unit::float(2.6, 1e-6);
+            let result = unit.integer_value();
+            assert_eq!(result, 3);
+
+            let unit = Unit::integer(100, 0.001);
+            let result = unit.integer_value();
+            assert_eq!(result, 100);
         }
 
         #[test]
@@ -507,13 +474,7 @@ mod tests {
             let unit = Unit::float(1.007, 1e-6);
             let result = unit.to_integer_unit();
 
-            match result {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 1);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(result, Unit::integer(1, 1e-6));
         }
 
         #[test]
@@ -521,13 +482,7 @@ mod tests {
             let unit = Unit::float(100.0, 0.001);
             let result = unit.to_integer_unit();
 
-            match result {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 100);
-                    assert_eq!(units, 1e-3);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(result, Unit::integer(100, 1e-3));
         }
 
         #[test]
@@ -542,28 +497,7 @@ mod tests {
             let unit = Unit::integer(100, 1e-9);
             let result = unit.to_float_unit().scale_to(1e-6);
 
-            match result {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert_relative_eq!(value, 0.1);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Float variant"),
-            }
-        }
-
-        #[test]
-        fn roundtrip() {
-            let original = Unit::integer(100, 1e-9);
-            let as_float = original.to_float_unit().scale_to(1e-6);
-            let back_to_int = as_float.to_integer_unit();
-
-            match back_to_int {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 0);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(result, Unit::float(0.1, 1e-6));
         }
 
         #[test]
@@ -571,13 +505,7 @@ mod tests {
             let unit = Unit::float(-100.5, 1e-6);
             let result = unit.to_integer_unit();
 
-            match result {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, -101);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(result, Unit::integer(-101, 1e-6));
         }
 
         #[test]
@@ -585,13 +513,7 @@ mod tests {
             let unit = Unit::float(0.0, 1e-6);
             let result = unit.to_integer_unit();
 
-            match result {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 0);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+            assert_eq!(result, Unit::integer(0, 1e-6));
         }
 
         #[test]
@@ -1025,12 +947,9 @@ mod tests {
 
             let result = a_unit + b_unit;
 
-            match result {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    value == a.value + b.value && (units - a.units).abs() < 1e-15
-                }
-                _ => false,
-            }
+            let integer_result = result.to_integer_unit();
+
+            integer_result == Unit::integer(a.value + b.value, a.units)
         }
 
         /// Verifies precise float addition when units are identical.
@@ -1047,13 +966,9 @@ mod tests {
 
             let result = a_unit + b_unit;
 
-            match result {
-                Unit::Float(FloatUnit { value, units }) => {
-                    approx_eq(value, a.value + b.value, a_unit.units())
-                        && approx_eq(units, a.units, 1e-15)
-                }
-                _ => false,
-            }
+            let float_result = result.to_float_unit();
+
+            float_result == Unit::float(a.value + b.value, a.units)
         }
     }
 }
