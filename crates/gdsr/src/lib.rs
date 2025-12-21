@@ -19,4 +19,4 @@ pub use point::Point;
 pub use traits::{Dimensions, Movable, ToGds, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer};
-pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Float, Integer, Unit};
+pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};

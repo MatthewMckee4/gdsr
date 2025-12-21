@@ -18,6 +18,8 @@ geo = { workspace = true }
 [dev-dependencies]
 approx = { workspace = true }
 insta = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 rstest = { workspace = true }
 tempfile = { workspace = true }
 

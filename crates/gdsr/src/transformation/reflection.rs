@@ -16,8 +16,8 @@ impl Reflection {
     }
 
     pub fn from_line(point1: &Point, point2: &Point) -> Self {
-        let dx = point2.x().true_value() - point1.x().true_value();
-        let dy = point2.y().true_value() - point1.y().true_value();
+        let dx = point2.x().absolute_value() - point1.x().absolute_value();
+        let dy = point2.y().absolute_value() - point1.y().absolute_value();
         let angle = dy.atan2(dx);
         let centre = Point::new(
             (point1.x() + point2.x()) / 2.0,
@@ -140,7 +140,7 @@ mod tests {
 
         // Reflecting across horizontal line at y=0 should flip y
         assert_eq!(reflected.x(), test_point.x());
-        let sum = (reflected.y() + test_point.y()).true_value();
+        let sum = (reflected.y() + test_point.y()).absolute_value();
         assert!(sum.abs() < 1e-9);
     }
 }

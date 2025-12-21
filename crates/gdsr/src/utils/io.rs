@@ -97,8 +97,8 @@ pub fn write_points_to_file(
     write_u16_array_to_file(file, &xy_header_buffer)?;
 
     for point in points_to_write {
-        let x_real = point.x().true_value();
-        let y_real = point.y().true_value();
+        let x_real = point.x().absolute_value();
+        let y_real = point.y().absolute_value();
 
         let scaled_x = (x_real / database_units).round() as i32;
         let scaled_y = (y_real / database_units).round() as i32;
@@ -303,8 +303,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                             .iter()
                             .map(|p| {
                                 Point::integer(
-                                    (p.x().as_float_value() * scale).round() as i32,
-                                    (p.y().as_float_value() * scale).round() as i32,
+                                    (p.x().float_value() * scale).round() as i32,
+                                    (p.y().float_value() * scale).round() as i32,
                                     db_units,
                                 )
                             })

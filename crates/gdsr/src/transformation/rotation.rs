@@ -83,7 +83,7 @@ mod tests {
         // (10, 0) rotated 90° around origin should be approximately (0, 10)
         let expected = Point::integer(0, 10, 1e-9);
         // Allow small floating point errors
-        assert!((rotated.x() - expected.x()).true_value().abs() < 1e-6);
-        assert!((rotated.y() - expected.y()).true_value().abs() < 1e-6);
+        assert!((rotated.x() - expected.x()).absolute_value().abs() < 1e-6);
+        assert!((rotated.y() - expected.y()).absolute_value().abs() < 1e-6);
     }
 }

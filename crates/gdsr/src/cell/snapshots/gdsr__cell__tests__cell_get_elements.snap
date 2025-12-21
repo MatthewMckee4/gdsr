@@ -24,13 +24,13 @@ expression: elements
             value: "",
             origin: Point {
                 x: Integer(
-                    Integer {
+                    IntegerUnit {
                         value: 0,
                         units: 1e-9,
                     },
                 ),
                 y: Integer(
-                    Integer {
+                    IntegerUnit {
                         value: 0,
                         units: 1e-9,
                     },

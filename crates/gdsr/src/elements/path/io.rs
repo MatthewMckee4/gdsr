@@ -44,7 +44,7 @@ impl ToGds for Path {
         }
 
         if let Some(width) = self.width() {
-            let scaled_width = width.scale_units(database_units);
+            let scaled_width = width.scale_to(database_units);
             let width_value = scaled_width.as_integer_unit().value as u32;
 
             let width_head = [

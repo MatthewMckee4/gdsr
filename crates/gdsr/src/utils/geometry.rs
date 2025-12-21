@@ -19,8 +19,8 @@ fn to_geo_float_coords(points: &[Point]) -> Vec<Coord<f64>> {
 
 fn to_geo_float_coord(point: &Point) -> Coord<f64> {
     Coord {
-        x: point.x().as_float_value(),
-        y: point.y().as_float_value(),
+        x: point.x().float_value(),
+        y: point.y().float_value(),
     }
 }
 
