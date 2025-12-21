@@ -916,10 +916,10 @@ mod tests {
         fn float_addition_commutativity(a: FloatUnit, b: FloatUnit) -> bool {
             let a = Unit::Float(a);
             let b = Unit::Float(b);
-            let sum_ab = a + b;
-            let sum_ba = b + a;
+            let sum_a_b = a + b;
+            let sum_b_a = b + a;
 
-            sum_ab == sum_ba
+            sum_a_b == sum_b_a
         }
 
         #[quickcheck]
