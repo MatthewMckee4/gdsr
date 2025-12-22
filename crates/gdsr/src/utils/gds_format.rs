@@ -47,3 +47,86 @@ pub fn u16_array_to_big_endian(array: &[u16]) -> Vec<u16> {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+
+    use super::*;
+
+    #[test]
+    fn test_eight_byte_real_zero() {
+        let value = 0.0;
+        let result = eight_byte_real(value);
+
+        assert_debug_snapshot!(result, @r"
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]
+        ");
+    }
+
+    #[test]
+    fn test_eight_byte_real_negative() {
+        let value = -123.456;
+        let result = eight_byte_real(value);
+
+        assert_debug_snapshot!(result, @r"
+        [
+            194,
+            123,
+            116,
+            188,
+            106,
+            126,
+            249,
+            220,
+        ]
+        ");
+    }
+
+    #[test]
+    fn test_eight_byte_real_positive() {
+        let value = 123.456;
+        let result = eight_byte_real(value);
+
+        assert_debug_snapshot!(result, @r"
+        [
+            66,
+            123,
+            116,
+            188,
+            106,
+            126,
+            249,
+            220,
+        ]
+        ");
+    }
+
+    #[test]
+    fn test_height_byte_real_log() {
+        let value = 16.0;
+        let result = eight_byte_real(value);
+
+        assert_debug_snapshot!(result, @r"
+        [
+            66,
+            16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]
+        ");
+    }
+}

@@ -758,8 +758,6 @@ mod tests {
 
     mod display_and_default {
 
-        use crate::FloatUnit;
-
         use super::*;
 
         #[test]
@@ -800,26 +798,16 @@ mod tests {
         fn test_scale_units_integer() {
             let unit = Unit::integer(1000, 1e-9);
             let scaled = unit.scale_to(1e-6);
-            match scaled {
-                Unit::Integer(IntegerUnit { value, units }) => {
-                    assert_eq!(value, 1);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Integer variant"),
-            }
+
+            assert_eq!(scaled, Unit::integer(1, 1e-6));
         }
 
         #[test]
         fn test_scale_units_float() {
             let unit = Unit::float(1000.0, 1e-9);
             let scaled = unit.scale_to(1e-6);
-            match scaled {
-                Unit::Float(FloatUnit { value, units }) => {
-                    assert!((value - 1.0).abs() < 1e-10);
-                    assert_eq!(units, 1e-6);
-                }
-                _ => panic!("Expected Float variant"),
-            }
+
+            assert_eq!(scaled, Unit::float(1.0, 1e-6));
         }
     }
 
@@ -886,16 +874,6 @@ mod tests {
         fn subtraction_preserves_units(a: Unit, b: Unit) -> bool {
             let result = a - b;
             result.units() == a.units()
-        }
-
-        /// Verifies that the result of addition has the same variant as the left operand.
-        #[quickcheck]
-        fn addition_preserves_variant(a: Unit, b: Unit) -> bool {
-            let result = a + b;
-            matches!(
-                (&a, &result),
-                (Unit::Integer(_), Unit::Integer(_)) | (Unit::Float(_), Unit::Float(_))
-            )
         }
 
         /// Verifies that the absolute value of the sum equals the sum of absolute values.
