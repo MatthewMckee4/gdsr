@@ -60,11 +60,8 @@ impl Unit {
         })
     }
 
-    pub const fn zero() -> Self {
-        Self::Integer(IntegerUnit {
-            value: 0,
-            units: DEFAULT_INTEGER_UNITS,
-        })
+    pub fn zero() -> Self {
+        Self::default()
     }
 
     /// Returns the inner value as a float, disregarding units.

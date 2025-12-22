@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use crate::units::Unit;
 use crate::{AngleInRadians, Movable, Transformable, Transformation};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Point {
     x: Unit,
     y: Unit,
@@ -21,6 +21,13 @@ impl Point {
         Self {
             x: Unit::float(x, units),
             y: Unit::float(y, units),
+        }
+    }
+
+    pub fn origin() -> Self {
+        Self {
+            x: Unit::zero(),
+            y: Unit::zero(),
         }
     }
 
@@ -149,15 +156,6 @@ impl Point {
         Self {
             x: Unit::float(new_x_real, u1),
             y: Unit::float(new_y_real, u2),
-        }
-    }
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Self {
-            x: Unit::default_integer(0),
-            y: Unit::default_integer(0),
         }
     }
 }

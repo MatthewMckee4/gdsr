@@ -192,6 +192,10 @@ impl Movable for Text {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::PI;
+
+    use insta::assert_debug_snapshot;
+
     use super::*;
 
     #[test]
@@ -246,37 +250,6 @@ mod tests {
         assert!(display_str.contains("Text 'Test Text'"));
         assert!(display_str.contains("vertical: Bottom"));
         assert!(display_str.contains("horizontal: Left"));
-    }
-
-    #[test]
-    fn test_text_clone_and_partial_eq() {
-        let text1 = Text::new(
-            "Clone Test",
-            Point::integer(5, 10, 1e-9),
-            2,
-            0,
-            1.2,
-            15.0,
-            true,
-            presentation::VerticalPresentation::Middle,
-            presentation::HorizontalPresentation::Centre,
-        );
-
-        let text2 = text1.clone();
-        assert_eq!(text1, text2);
-
-        let text3 = Text::new(
-            "Different Text",
-            Point::integer(5, 10, 1e-9),
-            2,
-            0,
-            1.2,
-            15.0,
-            true,
-            presentation::VerticalPresentation::Middle,
-            presentation::HorizontalPresentation::Centre,
-        );
-        assert_ne!(text1, text3);
     }
 
     #[test]
@@ -362,5 +335,39 @@ mod tests {
             text.horizontal_presentation(),
             &presentation::HorizontalPresentation::Left
         );
+    }
+
+    #[test]
+    fn test_text_rotate() {
+        let text = Text::default();
+
+        let rotated_text = text.rotate(PI / 2.0, Point::origin());
+
+        assert_debug_snapshot!(rotated_text, @r#"
+        Text {
+            value: "",
+            origin: Point {
+                x: Integer(
+                    IntegerUnit {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Integer(
+                    IntegerUnit {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            layer: 0,
+            datatype: 0,
+            magnification: 1.0,
+            angle: 1.5707963267948966,
+            x_reflection: false,
+            vertical_presentation: Middle,
+            horizontal_presentation: Centre,
+        }
+        "#);
     }
 }

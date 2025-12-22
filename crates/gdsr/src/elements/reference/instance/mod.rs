@@ -90,12 +90,7 @@ mod tests {
             1,
             0,
         );
-        let instance = Instance::from(polygon);
-
-        match instance {
-            Instance::Element(_) => {}
-            Instance::Cell(_) => panic!("Expected Element variant"),
-        }
+        assert!(Instance::from(polygon).as_element().is_some());
     }
 
     #[test]
@@ -128,14 +123,10 @@ mod tests {
             None,
             None,
         );
+
         let instance = Instance::from(path);
 
-        match instance {
-            Instance::Element(arc) => {
-                assert!(matches!(**arc, Element::Path(_)));
-            }
-            Instance::Cell(_) => panic!("Expected Element variant"),
-        }
+        assert!(instance.as_element().unwrap().as_path().is_some());
     }
 
     #[test]
@@ -153,14 +144,10 @@ mod tests {
             VerticalPresentation::Middle,
             HorizontalPresentation::Centre,
         );
+
         let instance = Instance::from(text);
 
-        match instance {
-            Instance::Element(arc) => {
-                assert!(matches!(**arc, Element::Text(_)));
-            }
-            Instance::Cell(_) => panic!("Expected Element variant"),
-        }
+        assert!(instance.as_element().unwrap().as_text().is_some());
     }
 
     #[test]
