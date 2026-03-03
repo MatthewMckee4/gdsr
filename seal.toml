@@ -2,7 +2,7 @@
 current-version = "0.0.1-alpha.0"
 
 version-files = [
-    "crates/gdsr/Cargo.toml",
+    "Cargo.toml",
 ]
 
 commit-message = "Release v{version}"

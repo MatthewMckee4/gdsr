@@ -1,7 +1,6 @@
 ---
-source: crates/gdsr/src/cell/mod.rs
-assertion_line: 259
-expression: rotated_elements
+source: src/cell/mod.rs
+expression: moved_elements
 ---
 [
     Polygon(
@@ -40,7 +39,7 @@ expression: rotated_elements
             layer: 0,
             datatype: 0,
             magnification: 1.0,
-            angle: 90.0,
+            angle: 0.0,
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,

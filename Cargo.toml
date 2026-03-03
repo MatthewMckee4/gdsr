@@ -1,8 +1,8 @@
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
+[package]
+name = "gdsr"
+version = "0.0.1-alpha.0"
+description = "A GDSII reader and writer for Rust"
+readme = "README.md"
 edition = "2024"
 rust-version = "1.85"
 homepage = "https://github.com/MatthewMckee4/gdsr"
@@ -11,18 +11,20 @@ repository = "https://github.com/MatthewMckee4/gdsr"
 authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
-[workspace.dependencies]
-approx = "0.5"
+[dependencies]
 bytemuck = "1.24.0"
 chrono = "0.4.42"
 geo = "0.28"
-insta = { version = "1.44.3" }
+
+[dev-dependencies]
+approx = "0.5"
+insta = "1.44.3"
 quickcheck = "1.0.3"
 quickcheck_macros = "1"
 rstest = "0.23.0"
 tempfile = "3.23"
 
-[workspace.lints.clippy]
+[lints.clippy]
 pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"

@@ -1,6 +1,6 @@
 ---
-source: crates/gdsr/src/cell/mod.rs
-expression: moved_elements
+source: src/cell/mod.rs
+expression: elements
 ---
 [
     Polygon(
@@ -25,13 +25,13 @@ expression: moved_elements
             origin: Point {
                 x: Integer(
                     IntegerUnit {
-                        value: 5,
+                        value: 0,
                         units: 1e-9,
                     },
                 ),
                 y: Integer(
                     IntegerUnit {
-                        value: 5,
+                        value: 0,
                         units: 1e-9,
                     },
                 ),
