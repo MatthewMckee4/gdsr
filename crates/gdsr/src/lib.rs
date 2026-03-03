@@ -17,6 +17,6 @@ pub use grid::Grid;
 pub use library::Library;
 pub use point::Point;
 pub use traits::{Dimensions, Movable, ToGds, Transformable};
-pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
+pub use transformation::{Reflection, Rotation, Scale, ScaleError, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};

@@ -238,7 +238,7 @@ mod tests {
         let element: Element = path.into();
 
         let centre = Point::integer(0, 0, 1e-9);
-        let transformed = element.clone().scale(2.0, centre);
+        let transformed = element.clone().scale(2.0, centre).unwrap();
 
         assert!(transformed.as_path().is_some());
     }

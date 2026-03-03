@@ -7,7 +7,7 @@ mod translation;
 
 pub use reflection::Reflection;
 pub use rotation::Rotation;
-pub use scale::Scale;
+pub use scale::{Scale, ScaleError};
 pub use translation::Translation;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_scale() {
-        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9)).unwrap();
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale.clone()));
 
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_apply_to_point_scale() {
-        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9)).unwrap();
         let mut transformation = Transformation::default();
         transformation.with_scale(Some(scale));
 
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_from_scale() {
-        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9));
+        let scale = Scale::new(2.0, Point::integer(0, 0, 1e-9)).unwrap();
         let transformation: Transformation = scale.clone().into();
 
         assert!(transformation.scale.is_some());

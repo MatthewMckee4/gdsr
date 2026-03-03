@@ -390,7 +390,7 @@ mod tests {
             .set_magnification(1.5);
 
         let centre = Point::integer(0, 0, 1e-9);
-        let scaled = text.scale(2.0, centre);
+        let scaled = text.scale(2.0, centre).unwrap();
 
         assert_eq!(scaled.magnification(), 3.0);
         assert_eq!(scaled.origin(), &Point::integer(20, 40, 1e-9));
@@ -406,6 +406,7 @@ mod tests {
         let transformed = text
             .reflect(0.0, Point::origin())
             .scale(2.0, Point::origin())
+            .unwrap()
             .rotate(PI / 2.0, Point::origin());
 
         assert!(transformed.x_reflection());

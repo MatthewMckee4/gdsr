@@ -380,7 +380,7 @@ mod tests {
         );
 
         let centre = Point::integer(0, 0, 1e-9);
-        let transformed = grid.scale(2.0, centre);
+        let transformed = grid.scale(2.0, centre).unwrap();
 
         assert_eq!(transformed.magnification, 2.0);
     }

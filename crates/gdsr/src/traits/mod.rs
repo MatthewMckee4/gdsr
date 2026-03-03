@@ -1,4 +1,4 @@
-use crate::transformation::{Reflection, Rotation, Scale, Transformation, Translation};
+use crate::transformation::{Reflection, Rotation, Scale, ScaleError, Transformation, Translation};
 use crate::{AngleInRadians, Point};
 
 pub trait ToGds {
@@ -21,9 +21,10 @@ pub trait Transformable: Sized {
         )
     }
 
-    #[must_use]
-    fn scale(self, factor: f64, centre: Point) -> Self {
-        self.transform_impl(Transformation::default().with_scale(Some(Scale::new(factor, centre))))
+    fn scale(self, factor: f64, centre: Point) -> Result<Self, ScaleError> {
+        Ok(self.transform_impl(
+            Transformation::default().with_scale(Some(Scale::new(factor, centre)?)),
+        ))
     }
 
     #[must_use]

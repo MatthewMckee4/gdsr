@@ -61,7 +61,9 @@ impl Reference {
                 }
 
                 new_element = new_element.rotate(grid.angle(), grid.origin());
-                new_element = new_element.scale(grid.magnification(), grid.origin());
+                new_element = new_element
+                    .scale(grid.magnification(), grid.origin())
+                    .expect("grid magnification must be a valid scale factor");
 
                 // Move element to final position
                 new_element = new_element.move_by(final_position - grid.origin());
