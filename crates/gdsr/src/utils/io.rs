@@ -494,37 +494,51 @@ impl<R: Read> Iterator for RecordReader<R> {
                 return Some(Err(GdsError::from(e)));
             }
 
-            GDSDataType::try_from(data_type).map_or(
-                GDSRecordData::None,
-                |data_type| match data_type {
-                    GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
-                        let result = read_i16_be(&buf);
-                        GDSRecordData::I16(result)
-                    }
-                    GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
-                        let result = read_i32_be(&buf);
-                        GDSRecordData::I32(result)
-                    }
-                    GDSDataType::EightByteReal => {
-                        let u64_values = read_u64_be(&buf);
-                        let result: Vec<f64> = u64_values
-                            .into_iter()
-                            .map(eight_byte_real_to_float)
-                            .collect();
-                        GDSRecordData::F64(result)
-                    }
-                    GDSDataType::AsciiString => {
-                        let mut result = String::from_utf8_lossy(&buf).into_owned();
+            let Ok(parsed_data_type) = GDSDataType::try_from(data_type) else {
+                return Some(Err(GdsError::InvalidData {
+                    message: format!("Invalid data type byte: {data_type:#04x}"),
+                }));
+            };
+
+            match parsed_data_type {
+                GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
+                    let result = read_i16_be(&buf);
+                    GDSRecordData::I16(result)
+                }
+                GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
+                    let result = read_i32_be(&buf);
+                    GDSRecordData::I32(result)
+                }
+                GDSDataType::EightByteReal => {
+                    let u64_values = read_u64_be(&buf);
+                    let result: Vec<f64> = u64_values
+                        .into_iter()
+                        .map(eight_byte_real_to_float)
+                        .collect();
+                    GDSRecordData::F64(result)
+                }
+                GDSDataType::AsciiString => match String::from_utf8(buf) {
+                    Ok(mut result) => {
                         if result.ends_with('\0') {
                             result.pop();
                         }
                         GDSRecordData::Str(result)
                     }
-                    GDSDataType::NoData => {
-                        GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned())
+                    Err(e) => {
+                        return Some(Err(GdsError::InvalidData {
+                            message: format!("Invalid UTF-8 in ASCII string record: {e}"),
+                        }));
                     }
                 },
-            )
+                GDSDataType::NoData => match String::from_utf8(buf) {
+                    Ok(result) => GDSRecordData::Str(result),
+                    Err(e) => {
+                        return Some(Err(GdsError::InvalidData {
+                            message: format!("Invalid UTF-8 in NoData record: {e}"),
+                        }));
+                    }
+                },
+            }
         } else {
             GDSRecordData::None
         };
