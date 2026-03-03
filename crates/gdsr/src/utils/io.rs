@@ -490,37 +490,54 @@ impl<R: Read> Iterator for RecordReader<R> {
                 return Some(Err(e));
             }
 
-            GDSDataType::try_from(data_type).map_or(
-                GDSRecordData::None,
-                |data_type| match data_type {
-                    GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
-                        let result = read_i16_be(&buf);
-                        GDSRecordData::I16(result)
-                    }
-                    GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
-                        let result = read_i32_be(&buf);
-                        GDSRecordData::I32(result)
-                    }
-                    GDSDataType::EightByteReal => {
-                        let u64_values = read_u64_be(&buf);
-                        let result: Vec<f64> = u64_values
-                            .into_iter()
-                            .map(eight_byte_real_to_float)
-                            .collect();
-                        GDSRecordData::F64(result)
-                    }
-                    GDSDataType::AsciiString => {
-                        let mut result = String::from_utf8_lossy(&buf).into_owned();
+            let Ok(parsed_data_type) = GDSDataType::try_from(data_type) else {
+                return Some(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid data type byte: {data_type:#04x}"),
+                )));
+            };
+
+            match parsed_data_type {
+                GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
+                    let result = read_i16_be(&buf);
+                    GDSRecordData::I16(result)
+                }
+                GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
+                    let result = read_i32_be(&buf);
+                    GDSRecordData::I32(result)
+                }
+                GDSDataType::EightByteReal => {
+                    let u64_values = read_u64_be(&buf);
+                    let result: Vec<f64> = u64_values
+                        .into_iter()
+                        .map(eight_byte_real_to_float)
+                        .collect();
+                    GDSRecordData::F64(result)
+                }
+                GDSDataType::AsciiString => match String::from_utf8(buf) {
+                    Ok(mut result) => {
                         if result.ends_with('\0') {
                             result.pop();
                         }
                         GDSRecordData::Str(result)
                     }
-                    GDSDataType::NoData => {
-                        GDSRecordData::Str(String::from_utf8_lossy(&buf).into_owned())
+                    Err(e) => {
+                        return Some(Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("Invalid UTF-8 in ASCII string record: {e}"),
+                        )));
                     }
                 },
-            )
+                GDSDataType::NoData => match String::from_utf8(buf) {
+                    Ok(result) => GDSRecordData::Str(result),
+                    Err(e) => {
+                        return Some(Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            format!("Invalid UTF-8 in NoData record: {e}"),
+                        )));
+                    }
+                },
+            }
         } else {
             GDSRecordData::None
         };
@@ -615,7 +632,25 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
+
+    fn record_reader(data: Vec<u8>) -> RecordReader<Cursor<Vec<u8>>> {
+        RecordReader::new(BufReader::new(Cursor::new(data)))
+    }
+
+    /// Builds a GDS binary record: 2-byte big-endian size, record type byte,
+    /// data type byte, then payload.
+    fn build_record(record_type: u8, data_type: u8, payload: &[u8]) -> Vec<u8> {
+        let size = (4 + payload.len()) as u16;
+        let mut buf = Vec::with_capacity(size as usize);
+        buf.extend_from_slice(&size.to_be_bytes());
+        buf.push(record_type);
+        buf.push(data_type);
+        buf.extend_from_slice(payload);
+        buf
+    }
 
     /// Verifies that `write_points_to_file` uses the truncated point count
     /// (capped at `MAX_POINTS`) for the record header size, not the original
@@ -637,5 +672,88 @@ mod tests {
 
         let expected_total_bytes = 4 + MAX_POINTS * 8;
         assert_eq!(buf.len(), expected_total_bytes);
+    }
+
+    #[test]
+    fn test_record_reader_valid_two_byte_signed_integer() {
+        let data = build_record(
+            GDSRecord::Header as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0x0258_u16.to_be_bytes(),
+        );
+        let mut reader = record_reader(data);
+
+        let result = reader.next().unwrap().unwrap();
+        assert!(matches!(result.0, GDSRecord::Header));
+        assert!(matches!(result.1, GDSRecordData::I16(ref v) if v == &[0x0258_i16]));
+        assert!(reader.next().is_none());
+    }
+
+    #[test]
+    fn test_record_reader_valid_ascii_string() {
+        let data = build_record(
+            GDSRecord::LibName as u8,
+            GDSDataType::AsciiString as u8,
+            b"test\0",
+        );
+        let mut reader = record_reader(data);
+
+        let result = reader.next().unwrap().unwrap();
+        assert!(matches!(result.0, GDSRecord::LibName));
+        assert!(matches!(result.1, GDSRecordData::Str(ref s) if s == "test"));
+    }
+
+    #[test]
+    fn test_record_reader_invalid_data_type_byte() {
+        let data = build_record(GDSRecord::Header as u8, 0xFF, &[0x00, 0x01]);
+        let mut reader = record_reader(data);
+
+        let err = reader.next().unwrap().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_record_reader_invalid_utf8_in_ascii_string() {
+        let data = build_record(
+            GDSRecord::LibName as u8,
+            GDSDataType::AsciiString as u8,
+            &[0xFF, 0xFE],
+        );
+        let mut reader = record_reader(data);
+
+        let err = reader.next().unwrap().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_record_reader_invalid_utf8_in_no_data_with_payload() {
+        let data = build_record(
+            GDSRecord::Header as u8,
+            GDSDataType::NoData as u8,
+            &[0xFF, 0xFE],
+        );
+        let mut reader = record_reader(data);
+
+        let err = reader.next().unwrap().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_record_reader_invalid_record_type() {
+        let data = build_record(0xFF, GDSDataType::NoData as u8, &[]);
+        let mut reader = record_reader(data);
+
+        let err = reader.next().unwrap().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn test_record_reader_no_data_record() {
+        let data = build_record(GDSRecord::EndEl as u8, GDSDataType::NoData as u8, &[]);
+        let mut reader = record_reader(data);
+
+        let result = reader.next().unwrap().unwrap();
+        assert!(matches!(result.0, GDSRecord::EndEl));
+        assert!(matches!(result.1, GDSRecordData::None));
     }
 }
