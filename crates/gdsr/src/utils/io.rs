@@ -11,6 +11,7 @@ use crate::config::gds_file_types::{
 };
 use crate::elements::text::utils::get_presentations_from_value;
 use crate::elements::{Path, PathType, Polygon, Reference, Text};
+use crate::error::GdsError;
 use crate::library::Library;
 use crate::utils::gds_format::{eight_byte_real, u16_array_to_big_endian};
 use crate::utils::geometry::round_to_decimals;
@@ -21,7 +22,7 @@ pub fn write_gds_head_to_file(
     user_units: f64,
     db_units: f64,
     buffer: &mut impl std::io::Write,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let now = Local::now();
     let timestamp = now.naive_utc();
 
@@ -59,7 +60,7 @@ pub fn write_gds_head_to_file(
     write_float_to_eight_byte_real_to_file(buffer, db_units)
 }
 
-pub fn write_gds_tail_to_file(buffer: &mut impl std::io::Write) -> io::Result<()> {
+pub fn write_gds_tail_to_file(buffer: &mut impl std::io::Write) -> Result<(), GdsError> {
     let tail = [
         4,
         combine_record_and_data_type(GDSRecord::EndLib, GDSDataType::NoData),
@@ -67,17 +68,20 @@ pub fn write_gds_tail_to_file(buffer: &mut impl std::io::Write) -> io::Result<()
     write_u16_array_to_file(buffer, &tail)
 }
 
-pub fn write_u16_array_to_file(buffer: &mut impl std::io::Write, array: &[u16]) -> io::Result<()> {
+pub fn write_u16_array_to_file(
+    buffer: &mut impl std::io::Write,
+    array: &[u16],
+) -> Result<(), GdsError> {
     let u16_array_to_big_endian = u16_array_to_big_endian(array);
-    buffer.write_all(cast_slice(&u16_array_to_big_endian))
+    Ok(buffer.write_all(cast_slice(&u16_array_to_big_endian))?)
 }
 
 pub fn write_float_to_eight_byte_real_to_file(
     buffer: &mut impl std::io::Write,
     value: f64,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let value = eight_byte_real(value);
-    buffer.write_all(&value)
+    Ok(buffer.write_all(&value)?)
 }
 
 pub const MAX_POINTS: usize = 8191;
@@ -86,7 +90,7 @@ pub fn write_points_to_file(
     buffer: &mut impl std::io::Write,
     points: &[Point],
     database_units: f64,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let integer_points: Vec<Point> = points.iter().map(Point::to_integer_unit).collect();
 
     let points_to_write = integer_points.get(..MAX_POINTS).unwrap_or(&integer_points);
@@ -113,7 +117,7 @@ pub fn write_points_to_file(
     Ok(())
 }
 
-pub fn write_element_tail_to_file(buffer: &mut impl std::io::Write) -> io::Result<()> {
+pub fn write_element_tail_to_file(buffer: &mut impl std::io::Write) -> Result<(), GdsError> {
     let tail = [
         4,
         combine_record_and_data_type(GDSRecord::EndEl, GDSDataType::NoData),
@@ -125,7 +129,7 @@ pub fn write_string_with_record_to_file(
     buffer: &mut impl std::io::Write,
     record: GDSRecord,
     string: &str,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let mut len = string.len();
     if len % 2 != 0 {
         len += 1;
@@ -144,7 +148,7 @@ pub fn write_string_with_record_to_file(
 
     write_u16_array_to_file(buffer, &string_start)?;
 
-    buffer.write_all(&lib_name_bytes)
+    Ok(buffer.write_all(&lib_name_bytes)?)
 }
 
 pub fn write_gds<'a, P: AsRef<std::path::Path>>(
@@ -153,7 +157,7 @@ pub fn write_gds<'a, P: AsRef<std::path::Path>>(
     user_units: f64,
     database_units: f64,
     cells: impl Iterator<Item = &'a Cell>,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let mut file = File::create(file_name)?;
 
     write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
@@ -164,7 +168,7 @@ pub fn write_gds<'a, P: AsRef<std::path::Path>>(
 
     write_gds_tail_to_file(&mut file)?;
 
-    file.flush()
+    Ok(file.flush()?)
 }
 
 pub fn write_transformation_to_file(
@@ -172,7 +176,7 @@ pub fn write_transformation_to_file(
     angle: f64,
     magnification: f64,
     x_reflection: bool,
-) -> io::Result<()> {
+) -> Result<(), GdsError> {
     let transform_applied = angle != 0.0 || magnification != 1.0 || x_reflection;
     if transform_applied {
         let buffer_flags = [
@@ -209,7 +213,7 @@ pub fn write_transformation_to_file(
 pub fn from_gds<P: AsRef<std::path::Path>>(
     file_name: P,
     units: Option<f64>,
-) -> io::Result<Library> {
+) -> Result<Library, GdsError> {
     let mut library = Library::new("Library");
 
     let file = File::open(file_name)?;
@@ -469,7 +473,7 @@ impl<R: Read> RecordReader<R> {
 }
 
 impl<R: Read> Iterator for RecordReader<R> {
-    type Item = io::Result<(GDSRecord, GDSRecordData)>;
+    type Item = Result<(GDSRecord, GDSRecordData), GdsError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut header = [0u8; 4];
@@ -477,7 +481,7 @@ impl<R: Read> Iterator for RecordReader<R> {
             if e.kind() == io::ErrorKind::UnexpectedEof {
                 return None;
             }
-            return Some(Err(e));
+            return Some(Err(GdsError::from(e)));
         }
 
         let size = u16::from_be_bytes([header[0], header[1]]) as usize;
@@ -487,7 +491,7 @@ impl<R: Read> Iterator for RecordReader<R> {
         let data = if size > 4 {
             let mut buf = vec![0u8; size - 4];
             if let Err(e) = self.reader.read_exact(&mut buf) {
-                return Some(Err(e));
+                return Some(Err(GdsError::from(e)));
             }
 
             GDSDataType::try_from(data_type).map_or(
@@ -527,10 +531,9 @@ impl<R: Read> Iterator for RecordReader<R> {
 
         GDSRecord::try_from(record_type).map_or_else(
             |()| {
-                Some(Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid record type",
-                )))
+                Some(Err(GdsError::InvalidData {
+                    message: "Invalid record type".to_string(),
+                }))
             },
             |record| Some(Ok((record, data))),
         )

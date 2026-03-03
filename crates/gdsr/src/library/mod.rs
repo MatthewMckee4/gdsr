@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::io;
 
 use crate::cell::Cell;
+use crate::error::GdsError;
 use crate::utils::io::{from_gds, write_gds};
 
 /// A GDSII library containing named cells. This is the top-level container for a GDSII design.
@@ -71,7 +71,7 @@ impl Library {
         file_name: P,
         user_units: f64,
         database_units: f64,
-    ) -> io::Result<()> {
+    ) -> Result<(), GdsError> {
         write_gds(
             file_name,
             &self.name,
@@ -90,7 +90,7 @@ impl Library {
     pub fn read_file<P: AsRef<std::path::Path>>(
         file_name: P,
         units: Option<f64>,
-    ) -> io::Result<Self> {
+    ) -> Result<Self, GdsError> {
         from_gds(file_name, units)
     }
 }

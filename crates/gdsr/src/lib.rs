@@ -1,6 +1,7 @@
 mod cell;
 mod config;
 mod elements;
+mod error;
 mod grid;
 mod library;
 mod point;
@@ -13,6 +14,7 @@ mod utils;
 pub use cell::Cell;
 pub use elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
 pub use elements::{Element, Instance, Path, PathType, Polygon, Reference, Text};
+pub use error::GdsError;
 pub use grid::Grid;
 pub use library::Library;
 pub use point::Point;

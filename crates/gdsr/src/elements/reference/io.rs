@@ -1,6 +1,7 @@
 use super::{Instance, Reference};
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
 use crate::elements::Element;
+use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{
     write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
@@ -12,7 +13,7 @@ impl ToGds for Reference {
         &self,
         buffer: &mut impl std::io::Write,
         database_units: f64,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), GdsError> {
         match &self.instance {
             Instance::Cell(cell_name) => {
                 self.to_gds_impl_with_cell(buffer, database_units, cell_name)
@@ -30,7 +31,7 @@ impl Reference {
         buffer: &mut impl std::io::Write,
         database_units: f64,
         element: &Element,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), GdsError> {
         for element in self.get_elements_in_grid(element) {
             element.to_gds_impl(buffer, database_units)?;
         }
@@ -43,7 +44,7 @@ impl Reference {
         buffer: &mut impl std::io::Write,
         database_units: f64,
         cell_name: &str,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), GdsError> {
         let buffer_start = [
             4,
             combine_record_and_data_type(GDSRecord::ARef, GDSDataType::NoData),

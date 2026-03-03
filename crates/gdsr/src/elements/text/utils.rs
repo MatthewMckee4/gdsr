@@ -22,7 +22,7 @@ pub const fn get_presentation_value(
 
 pub fn get_presentations_from_value(
     value: i16,
-) -> Result<(VerticalPresentation, HorizontalPresentation), String> {
+) -> Result<(VerticalPresentation, HorizontalPresentation), crate::error::GdsError> {
     let (vertical_value, horizontal_value) = match value {
         0 => (0, 0),
         1 => (0, 1),
@@ -33,7 +33,11 @@ pub fn get_presentations_from_value(
         8 => (2, 0),
         9 => (2, 1),
         10 => (2, 2),
-        _ => return Err("Invalid presentation value".to_string()),
+        _ => {
+            return Err(crate::error::GdsError::ValidationError {
+                message: "Invalid presentation value".to_string(),
+            });
+        }
     };
 
     let vertical_presentation = VerticalPresentation::new(vertical_value)?;

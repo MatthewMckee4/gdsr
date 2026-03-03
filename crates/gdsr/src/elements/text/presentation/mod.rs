@@ -19,12 +19,14 @@ impl std::fmt::Debug for VerticalPresentation {
 }
 
 impl VerticalPresentation {
-    pub fn new(value: i32) -> Result<Self, String> {
+    pub fn new(value: i32) -> Result<Self, crate::error::GdsError> {
         match value {
             0 => Ok(Self::Top),
             1 => Ok(Self::Middle),
             2 => Ok(Self::Bottom),
-            _ => Err("Invalid value for VerticalPresentation".to_string()),
+            _ => Err(crate::error::GdsError::ValidationError {
+                message: "Invalid value for VerticalPresentation".to_string(),
+            }),
         }
     }
 
@@ -66,12 +68,14 @@ impl std::fmt::Debug for HorizontalPresentation {
 }
 
 impl HorizontalPresentation {
-    pub fn new(value: i32) -> Result<Self, String> {
+    pub fn new(value: i32) -> Result<Self, crate::error::GdsError> {
         match value {
             0 => Ok(Self::Left),
             1 => Ok(Self::Centre),
             2 => Ok(Self::Right),
-            _ => Err("Invalid value for HorizontalPresentation".to_string()),
+            _ => Err(crate::error::GdsError::ValidationError {
+                message: "Invalid value for HorizontalPresentation".to_string(),
+            }),
         }
     }
 
@@ -98,14 +102,17 @@ mod tests {
 
     #[test]
     fn test_vertical_presentation_new() {
-        assert_eq!(VerticalPresentation::new(0), Ok(VerticalPresentation::Top));
         assert_eq!(
-            VerticalPresentation::new(1),
-            Ok(VerticalPresentation::Middle)
+            VerticalPresentation::new(0).unwrap(),
+            VerticalPresentation::Top
         );
         assert_eq!(
-            VerticalPresentation::new(2),
-            Ok(VerticalPresentation::Bottom)
+            VerticalPresentation::new(1).unwrap(),
+            VerticalPresentation::Middle
+        );
+        assert_eq!(
+            VerticalPresentation::new(2).unwrap(),
+            VerticalPresentation::Bottom
         );
         assert!(VerticalPresentation::new(3).is_err());
         assert!(VerticalPresentation::new(-1).is_err());
@@ -163,16 +170,16 @@ mod tests {
     #[test]
     fn test_horizontal_presentation_new() {
         assert_eq!(
-            HorizontalPresentation::new(0),
-            Ok(HorizontalPresentation::Left)
+            HorizontalPresentation::new(0).unwrap(),
+            HorizontalPresentation::Left
         );
         assert_eq!(
-            HorizontalPresentation::new(1),
-            Ok(HorizontalPresentation::Centre)
+            HorizontalPresentation::new(1).unwrap(),
+            HorizontalPresentation::Centre
         );
         assert_eq!(
-            HorizontalPresentation::new(2),
-            Ok(HorizontalPresentation::Right)
+            HorizontalPresentation::new(2).unwrap(),
+            HorizontalPresentation::Right
         );
         assert!(HorizontalPresentation::new(3).is_err());
         assert!(HorizontalPresentation::new(-1).is_err());
@@ -229,13 +236,9 @@ mod tests {
 
     #[test]
     fn test_presentation_error_messages() {
-        assert_eq!(
-            VerticalPresentation::new(10),
-            Err("Invalid value for VerticalPresentation".to_string())
-        );
-        assert_eq!(
-            HorizontalPresentation::new(10),
-            Err("Invalid value for HorizontalPresentation".to_string())
-        );
+        let err = VerticalPresentation::new(10).unwrap_err();
+        insta::assert_snapshot!(err.to_string(), @"Validation error: Invalid value for VerticalPresentation");
+        let err = HorizontalPresentation::new(10).unwrap_err();
+        insta::assert_snapshot!(err.to_string(), @"Validation error: Invalid value for HorizontalPresentation");
     }
 }

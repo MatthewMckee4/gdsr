@@ -2,6 +2,7 @@ use chrono::{Datelike, Local, Timelike};
 
 use crate::Cell;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{write_string_with_record_to_file, write_u16_array_to_file};
 
@@ -10,7 +11,7 @@ impl ToGds for Cell {
         &self,
         buffer: &mut impl std::io::Write,
         database_units: f64,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), GdsError> {
         let now = Local::now();
         let timestamp = now.naive_utc();
 

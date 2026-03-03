@@ -1,6 +1,7 @@
 use super::Text;
 use super::utils::get_presentation_value;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{
     write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
@@ -12,7 +13,7 @@ impl ToGds for Text {
         &self,
         buffer: &mut impl std::io::Write,
         database_units: f64,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), GdsError> {
         let buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
