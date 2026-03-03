@@ -1287,4 +1287,338 @@ mod tests {
         let decoded = eight_byte_real_to_float(u64::from_be_bytes(buf.try_into().unwrap()));
         assert!((decoded - 1.0).abs() < 1e-10);
     }
+
+    fn make_reader(data: &[u8]) -> RecordReader<Cursor<Vec<u8>>> {
+        RecordReader::new(BufReader::new(Cursor::new(data.to_vec())))
+    }
+
+    fn build_record(record_type: u8, data_type: u8, payload: &[u8]) -> Vec<u8> {
+        let size = (4 + payload.len()) as u16;
+        let mut buf = Vec::with_capacity(size as usize);
+        buf.extend_from_slice(&size.to_be_bytes());
+        buf.push(record_type);
+        buf.push(data_type);
+        buf.extend_from_slice(payload);
+        buf
+    }
+
+    #[test]
+    fn test_empty_input_yields_no_records() {
+        let mut reader = make_reader(&[]);
+        assert!(reader.next().is_none());
+    }
+
+    #[test]
+    fn test_truncated_header_yields_no_records() {
+        let mut reader = make_reader(&[0x00, 0x06]);
+        assert!(reader.next().is_none());
+    }
+
+    #[test]
+    fn test_truncated_body_returns_error() {
+        let data = [0x00, 0x08, 0x00, 0x02, 0xAB];
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_record_type_returns_error() {
+        let data = build_record(0xFF, 0x00, &[]);
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multiple_invalid_record_types_all_return_errors() {
+        for bad_type in [0x3C, 0x50, 0x80, 0xFE, 0xFF] {
+            let data = build_record(bad_type, 0x00, &[]);
+            let mut reader = make_reader(&data);
+            let result = reader.next().unwrap();
+            assert!(
+                result.is_err(),
+                "Expected error for record type {bad_type:#04x}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_zero_size_record_parses_without_panic() {
+        let data = [0x00, 0x00, 0x04, 0x00];
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_size_less_than_header_parses_without_panic() {
+        for size in [1u16, 2, 3] {
+            let data = [(size >> 8) as u8, (size & 0xFF) as u8, 0x04, 0x00];
+            let mut reader = make_reader(&data);
+            let result = reader.next().unwrap();
+            assert!(result.is_ok(), "Unexpected error for size={size}");
+        }
+    }
+
+    #[test]
+    fn test_oversized_record_returns_error() {
+        let data = [0x00, 0x64, 0x00, 0x02, 0x00, 0x01];
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unknown_data_type_returns_error() {
+        let payload = [0x00, 0x01];
+        let data = build_record(0x00, 0xFE, &payload);
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_wrong_data_type_for_boundary_parses_as_string() {
+        let payload = b"hello\0";
+        let data = build_record(
+            GDSRecord::Boundary as u8,
+            GDSDataType::AsciiString as u8,
+            payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (record, data) = result.unwrap();
+        assert!(matches!(record, GDSRecord::Boundary));
+        assert!(matches!(data, GDSRecordData::Str(_)));
+    }
+
+    #[test]
+    fn test_xy_record_with_odd_payload_size_does_not_panic() {
+        let payload = [0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0xFF];
+        let data = build_record(
+            GDSRecord::XY as u8,
+            GDSDataType::FourByteSignedInteger as u8,
+            &payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (record, rdata) = result.unwrap();
+        assert!(matches!(record, GDSRecord::XY));
+        if let GDSRecordData::I32(values) = rdata {
+            assert_eq!(values.len(), 2);
+        } else {
+            panic!("Expected I32 data");
+        }
+    }
+
+    #[test]
+    fn test_xy_record_with_single_byte_payload_yields_empty_vec() {
+        let payload = [0xFF];
+        let data = build_record(
+            GDSRecord::XY as u8,
+            GDSDataType::FourByteSignedInteger as u8,
+            &payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (_, rdata) = result.unwrap();
+        if let GDSRecordData::I32(values) = rdata {
+            assert!(values.is_empty());
+        } else {
+            panic!("Expected I32 data");
+        }
+    }
+
+    #[test]
+    fn test_valid_record_followed_by_truncated_record() {
+        let mut data = build_record(GDSRecord::EndLib as u8, GDSDataType::NoData as u8, &[]);
+        data.extend_from_slice(&[0x00, 0x10, 0x00, 0x02, 0xFF]);
+        let mut reader = make_reader(&data);
+        let first = reader.next().unwrap();
+        assert!(first.is_ok());
+        let second = reader.next().unwrap();
+        assert!(second.is_err());
+    }
+
+    #[test]
+    fn test_valid_record_followed_by_invalid_record_type() {
+        let mut data = build_record(GDSRecord::EndLib as u8, GDSDataType::NoData as u8, &[]);
+        data.extend_from_slice(&build_record(0xFF, 0x00, &[]));
+        let mut reader = make_reader(&data);
+        let first = reader.next().unwrap();
+        assert!(first.is_ok());
+        let second = reader.next().unwrap();
+        assert!(second.is_err());
+    }
+
+    #[test]
+    fn test_eight_byte_real_with_incomplete_payload_does_not_panic() {
+        let payload = [0x41, 0x10, 0x00, 0x00, 0x00];
+        let data = build_record(
+            GDSRecord::Units as u8,
+            GDSDataType::EightByteReal as u8,
+            &payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (_, rdata) = result.unwrap();
+        if let GDSRecordData::F64(values) = rdata {
+            assert!(values.is_empty());
+        } else {
+            panic!("Expected F64 data");
+        }
+    }
+
+    #[test]
+    fn test_i16_with_single_byte_payload_yields_empty_vec() {
+        let payload = [0xFF];
+        let data = build_record(
+            GDSRecord::Layer as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (_, rdata) = result.unwrap();
+        if let GDSRecordData::I16(values) = rdata {
+            assert!(values.is_empty());
+        } else {
+            panic!("Expected I16 data");
+        }
+    }
+
+    #[test]
+    fn test_all_zeros_record_parses_as_header() {
+        let data = [0x00, 0x04, 0x00, 0x00];
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (record, rdata) = result.unwrap();
+        assert!(matches!(record, GDSRecord::Header));
+        assert!(matches!(rdata, GDSRecordData::None));
+    }
+
+    #[test]
+    fn test_maximum_u16_size_returns_error_on_insufficient_data() {
+        let data = [0xFF, 0xFF, 0x00, 0x02, 0x00, 0x01];
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_garbage_bytes_after_valid_endlib() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        write_gds_tail_to_file(&mut data).unwrap();
+        data.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("garbage_after_endlib.gds");
+        std::fs::write(&path, &data).unwrap();
+        let result = Library::read_file(&path, None);
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_empty_file_via_from_gds_returns_default_library() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.gds");
+        std::fs::write(&path, []).unwrap();
+        let result = from_gds(&path, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_truncated_file_mid_header_record_returns_error() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.truncate(data.len() / 2);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("truncated.gds");
+        std::fs::write(&path, &data).unwrap();
+        let result = from_gds(&path, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_file_with_only_invalid_record_type_returns_error() {
+        let data = build_record(0xFF, 0x00, &[]);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("invalid_record.gds");
+        std::fs::write(&path, &data).unwrap();
+        let result = from_gds(&path, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bgnstr_without_endstr_does_not_insert_cell() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.extend_from_slice(&build_record(
+            GDSRecord::BgnStr as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00; 24],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::StrName as u8,
+            GDSDataType::AsciiString as u8,
+            b"orphan",
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("no_endstr.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert!(library.cells.is_empty());
+    }
+
+    #[test]
+    fn test_boundary_with_string_data_does_not_create_polygon_points() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.extend_from_slice(&build_record(
+            GDSRecord::BgnStr as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00; 24],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::StrName as u8,
+            GDSDataType::AsciiString as u8,
+            b"cell",
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Boundary as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::XY as u8,
+            GDSDataType::AsciiString as u8,
+            b"not_coordinates",
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndStr as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("wrong_data_type.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        let cell = library.cells.values().next().unwrap();
+        let polygons = cell.polygons();
+        assert_eq!(polygons.len(), 1);
+        assert!(polygons[0].points.is_empty());
+    }
 }
