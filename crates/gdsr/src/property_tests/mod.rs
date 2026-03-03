@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 mod arbitrary;
 mod grid;
 mod path;

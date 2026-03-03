@@ -3,7 +3,6 @@ use quickcheck_macros::quickcheck;
 use crate::*;
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn double_reflection_cancels(text: Text) -> bool {
     let centre = Point::integer(0, 0, text.origin().units().0);
     let reflected_twice = text.clone().reflect(0.0, centre).reflect(0.0, centre);
@@ -11,7 +10,6 @@ fn double_reflection_cancels(text: Text) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn scale_multiplies_magnification(text: Text) -> bool {
     let centre = Point::integer(0, 0, text.origin().units().0);
     let scaled = text.clone().scale(2.0, centre);

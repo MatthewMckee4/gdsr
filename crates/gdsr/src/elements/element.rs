@@ -165,7 +165,45 @@ impl Dimensions for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::*;
+    use crate::{Grid, Point};
+
+    const UNITS: f64 = 1e-9;
+
+    fn p(x: i32, y: i32) -> Point {
+        Point::integer(x, y, UNITS)
+    }
+
+    fn pf(x: f64, y: f64) -> Point {
+        Point::float(x, y, 1e-6)
+    }
+
+    fn origin() -> Point {
+        p(0, 0)
+    }
+
+    fn simple_polygon() -> Polygon {
+        Polygon::new(vec![p(0, 0), p(10, 0), p(10, 10)], 1, 0)
+    }
+
+    fn simple_path() -> Path {
+        Path::new(vec![p(0, 0), p(10, 10)], 1, 0, None, None)
+    }
+
+    fn simple_grid() -> Grid {
+        Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(p(10, 0)))
+            .with_spacing_y(Some(p(0, 10)))
+    }
+
+    fn simple_reference() -> Reference {
+        Reference::new(simple_polygon())
+    }
+
+    fn simple_text() -> Text {
+        Text::default()
+    }
 
     fn all_elements() -> [Element; 4] {
         [

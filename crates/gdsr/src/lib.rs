@@ -7,8 +7,6 @@ mod library;
 mod point;
 #[cfg(test)]
 mod property_tests;
-#[cfg(test)]
-pub(crate) mod test_fixtures;
 mod traits;
 mod transformation;
 mod types;

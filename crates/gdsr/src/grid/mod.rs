@@ -281,7 +281,19 @@ mod tests {
     use insta::assert_snapshot;
 
     use super::*;
-    use crate::test_fixtures::{origin, p, pf};
+    use crate::Point;
+
+    fn p(x: i32, y: i32) -> Point {
+        Point::integer(x, y, 1e-9)
+    }
+
+    fn pf(x: f64, y: f64) -> Point {
+        Point::float(x, y, 1e-6)
+    }
+
+    fn origin() -> Point {
+        p(0, 0)
+    }
 
     /// Standard test grid used across multiple tests.
     fn test_grid() -> Grid {

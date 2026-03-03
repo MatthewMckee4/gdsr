@@ -21,7 +21,6 @@ fn identity_does_not_change_point(x: i32, y: i32) -> bool {
 
 /// Double reflection with the same axis cancels out.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn double_reflection_cancels(reflection: Reflection, x: i32, y: i32) -> bool {
     let x = (x % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
     let y = (y % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
@@ -113,7 +112,6 @@ fn scale_then_inverse_is_identity(x: i32, y: i32, cx: i32, cy: i32) -> bool {
 
 /// Rotation then inverse rotation returns to the original point.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn rotation_then_inverse_is_identity(rotation: Rotation, x: i32, y: i32) -> bool {
     let x = (x % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
     let y = (y % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
@@ -126,7 +124,6 @@ fn rotation_then_inverse_is_identity(rotation: Rotation, x: i32, y: i32) -> bool
 
 /// Translation then inverse translation returns to the original point.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn translation_then_inverse_is_identity(translation: Translation, x: i32, y: i32) -> bool {
     let x = (x % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
     let y = (y % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);

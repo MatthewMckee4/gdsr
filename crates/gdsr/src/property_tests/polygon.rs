@@ -4,19 +4,16 @@ use crate::elements::polygon::close_points;
 use crate::*;
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn area_is_non_negative(polygon: Polygon) -> bool {
     polygon.area().float_value() >= 0.0
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn perimeter_is_non_negative(polygon: Polygon) -> bool {
     polygon.perimeter().float_value() >= 0.0
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn translation_preserves_area(polygon: Polygon, dx: i32, dy: i32) -> bool {
     let units = polygon.points()[0].units().0;
     let dx = (dx % 10_000).clamp(-10_000, 10_000);
@@ -27,7 +24,6 @@ fn translation_preserves_area(polygon: Polygon, dx: i32, dy: i32) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn translation_preserves_perimeter(polygon: Polygon, dx: i32, dy: i32) -> bool {
     let units = polygon.points()[0].units().0;
     let dx = (dx % 10_000).clamp(-10_000, 10_000);
@@ -39,7 +35,6 @@ fn translation_preserves_perimeter(polygon: Polygon, dx: i32, dy: i32) -> bool {
 
 /// Rotation should preserve area (within floating point tolerance).
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn rotation_preserves_area(polygon: Polygon) -> bool {
     let units = polygon.points()[0].units().0;
     let centre = Point::integer(0, 0, units);
@@ -53,7 +48,6 @@ fn rotation_preserves_area(polygon: Polygon) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn bounding_box_contains_all_points(polygon: Polygon) -> bool {
     let (min, max) = polygon.bounding_box();
     polygon.points().iter().all(|p| {
@@ -65,7 +59,6 @@ fn bounding_box_contains_all_points(polygon: Polygon) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn close_points_is_idempotent(polygon: Polygon) -> bool {
     let once = close_points(polygon.points().to_vec());
     let twice = close_points(once.clone());

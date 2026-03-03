@@ -7,7 +7,6 @@ use crate::*;
 const MAX_VALUE: i32 = 10_000;
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn addition_commutativity(a: Point, b: Point) -> bool {
     let a = a.to_float_unit();
     let b = b.to_float_unit().scale_units(a.units().0);
@@ -16,7 +15,6 @@ fn addition_commutativity(a: Point, b: Point) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn addition_associativity(a: Point, b: Point, c: Point) -> bool {
     let units = a.units().0;
     let a = a.to_float_unit();
@@ -27,7 +25,6 @@ fn addition_associativity(a: Point, b: Point, c: Point) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn additive_identity(a: Point) -> bool {
     let zero = Point::float(0.0, 0.0, a.units().0);
     let a = a.to_float_unit();
@@ -39,7 +36,6 @@ fn additive_identity(a: Point) -> bool {
 
 /// Verifies that a + (-a) produces a zero point.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn additive_inverse(a: Point) -> bool {
     let units = a.units().0;
     let neg_a = Point::new(
@@ -56,7 +52,6 @@ fn additive_inverse(a: Point) -> bool {
 /// Uses float points with matching units and approximate comparison
 /// to account for floating point rounding in different evaluation orders.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn scalar_multiplication_distributivity(a: Point, b: Point, s: i32) -> bool {
     let units = a.units().0;
     let a = Point::float(a.x().float_value(), a.y().float_value(), units);
@@ -74,7 +69,6 @@ fn scalar_multiplication_distributivity(a: Point, b: Point, s: i32) -> bool {
 
 /// Verifies that rotation by 2*pi returns approximately the original point.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn rotation_by_2pi_is_identity(a: Point) -> bool {
     let a = a.to_float_unit();
     let origin = Point::float(0.0, 0.0, a.units().0);

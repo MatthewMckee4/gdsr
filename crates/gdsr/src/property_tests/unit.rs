@@ -47,14 +47,12 @@ fn multiplicative_identity(a: Unit) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn addition_preserves_units(a: Unit, b: Unit) -> bool {
     let result = a + b;
     result.units() == a.units()
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn subtraction_preserves_units(a: Unit, b: Unit) -> bool {
     let result = a - b;
     result.units() == a.units()
@@ -63,7 +61,6 @@ fn subtraction_preserves_units(a: Unit, b: Unit) -> bool {
 /// Verifies that the absolute value of the sum equals the sum of absolute values.
 /// Tolerance accounts for unit scaling and integer rounding.
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn addition_absolute_value_correctness(a: Unit, b: Unit) -> bool {
     let sum = a + b;
     let abs_sum = sum.absolute_value();

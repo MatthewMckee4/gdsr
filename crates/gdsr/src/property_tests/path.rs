@@ -3,7 +3,6 @@ use quickcheck_macros::quickcheck;
 use crate::*;
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn bounding_box_contains_all_points(path: Path) -> bool {
     if path.points().is_empty() {
         return true;
@@ -18,7 +17,6 @@ fn bounding_box_contains_all_points(path: Path) -> bool {
 }
 
 #[quickcheck]
-#[allow(clippy::needless_pass_by_value)]
 fn translation_preserves_point_count(path: Path, dx: i32, dy: i32) -> bool {
     let units = path.points()[0].units().0;
     let dx = (dx % 10_000).clamp(-10_000, 10_000);
