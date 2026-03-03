@@ -4,6 +4,7 @@ pub mod io;
 pub mod presentation;
 pub mod utils;
 
+/// A text annotation placed at a specific point with configurable presentation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Text {
     pub(crate) value: String,
@@ -34,6 +35,7 @@ impl Default for Text {
 }
 
 impl Text {
+    /// Creates a new text element with the given properties.
     pub fn new(
         text: &str,
         origin: Point,
@@ -58,70 +60,84 @@ impl Text {
         }
     }
 
+    /// Returns the text string.
     pub const fn text(&self) -> &String {
         &self.value
     }
 
+    /// Sets the text string and returns the modified value.
     #[must_use]
     pub fn set_text(mut self, text: String) -> Self {
         self.value = text;
         self
     }
 
+    /// Returns the origin point.
     pub const fn origin(&self) -> &Point {
         &self.origin
     }
 
+    /// Sets the origin point and returns the modified value.
     #[must_use]
     pub fn set_origin(mut self, origin: Point) -> Self {
         self.origin = origin;
         self
     }
 
+    /// Returns the layer number.
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
+    /// Sets the layer number and returns the modified value.
     #[must_use]
     pub fn set_layer(mut self, layer: Layer) -> Self {
         self.layer = layer;
         self
     }
 
+    /// Returns the magnification factor.
     pub const fn magnification(&self) -> f64 {
         self.magnification
     }
 
+    /// Sets the magnification factor and returns the modified value.
     #[must_use]
     pub fn set_magnification(mut self, magnification: f64) -> Self {
         self.magnification = magnification;
         self
     }
 
+    /// Returns the rotation angle in radians.
     pub const fn angle(&self) -> f64 {
         self.angle
     }
 
+    /// Sets the rotation angle and returns the modified value.
     #[must_use]
     pub fn set_angle(mut self, angle: f64) -> Self {
         self.angle = angle;
         self
     }
 
+    /// Returns whether x-axis reflection is enabled.
     pub const fn x_reflection(&self) -> bool {
         self.x_reflection
     }
 
+    /// Sets x-axis reflection and returns the modified value.
     #[must_use]
     pub fn set_x_reflection(mut self, x_reflection: bool) -> Self {
         self.x_reflection = x_reflection;
         self
     }
 
+    /// Returns the vertical text presentation alignment.
     pub const fn vertical_presentation(&self) -> &presentation::VerticalPresentation {
         &self.vertical_presentation
     }
 
+    /// Sets the vertical presentation alignment and returns the modified value.
     #[must_use]
     pub fn set_vertical_presentation(
         mut self,
@@ -131,10 +147,12 @@ impl Text {
         self
     }
 
+    /// Returns the horizontal text presentation alignment.
     pub const fn horizontal_presentation(&self) -> &presentation::HorizontalPresentation {
         &self.horizontal_presentation
     }
 
+    /// Sets the horizontal presentation alignment and returns the modified value.
     #[must_use]
     pub fn set_horizontal_presentation(
         mut self,

@@ -4,6 +4,7 @@ use crate::{
 
 mod io;
 
+/// A named cell containing polygons, paths, texts, and references to other cells or elements.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
     name: String,
@@ -14,6 +15,7 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// Creates a new empty cell with the given name.
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -24,6 +26,7 @@ impl Cell {
         }
     }
 
+    /// Returns the cell name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -32,22 +35,27 @@ impl Cell {
         self.name = name.to_string();
     }
 
+    /// Returns the polygons in this cell.
     pub const fn polygons(&self) -> &Vec<Polygon> {
         &self.polygons
     }
 
+    /// Returns the paths in this cell.
     pub const fn paths(&self) -> &Vec<Path> {
         &self.paths
     }
 
+    /// Returns the texts in this cell.
     pub const fn texts(&self) -> &Vec<Text> {
         &self.texts
     }
 
+    /// Returns the references in this cell.
     pub const fn references(&self) -> &Vec<Reference> {
         &self.references
     }
 
+    /// Adds an element (polygon, path, text, or reference) to the cell.
     pub fn add(&mut self, element: impl Into<Element>) {
         match element.into() {
             Element::Path(path) => self.paths.push(path),
@@ -57,6 +65,7 @@ impl Cell {
         }
     }
 
+    /// Returns all elements in this cell, recursively flattening references up to the given depth.
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();

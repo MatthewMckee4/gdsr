@@ -5,6 +5,7 @@ mod path_type;
 
 pub use path_type::PathType;
 
+/// An open path defined by a sequence of points, with optional width and end cap type.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Path {
     pub(crate) points: Vec<Point>,
@@ -15,6 +16,7 @@ pub struct Path {
 }
 
 impl Path {
+    /// Creates a new path from the given points, layer, data type, optional end cap type, and optional width.
     pub fn new(
         points: impl IntoIterator<Item = Point>,
         layer: Layer,
@@ -31,22 +33,27 @@ impl Path {
         }
     }
 
+    /// Returns the path's points.
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
+    /// Returns the layer number.
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
+    /// Returns the data type.
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
+    /// Returns the end cap type, if set.
     pub const fn path_type(&self) -> &Option<PathType> {
         &self.r#type
     }
 
+    /// Returns the path width, if set.
     pub const fn width(&self) -> Option<Unit> {
         self.width
     }

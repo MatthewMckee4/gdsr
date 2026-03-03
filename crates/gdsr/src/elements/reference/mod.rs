@@ -5,6 +5,7 @@ mod io;
 
 pub use instance::Instance;
 
+/// A reference to an instance (cell or element) placed with a grid layout.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Reference {
     pub(crate) instance: Instance,
@@ -12,6 +13,7 @@ pub struct Reference {
 }
 
 impl Reference {
+    /// Creates a new reference to the given instance with a default grid.
     pub fn new(instance: impl Into<Instance>) -> Self {
         Self {
             instance: instance.into(),
@@ -19,20 +21,24 @@ impl Reference {
         }
     }
 
+    /// Returns the referenced instance.
     pub const fn instance(&self) -> &Instance {
         &self.instance
     }
 
+    /// Returns the grid layout configuration.
     pub const fn grid(&self) -> &Grid {
         &self.grid
     }
 
+    /// Sets the grid layout and returns the modified reference.
     #[must_use]
     pub const fn with_grid(mut self, grid: Grid) -> Self {
         self.grid = grid;
         self
     }
 
+    /// Expands a single element across the grid, returning one element per grid position.
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
         let grid = self.grid();
 
@@ -73,6 +79,8 @@ impl Reference {
         elements
     }
 
+    /// Recursively flattens this reference into concrete elements, resolving cell references
+    /// up to the given depth (or fully if `None`).
     pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();

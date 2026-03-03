@@ -5,6 +5,7 @@ mod utils;
 
 pub use utils::get_correct_polygon_points_format;
 
+/// A closed polygon defined by a sequence of points on a specific layer.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Polygon {
     pub(crate) points: Vec<Point>,
@@ -13,6 +14,8 @@ pub struct Polygon {
 }
 
 impl Polygon {
+    /// Creates a new polygon from the given points, layer, and data type.
+    /// The polygon is automatically closed if needed.
     pub fn new(points: impl IntoIterator<Item = Point>, layer: Layer, data_type: DataType) -> Self {
         Self {
             points: utils::get_correct_polygon_points_format(points),
@@ -21,22 +24,27 @@ impl Polygon {
         }
     }
 
+    /// Returns the polygon's points (including the closing point).
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
+    /// Returns the layer number.
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
+    /// Returns the data type.
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
+    /// Computes the area of the polygon using the shoelace formula.
     pub fn area(&self) -> Unit {
         crate::utils::geometry::area(&self.points)
     }
 
+    /// Computes the perimeter of the polygon.
     pub fn perimeter(&self) -> Unit {
         crate::utils::geometry::perimeter(&self.points)
     }

@@ -4,15 +4,21 @@ use crate::elements::{Path, Polygon, Reference, Text};
 use crate::traits::ToGds;
 use crate::{Instance, Movable, Point, Transformable, Transformation};
 
+/// A GDSII element: one of [`Path`], [`Polygon`], [`Text`], or [`Reference`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
+    /// A path element.
     Path(Path),
+    /// A polygon element.
     Polygon(Polygon),
+    /// A text annotation element.
     Text(Text),
+    /// A reference to another cell or element.
     Reference(Reference),
 }
 
 impl Element {
+    /// Returns the inner [`Path`] if this is a `Path` variant, or `None`.
     pub fn as_path(&self) -> Option<&Path> {
         if let Self::Path(v) = self {
             Some(v)
@@ -21,6 +27,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Polygon`] if this is a `Polygon` variant, or `None`.
     pub fn as_polygon(&self) -> Option<&Polygon> {
         if let Self::Polygon(v) = self {
             Some(v)
@@ -29,6 +36,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Text`] if this is a `Text` variant, or `None`.
     pub fn as_text(&self) -> Option<&Text> {
         if let Self::Text(v) = self {
             Some(v)
@@ -37,6 +45,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Reference`] if this is a `Reference` variant, or `None`.
     pub fn as_reference(&self) -> Option<&Reference> {
         if let Self::Reference(v) = self {
             Some(v)

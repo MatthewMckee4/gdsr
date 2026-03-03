@@ -4,12 +4,14 @@ type IntegerType = i32;
 type FloatType = f64;
 type UnitsType = f64;
 
+/// A unit value backed by a 32-bit integer.
 #[derive(Clone, Copy, Debug)]
 pub struct IntegerUnit {
     pub value: IntegerType,
     pub units: UnitsType,
 }
 
+/// A unit value backed by a 64-bit float.
 #[derive(Clone, Copy, Debug)]
 pub struct FloatUnit {
     pub value: FloatType,
@@ -30,7 +32,9 @@ pub enum Unit {
     Float(FloatUnit),
 }
 
+/// Default units for integer values (1e-9, i.e. nanometers).
 pub const DEFAULT_INTEGER_UNITS: UnitsType = 1e-9;
+/// Default units for float values (1e-6, i.e. micrometers).
 pub const DEFAULT_FLOAT_UNITS: UnitsType = 1e-6;
 
 impl Unit {
@@ -60,6 +64,7 @@ impl Unit {
         })
     }
 
+    /// Returns a zero-valued unit with default integer units.
     pub fn zero() -> Self {
         Self::default()
     }

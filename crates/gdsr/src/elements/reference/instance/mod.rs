@@ -4,13 +4,17 @@ use crate::Cell;
 use crate::elements::Element;
 // Note: Reference is defined in parent module, so we can't import it here to avoid circular dependency
 
+/// The target of a [`Reference`](crate::Reference): either a cell name or an inline element.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instance {
+    /// A reference to a named cell in the library.
     Cell(String),
+    /// An inline element stored directly in the reference.
     Element(Arc<Box<Element>>),
 }
 
 impl Instance {
+    /// Returns the cell name if this is a `Cell` instance, or `None`.
     pub fn as_cell(&self) -> Option<&String> {
         if let Self::Cell(v) = self {
             Some(v)
@@ -19,6 +23,7 @@ impl Instance {
         }
     }
 
+    /// Returns the element if this is an `Element` instance, or `None`.
     pub fn as_element(&self) -> Option<&Arc<Box<Element>>> {
         if let Self::Element(v) = self {
             Some(v)
