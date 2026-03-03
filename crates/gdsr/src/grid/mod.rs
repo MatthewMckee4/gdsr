@@ -565,4 +565,163 @@ mod tests {
         assert_eq!(grid.angle, 90.0);
         assert!(grid.x_reflection);
     }
+
+    #[test]
+    fn test_grid_1x1() {
+        let grid = Grid::new(
+            Point::integer(5, 10, 1e-9),
+            1,
+            1,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 1);
+        assert_eq!(grid.rows(), 1);
+        assert_eq!(grid.origin(), Point::integer(5, 10, 1e-9));
+    }
+
+    #[test]
+    fn test_grid_asymmetric_1x5() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            1,
+            5,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 1);
+        assert_eq!(grid.rows(), 5);
+    }
+
+    #[test]
+    fn test_grid_asymmetric_5x1() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            5,
+            1,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 5);
+        assert_eq!(grid.rows(), 1);
+    }
+
+    #[test]
+    fn test_grid_none_spacing() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            3,
+            3,
+            None,
+            None,
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.spacing_x(), None);
+        assert_eq!(grid.spacing_y(), None);
+    }
+
+    #[test]
+    fn test_grid_zero_spacing() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            3,
+            3,
+            Some(Point::integer(0, 0, 1e-9)),
+            Some(Point::integer(0, 0, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.spacing_x(), Some(Point::integer(0, 0, 1e-9)));
+        assert_eq!(grid.spacing_y(), Some(Point::integer(0, 0, 1e-9)));
+    }
+
+    #[test]
+    fn test_grid_negative_spacing() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            3,
+            3,
+            Some(Point::integer(-10, 0, 1e-9)),
+            Some(Point::integer(0, -10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.spacing_x(), Some(Point::integer(-10, 0, 1e-9)));
+        assert_eq!(grid.spacing_y(), Some(Point::integer(0, -10, 1e-9)));
+    }
+
+    #[test]
+    fn test_grid_transform_rotation_then_reflection() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            2,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = grid.rotate(FRAC_PI_2, centre).reflect(0.0, centre);
+
+        assert!((transformed.angle() - FRAC_PI_2).abs() < 0.001);
+        assert!(transformed.x_reflection());
+    }
+
+    #[test]
+    fn test_grid_transform_double_reflection_cancels() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            2,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = grid.reflect(0.0, centre).reflect(0.0, centre);
+
+        assert!(!transformed.x_reflection());
+    }
+
+    #[test]
+    fn test_grid_large() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            100,
+            100,
+            Some(Point::integer(1, 0, 1e-9)),
+            Some(Point::integer(0, 1, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 100);
+        assert_eq!(grid.rows(), 100);
+    }
 }

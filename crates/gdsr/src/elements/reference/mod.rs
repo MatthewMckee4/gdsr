@@ -422,4 +422,200 @@ mod tests {
         let flattened = reference.flatten(None, &library);
         assert_eq!(flattened.len(), 4); // 2x2 grid
     }
+
+    #[test]
+    fn test_reference_1x1_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(1)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 20, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon.clone());
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 1);
+        let result = elements[0].as_polygon().unwrap();
+        assert_eq!(result.points(), polygon.points());
+    }
+
+    #[test]
+    fn test_reference_asymmetric_1x5_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(1)
+            .with_rows(5)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 20, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 5);
+        for (i, el) in elements.iter().enumerate() {
+            let p = el.as_polygon().unwrap();
+            let expected_y_offset = (i as i32) * 20;
+            assert_eq!(p.points()[0], Point::integer(0, expected_y_offset, 1e-9));
+        }
+    }
+
+    #[test]
+    fn test_reference_asymmetric_5x1_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(5)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 20, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 5);
+        for (i, el) in elements.iter().enumerate() {
+            let p = el.as_polygon().unwrap();
+            let expected_x_offset = (i as i32) * 20;
+            assert_eq!(p.points()[0], Point::integer(expected_x_offset, 0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn test_reference_none_spacing_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default().with_columns(3).with_rows(3);
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon.clone());
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 9);
+        for el in &elements {
+            let p = el.as_polygon().unwrap();
+            assert_eq!(p.points(), polygon.points());
+        }
+    }
+
+    #[test]
+    fn test_reference_zero_spacing_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(3)
+            .with_rows(3)
+            .with_spacing_x(Some(Point::integer(0, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 0, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon.clone());
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 9);
+        for el in &elements {
+            let p = el.as_polygon().unwrap();
+            assert_eq!(p.points(), polygon.points());
+        }
+    }
+
+    #[test]
+    fn test_reference_negative_spacing_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(3)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(-20, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, -20, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 3);
+        for (i, el) in elements.iter().enumerate() {
+            let p = el.as_polygon().unwrap();
+            let expected_x_offset = (i as i32) * -20;
+            assert_eq!(p.points()[0], Point::integer(expected_x_offset, 0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn test_reference_large_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(1, 0, 1e-9),
+                Point::integer(1, 1, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(10)
+            .with_rows(10)
+            .with_spacing_x(Some(Point::integer(5, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 5, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert_eq!(elements.len(), 100);
+    }
 }
