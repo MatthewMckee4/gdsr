@@ -2,7 +2,10 @@ use super::Path;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
 use crate::error::GdsError;
 use crate::traits::ToGds;
-use crate::utils::io::{write_element_tail_to_file, write_points_to_file, write_u16_array_to_file};
+use crate::utils::io::{
+    validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
+    write_u16_array_to_file,
+};
 
 impl ToGds for Path {
     fn to_gds_impl(
@@ -10,6 +13,9 @@ impl ToGds for Path {
         buffer: &mut impl std::io::Write,
         database_units: f64,
     ) -> Result<(), GdsError> {
+        validate_layer(self.layer())?;
+        validate_data_type(self.data_type())?;
+
         if self.points().len() < 2 {
             return Err(GdsError::ValidationError {
                 message: "Path must have at least 2 points".to_string(),

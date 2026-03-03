@@ -4,8 +4,8 @@ use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_d
 use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{
-    write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
-    write_transformation_to_file, write_u16_array_to_file,
+    validate_layer, validate_string_length, write_element_tail_to_file, write_points_to_file,
+    write_string_with_record_to_file, write_transformation_to_file, write_u16_array_to_file,
 };
 
 impl ToGds for Text {
@@ -14,6 +14,9 @@ impl ToGds for Text {
         buffer: &mut impl std::io::Write,
         database_units: f64,
     ) -> Result<(), GdsError> {
+        validate_layer(self.layer())?;
+        validate_string_length(self.text())?;
+
         let buffer_start = vec![
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),

@@ -1116,3 +1116,293 @@ fn test_multiple_cells_referencing_same_cell() {
 
     assert_eq!(library, new_library);
 }
+
+fn assert_write_validation_error(library: &Library) {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("validation.gds");
+    let err = library.write_file(&gds_path, 1e-9, 1e-9).unwrap_err();
+    let is_validation = match &err {
+        GdsError::ValidationError { .. } => true,
+        GdsError::Io(e) => e.kind() == std::io::ErrorKind::InvalidInput,
+        GdsError::InvalidData { .. } => false,
+    };
+    assert!(is_validation, "expected validation error, got: {err}");
+}
+
+#[test]
+fn test_polygon_invalid_layer() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+        ],
+        256,
+        0,
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_polygon_invalid_data_type() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+        ],
+        0,
+        256,
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_polygon_too_few_points() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Polygon::new(
+        [Point::integer(0, 0, units), Point::integer(10, 0, units)],
+        0,
+        0,
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_path_invalid_layer() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Path::new(
+        vec![Point::integer(0, 0, units), Point::integer(10, 0, units)],
+        256,
+        0,
+        None,
+        None,
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_path_invalid_data_type() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Path::new(
+        vec![Point::integer(0, 0, units), Point::integer(10, 0, units)],
+        0,
+        256,
+        None,
+        None,
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_text_invalid_layer() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Text::new(
+        "hello",
+        Point::integer(0, 0, units),
+        256,
+        0,
+        1.0,
+        0.0,
+        false,
+        VerticalPresentation::default(),
+        HorizontalPresentation::default(),
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_text_string_too_long() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    let long_string = "a".repeat(513);
+    cell.add(Text::new(
+        &long_string,
+        Point::integer(0, 0, units),
+        0,
+        0,
+        1.0,
+        0.0,
+        false,
+        VerticalPresentation::default(),
+        HorizontalPresentation::default(),
+    ));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_text_string_at_max_length() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    let max_string = "a".repeat(512);
+    cell.add(Text::new(
+        &max_string,
+        Point::integer(0, 0, units),
+        0,
+        0,
+        1.0,
+        0.0,
+        false,
+        VerticalPresentation::default(),
+        HorizontalPresentation::default(),
+    ));
+    library.add_cell(cell);
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("valid.gds");
+    assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}
+
+#[test]
+fn test_cell_name_too_long() {
+    let mut library = Library::new("lib");
+    let long_name = "a".repeat(33);
+    let cell = Cell::new(&long_name);
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_cell_name_invalid_characters() {
+    let mut library = Library::new("lib");
+    let cell = Cell::new("cell with spaces");
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_cell_name_valid_special_characters() {
+    let mut library = Library::new("lib");
+    let cell = Cell::new("CELL_with$valid?chars");
+    library.add_cell(cell);
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("valid.gds");
+    assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}
+
+#[test]
+fn test_cell_name_at_max_length() {
+    let mut library = Library::new("lib");
+    let max_name = "a".repeat(32);
+    let cell = Cell::new(&max_name);
+    library.add_cell(cell);
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("valid.gds");
+    assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}
+
+#[test]
+fn test_reference_columns_exceed_max() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut base_cell = Cell::new("base");
+    base_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        0,
+        0,
+    ));
+    library.add_cell(base_cell);
+
+    let mut cell = Cell::new("cell");
+    cell.add(Reference::new("base").with_grid(Grid::default().with_columns(32768).with_rows(1)));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_reference_rows_exceed_max() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut base_cell = Cell::new("base");
+    base_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        0,
+        0,
+    ));
+    library.add_cell(base_cell);
+
+    let mut cell = Cell::new("cell");
+    cell.add(Reference::new("base").with_grid(Grid::default().with_columns(1).with_rows(32768)));
+    library.add_cell(cell);
+    assert_write_validation_error(&library);
+}
+
+#[test]
+fn test_reference_col_row_at_max() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut base_cell = Cell::new("base");
+    base_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        0,
+        0,
+    ));
+    library.add_cell(base_cell);
+
+    let mut cell = Cell::new("cell");
+    cell.add(
+        Reference::new("base").with_grid(Grid::default().with_columns(32767).with_rows(32767)),
+    );
+    library.add_cell(cell);
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("valid.gds");
+    assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}
+
+#[test]
+fn test_polygon_layer_and_data_type_at_boundary() {
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+    let mut cell = Cell::new("cell");
+    cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        255,
+        255,
+    ));
+    library.add_cell(cell);
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("valid.gds");
+    assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}

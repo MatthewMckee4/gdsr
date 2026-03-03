@@ -3,7 +3,8 @@ use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_d
 use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{
-    MAX_POINTS, write_element_tail_to_file, write_points_to_file, write_u16_array_to_file,
+    MAX_POINTS, MIN_POLYGON_POINTS, validate_data_type, validate_layer, write_element_tail_to_file,
+    write_points_to_file, write_u16_array_to_file,
 };
 
 impl ToGds for Polygon {
@@ -18,6 +19,18 @@ impl ToGds for Polygon {
                     "Polygon has {} points, which exceeds the maximum of {}",
                     self.points().len(),
                     MAX_POINTS
+                ),
+            });
+        }
+
+        validate_layer(self.layer())?;
+        validate_data_type(self.data_type())?;
+
+        if self.points().len() < MIN_POLYGON_POINTS {
+            return Err(GdsError::ValidationError {
+                message: format!(
+                    "Polygon must have at least {MIN_POLYGON_POINTS} points (3 vertices + closing point), got {}",
+                    self.points().len()
                 ),
             });
         }

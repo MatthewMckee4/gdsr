@@ -4,8 +4,8 @@ use crate::elements::Element;
 use crate::error::GdsError;
 use crate::traits::ToGds;
 use crate::utils::io::{
-    write_element_tail_to_file, write_points_to_file, write_string_with_record_to_file,
-    write_transformation_to_file, write_u16_array_to_file,
+    validate_col_row, write_element_tail_to_file, write_points_to_file,
+    write_string_with_record_to_file, write_transformation_to_file, write_u16_array_to_file,
 };
 
 impl ToGds for Reference {
@@ -45,6 +45,8 @@ impl Reference {
         database_units: f64,
         cell_name: &str,
     ) -> Result<(), GdsError> {
+        validate_col_row(self.grid().columns(), self.grid().rows())?;
+
         let is_single_instance = self.grid().columns() == 1 && self.grid().rows() == 1;
 
         let record = if is_single_instance {
