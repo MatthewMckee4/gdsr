@@ -1,4 +1,4 @@
-use crate::{DataType, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
 
 pub mod io;
 pub mod presentation;
@@ -182,6 +182,12 @@ impl Movable for Text {
     fn move_to(mut self, target: Point) -> Self {
         self.origin = target;
         self
+    }
+}
+
+impl Dimensions for Text {
+    fn bounding_box(&self) -> (Point, Point) {
+        (self.origin, self.origin)
     }
 }
 
@@ -391,6 +397,23 @@ mod tests {
 
         assert_eq!(scaled.magnification(), 3.0);
         assert_eq!(scaled.origin(), &Point::integer(20, 40, 1e-9));
+    }
+
+    #[test]
+    fn test_text_bounding_box() {
+        let origin = Point::integer(10, 20, 1e-9);
+        let text = Text::default().set_origin(origin);
+        let (min, max) = text.bounding_box();
+        assert_eq!(min, origin);
+        assert_eq!(max, origin);
+    }
+
+    #[test]
+    fn test_text_bounding_box_default() {
+        let text = Text::default();
+        let (min, max) = text.bounding_box();
+        assert_eq!(min, Point::integer(0, 0, 1e-9));
+        assert_eq!(max, Point::integer(0, 0, 1e-9));
     }
 
     #[test]
