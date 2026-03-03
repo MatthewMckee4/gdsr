@@ -91,7 +91,7 @@ pub fn write_points_to_file(
 
     let points_to_write = integer_points.get(..MAX_POINTS).unwrap_or(&integer_points);
 
-    let record_size = 4 + (points.len() * 8) as u16;
+    let record_size = 4 + (points_to_write.len() * 8) as u16;
     let xy_header_buffer = [
         record_size,
         combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
@@ -611,4 +611,31 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
     vec.chunks(2)
         .map(|chunk| Point::integer(chunk[0], chunk[1], db_units))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies that `write_points_to_file` uses the truncated point count
+    /// (capped at `MAX_POINTS`) for the record header size, not the original
+    /// input length.
+    #[test]
+    fn test_write_points_record_size_capped_at_max_points() {
+        let db_units = 1e-9;
+        let num_points = MAX_POINTS + 100;
+        let points: Vec<Point> = (0..num_points)
+            .map(|i| Point::integer(i as i32, 0, db_units))
+            .collect();
+
+        let mut buf = Vec::new();
+        write_points_to_file(&mut buf, &points, db_units).unwrap();
+
+        let record_size = u16::from_be_bytes([buf[0], buf[1]]);
+        let expected_size = 4 + (MAX_POINTS * 8) as u16;
+        assert_eq!(record_size, expected_size);
+
+        let expected_total_bytes = 4 + MAX_POINTS * 8;
+        assert_eq!(buf.len(), expected_total_bytes);
+    }
 }
