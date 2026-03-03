@@ -1,6 +1,7 @@
 # GDSR
 
 [![Crates.io](https://img.shields.io/crates/v/gdsr)](https://crates.io/crates/gdsr)
+[![codecov](https://codecov.io/github/MatthewMckee4/gdsr/graph/badge.svg?token=O2OQ6OOR9O)](https://codecov.io/github/MatthewMckee4/gdsr)
 
 GDSII manipulation, written in rust.
 
