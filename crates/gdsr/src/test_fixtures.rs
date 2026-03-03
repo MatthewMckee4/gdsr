@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::elements::{Path, Polygon, Reference, Text};
 use crate::{Grid, Point};
 
@@ -21,16 +19,8 @@ pub fn triangle_points() -> Vec<Point> {
     vec![p(0, 0), p(10, 0), p(10, 10)]
 }
 
-pub fn square_points() -> Vec<Point> {
-    vec![p(0, 0), p(10, 0), p(10, 10), p(0, 10)]
-}
-
 pub fn simple_polygon() -> Polygon {
     Polygon::new(triangle_points(), 1, 0)
-}
-
-pub fn square_polygon() -> Polygon {
-    Polygon::new(square_points(), 1, 0)
 }
 
 pub fn simple_path() -> Path {

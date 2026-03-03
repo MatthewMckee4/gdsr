@@ -1,8 +1,8 @@
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
 
-use gdsr::*;
-use rstest::rstest;
 use tempfile::tempdir;
+
+use crate::*;
 
 fn assert_roundtrip(library: &Library) {
     let temp_dir = tempdir().unwrap();
@@ -12,469 +12,14 @@ fn assert_roundtrip(library: &Library) {
     assert_eq!(*library, read_library, "{library:#?}\n{read_library:#?}");
 }
 
-#[test]
-fn test_library_roundtrip_mixed_elements() {
-    let units = 1e-9;
-
-    let mut library = Library::new("mixed_elements");
-
-    let mut cell = Cell::new("mixed_cell");
-
-    let polygon = Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(10, 0, units),
-            Point::integer(10, 10, units),
-            Point::integer(0, 10, units),
-        ],
-        1,
-        0,
-    );
-    cell.add(polygon);
-
-    let text = Text::new(
-        "Test Label",
-        Point::integer(5, 5, units),
-        1,
-        0,
-        1.0,
-        0.0,
-        false,
-        gdsr::VerticalPresentation::default(),
-        gdsr::HorizontalPresentation::default(),
-    );
-    cell.add(text);
-
-    let path = Path::new(
-        vec![
-            Point::integer(0, 0, units),
-            Point::integer(5, 5, units),
-            Point::integer(10, 0, units),
-        ],
-        1,
-        0,
-        Some(PathType::Square),
-        Some(Unit::float(2.0, units)),
-    );
-    cell.add(path);
-
-    let ref_polygon = Polygon::new(
-        [
-            Point::integer(15, 15, units),
-            Point::integer(20, 15, units),
-            Point::integer(20, 20, units),
-            Point::integer(15, 20, units),
-        ],
-        2,
-        0,
-    );
-
-    let reference = Reference::new(ref_polygon.clone()).with_grid(
-        Grid::default()
-            .with_origin(Point::integer(0, 25, units))
-            .with_columns(2)
-            .with_rows(2)
-            .with_spacing_x(Some(Point::integer(25, 0, units)))
-            .with_spacing_y(Some(Point::integer(0, 25, units))),
-    );
-
-    let elements = reference.flatten(None, &library);
-
-    for element in elements {
-        cell.add(element);
-    }
-
-    library.add_cell(cell);
-
-    assert_roundtrip(&library);
-}
-
-#[rstest]
-#[case(1e-9, 1e-10)]
-#[case(1e-6, 1e-10)]
-#[case(1e-7, 1e-9)]
-#[case(1e-8, 1e-9)]
-#[case(1e-9, 1e-9)]
-fn test_library_roundtrip_different_units(#[case] user_units: f64, #[case] database_units: f64) {
-    let mut library = Library::new("main");
-
-    let units = 1e-9;
-
-    let mut cell = Cell::new("1");
-
-    let polygon = Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(100, 0, units),
-            Point::integer(100, 100, units),
-            Point::integer(0, 100, units),
-        ],
-        1,
-        0,
-    );
-
-    let reference = Reference::new(polygon.clone()).with_grid(Grid::new(
-        Point::integer(0, 0, units),
-        3,
-        3,
-        Some(Point::integer(150, 0, units)),
-        Some(Point::integer(0, 150, units)),
-        1.5,
-        45.0,
-        true,
-    ));
-
-    let elements = reference.flatten(None, &library);
-
-    for element in elements {
-        cell.add(element);
-    }
-
-    let mut cell2 = Cell::new("2");
-
-    let polygon2 = Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(100, 0, units),
-            Point::integer(100, 100, units),
-            Point::integer(0, 100, units),
-        ],
-        1,
-        0,
-    );
-
-    cell2.add(polygon2);
-
-    let reference2 = Reference::new(&cell2).with_grid(
-        Grid::default()
-            .with_columns(3)
-            .with_rows(3)
-            .with_spacing_x(Some(Point::integer(150, 0, units)))
-            .with_spacing_y(Some(Point::integer(0, 150, units))),
-    );
-
-    cell.add(reference2);
-
-    library.add_cell(cell2);
-
-    library.add_cell(cell);
-
+fn assert_write_validation_error(library: &Library) {
     let temp_dir = tempdir().unwrap();
-    let gds_path = temp_dir.path().join("main.gds");
-    library
-        .write_file(&gds_path, user_units, database_units)
-        .unwrap();
-    let new_library = Library::read_file(&gds_path, Some(units)).unwrap();
-    assert_eq!(library, new_library);
-}
-
-#[test]
-fn test_empty_library_roundtrip() {
-    let temp_dir = tempdir().unwrap();
-    let gds_path = temp_dir.path().join("empty.gds");
-
-    let library = Library::new("empty");
-
-    let _res = library.write_file(&gds_path, 1e-9, 1e-10);
-
-    let new_library = Library::read_file(&gds_path, None).unwrap();
-
-    assert_eq!(library, new_library);
-}
-
-#[test]
-fn test_complex_path_types_roundtrip() {
-    let units = 1e-9;
-    let mut library = Library::new("path_test");
-    let mut cell = Cell::new("path_cell");
-
-    cell.add(Path::new(
-        vec![
-            Point::integer(0, 0, units),
-            Point::integer(50, 0, units),
-            Point::integer(50, 50, units),
-        ],
-        1,
-        0,
-        Some(PathType::Square),
-        Some(Unit::float(5.0, units)),
-    ));
-
-    cell.add(Path::new(
-        vec![
-            Point::integer(100, 0, units),
-            Point::integer(150, 0, units),
-            Point::integer(150, 50, units),
-        ],
-        2,
-        0,
-        Some(PathType::Round),
-        Some(Unit::float(3.0, units)),
-    ));
-
-    cell.add(Path::new(
-        vec![Point::integer(200, 0, units), Point::integer(250, 0, units)],
-        3,
-        0,
-        Some(PathType::Overlap),
-        Some(Unit::float(4.0, units)),
-    ));
-
-    library.add_cell(cell);
-
-    assert_roundtrip(&library);
-}
-
-#[test]
-fn test_text_with_various_presentations() {
-    let units = 1e-9;
-    let mut library = Library::new("text_test");
-    let mut cell = Cell::new("text_cell");
-
-    cell.add(Text::new(
-        "Top Left",
-        Point::integer(0, 0, units),
-        1,
-        0,
-        1.0,
-        0.0,
-        false,
-        gdsr::VerticalPresentation::Top,
-        gdsr::HorizontalPresentation::Left,
-    ));
-
-    cell.add(Text::new(
-        "Middle Centre",
-        Point::integer(50, 50, units),
-        1,
-        0,
-        1.5,
-        45.0,
-        false,
-        gdsr::VerticalPresentation::Middle,
-        gdsr::HorizontalPresentation::Centre,
-    ));
-
-    cell.add(Text::new(
-        "Bottom Right",
-        Point::integer(100, 100, units),
-        2,
-        0,
-        2.0,
-        90.0,
-        true,
-        gdsr::VerticalPresentation::Bottom,
-        gdsr::HorizontalPresentation::Right,
-    ));
-
-    library.add_cell(cell);
-
-    assert_roundtrip(&library);
-}
-
-#[test]
-fn test_nested_references() {
-    let units = 1e-9;
-    let mut library = Library::new("nested_test");
-
-    let mut cell1 = Cell::new("base_cell");
-    cell1.add(Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(10, 0, units),
-            Point::integer(10, 10, units),
-            Point::integer(0, 10, units),
-        ],
-        1,
-        0,
-    ));
-
-    let mut cell2 = Cell::new("mid_cell");
-    cell2.add(
-        Reference::new("base_cell".to_string()).with_grid(
-            Grid::default()
-                .with_columns(2)
-                .with_rows(2)
-                .with_spacing_x(Some(Point::integer(20, 0, units)))
-                .with_spacing_y(Some(Point::integer(0, 20, units))),
-        ),
+    let gds_path = temp_dir.path().join("validation.gds");
+    let err = library.write_file(&gds_path, 1e-9, 1e-9).unwrap_err();
+    assert!(
+        matches!(err, GdsError::ValidationError { .. }),
+        "expected ValidationError, got: {err}"
     );
-
-    let mut cell3 = Cell::new("top_cell");
-    cell3.add(
-        Reference::new("mid_cell".to_string())
-            .with_grid(Grid::default().with_origin(Point::integer(50, 50, units))),
-    );
-
-    library.add_cell(cell1);
-    library.add_cell(cell2);
-    library.add_cell(cell3);
-
-    assert_roundtrip(&library);
-}
-
-#[test]
-fn test_large_polygon_coordinates() {
-    let units = 1e-9;
-    let mut library = Library::new("large_coords_test");
-    let mut cell = Cell::new("large_cell");
-
-    cell.add(Polygon::new(
-        [
-            Point::integer(1_000_000, 1_000_000, units),
-            Point::integer(2_000_000, 1_000_000, units),
-            Point::integer(2_000_000, 2_000_000, units),
-            Point::integer(1_000_000, 2_000_000, units),
-        ],
-        1,
-        0,
-    ));
-
-    library.add_cell(cell);
-
-    assert_roundtrip(&library);
-}
-
-#[test]
-fn test_float_coordinates() {
-    let temp_dir = tempdir().unwrap();
-    let gds_path = temp_dir.path().join("float_coords.gds");
-
-    let units = 1e-9;
-    let mut library = Library::new("float_test");
-    let mut cell = Cell::new("float_cell");
-
-    let polygon = Polygon::new(
-        [
-            Point::float(0.5, 0.5, units),
-            Point::float(10.5, 0.5, units),
-            Point::float(10.5, 10.5, units),
-            Point::float(0.5, 10.5, units),
-        ],
-        1,
-        0,
-    );
-    cell.add(polygon);
-
-    let path = Path::new(
-        vec![
-            Point::float(15.25, 15.25, units),
-            Point::float(20.75, 15.25, units),
-            Point::float(20.75, 20.75, units),
-        ],
-        2,
-        0,
-        Some(PathType::Round),
-        Some(Unit::float(1.5, units)),
-    );
-
-    cell.add(path);
-
-    library.add_cell(cell.clone());
-
-    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
-
-    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
-
-    assert_eq!(new_library.name(), library.name());
-    assert_eq!(new_library.cells().len(), 1);
-    assert!(new_library.contains_cell(&cell));
-}
-
-#[test]
-fn test_multiple_cells_different_layers() {
-    let units = 1e-9;
-    let mut library = Library::new("multi_layer_test");
-
-    for layer in 0..5 {
-        let cell_name = format!("layer_{layer}_cell");
-        let mut cell = Cell::new(cell_name.as_str());
-
-        cell.add(Polygon::new(
-            [
-                Point::integer(layer * 10, 0, units),
-                Point::integer(layer * 10 + 10, 0, units),
-                Point::integer(layer * 10 + 10, 10, units),
-                Point::integer(layer * 10, 10, units),
-            ],
-            layer as u16,
-            0,
-        ));
-
-        library.add_cell(cell);
-    }
-
-    assert_roundtrip(&library);
-}
-
-#[test]
-fn test_error_invalid_file() {
-    let result = Library::read_file("/nonexistent/path/to/file.gds", None);
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_single_cell_with_all_element_types() {
-    let units = 1e-9;
-    let mut library = Library::new("all_elements_test");
-    let mut cell = Cell::new("main_cell");
-
-    cell.add(Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(100, 0, units),
-            Point::integer(100, 100, units),
-            Point::integer(0, 100, units),
-        ],
-        1,
-        0,
-    ));
-
-    cell.add(Path::new(
-        vec![
-            Point::integer(150, 50, units),
-            Point::integer(200, 50, units),
-            Point::integer(200, 100, units),
-        ],
-        2,
-        0,
-        Some(PathType::Round),
-        Some(Unit::float(5.0, units)),
-    ));
-
-    cell.add(Text::new(
-        "All Elements",
-        Point::integer(250, 50, units),
-        3,
-        0,
-        2.0,
-        0.0,
-        false,
-        gdsr::VerticalPresentation::Middle,
-        gdsr::HorizontalPresentation::Centre,
-    ));
-
-    let mut ref_cell = Cell::new("ref_cell");
-    ref_cell.add(Polygon::new(
-        [
-            Point::integer(0, 0, units),
-            Point::integer(20, 0, units),
-            Point::integer(20, 20, units),
-            Point::integer(0, 20, units),
-        ],
-        4,
-        0,
-    ));
-    library.add_cell(ref_cell);
-
-    cell.add(
-        Reference::new("ref_cell".to_string())
-            .with_grid(Grid::default().with_origin(Point::integer(300, 50, units))),
-    );
-
-    library.add_cell(cell);
-
-    assert_roundtrip(&library);
 }
 
 fn get_elements(units: f64) -> Vec<Element> {
@@ -498,8 +43,8 @@ fn get_elements(units: f64) -> Vec<Element> {
             2.0,
             0.0,
             false,
-            gdsr::VerticalPresentation::Middle,
-            gdsr::HorizontalPresentation::Centre,
+            VerticalPresentation::Middle,
+            HorizontalPresentation::Centre,
         )
         .into(),
         Path::new(
@@ -692,6 +237,476 @@ fn get_elements(units: f64) -> Vec<Element> {
         ))
         .into(),
     ]
+}
+
+#[test]
+fn test_library_roundtrip_mixed_elements() {
+    let units = 1e-9;
+
+    let mut library = Library::new("mixed_elements");
+
+    let mut cell = Cell::new("mixed_cell");
+
+    let polygon = Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    );
+    cell.add(polygon);
+
+    let text = Text::new(
+        "Test Label",
+        Point::integer(5, 5, units),
+        1,
+        0,
+        1.0,
+        0.0,
+        false,
+        VerticalPresentation::default(),
+        HorizontalPresentation::default(),
+    );
+    cell.add(text);
+
+    let path = Path::new(
+        vec![
+            Point::integer(0, 0, units),
+            Point::integer(5, 5, units),
+            Point::integer(10, 0, units),
+        ],
+        1,
+        0,
+        Some(PathType::Square),
+        Some(Unit::float(2.0, units)),
+    );
+    cell.add(path);
+
+    let ref_polygon = Polygon::new(
+        [
+            Point::integer(15, 15, units),
+            Point::integer(20, 15, units),
+            Point::integer(20, 20, units),
+            Point::integer(15, 20, units),
+        ],
+        2,
+        0,
+    );
+
+    let reference = Reference::new(ref_polygon.clone()).with_grid(
+        Grid::default()
+            .with_origin(Point::integer(0, 25, units))
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(25, 0, units)))
+            .with_spacing_y(Some(Point::integer(0, 25, units))),
+    );
+
+    let elements = reference.flatten(None, &library);
+
+    for element in elements {
+        cell.add(element);
+    }
+
+    library.add_cell(cell);
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_library_roundtrip_different_units() {
+    let cases = [
+        (1e-9, 1e-10),
+        (1e-6, 1e-10),
+        (1e-7, 1e-9),
+        (1e-8, 1e-9),
+        (1e-9, 1e-9),
+    ];
+
+    for (user_units, database_units) in cases {
+        let mut library = Library::new("main");
+
+        let units = 1e-9;
+
+        let mut cell = Cell::new("1");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(100, 0, units),
+                Point::integer(100, 100, units),
+                Point::integer(0, 100, units),
+            ],
+            1,
+            0,
+        );
+
+        let reference = Reference::new(polygon.clone()).with_grid(Grid::new(
+            Point::integer(0, 0, units),
+            3,
+            3,
+            Some(Point::integer(150, 0, units)),
+            Some(Point::integer(0, 150, units)),
+            1.5,
+            45.0,
+            true,
+        ));
+
+        let elements = reference.flatten(None, &library);
+
+        for element in elements {
+            cell.add(element);
+        }
+
+        let mut cell2 = Cell::new("2");
+
+        let polygon2 = Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(100, 0, units),
+                Point::integer(100, 100, units),
+                Point::integer(0, 100, units),
+            ],
+            1,
+            0,
+        );
+
+        cell2.add(polygon2);
+
+        let reference2 = Reference::new(&cell2).with_grid(
+            Grid::default()
+                .with_columns(3)
+                .with_rows(3)
+                .with_spacing_x(Some(Point::integer(150, 0, units)))
+                .with_spacing_y(Some(Point::integer(0, 150, units))),
+        );
+
+        cell.add(reference2);
+
+        library.add_cell(cell2);
+
+        library.add_cell(cell);
+
+        let temp_dir = tempdir().unwrap();
+        let gds_path = temp_dir.path().join("main.gds");
+        library
+            .write_file(&gds_path, user_units, database_units)
+            .unwrap();
+        let new_library = Library::read_file(&gds_path, Some(units)).unwrap();
+        assert_eq!(library, new_library);
+    }
+}
+
+#[test]
+fn test_empty_library_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("empty.gds");
+
+    let library = Library::new("empty");
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-10);
+
+    let new_library = Library::read_file(&gds_path, None).unwrap();
+
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_complex_path_types_roundtrip() {
+    let units = 1e-9;
+    let mut library = Library::new("path_test");
+    let mut cell = Cell::new("path_cell");
+
+    cell.add(Path::new(
+        vec![
+            Point::integer(0, 0, units),
+            Point::integer(50, 0, units),
+            Point::integer(50, 50, units),
+        ],
+        1,
+        0,
+        Some(PathType::Square),
+        Some(Unit::float(5.0, units)),
+    ));
+
+    cell.add(Path::new(
+        vec![
+            Point::integer(100, 0, units),
+            Point::integer(150, 0, units),
+            Point::integer(150, 50, units),
+        ],
+        2,
+        0,
+        Some(PathType::Round),
+        Some(Unit::float(3.0, units)),
+    ));
+
+    cell.add(Path::new(
+        vec![Point::integer(200, 0, units), Point::integer(250, 0, units)],
+        3,
+        0,
+        Some(PathType::Overlap),
+        Some(Unit::float(4.0, units)),
+    ));
+
+    library.add_cell(cell);
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_text_with_various_presentations() {
+    let units = 1e-9;
+    let mut library = Library::new("text_test");
+    let mut cell = Cell::new("text_cell");
+
+    cell.add(Text::new(
+        "Top Left",
+        Point::integer(0, 0, units),
+        1,
+        0,
+        1.0,
+        0.0,
+        false,
+        VerticalPresentation::Top,
+        HorizontalPresentation::Left,
+    ));
+
+    cell.add(Text::new(
+        "Middle Centre",
+        Point::integer(50, 50, units),
+        1,
+        0,
+        1.5,
+        45.0,
+        false,
+        VerticalPresentation::Middle,
+        HorizontalPresentation::Centre,
+    ));
+
+    cell.add(Text::new(
+        "Bottom Right",
+        Point::integer(100, 100, units),
+        2,
+        0,
+        2.0,
+        90.0,
+        true,
+        VerticalPresentation::Bottom,
+        HorizontalPresentation::Right,
+    ));
+
+    library.add_cell(cell);
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_nested_references() {
+    let units = 1e-9;
+    let mut library = Library::new("nested_test");
+
+    let mut cell1 = Cell::new("base_cell");
+    cell1.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    ));
+
+    let mut cell2 = Cell::new("mid_cell");
+    cell2.add(
+        Reference::new("base_cell".to_string()).with_grid(
+            Grid::default()
+                .with_columns(2)
+                .with_rows(2)
+                .with_spacing_x(Some(Point::integer(20, 0, units)))
+                .with_spacing_y(Some(Point::integer(0, 20, units))),
+        ),
+    );
+
+    let mut cell3 = Cell::new("top_cell");
+    cell3.add(
+        Reference::new("mid_cell".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(50, 50, units))),
+    );
+
+    library.add_cell(cell1);
+    library.add_cell(cell2);
+    library.add_cell(cell3);
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_large_polygon_coordinates() {
+    let units = 1e-9;
+    let mut library = Library::new("large_coords_test");
+    let mut cell = Cell::new("large_cell");
+
+    cell.add(Polygon::new(
+        [
+            Point::integer(1_000_000, 1_000_000, units),
+            Point::integer(2_000_000, 1_000_000, units),
+            Point::integer(2_000_000, 2_000_000, units),
+            Point::integer(1_000_000, 2_000_000, units),
+        ],
+        1,
+        0,
+    ));
+
+    library.add_cell(cell);
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_float_coordinates() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("float_coords.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("float_test");
+    let mut cell = Cell::new("float_cell");
+
+    let polygon = Polygon::new(
+        [
+            Point::float(0.5, 0.5, units),
+            Point::float(10.5, 0.5, units),
+            Point::float(10.5, 10.5, units),
+            Point::float(0.5, 10.5, units),
+        ],
+        1,
+        0,
+    );
+    cell.add(polygon);
+
+    let path = Path::new(
+        vec![
+            Point::float(15.25, 15.25, units),
+            Point::float(20.75, 15.25, units),
+            Point::float(20.75, 20.75, units),
+        ],
+        2,
+        0,
+        Some(PathType::Round),
+        Some(Unit::float(1.5, units)),
+    );
+
+    cell.add(path);
+
+    library.add_cell(cell.clone());
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    assert_eq!(new_library.name(), library.name());
+    assert_eq!(new_library.cells().len(), 1);
+    assert!(new_library.contains_cell(&cell));
+}
+
+#[test]
+fn test_multiple_cells_different_layers() {
+    let units = 1e-9;
+    let mut library = Library::new("multi_layer_test");
+
+    for layer in 0..5 {
+        let cell_name = format!("layer_{layer}_cell");
+        let mut cell = Cell::new(cell_name.as_str());
+
+        cell.add(Polygon::new(
+            [
+                Point::integer(layer * 10, 0, units),
+                Point::integer(layer * 10 + 10, 0, units),
+                Point::integer(layer * 10 + 10, 10, units),
+                Point::integer(layer * 10, 10, units),
+            ],
+            layer as u16,
+            0,
+        ));
+
+        library.add_cell(cell);
+    }
+
+    assert_roundtrip(&library);
+}
+
+#[test]
+fn test_error_invalid_file() {
+    let result = Library::read_file("/nonexistent/path/to/file.gds", None);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_single_cell_with_all_element_types() {
+    let units = 1e-9;
+    let mut library = Library::new("all_elements_test");
+    let mut cell = Cell::new("main_cell");
+
+    cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(100, 0, units),
+            Point::integer(100, 100, units),
+            Point::integer(0, 100, units),
+        ],
+        1,
+        0,
+    ));
+
+    cell.add(Path::new(
+        vec![
+            Point::integer(150, 50, units),
+            Point::integer(200, 50, units),
+            Point::integer(200, 100, units),
+        ],
+        2,
+        0,
+        Some(PathType::Round),
+        Some(Unit::float(5.0, units)),
+    ));
+
+    cell.add(Text::new(
+        "All Elements",
+        Point::integer(250, 50, units),
+        3,
+        0,
+        2.0,
+        0.0,
+        false,
+        VerticalPresentation::Middle,
+        HorizontalPresentation::Centre,
+    ));
+
+    let mut ref_cell = Cell::new("ref_cell");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(20, 0, units),
+            Point::integer(20, 20, units),
+            Point::integer(0, 20, units),
+        ],
+        4,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    cell.add(
+        Reference::new("ref_cell".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(300, 50, units))),
+    );
+
+    library.add_cell(cell);
+
+    assert_roundtrip(&library);
 }
 
 #[test]
@@ -1024,16 +1039,6 @@ fn test_multiple_cells_referencing_same_cell() {
     library.add_cell(cell_b);
 
     assert_roundtrip(&library);
-}
-
-fn assert_write_validation_error(library: &Library) {
-    let temp_dir = tempdir().unwrap();
-    let gds_path = temp_dir.path().join("validation.gds");
-    let err = library.write_file(&gds_path, 1e-9, 1e-9).unwrap_err();
-    assert!(
-        matches!(err, GdsError::ValidationError { .. }),
-        "expected ValidationError, got: {err}"
-    );
 }
 
 #[test]
