@@ -16,8 +16,8 @@ impl Reflection {
     }
 
     pub fn from_line(point1: &Point, point2: &Point) -> Self {
-        let dx = point2.x().absolute_value() - point1.x().absolute_value();
-        let dy = point2.y().absolute_value() - point1.y().absolute_value();
+        let dx = (point2.x() - point1.x()).absolute_value();
+        let dy = (point2.y() - point1.y()).absolute_value();
         let angle = dy.atan2(dx);
         let centre = Point::new(
             (point1.x() + point2.x()) / 2.0,
@@ -142,5 +142,63 @@ mod tests {
         assert_eq!(reflected.x(), test_point.x());
         let sum = (reflected.y() + test_point.y()).absolute_value();
         assert!(sum.abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_reflection_from_line_negative_quadrant() {
+        let point1 = Point::integer(-5, -10, 1e-9);
+        let point2 = Point::integer(0, 0, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        let expected_angle = (10.0_f64).atan2(5.0);
+        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+
+        assert_eq!(reflection.centre, Point::integer(-3, -5, 1e-9));
+
+        // Reflecting (1, 0) across the line from (-5, -10) to (0, 0)
+        let test_point = Point::integer(1, 0, 1e-9);
+        let reflected = reflection.apply_to_point(&test_point);
+        let double_reflected = reflection.apply_to_point(&reflected);
+        assert!(
+            (double_reflected.x() - test_point.x())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (double_reflected.y() - test_point.y())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn test_reflection_from_line_crossing_quadrants() {
+        let point1 = Point::integer(-5, 3, 1e-9);
+        let point2 = Point::integer(5, -3, 1e-9);
+        let reflection = Reflection::from_line(&point1, &point2);
+
+        let expected_angle = (-6.0_f64).atan2(10.0);
+        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+
+        assert_eq!(reflection.centre, Point::integer(0, 0, 1e-9));
+
+        // Reflecting (3, 3) across the line from (-5, 3) to (5, -3)
+        let test_point = Point::integer(3, 3, 1e-9);
+        let reflected = reflection.apply_to_point(&test_point);
+        let double_reflected = reflection.apply_to_point(&reflected);
+        assert!(
+            (double_reflected.x() - test_point.x())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (double_reflected.y() - test_point.y())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
     }
 }
