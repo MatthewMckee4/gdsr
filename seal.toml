@@ -1,0 +1,25 @@
+[release]
+current-version = "0.0.1-alpha.0"
+
+version-files = [
+    "crates/gdsr/Cargo.toml",
+]
+
+commit-message = "Release v{version}"
+branch-name = "release/v{version}"
+push = true
+confirm = true
+
+[changelog.section-labels]
+"Bug Fixes" = ["bug"]
+"Enhancements" = ["enhancement"]
+"Refactoring" = ["refactor"]
+"Documentation" = ["documentation"]
+"Testing" = ["testing"]
+"Dependencies" = ["dependencies"]
+
+[changelog]
+ignore-contributors = ["dependabot[bot]"]
+ignore-labels = ["Internal", "ci", "release", "wontfix", "good first issue", "help wanted"]
+include-contributors = true
+changelog-heading = "{version}"

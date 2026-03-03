@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., 0.0.1-alpha.0)"
+        required: true
+        default: dry-run
+        type: string
+
+env:
+  PYTHON_VERSION: "3.14"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-release:
+    name: Generate release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      release-metadata: ${{ steps.seal-generate.outputs.metadata }}
+      tag: ${{ github.event.inputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install seal
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/MatthewMckee4/seal/releases/download/0.0.1-alpha.5/seal-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Generate release metadata
+        id: seal-generate
+        run: |
+          METADATA=$(seal generate release)
+          {
+            echo "metadata<<EOF"
+            echo "$METADATA"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release metadata:"
+          echo "$METADATA"
+
+  create-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: generate-release
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Parse release metadata
+        id: parse-metadata
+        env:
+          METADATA: ${{ needs.generate-release.outputs.release-metadata }}
+        run: |
+          TITLE=$(echo "$METADATA" | jq -r '.title')
+          BODY=$(echo "$METADATA" | jq -r '.body')
+          PRERELEASE=$(echo "$METADATA" | jq -r '.prerelease')
+
+          {
+            echo "title=$TITLE"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+          # Save body to file to handle multiline content
+          echo "$BODY" > "$RUNNER_TEMP/release-notes.txt"
+
+      - name: Create GitHub release
+        env:
+          TAG: ${{ needs.generate-release.outputs.tag }}
+          TITLE: ${{ steps.parse-metadata.outputs.title }}
+          PRERELEASE: ${{ steps.parse-metadata.outputs.prerelease }}
+        run: |
+          ARGS=(
+            "$TAG"
+            --title "$TITLE"
+            --notes-file "$RUNNER_TEMP/release-notes.txt"
+          )
+
+          if [ "$PRERELEASE" = "true" ]; then
+            ARGS+=(--prerelease)
+          fi
+
+          gh release create "${ARGS[@]}"
+
+  publish-crate:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: [generate-release, create-release]
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish -p gdsr
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-docs:
+    name: Publish documentation
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: false
+
+      - name: Prepare docs
+        run: uv run --script scripts/prepare_docs.py
+
+      - name: Build docs
+        run: uv run --isolated --only-group docs zensical build
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          publish_branch: gh-pages
+          keep_files: false
+          force_orphan: true

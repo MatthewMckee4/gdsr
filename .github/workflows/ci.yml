@@ -11,8 +11,7 @@ on:
 
 permissions: {}
 
-env:
-  PYTHON_VERSION: "3.10"
+env: {}
 
 jobs:
   determine_changes:
@@ -46,11 +45,15 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             . \
             ':!docs/' \
+            ':!.markdownlint.yaml' \
+            ':!.pre-commit-config.yaml' \
+            ':!CHANGELOG.md' \
             ':!CODE_OF_CONDUCT.md' \
             ':!CONTRIBUTING.md' \
+            ':!justfile' \
             ':!LICENSE' \
-            ':!pyproject.toml' \
             ':!README.md' \
+            ':!seal.toml' \
             ':!zensical.toml' \
           ; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -68,29 +71,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@3542bca2639a428e1796aaa6a2ffef0c0f575566 # v3.1.4
-
-      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-
-  build-docs:
-    name: "Build docs"
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-        with:
-          persist-credentials: false
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Prepare docs
-        run: uv run --script scripts/prepare_docs.py
-
-      - name: Build docs
-        run: uv run --isolated --with-requirements docs/requirements.txt zensical build
+      - uses: j178/prek-action@91fd7d7cf70ae1dee9f4f44e7dfa5d1073fe6623 # v1.0.11
 
   cargo-test:
     name: "cargo test (${{ matrix.os }})"
@@ -98,11 +79,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     needs: determine_changes
-
     if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
 
     strategy:
-      max-parallel: 18
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -122,10 +101,47 @@ jobs:
         with:
           tool: cargo-nextest
 
-      - name: "Cargo test"
-        run: |
-          cargo nextest run --no-fail-fast
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: "3.10"
 
+      - name: Setup Python
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
+        id: setup-python
+        with:
+          python-version: "3.10"
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        with:
+          command: build
+
+      - name: Run tests
+        env:
+          PYO3_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          KARVA_MAX_PARALLELISM: 2
+        run: |
+          cargo nextest run
+
+  build-docs:
+    name: "Build docs"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Prepare docs
+        run: uv run --script scripts/prepare_docs.py
+
+      - name: Build docs
+        run: uv run --isolated --only-group docs zensical build
   coverage:
     name: "coverage"
 
