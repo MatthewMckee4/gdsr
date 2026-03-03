@@ -240,4 +240,158 @@ mod tests {
         let cloned = transformation.clone();
         assert_eq!(cloned.translation, transformation.translation);
     }
+
+    fn assert_point_approx_eq(actual: &Point, expected: &Point) {
+        assert!(
+            (actual.x() - expected.x()).absolute_value().abs() < 1e-6,
+            "x mismatch: actual={actual:?}, expected={expected:?}"
+        );
+        assert!(
+            (actual.y() - expected.y()).absolute_value().abs() < 1e-6,
+            "y mismatch: actual={actual:?}, expected={expected:?}"
+        );
+    }
+
+    #[test]
+    fn test_rotation_and_scale_combined() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let scale = Scale::new(2.0, origin);
+
+        let mut transformation = Transformation::default();
+        transformation.with_rotation(Some(rotation));
+        transformation.with_scale(Some(scale));
+
+        let point = Point::integer(3, 0, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let rotated = Rotation::new(std::f64::consts::FRAC_PI_2, origin).apply_to_point(&point);
+        let expected = Scale::new(2.0, origin).apply_to_point(&rotated);
+        assert_point_approx_eq(&result, &expected);
+        assert_point_approx_eq(&result, &Point::integer(0, 6, 1e-9));
+    }
+
+    #[test]
+    fn test_rotation_and_translation_combined() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let translation = Translation::new(Point::integer(10, 5, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_rotation(Some(rotation));
+        transformation.with_translation(Some(translation));
+
+        let point = Point::integer(4, 0, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let rotated = Rotation::new(std::f64::consts::FRAC_PI_2, origin).apply_to_point(&point);
+        let expected = Translation::new(Point::integer(10, 5, 1e-9)).apply_to_point(&rotated);
+        assert_point_approx_eq(&result, &expected);
+        assert_point_approx_eq(&result, &Point::integer(10, 9, 1e-9));
+    }
+
+    #[test]
+    fn test_scale_and_translation_combined() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let scale = Scale::new(3.0, origin);
+        let translation = Translation::new(Point::integer(1, 2, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+        transformation.with_translation(Some(translation));
+
+        let point = Point::integer(2, 5, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let scaled = Scale::new(3.0, origin).apply_to_point(&point);
+        let expected = Translation::new(Point::integer(1, 2, 1e-9)).apply_to_point(&scaled);
+        assert_point_approx_eq(&result, &expected);
+        assert_point_approx_eq(&result, &Point::integer(7, 17, 1e-9));
+    }
+
+    #[test]
+    fn test_reflection_and_rotation_combined() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let reflection = Reflection::new(0.0, origin);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+
+        let mut transformation = Transformation::default();
+        transformation.with_reflection(Some(reflection.clone()));
+        transformation.with_rotation(Some(rotation.clone()));
+
+        let point = Point::integer(3, 4, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let reflected = reflection.apply_to_point(&point);
+        let expected = rotation.apply_to_point(&reflected);
+        assert_point_approx_eq(&result, &expected);
+        assert_point_approx_eq(&reflected, &Point::integer(3, -4, 1e-9));
+        assert_point_approx_eq(&result, &Point::integer(4, 3, 1e-9));
+    }
+
+    #[test]
+    fn test_all_four_transformations_combined() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let reflection = Reflection::new(0.0, origin);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let scale = Scale::new(2.0, origin);
+        let translation = Translation::new(Point::integer(10, 10, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_reflection(Some(reflection.clone()));
+        transformation.with_rotation(Some(rotation.clone()));
+        transformation.with_scale(Some(scale.clone()));
+        transformation.with_translation(Some(translation.clone()));
+
+        let point = Point::integer(3, 4, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let step1 = reflection.apply_to_point(&point);
+        let step2 = rotation.apply_to_point(&step1);
+        let step3 = scale.apply_to_point(&step2);
+        let expected = translation.apply_to_point(&step3);
+        assert_point_approx_eq(&result, &expected);
+
+        assert_point_approx_eq(&step1, &Point::integer(3, -4, 1e-9));
+        assert_point_approx_eq(&step2, &Point::integer(4, 3, 1e-9));
+        assert_point_approx_eq(&step3, &Point::integer(8, 6, 1e-9));
+        assert_point_approx_eq(&result, &Point::integer(18, 16, 1e-9));
+    }
+
+    #[test]
+    fn test_order_of_operations_reflection_before_rotation() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let reflection = Reflection::new(0.0, origin);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let scale = Scale::new(2.0, origin);
+        let translation = Translation::new(Point::integer(5, 5, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_reflection(Some(reflection.clone()));
+        transformation.with_rotation(Some(rotation.clone()));
+        transformation.with_scale(Some(scale.clone()));
+        transformation.with_translation(Some(translation.clone()));
+
+        let point = Point::integer(1, 3, 1e-9);
+
+        let step1 = reflection.apply_to_point(&point);
+        let step2 = rotation.apply_to_point(&step1);
+        let step3 = scale.apply_to_point(&step2);
+        let step4 = translation.apply_to_point(&step3);
+
+        let result = transformation.apply_to_point(&point);
+        assert_point_approx_eq(&result, &step4);
+
+        let wrong_step1 = rotation.apply_to_point(&point);
+        let wrong_step2 = reflection.apply_to_point(&wrong_step1);
+        let wrong_step3 = scale.apply_to_point(&wrong_step2);
+        let wrong_result = translation.apply_to_point(&wrong_step3);
+
+        let results_differ = (result.x() - wrong_result.x()).absolute_value().abs() > 1e-12
+            || (result.y() - wrong_result.y()).absolute_value().abs() > 1e-12;
+        assert!(
+            results_differ,
+            "Swapping reflection and rotation order should produce different results"
+        );
+    }
 }
