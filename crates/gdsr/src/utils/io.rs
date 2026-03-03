@@ -632,7 +632,10 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{BufReader, Cursor};
+
     use super::*;
+    use crate::utils::gds_format::eight_byte_real;
 
     /// Verifies that `write_points_to_file` uses the truncated point count
     /// (capped at `MAX_POINTS`) for the record header size, not the original
@@ -654,5 +657,551 @@ mod tests {
 
         let expected_total_bytes = 4 + MAX_POINTS * 8;
         assert_eq!(buf.len(), expected_total_bytes);
+    }
+
+    #[test]
+    fn test_read_i16_be_standard_values() {
+        let buf = [0x00, 0x01, 0x00, 0x0A, 0xFF, 0xFF];
+        let result = read_i16_be(&buf);
+        assert_eq!(result, vec![1, 10, -1]);
+    }
+
+    #[test]
+    fn test_read_i16_be_min_max() {
+        let buf = [0x7F, 0xFF, 0x80, 0x00];
+        let result = read_i16_be(&buf);
+        assert_eq!(result, vec![i16::MAX, i16::MIN]);
+    }
+
+    #[test]
+    fn test_read_i16_be_endianness() {
+        let buf = [0x01, 0x00];
+        let result = read_i16_be(&buf);
+        assert_eq!(result, vec![256]);
+    }
+
+    #[test]
+    fn test_read_i16_be_empty() {
+        let result = read_i16_be(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_read_i16_be_odd_length_ignores_trailing() {
+        let buf = [0x00, 0x05, 0xFF];
+        let result = read_i16_be(&buf);
+        assert_eq!(result, vec![5]);
+    }
+
+    #[test]
+    fn test_read_i32_be_standard_values() {
+        let buf = [0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x64];
+        let result = read_i32_be(&buf);
+        assert_eq!(result, vec![1, 100]);
+    }
+
+    #[test]
+    fn test_read_i32_be_min_max() {
+        let buf = [0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00];
+        let result = read_i32_be(&buf);
+        assert_eq!(result, vec![i32::MAX, i32::MIN]);
+    }
+
+    #[test]
+    fn test_read_i32_be_negative() {
+        let buf = [0xFF, 0xFF, 0xFF, 0xFF];
+        let result = read_i32_be(&buf);
+        assert_eq!(result, vec![-1]);
+    }
+
+    #[test]
+    fn test_read_i32_be_endianness() {
+        let buf = [0x01, 0x00, 0x00, 0x00];
+        let result = read_i32_be(&buf);
+        assert_eq!(result, vec![0x0100_0000]);
+    }
+
+    #[test]
+    fn test_read_i32_be_empty() {
+        let result = read_i32_be(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_read_i32_be_trailing_bytes_ignored() {
+        let buf = [0x00, 0x00, 0x00, 0x07, 0xFF, 0xFF];
+        let result = read_i32_be(&buf);
+        assert_eq!(result, vec![7]);
+    }
+
+    #[test]
+    fn test_read_u64_be_standard_values() {
+        let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
+        let result = read_u64_be(&buf);
+        assert_eq!(result, vec![1u64]);
+    }
+
+    #[test]
+    fn test_read_u64_be_max() {
+        let buf = [0xFF; 8];
+        let result = read_u64_be(&buf);
+        assert_eq!(result, vec![u64::MAX]);
+    }
+
+    #[test]
+    fn test_read_u64_be_multiple() {
+        let mut buf = [0u8; 16];
+        buf[7] = 1;
+        buf[15] = 2;
+        let result = read_u64_be(&buf);
+        assert_eq!(result, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_read_u64_be_empty() {
+        let result = read_u64_be(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_eight_byte_real_to_float_zero() {
+        assert_eq!(eight_byte_real_to_float(0), 0.0);
+    }
+
+    #[test]
+    fn test_eight_byte_real_to_float_positive() {
+        let bytes = u64::from_be_bytes(eight_byte_real(1.0));
+        let result = eight_byte_real_to_float(bytes);
+        assert!((result - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_eight_byte_real_to_float_negative() {
+        let bytes = u64::from_be_bytes(eight_byte_real(-42.5));
+        let result = eight_byte_real_to_float(bytes);
+        assert!((result - (-42.5)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_eight_byte_real_to_float_small_value() {
+        let bytes = u64::from_be_bytes(eight_byte_real(1e-9));
+        let result = eight_byte_real_to_float(bytes);
+        assert!((result - 1e-9).abs() < 1e-20);
+    }
+
+    #[test]
+    fn test_float_to_eight_byte_real_roundtrip() {
+        let values = [0.0, 1.0, -1.0, 123.456, -0.001, 1e-9, 1e9, 16.0];
+        for &val in &values {
+            let encoded = eight_byte_real(val);
+            let decoded = eight_byte_real_to_float(u64::from_be_bytes(encoded));
+            if val == 0.0 {
+                assert_eq!(decoded, 0.0);
+            } else {
+                let rel_err = ((decoded - val) / val).abs();
+                assert!(rel_err < 1e-10, "roundtrip failed for {val}: got {decoded}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_write_points_to_file_empty() {
+        let mut buf = Vec::new();
+        let points: Vec<Point> = vec![];
+        write_points_to_file(&mut buf, &points, 1e-9).unwrap();
+
+        assert_eq!(
+            buf.len(),
+            4,
+            "header only (4 bytes for the u16 array of size 2)"
+        );
+    }
+
+    #[test]
+    fn test_write_points_to_file_single_point() {
+        let mut buf = Vec::new();
+        let points = vec![Point::integer(100, 200, 1e-9)];
+        write_points_to_file(&mut buf, &points, 1e-9).unwrap();
+
+        let header_size = 4;
+        let point_size = 8;
+        assert_eq!(buf.len(), header_size + point_size);
+
+        let x = i32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        let y = i32::from_be_bytes([buf[8], buf[9], buf[10], buf[11]]);
+        assert_eq!(x, 100);
+        assert_eq!(y, 200);
+    }
+
+    #[test]
+    fn test_write_points_to_file_exactly_max_points() {
+        let mut buf = Vec::new();
+        let points: Vec<Point> = (0..MAX_POINTS as i32)
+            .map(|i| Point::integer(i, i, 1e-9))
+            .collect();
+        write_points_to_file(&mut buf, &points, 1e-9).unwrap();
+
+        let header_size = 4;
+        let expected_data = MAX_POINTS * 8;
+        assert_eq!(buf.len(), header_size + expected_data);
+    }
+
+    #[test]
+    fn test_write_points_to_file_over_max_points_truncates() {
+        let mut buf = Vec::new();
+        let count = MAX_POINTS + 100;
+        let points: Vec<Point> = (0..count as i32)
+            .map(|i| Point::integer(i, i, 1e-9))
+            .collect();
+        write_points_to_file(&mut buf, &points, 1e-9).unwrap();
+
+        let header_size = 4;
+        let expected_data = MAX_POINTS * 8;
+        assert_eq!(buf.len(), header_size + expected_data);
+    }
+
+    #[test]
+    fn test_write_string_with_record_to_file_even_length() {
+        let mut buf = Vec::new();
+        write_string_with_record_to_file(&mut buf, GDSRecord::LibName, "ABCD").unwrap();
+
+        let header_size = 4;
+        assert_eq!(buf.len(), header_size + 4);
+        assert_eq!(&buf[header_size..], b"ABCD");
+    }
+
+    #[test]
+    fn test_write_string_with_record_to_file_odd_length_padded() {
+        let mut buf = Vec::new();
+        write_string_with_record_to_file(&mut buf, GDSRecord::LibName, "ABC").unwrap();
+
+        let header_size = 4;
+        assert_eq!(buf.len(), header_size + 4);
+        assert_eq!(&buf[header_size..header_size + 3], b"ABC");
+        assert_eq!(buf[header_size + 3], 0x00);
+    }
+
+    #[test]
+    fn test_write_string_with_record_to_file_empty() {
+        let mut buf = Vec::new();
+        write_string_with_record_to_file(&mut buf, GDSRecord::LibName, "").unwrap();
+
+        let header_size = 4;
+        assert_eq!(buf.len(), header_size);
+    }
+
+    #[test]
+    fn test_record_reader_empty_input() {
+        let cursor = Cursor::new(Vec::<u8>::new());
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn test_record_reader_valid_no_data_record() {
+        let record_type = GDSRecord::EndEl as u8;
+        let data_type = GDSDataType::NoData as u8;
+        let size: u16 = 4;
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::EndEl));
+        assert!(matches!(rec_data, GDSRecordData::None));
+    }
+
+    #[test]
+    fn test_record_reader_i16_data() {
+        let record_type = GDSRecord::Layer as u8;
+        let data_type = GDSDataType::TwoByteSignedInteger as u8;
+        let size: u16 = 6;
+        let value: i16 = 5;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(&value.to_be_bytes());
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::Layer));
+        if let GDSRecordData::I16(vals) = rec_data {
+            assert_eq!(vals, &[5]);
+        } else {
+            panic!("expected I16 data");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_i32_data() {
+        let record_type = GDSRecord::Width as u8;
+        let data_type = GDSDataType::FourByteSignedInteger as u8;
+        let value: i32 = 1000;
+        let size: u16 = 8;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(&value.to_be_bytes());
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::Width));
+        if let GDSRecordData::I32(vals) = rec_data {
+            assert_eq!(vals, &[1000]);
+        } else {
+            panic!("expected I32 data");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_f64_data() {
+        let record_type = GDSRecord::Mag as u8;
+        let data_type = GDSDataType::EightByteReal as u8;
+        let encoded = eight_byte_real(2.5);
+        let size: u16 = 12;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(&encoded);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::Mag));
+        if let GDSRecordData::F64(vals) = rec_data {
+            assert!((vals[0] - 2.5).abs() < 1e-10);
+        } else {
+            panic!("expected F64 data");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_string_data() {
+        let record_type = GDSRecord::LibName as u8;
+        let data_type = GDSDataType::AsciiString as u8;
+        let string_bytes = b"TEST\0";
+        let size: u16 = 4 + string_bytes.len() as u16;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(string_bytes);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::LibName));
+        if let GDSRecordData::Str(s) = rec_data {
+            assert_eq!(s, "TEST");
+        } else {
+            panic!("expected Str data");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_string_without_null_terminator() {
+        let record_type = GDSRecord::LibName as u8;
+        let data_type = GDSDataType::AsciiString as u8;
+        let string_bytes = b"NOTERM";
+        let size: u16 = 4 + string_bytes.len() as u16;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(string_bytes);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        if let GDSRecordData::Str(s) = &records[0].as_ref().unwrap().1 {
+            assert_eq!(s, "NOTERM");
+        } else {
+            panic!("expected Str data");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_truncated_header() {
+        let data = vec![0x00, 0x06, 0x0D];
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert!(records.is_empty() || records[0].is_err());
+    }
+
+    #[test]
+    fn test_record_reader_truncated_body() {
+        let record_type = GDSRecord::Layer as u8;
+        let data_type = GDSDataType::TwoByteSignedInteger as u8;
+        let size: u16 = 6;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        // Missing the 2-byte body
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        assert!(records[0].is_err());
+    }
+
+    #[test]
+    fn test_record_reader_invalid_record_type() {
+        let size: u16 = 4;
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(0xFF);
+        data.push(0x00);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        assert!(records[0].is_err());
+    }
+
+    #[test]
+    fn test_record_reader_multiple_records() {
+        let mut data = Vec::new();
+
+        // First record: EndEl (no data)
+        data.extend_from_slice(&4u16.to_be_bytes());
+        data.push(GDSRecord::EndEl as u8);
+        data.push(GDSDataType::NoData as u8);
+
+        // Second record: EndEl (no data)
+        data.extend_from_slice(&4u16.to_be_bytes());
+        data.push(GDSRecord::EndEl as u8);
+        data.push(GDSDataType::NoData as u8);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 2);
+        assert!(records[0].is_ok());
+        assert!(records[1].is_ok());
+    }
+
+    #[test]
+    fn test_record_reader_bit_array_data() {
+        let record_type = GDSRecord::STrans as u8;
+        let data_type = GDSDataType::BitArray as u8;
+        let size: u16 = 6;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(data_type);
+        data.extend_from_slice(&0x8000u16.to_be_bytes());
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        let (rec, rec_data) = records[0].as_ref().unwrap();
+        assert!(matches!(rec, GDSRecord::STrans));
+        if let GDSRecordData::I16(vals) = rec_data {
+            assert_eq!(vals[0] as u16, 0x8000);
+        } else {
+            panic!("expected I16 data for BitArray");
+        }
+    }
+
+    #[test]
+    fn test_record_reader_unknown_data_type_returns_error() {
+        let record_type = GDSRecord::EndEl as u8;
+        let unknown_data_type = 0xFFu8;
+        let size: u16 = 6;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&size.to_be_bytes());
+        data.push(record_type);
+        data.push(unknown_data_type);
+        data.extend_from_slice(&[0x00, 0x00]);
+
+        let cursor = Cursor::new(data);
+        let reader = RecordReader::new(BufReader::new(cursor));
+        let records: Vec<_> = reader.collect();
+
+        assert_eq!(records.len(), 1);
+        assert!(records[0].is_err());
+    }
+
+    #[test]
+    fn test_get_points_from_i32_vec() {
+        let vec = vec![10, 20, 30, 40];
+        let points = get_points_from_i32_vec(&vec, 1e-9);
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0], Point::integer(10, 20, 1e-9));
+        assert_eq!(points[1], Point::integer(30, 40, 1e-9));
+    }
+
+    #[test]
+    fn test_get_points_from_i32_vec_empty() {
+        let points = get_points_from_i32_vec(&[], 1e-9);
+        assert!(points.is_empty());
+    }
+
+    #[test]
+    fn test_write_u16_array_to_file() {
+        let mut buf = Vec::new();
+        write_u16_array_to_file(&mut buf, &[0x0102, 0x0304]).unwrap();
+        assert_eq!(buf, [0x01, 0x02, 0x03, 0x04]);
+    }
+
+    #[test]
+    fn test_write_element_tail_to_file() {
+        let mut buf = Vec::new();
+        write_element_tail_to_file(&mut buf).unwrap();
+        assert_eq!(buf.len(), 4);
+    }
+
+    #[test]
+    fn test_write_float_to_eight_byte_real_to_file() {
+        let mut buf = Vec::new();
+        write_float_to_eight_byte_real_to_file(&mut buf, 1.0).unwrap();
+        assert_eq!(buf.len(), 8);
+
+        let decoded = eight_byte_real_to_float(u64::from_be_bytes(buf.try_into().unwrap()));
+        assert!((decoded - 1.0).abs() < 1e-10);
     }
 }
