@@ -72,6 +72,26 @@ jobs:
 
       - uses: j178/prek-action@91fd7d7cf70ae1dee9f4f44e7dfa5d1073fe6623 # v1.0.11
 
+  build-docs:
+    name: "Build docs"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Prepare docs
+        run: uv run --script scripts/prepare_docs.py
+
+      - name: Build docs
+        run: uv run --isolated --with-requirements docs/requirements.txt zensical build
+
   cargo-test:
     name: "cargo test (${{ matrix.os }})"
 
@@ -103,25 +123,6 @@ jobs:
       - name: Run tests
         run: cargo nextest run
 
-  build-docs:
-    name: "Build docs"
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-        with:
-          persist-credentials: false
-
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Prepare docs
-        run: uv run --script scripts/prepare_docs.py
-
-      - name: Build docs
-        run: uv run --isolated --only-group docs zensical build
   coverage:
     name: "coverage"
 
