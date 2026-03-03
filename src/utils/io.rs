@@ -12,9 +12,9 @@ use crate::config::gds_file_types::{
 use crate::elements::text::utils::get_presentations_from_value;
 use crate::elements::{Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
+use crate::geometry::round_to_decimals;
 use crate::library::Library;
 use crate::utils::gds_format::{eight_byte_real, u16_array_to_big_endian};
-use crate::utils::geometry::round_to_decimals;
 use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, ToGds, Unit};
 
 pub fn write_gds_head_to_file(

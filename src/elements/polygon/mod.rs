@@ -43,17 +43,17 @@ impl Polygon {
 
     /// Computes the area of the polygon using the shoelace formula.
     pub fn area(&self) -> Unit {
-        crate::utils::geometry::area(&self.points)
+        crate::geometry::area(&self.points)
     }
 
     /// Computes the perimeter of the polygon.
     pub fn perimeter(&self) -> Unit {
-        crate::utils::geometry::perimeter(&self.points)
+        crate::geometry::perimeter(&self.points)
     }
 
     /// Check if a point is inside the polygon
     pub fn is_point_inside(&self, point: &Point) -> bool {
-        crate::utils::geometry::is_point_inside(point, &self.points)
+        crate::geometry::is_point_inside(point, &self.points)
     }
 
     /// Converts all points to integer units.
@@ -76,7 +76,7 @@ impl Polygon {
 
     /// Check if a point lies on the edge of the polygon
     pub fn is_point_on_edge(&self, point: &Point) -> bool {
-        crate::utils::geometry::is_point_on_edge(point, &self.points)
+        crate::geometry::is_point_on_edge(point, &self.points)
     }
 }
 
@@ -127,7 +127,7 @@ impl Movable for Polygon {
 
 impl Dimensions for Polygon {
     fn bounding_box(&self) -> (Point, Point) {
-        crate::utils::geometry::bounding_box(&self.points)
+        crate::geometry::bounding_box(&self.points)
     }
 }
 

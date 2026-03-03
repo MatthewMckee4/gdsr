@@ -196,7 +196,7 @@ impl Dimensions for Cell {
             }))
             .collect();
 
-        crate::utils::geometry::bounding_box(&all_points)
+        crate::geometry::bounding_box(&all_points)
     }
 }
 

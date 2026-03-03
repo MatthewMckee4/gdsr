@@ -14,7 +14,6 @@ license = "MIT"
 [dependencies]
 bytemuck = "1.24.0"
 chrono = "0.4.42"
-geo = "0.28"
 
 [dev-dependencies]
 approx = "0.5"

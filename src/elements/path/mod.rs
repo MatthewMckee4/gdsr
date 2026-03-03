@@ -117,7 +117,7 @@ impl Movable for Path {
 
 impl Dimensions for Path {
     fn bounding_box(&self) -> (Point, Point) {
-        crate::utils::geometry::bounding_box(&self.points)
+        crate::geometry::bounding_box(&self.points)
     }
 }
 

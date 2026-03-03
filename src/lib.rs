@@ -2,6 +2,7 @@ mod cell;
 mod config;
 mod elements;
 mod error;
+mod geometry;
 mod grid;
 mod library;
 mod point;
