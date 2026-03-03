@@ -1,5 +1,6 @@
 ---
 source: crates/gdsr/src/cell/mod.rs
+assertion_line: 259
 expression: rotated_elements
 ---
 [
@@ -23,15 +24,15 @@ expression: rotated_elements
         Text {
             value: "",
             origin: Point {
-                x: Float(
-                    FloatUnit {
-                        value: 5.0,
+                x: Integer(
+                    IntegerUnit {
+                        value: 5,
                         units: 1e-9,
                     },
                 ),
-                y: Float(
-                    FloatUnit {
-                        value: 5.0,
+                y: Integer(
+                    IntegerUnit {
+                        value: 5,
                         units: 1e-9,
                     },
                 ),

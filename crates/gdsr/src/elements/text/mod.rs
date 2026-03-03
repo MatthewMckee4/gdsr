@@ -160,23 +160,18 @@ impl std::fmt::Display for Text {
 
 impl Transformable for Text {
     fn transform_impl(mut self, transformation: &crate::Transformation) -> Self {
-        if let Some(translation) = &transformation.translation {
-            self.origin = translation.apply_to_point(self.origin());
-        }
+        self.origin = transformation.apply_to_point(&self.origin);
 
         if let Some(scale) = &transformation.scale {
             self.magnification *= scale.factor();
         }
 
         if let Some(rotation) = &transformation.rotation {
-            if *rotation.centre() == Point::default() {
-                self.angle += rotation.angle();
-            } else {
-                self.origin = self
-                    .origin
-                    .rotate_around_point(rotation.angle(), rotation.centre());
-                self.angle += rotation.angle();
-            }
+            self.angle += rotation.angle();
+        }
+
+        if transformation.reflection.is_some() {
+            self.x_reflection = !self.x_reflection;
         }
 
         self
@@ -365,6 +360,80 @@ mod tests {
             magnification: 1.0,
             angle: 1.5707963267948966,
             x_reflection: false,
+            vertical_presentation: Middle,
+            horizontal_presentation: Centre,
+        }
+        "#);
+    }
+
+    #[test]
+    fn test_text_reflect() {
+        let text = Text::default()
+            .set_origin(Point::integer(10, 20, 1e-9))
+            .set_x_reflection(false);
+
+        let reflected = text.reflect(0.0, Point::origin());
+
+        assert!(reflected.x_reflection());
+        assert_eq!(reflected.origin(), &Point::integer(10, -20, 1e-9));
+
+        let reflected_again = reflected.reflect(0.0, Point::origin());
+
+        assert!(!reflected_again.x_reflection());
+        assert_eq!(reflected_again.origin(), &Point::integer(10, 20, 1e-9));
+    }
+
+    #[test]
+    fn test_text_scale() {
+        let text = Text::default()
+            .set_origin(Point::integer(10, 20, 1e-9))
+            .set_magnification(1.5);
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let scaled = text.scale(2.0, centre);
+
+        assert_eq!(scaled.magnification(), 3.0);
+        assert_eq!(scaled.origin(), &Point::integer(20, 40, 1e-9));
+    }
+
+    #[test]
+    fn test_text_reflect_scale_rotate() {
+        let text = Text::default()
+            .set_origin(Point::integer(10, 0, 1e-9))
+            .set_magnification(1.0)
+            .set_x_reflection(false);
+
+        let transformed = text
+            .reflect(0.0, Point::origin())
+            .scale(2.0, Point::origin())
+            .rotate(PI / 2.0, Point::origin());
+
+        assert!(transformed.x_reflection());
+        assert_eq!(transformed.magnification(), 2.0);
+        assert_eq!(transformed.angle(), PI / 2.0);
+
+        assert_debug_snapshot!(transformed, @r#"
+        Text {
+            value: "",
+            origin: Point {
+                x: Integer(
+                    IntegerUnit {
+                        value: 0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Integer(
+                    IntegerUnit {
+                        value: 20,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            layer: 0,
+            datatype: 0,
+            magnification: 2.0,
+            angle: 1.5707963267948966,
+            x_reflection: true,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
         }
