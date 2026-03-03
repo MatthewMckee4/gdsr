@@ -218,6 +218,6 @@ mod tests {
     #[test]
     fn test_library_debug() {
         let library: Library = Library::new("debug_lib");
-        insta::assert_snapshot!(format!("{library:?}"));
+        insta::assert_snapshot!(format!("{library:?}"), @r#"Library { name: "debug_lib", cells: {} }"#);
     }
 }

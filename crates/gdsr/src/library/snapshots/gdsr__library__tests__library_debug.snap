@@ -1,5 +1,0 @@
----
-source: crates/gdsr/src/library/mod.rs
-expression: "format!(\"{library:?}\")"
----
-Library { name: "debug_lib", cells: {} }

@@ -1,5 +1,0 @@
----
-source: crates/gdsr/src/transformation/scale.rs
-expression: scale.to_string()
----
-Scale by 2.5 about Point(10 (1.000e-9), 20 (1.000e-9))

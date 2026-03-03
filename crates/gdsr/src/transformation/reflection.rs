@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_reflection_display() {
         let reflection = Reflection::new(0.5, Point::integer(10, 20, 1e-9));
-        insta::assert_snapshot!(reflection.to_string());
+        insta::assert_snapshot!(reflection.to_string(), @"Reflection with angle 0.5 rad about Point(10 (1.000e-9), 20 (1.000e-9))");
     }
 
     #[test]

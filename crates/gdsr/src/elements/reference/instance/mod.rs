@@ -168,6 +168,6 @@ mod tests {
             0,
         );
         let instance = Instance::from(polygon);
-        insta::assert_snapshot!(instance.to_string());
+        insta::assert_snapshot!(instance.to_string(), @"Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0");
     }
 }

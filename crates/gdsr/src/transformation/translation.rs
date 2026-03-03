@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn test_translation_display() {
         let translation = Translation::new(Point::integer(5, -3, 1e-9));
-        insta::assert_snapshot!(translation.to_string());
+        insta::assert_snapshot!(translation.to_string(), @"Translation by Point(5 (1.000e-9), -3 (1.000e-9))");
     }
 
     #[test]

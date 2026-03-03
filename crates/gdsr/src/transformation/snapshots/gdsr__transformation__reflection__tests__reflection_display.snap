@@ -1,5 +1,0 @@
----
-source: crates/gdsr/src/transformation/reflection.rs
-expression: reflection.to_string()
----
-Reflection with angle 0.5 rad about Point(10 (1.000e-9), 20 (1.000e-9))

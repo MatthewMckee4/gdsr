@@ -1,5 +1,0 @@
----
-source: crates/gdsr/src/cell/mod.rs
-expression: cell.to_string()
----
-Cell 'test_cell' with 1 polygon(s), 0 path(s), 0 text(s)

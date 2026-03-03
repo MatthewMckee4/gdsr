@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_scale_display() {
         let scale = Scale::new(2.5, Point::integer(10, 20, 1e-9));
-        insta::assert_snapshot!(scale.to_string());
+        insta::assert_snapshot!(scale.to_string(), @"Scale by 2.5 about Point(10 (1.000e-9), 20 (1.000e-9))");
     }
 
     #[test]

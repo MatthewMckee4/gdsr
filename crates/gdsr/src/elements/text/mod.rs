@@ -241,7 +241,7 @@ mod tests {
             presentation::HorizontalPresentation::Left,
         );
 
-        insta::assert_snapshot!(text.to_string());
+        insta::assert_snapshot!(text.to_string(), @"Text 'Test Text' vertical: Bottom, horizontal: Left at Point(10 (1.000e-9), 20 (1.000e-9))");
     }
 
     #[test]
