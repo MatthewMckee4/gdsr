@@ -1,7 +1,6 @@
 # GDSR
 
 [![Crates.io](https://img.shields.io/crates/v/gdsr)](https://crates.io/crates/gdsr)
-[![Documentation](https://img.shields.io/docsrs/gdsr)](https://docs.rs/gdsr)
 [![codecov](https://codecov.io/github/MatthewMckee4/gdsr/graph/badge.svg?token=O2OQ6OOR9O)](https://codecov.io/github/MatthewMckee4/gdsr)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/MatthewMckee4/gdsr/blob/main/LICENSE)
 
