@@ -1,5 +1,6 @@
 use crate::{AngleInRadians, Point};
 
+/// A rotation transformation defined by an angle (in radians) and a centre point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rotation {
     angle: AngleInRadians,
@@ -13,18 +14,22 @@ impl std::fmt::Display for Rotation {
 }
 
 impl Rotation {
+    /// Creates a new rotation with the given angle (in radians) and centre point.
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
+    /// Returns the rotation angle in radians.
     pub const fn angle(&self) -> AngleInRadians {
         self.angle
     }
 
+    /// Returns the centre point of the rotation.
     pub const fn centre(&self) -> &Point {
         &self.centre
     }
 
+    /// Rotates a point around this rotation's centre and returns the new point.
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let cos_angle = self.angle.cos();
         let sin_angle = self.angle.sin();

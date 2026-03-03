@@ -1,5 +1,6 @@
 use crate::Point;
 
+/// A scale transformation defined by a factor and a centre point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scale {
     factor: f64,
@@ -13,18 +14,22 @@ impl std::fmt::Display for Scale {
 }
 
 impl Scale {
+    /// Creates a new scale with the given factor and centre point.
     pub const fn new(factor: f64, centre: Point) -> Self {
         Self { factor, centre }
     }
 
+    /// Returns the scale factor.
     pub const fn factor(&self) -> f64 {
         self.factor
     }
 
+    /// Returns the centre point of the scale.
     pub const fn centre(&self) -> &Point {
         &self.centre
     }
 
+    /// Scales a point relative to this scale's centre and returns the new point.
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let self_center_x = self.centre.x();
         let self_center_y = self.centre.y();

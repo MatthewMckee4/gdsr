@@ -2,6 +2,7 @@ use std::f64::consts::PI;
 
 use crate::{AngleInRadians, Movable, Point, Transformable, Transformation};
 
+/// A grid layout that repeats elements in rows and columns with optional transformations.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Grid {
     origin: Point,
@@ -15,6 +16,7 @@ pub struct Grid {
 }
 
 impl Grid {
+    /// Creates a new grid with the given parameters.
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         origin: Point,
@@ -38,112 +40,136 @@ impl Grid {
         }
     }
 
+    /// Returns the origin point of the grid.
     pub const fn origin(&self) -> Point {
         self.origin
     }
 
+    /// Returns the number of columns.
     pub const fn columns(&self) -> u32 {
         self.columns
     }
 
+    /// Returns the number of rows.
     pub const fn rows(&self) -> u32 {
         self.rows
     }
 
+    /// Returns the column spacing vector, if set.
     pub const fn spacing_x(&self) -> Option<Point> {
         self.spacing_x
     }
 
+    /// Returns the row spacing vector, if set.
     pub const fn spacing_y(&self) -> Option<Point> {
         self.spacing_y
     }
 
+    /// Returns the magnification factor.
     pub const fn magnification(&self) -> f64 {
         self.magnification
     }
 
+    /// Returns the rotation angle in radians.
     pub const fn angle(&self) -> f64 {
         self.angle
     }
 
+    /// Returns whether x-axis reflection is enabled.
     pub const fn x_reflection(&self) -> bool {
         self.x_reflection
     }
 
+    /// Sets the origin point.
     pub const fn set_origin(&mut self, origin: Point) {
         self.origin = origin;
     }
 
+    /// Returns a new grid with the given origin.
     #[must_use]
     pub const fn with_origin(mut self, origin: Point) -> Self {
         self.origin = origin;
         self
     }
 
+    /// Sets the number of columns.
     pub const fn set_columns(&mut self, columns: u32) {
         self.columns = columns;
     }
 
+    /// Returns a new grid with the given number of columns.
     #[must_use]
     pub const fn with_columns(mut self, columns: u32) -> Self {
         self.columns = columns;
         self
     }
 
+    /// Sets the number of rows.
     pub const fn set_rows(&mut self, rows: u32) {
         self.rows = rows;
     }
 
+    /// Returns a new grid with the given number of rows.
     #[must_use]
     pub const fn with_rows(mut self, rows: u32) -> Self {
         self.rows = rows;
         self
     }
 
+    /// Sets the column spacing vector.
     pub const fn set_spacing_x(&mut self, spacing_x: Option<Point>) {
         self.spacing_x = spacing_x;
     }
 
+    /// Returns a new grid with the given column spacing vector.
     #[must_use]
     pub const fn with_spacing_x(mut self, spacing_x: Option<Point>) -> Self {
         self.spacing_x = spacing_x;
         self
     }
 
+    /// Sets the row spacing vector.
     pub const fn set_spacing_y(&mut self, spacing_y: Option<Point>) {
         self.spacing_y = spacing_y;
     }
 
+    /// Returns a new grid with the given row spacing vector.
     #[must_use]
     pub const fn with_spacing_y(mut self, spacing_y: Option<Point>) -> Self {
         self.spacing_y = spacing_y;
         self
     }
 
+    /// Sets the magnification factor.
     pub const fn set_magnification(&mut self, magnification: f64) {
         self.magnification = magnification;
     }
 
+    /// Returns a new grid with the given magnification factor.
     #[must_use]
     pub const fn with_magnification(mut self, magnification: f64) -> Self {
         self.magnification = magnification;
         self
     }
 
+    /// Sets the rotation angle in radians.
     pub const fn set_angle(&mut self, angle: AngleInRadians) {
         self.angle = angle;
     }
 
+    /// Returns a new grid with the given rotation angle.
     #[must_use]
     pub const fn with_angle(mut self, angle: AngleInRadians) -> Self {
         self.angle = angle;
         self
     }
 
+    /// Sets whether x-axis reflection is enabled.
     pub const fn set_x_reflection(&mut self, x_reflection: bool) {
         self.x_reflection = x_reflection;
     }
 
+    /// Returns a new grid with the given x-axis reflection setting.
     #[must_use]
     pub const fn with_x_reflection(mut self, x_reflection: bool) -> Self {
         self.x_reflection = x_reflection;

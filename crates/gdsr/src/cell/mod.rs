@@ -1,9 +1,11 @@
 use crate::{
-    Element, Library, Movable, Path, Polygon, Reference, Text, Transformable, Transformation,
+    Dimensions, Element, Library, Movable, Path, Point, Polygon, Reference, Text, Transformable,
+    Transformation,
 };
 
 mod io;
 
+/// A named cell containing polygons, paths, texts, and references to other cells or elements.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
     name: String,
@@ -14,6 +16,7 @@ pub struct Cell {
 }
 
 impl Cell {
+    /// Creates a new empty cell with the given name.
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -24,6 +27,7 @@ impl Cell {
         }
     }
 
+    /// Returns the cell name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -32,22 +36,27 @@ impl Cell {
         self.name = name.to_string();
     }
 
+    /// Returns the polygons in this cell.
     pub const fn polygons(&self) -> &Vec<Polygon> {
         &self.polygons
     }
 
+    /// Returns the paths in this cell.
     pub const fn paths(&self) -> &Vec<Path> {
         &self.paths
     }
 
+    /// Returns the texts in this cell.
     pub const fn texts(&self) -> &Vec<Text> {
         &self.texts
     }
 
+    /// Returns the references in this cell.
     pub const fn references(&self) -> &Vec<Reference> {
         &self.references
     }
 
+    /// Adds an element (polygon, path, text, or reference) to the cell.
     pub fn add(&mut self, element: impl Into<Element>) {
         match element.into() {
             Element::Path(path) => self.paths.push(path),
@@ -97,6 +106,7 @@ impl Cell {
         }
     }
 
+    /// Returns all elements in this cell, recursively flattening references up to the given depth.
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();
@@ -167,6 +177,29 @@ impl Transformable for Cell {
     }
 }
 
+impl Dimensions for Cell {
+    fn bounding_box(&self) -> (Point, Point) {
+        let all_points: Vec<Point> = self
+            .polygons
+            .iter()
+            .flat_map(|p| {
+                let (min, max) = p.bounding_box();
+                vec![min, max]
+            })
+            .chain(self.paths.iter().flat_map(|p| {
+                let (min, max) = p.bounding_box();
+                vec![min, max]
+            }))
+            .chain(self.texts.iter().flat_map(|t| {
+                let (min, max) = t.bounding_box();
+                vec![min, max]
+            }))
+            .collect();
+
+        crate::utils::geometry::bounding_box(&all_points)
+    }
+}
+
 impl Movable for Cell {
     fn move_to(mut self, target: crate::Point) -> Self {
         self.polygons = self
@@ -200,7 +233,6 @@ impl Movable for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Point;
 
     #[test]
     fn test_cell_new() {
@@ -347,5 +379,66 @@ mod tests {
         let rotated_elements = rotated_cell.get_elements(None, &library);
 
         insta::assert_debug_snapshot!(rotated_elements);
+    }
+
+    #[test]
+    fn test_cell_bounding_box() {
+        let mut cell = Cell::new("test");
+        cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        ));
+        cell.add(Path::new(
+            vec![Point::integer(-5, 5, 1e-9), Point::integer(15, 20, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        ));
+        cell.add(Text::default().set_origin(Point::integer(3, -2, 1e-9)));
+
+        let (min, max) = cell.bounding_box();
+        assert_eq!(min, Point::integer(-5, -2, 1e-9));
+        assert_eq!(max, Point::integer(15, 20, 1e-9));
+    }
+
+    #[test]
+    fn test_cell_bounding_box_empty() {
+        let cell = Cell::new("empty");
+        let (min, max) = cell.bounding_box();
+        assert_eq!(min, Point::default());
+        assert_eq!(max, Point::default());
+    }
+
+    #[test]
+    fn test_cell_bounding_box_polygons_only() {
+        let mut cell = Cell::new("test");
+        cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(5, 0, 1e-9),
+                Point::integer(5, 5, 1e-9),
+            ],
+            1,
+            0,
+        ));
+        cell.add(Polygon::new(
+            [
+                Point::integer(10, 10, 1e-9),
+                Point::integer(20, 10, 1e-9),
+                Point::integer(20, 20, 1e-9),
+            ],
+            1,
+            0,
+        ));
+
+        let (min, max) = cell.bounding_box();
+        assert_eq!(min, Point::integer(0, 0, 1e-9));
+        assert_eq!(max, Point::integer(20, 20, 1e-9));
     }
 }

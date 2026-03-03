@@ -10,6 +10,7 @@ pub use rotation::Rotation;
 pub use scale::Scale;
 pub use translation::Translation;
 
+/// A composite transformation that applies reflection, rotation, scale, and translation in order.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Transformation {
     pub reflection: Option<Reflection>,
@@ -19,26 +20,32 @@ pub struct Transformation {
 }
 
 impl Transformation {
+    /// Sets the reflection component and returns `&mut Self` for chaining.
     pub const fn with_reflection(&mut self, reflection: Option<Reflection>) -> &mut Self {
         self.reflection = reflection;
         self
     }
 
+    /// Sets the rotation component and returns `&mut Self` for chaining.
     pub const fn with_rotation(&mut self, rotation: Option<Rotation>) -> &mut Self {
         self.rotation = rotation;
         self
     }
 
+    /// Sets the scale component and returns `&mut Self` for chaining.
     pub const fn with_scale(&mut self, scale: Option<Scale>) -> &mut Self {
         self.scale = scale;
         self
     }
 
+    /// Sets the translation component and returns `&mut Self` for chaining.
     pub const fn with_translation(&mut self, translation: Option<Translation>) -> &mut Self {
         self.translation = translation;
         self
     }
 
+    /// Applies all transformation components to a point in order:
+    /// reflection, rotation, scale, then translation.
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let mut new_point = *point;
 

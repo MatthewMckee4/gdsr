@@ -2,17 +2,23 @@ use std::sync::Arc;
 
 use crate::elements::{Path, Polygon, Reference, Text};
 use crate::traits::ToGds;
-use crate::{Instance, Movable, Point, Transformable, Transformation};
+use crate::{Dimensions, Instance, Movable, Point, Transformable, Transformation};
 
+/// A GDSII element: one of [`Path`], [`Polygon`], [`Text`], or [`Reference`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
+    /// A path element.
     Path(Path),
+    /// A polygon element.
     Polygon(Polygon),
+    /// A text annotation element.
     Text(Text),
+    /// A reference to another cell or element.
     Reference(Reference),
 }
 
 impl Element {
+    /// Returns the inner [`Path`] if this is a `Path` variant, or `None`.
     pub fn as_path(&self) -> Option<&Path> {
         if let Self::Path(v) = self {
             Some(v)
@@ -21,6 +27,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Polygon`] if this is a `Polygon` variant, or `None`.
     pub fn as_polygon(&self) -> Option<&Polygon> {
         if let Self::Polygon(v) = self {
             Some(v)
@@ -29,6 +36,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Text`] if this is a `Text` variant, or `None`.
     pub fn as_text(&self) -> Option<&Text> {
         if let Self::Text(v) = self {
             Some(v)
@@ -37,6 +45,7 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Reference`] if this is a `Reference` variant, or `None`.
     pub fn as_reference(&self) -> Option<&Reference> {
         if let Self::Reference(v) = self {
             Some(v)
@@ -134,6 +143,17 @@ impl Movable for Element {
             Self::Polygon(polygon) => Self::Polygon(polygon.move_to(target)),
             Self::Reference(reference) => Self::Reference(reference.move_to(target)),
             Self::Text(text) => Self::Text(text.move_to(target)),
+        }
+    }
+}
+
+impl Dimensions for Element {
+    fn bounding_box(&self) -> (Point, Point) {
+        match self {
+            Self::Path(path) => path.bounding_box(),
+            Self::Polygon(polygon) => polygon.bounding_box(),
+            Self::Text(text) => text.bounding_box(),
+            Self::Reference(_) => (Point::default(), Point::default()),
         }
     }
 }
@@ -402,5 +422,64 @@ mod tests {
         let moved = element.move_by(delta);
 
         assert!(moved.as_path().is_some());
+    }
+
+    #[test]
+    fn test_element_bounding_box_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let element: Element = polygon.into();
+        let (min, max) = element.bounding_box();
+        assert_eq!(min, Point::integer(0, 0, 1e-9));
+        assert_eq!(max, Point::integer(10, 10, 1e-9));
+    }
+
+    #[test]
+    fn test_element_bounding_box_path() {
+        let path = Path::new(
+            vec![Point::integer(-5, 3, 1e-9), Point::integer(10, 7, 1e-9)],
+            1,
+            0,
+            None,
+            None,
+        );
+        let element: Element = path.into();
+        let (min, max) = element.bounding_box();
+        assert_eq!(min, Point::integer(-5, 3, 1e-9));
+        assert_eq!(max, Point::integer(10, 7, 1e-9));
+    }
+
+    #[test]
+    fn test_element_bounding_box_text() {
+        let text = Text::default().set_origin(Point::integer(5, 10, 1e-9));
+        let element: Element = text.into();
+        let (min, max) = element.bounding_box();
+        assert_eq!(min, Point::integer(5, 10, 1e-9));
+        assert_eq!(max, Point::integer(5, 10, 1e-9));
+    }
+
+    #[test]
+    fn test_element_bounding_box_reference() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let reference = Reference::new(polygon);
+        let element: Element = reference.into();
+        let (min, max) = element.bounding_box();
+        assert_eq!(min, Point::default());
+        assert_eq!(max, Point::default());
     }
 }

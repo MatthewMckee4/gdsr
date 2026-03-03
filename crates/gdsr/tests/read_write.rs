@@ -949,3 +949,178 @@ fn test_invalid_no_cell() {
 
     assert_eq!(expected_library, new_library);
 }
+
+#[test]
+fn test_empty_cell_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("empty_cell.gds");
+
+    let mut library = Library::new("empty_cell_lib");
+    let cell = Cell::new("empty");
+    library.add_cell(cell);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_max_coordinate_values_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("max_coords.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("max_coords_lib");
+    let mut cell = Cell::new("max_cell");
+
+    let polygon = Polygon::new(
+        [
+            Point::integer(i32::MAX, i32::MAX, units),
+            Point::integer(i32::MIN, i32::MAX, units),
+            Point::integer(i32::MIN, i32::MIN, units),
+            Point::integer(i32::MAX, i32::MIN, units),
+        ],
+        1,
+        0,
+    );
+    cell.add(polygon);
+
+    library.add_cell(cell);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_special_characters_in_cell_names_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("special_names.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("special_names_lib");
+
+    let names = [
+        "CELL_WITH_UNDERSCORES",
+        "Cell123",
+        "A_1_B_2",
+        "X",
+        "cell_00",
+    ];
+
+    for name in &names {
+        let mut cell = Cell::new(name);
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+                Point::integer(0, 10, units),
+            ],
+            1,
+            0,
+        );
+        cell.add(polygon);
+        library.add_cell(cell);
+    }
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_all_presentation_combinations_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("all_presentations.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("presentations_lib");
+    let mut cell = Cell::new("text_cell");
+
+    let vertical_presentations = [
+        VerticalPresentation::Top,
+        VerticalPresentation::Middle,
+        VerticalPresentation::Bottom,
+    ];
+    let horizontal_presentations = [
+        HorizontalPresentation::Left,
+        HorizontalPresentation::Centre,
+        HorizontalPresentation::Right,
+    ];
+
+    let mut y_offset = 0;
+    for vp in &vertical_presentations {
+        for hp in &horizontal_presentations {
+            let text = Text::new(
+                &format!("{vp}_{hp}"),
+                Point::integer(0, y_offset, units),
+                1,
+                0,
+                1.0,
+                0.0,
+                false,
+                *vp,
+                *hp,
+            );
+            cell.add(text);
+            y_offset += 100;
+        }
+    }
+
+    library.add_cell(cell);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, None).unwrap();
+
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_multiple_cells_referencing_same_cell() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("multi_ref.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("multi_ref_lib");
+
+    let mut shared_cell = Cell::new("shared");
+    shared_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(5, 0, units),
+            Point::integer(5, 5, units),
+            Point::integer(0, 5, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(shared_cell);
+
+    let mut cell_a = Cell::new("cell_a");
+    cell_a.add(
+        Reference::new("shared".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(0, 0, units))),
+    );
+    library.add_cell(cell_a);
+
+    let mut cell_b = Cell::new("cell_b");
+    cell_b.add(
+        Reference::new("shared".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(100, 100, units))),
+    );
+    library.add_cell(cell_b);
+
+    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+
+    assert_eq!(library, new_library);
+}

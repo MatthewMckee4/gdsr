@@ -1,5 +1,6 @@
 use crate::{AngleInRadians, Point};
 
+/// A reflection transformation defined by an axis angle and centre point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reflection {
     angle: AngleInRadians,
@@ -17,14 +18,17 @@ impl std::fmt::Display for Reflection {
 }
 
 impl Reflection {
+    /// Creates a new reflection with the given axis angle (in radians) and centre point.
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
+    /// Creates a horizontal reflection (angle = 0) about the x-axis.
     pub const fn new_horizontal() -> Self {
         Self::new(0.0, Point::integer(0, 1, 1e-9))
     }
 
+    /// Creates a reflection from a line defined by two points.
     pub fn from_line(point1: &Point, point2: &Point) -> Self {
         let dx = (point2.x() - point1.x()).absolute_value();
         let dy = (point2.y() - point1.y()).absolute_value();
@@ -36,6 +40,7 @@ impl Reflection {
         Self { angle, centre }
     }
 
+    /// Reflects a point across this reflection's axis and returns the new point.
     pub fn apply_to_point(&self, point: &Point) -> Point {
         let cos_2angle = (2.0 * self.angle).cos();
         let sin_2angle = (2.0 * self.angle).sin();

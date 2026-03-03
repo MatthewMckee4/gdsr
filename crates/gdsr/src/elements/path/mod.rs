@@ -1,10 +1,11 @@
-use crate::{DataType, Layer, Movable, Point, Transformable, Unit};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 
 mod io;
 mod path_type;
 
 pub use path_type::PathType;
 
+/// An open path defined by a sequence of points, with optional width and end cap type.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Path {
     pub(crate) points: Vec<Point>,
@@ -15,6 +16,7 @@ pub struct Path {
 }
 
 impl Path {
+    /// Creates a new path from the given points, layer, data type, optional end cap type, and optional width.
     pub fn new(
         points: impl IntoIterator<Item = Point>,
         layer: Layer,
@@ -31,22 +33,27 @@ impl Path {
         }
     }
 
+    /// Returns the path's points.
     pub fn points(&self) -> &[Point] {
         &self.points
     }
 
+    /// Returns the layer number.
     pub const fn layer(&self) -> Layer {
         self.layer
     }
 
+    /// Returns the data type.
     pub const fn data_type(&self) -> DataType {
         self.data_type
     }
 
+    /// Returns the end cap type, if set.
     pub const fn path_type(&self) -> &Option<PathType> {
         &self.r#type
     }
 
+    /// Returns the path width, if set.
     pub const fn width(&self) -> Option<Unit> {
         self.width
     }
@@ -105,6 +112,12 @@ impl Movable for Path {
         };
         let delta = target - *first_point;
         self.move_by(delta)
+    }
+}
+
+impl Dimensions for Path {
+    fn bounding_box(&self) -> (Point, Point) {
+        crate::utils::geometry::bounding_box(&self.points)
     }
 }
 
@@ -229,5 +242,35 @@ mod tests {
         let points = vec![Point::integer(0, 0, 1e-9), Point::float(100.0, 100.0, 1e-6)];
         let path = Path::new(points, 0, 0, None, None);
         assert_eq!(path.points().len(), 2);
+    }
+
+    #[test]
+    fn test_path_bounding_box() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 5, 1e-9),
+            Point::integer(20, -3, 1e-9),
+        ];
+        let path = Path::new(points, 1, 0, None, None);
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::integer(0, -3, 1e-9));
+        assert_eq!(max, Point::integer(20, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_path_bounding_box_empty() {
+        let path = Path::default();
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::default());
+        assert_eq!(max, Point::default());
+    }
+
+    #[test]
+    fn test_path_bounding_box_single_point() {
+        let points = vec![Point::integer(5, 10, 1e-9)];
+        let path = Path::new(points, 1, 0, None, None);
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::integer(5, 10, 1e-9));
+        assert_eq!(max, Point::integer(5, 10, 1e-9));
     }
 }

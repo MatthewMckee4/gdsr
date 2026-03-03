@@ -1,5 +1,6 @@
 use crate::Point;
 
+/// A translation transformation defined by a delta point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Translation {
     delta: Point,
@@ -12,10 +13,12 @@ impl std::fmt::Display for Translation {
 }
 
 impl Translation {
+    /// Creates a new translation with the given delta.
     pub const fn new(delta: Point) -> Self {
         Self { delta }
     }
 
+    /// Translates a point by this translation's delta and returns the new point.
     pub fn apply_to_point(&self, point: &Point) -> Point {
         point + self.delta
     }

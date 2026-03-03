@@ -4,6 +4,7 @@ use std::io;
 use crate::cell::Cell;
 use crate::utils::io::{from_gds, write_gds};
 
+/// A GDSII library containing named cells. This is the top-level container for a GDSII design.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Library {
     pub(crate) name: String,
@@ -11,6 +12,7 @@ pub struct Library {
 }
 
 impl Library {
+    /// Creates a new empty library with the given name.
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -18,32 +20,39 @@ impl Library {
         }
     }
 
+    /// Returns the library name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the map of cell names to cells.
     pub fn cells(&self) -> &HashMap<String, Cell> {
         &self.cells
     }
 
+    /// Sets the library name.
     pub fn set_name(&mut self, name: &str) {
         self.name = name.to_string();
     }
 
+    /// Adds a cell to the library. If a cell with the same name exists, it is replaced.
     pub fn add_cell(&mut self, cell: Cell) {
         self.cells.insert(cell.name().to_string(), cell);
     }
 
+    /// Removes the given cells from the library by name.
     pub fn remove_cell(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.remove(cell.name());
         }
     }
 
+    /// Returns a reference to the cell with the given name, if it exists.
     pub fn get_cell(&self, name: &str) -> Option<&Cell> {
         self.cells.get(name)
     }
 
+    /// Returns `true` if the library contains a cell with the same name.
     pub fn contains_cell(&self, cell: &Cell) -> bool {
         self.cells.contains_key(cell.name())
     }

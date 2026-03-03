@@ -3,6 +3,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use crate::units::Unit;
 use crate::{AngleInRadians, Movable, Transformable, Transformation};
 
+/// A 2D point with x and y coordinates, each carrying their own unit of measurement.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Point {
     x: Unit,
@@ -10,6 +11,7 @@ pub struct Point {
 }
 
 impl Point {
+    /// Creates a point with integer coordinates and the given units.
     pub const fn integer(x: i32, y: i32, units: f64) -> Self {
         Self {
             x: Unit::integer(x, units),
@@ -17,6 +19,7 @@ impl Point {
         }
     }
 
+    /// Creates a point with float coordinates and the given units.
     pub const fn float(x: f64, y: f64, units: f64) -> Self {
         Self {
             x: Unit::float(x, units),
@@ -24,6 +27,7 @@ impl Point {
         }
     }
 
+    /// Creates a point at the origin (0, 0) with default integer units.
     pub fn origin() -> Self {
         Self {
             x: Unit::zero(),
@@ -31,6 +35,7 @@ impl Point {
         }
     }
 
+    /// Creates a point with integer coordinates and default integer units (1e-9).
     pub const fn default_integer(x: i32, y: i32) -> Self {
         Self {
             x: Unit::default_integer(x),
@@ -38,6 +43,7 @@ impl Point {
         }
     }
 
+    /// Creates a point with float coordinates and default float units (1e-6).
     pub const fn default_float(x: f64, y: f64) -> Self {
         Self {
             x: Unit::default_float(x),
@@ -53,10 +59,12 @@ impl Point {
         Self { x, y }
     }
 
+    /// Returns the units for both coordinates as `(x_units, y_units)`.
     pub const fn units(&self) -> (f64, f64) {
         (self.x.units(), self.y.units())
     }
 
+    /// Returns a copy of this point with both coordinates set to the given units (without scaling).
     #[must_use]
     pub const fn set_units(&self, units: f64) -> Self {
         Self {
@@ -65,6 +73,7 @@ impl Point {
         }
     }
 
+    /// Returns a copy of this point with both coordinates scaled to the given units.
     #[must_use]
     pub fn scale_units(&self, new_units: f64) -> Self {
         Self {
