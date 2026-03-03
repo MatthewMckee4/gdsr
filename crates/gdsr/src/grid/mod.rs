@@ -149,6 +149,24 @@ impl Grid {
         self.x_reflection = x_reflection;
         self
     }
+
+    /// Converts origin and spacing points to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.origin = self.origin.to_integer_unit();
+        self.spacing_x = self.spacing_x.map(|p| p.to_integer_unit());
+        self.spacing_y = self.spacing_y.map(|p| p.to_integer_unit());
+        self
+    }
+
+    /// Converts origin and spacing points to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.origin = self.origin.to_float_unit();
+        self.spacing_x = self.spacing_x.map(|p| p.to_float_unit());
+        self.spacing_y = self.spacing_y.map(|p| p.to_float_unit());
+        self
+    }
 }
 
 impl Default for Grid {
@@ -706,6 +724,85 @@ mod tests {
         let transformed = grid.reflect(0.0, centre).reflect(0.0, centre);
 
         assert!(!transformed.x_reflection());
+    }
+
+    #[test]
+    fn test_grid_to_integer_unit() {
+        let grid = Grid::new(
+            Point::float(1.5, 2.5, 1e-6),
+            2,
+            3,
+            Some(Point::float(10.0, 0.0, 1e-6)),
+            Some(Point::float(0.0, 10.0, 1e-6)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let converted = grid.to_integer_unit();
+
+        assert_eq!(
+            converted.origin(),
+            Point::float(1.5, 2.5, 1e-6).to_integer_unit()
+        );
+        assert_eq!(
+            converted.spacing_x(),
+            Some(Point::float(10.0, 0.0, 1e-6).to_integer_unit())
+        );
+        assert_eq!(
+            converted.spacing_y(),
+            Some(Point::float(0.0, 10.0, 1e-6).to_integer_unit())
+        );
+        assert_eq!(converted.columns(), 2);
+        assert_eq!(converted.rows(), 3);
+    }
+
+    #[test]
+    fn test_grid_to_float_unit() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            3,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        let converted = grid.to_float_unit();
+
+        assert_eq!(
+            converted.origin(),
+            Point::integer(10, 20, 1e-9).to_float_unit()
+        );
+        assert_eq!(
+            converted.spacing_x(),
+            Some(Point::integer(5, 0, 1e-9).to_float_unit())
+        );
+        assert_eq!(
+            converted.spacing_y(),
+            Some(Point::integer(0, 5, 1e-9).to_float_unit())
+        );
+    }
+
+    #[test]
+    fn test_grid_to_integer_unit_none_spacing() {
+        let grid = Grid::new(
+            Point::float(1.0, 2.0, 1e-6),
+            2,
+            2,
+            None,
+            None,
+            1.0,
+            0.0,
+            false,
+        );
+
+        let converted = grid.to_integer_unit();
+
+        assert_eq!(converted.spacing_x(), None);
+        assert_eq!(converted.spacing_y(), None);
     }
 
     #[test]

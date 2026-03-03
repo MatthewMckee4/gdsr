@@ -50,6 +50,26 @@ impl Path {
     pub const fn width(&self) -> Option<Unit> {
         self.width
     }
+
+    /// Converts all points and width to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.points = self
+            .points
+            .into_iter()
+            .map(|p| p.to_integer_unit())
+            .collect();
+        self.width = self.width.map(Unit::to_integer_unit);
+        self
+    }
+
+    /// Converts all points and width to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.points = self.points.into_iter().map(|p| p.to_float_unit()).collect();
+        self.width = self.width.map(Unit::to_float_unit);
+        self
+    }
 }
 
 impl std::fmt::Display for Path {
@@ -157,6 +177,51 @@ mod tests {
             Some(Unit::default_integer(5)),
         );
         assert_ne!(path1, path3);
+    }
+
+    #[test]
+    fn test_path_to_integer_unit() {
+        let points = vec![Point::float(1.5, 2.5, 1e-6), Point::float(10.0, 10.0, 1e-6)];
+        let path = Path::new(
+            points,
+            1,
+            0,
+            Some(PathType::Round),
+            Some(Unit::default_float(5.0)),
+        );
+        let converted = path.to_integer_unit();
+
+        for point in converted.points() {
+            assert_eq!(*point, point.to_integer_unit());
+        }
+        assert_eq!(
+            converted.width(),
+            Some(Unit::default_float(5.0).to_integer_unit())
+        );
+    }
+
+    #[test]
+    fn test_path_to_float_unit() {
+        let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
+        let path = Path::new(points, 1, 0, None, Some(Unit::default_integer(10)));
+        let converted = path.to_float_unit();
+
+        for point in converted.points() {
+            assert_eq!(*point, point.to_float_unit());
+        }
+        assert_eq!(
+            converted.width(),
+            Some(Unit::default_integer(10).to_float_unit())
+        );
+    }
+
+    #[test]
+    fn test_path_to_integer_unit_no_width() {
+        let points = vec![Point::float(1.0, 2.0, 1e-6)];
+        let path = Path::new(points, 0, 0, None, None);
+        let converted = path.to_integer_unit();
+
+        assert_eq!(converted.width(), None);
     }
 
     #[test]

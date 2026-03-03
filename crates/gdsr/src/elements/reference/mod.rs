@@ -33,6 +33,20 @@ impl Reference {
         self
     }
 
+    /// Converts grid to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.grid = self.grid.to_integer_unit();
+        self
+    }
+
+    /// Converts grid to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.grid = self.grid.to_float_unit();
+        self
+    }
+
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {
         let grid = self.grid();
 
@@ -209,6 +223,62 @@ mod tests {
         let reference = Reference::new("test_cell").with_grid(grid);
 
         insta::assert_snapshot!(reference.to_string(), @"Reference to Cell instance: test_cell with grid Grid at Point(0 (1.000e-9), 0 (1.000e-9)) with 1 columns and 1 rows, spacing (None, None), magnification 1.0, angle 0.0, x_reflection false");
+    }
+
+    #[test]
+    fn test_reference_to_integer_unit() {
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_origin(Point::float(1.5, 2.5, 1e-6))
+            .with_spacing_x(Some(Point::float(10.0, 0.0, 1e-6)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
+        let converted = reference.to_integer_unit();
+
+        assert_eq!(
+            converted.grid().origin(),
+            Point::float(1.5, 2.5, 1e-6).to_integer_unit()
+        );
+        assert_eq!(
+            converted.grid().spacing_x(),
+            Some(Point::float(10.0, 0.0, 1e-6).to_integer_unit())
+        );
+    }
+
+    #[test]
+    fn test_reference_to_float_unit() {
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_origin(Point::integer(10, 20, 1e-9))
+            .with_spacing_x(Some(Point::integer(5, 0, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
+        let converted = reference.to_float_unit();
+
+        assert_eq!(
+            converted.grid().origin(),
+            Point::integer(10, 20, 1e-9).to_float_unit()
+        );
+        assert_eq!(
+            converted.grid().spacing_x(),
+            Some(Point::integer(5, 0, 1e-9).to_float_unit())
+        );
     }
 
     #[test]

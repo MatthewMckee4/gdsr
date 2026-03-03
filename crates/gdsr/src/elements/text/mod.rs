@@ -143,6 +143,20 @@ impl Text {
         self.horizontal_presentation = horizontal_presentation;
         self
     }
+
+    /// Converts origin to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.origin = self.origin.to_integer_unit();
+        self
+    }
+
+    /// Converts origin to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.origin = self.origin.to_float_unit();
+        self
+    }
 }
 
 impl std::fmt::Display for Text {
@@ -326,6 +340,28 @@ mod tests {
         assert_eq!(
             text.horizontal_presentation(),
             &presentation::HorizontalPresentation::Left
+        );
+    }
+
+    #[test]
+    fn test_text_to_integer_unit() {
+        let text = Text::default().set_origin(Point::float(1.5, 2.5, 1e-6));
+        let converted = text.to_integer_unit();
+
+        assert_eq!(
+            *converted.origin(),
+            Point::float(1.5, 2.5, 1e-6).to_integer_unit()
+        );
+    }
+
+    #[test]
+    fn test_text_to_float_unit() {
+        let text = Text::default().set_origin(Point::integer(100, 200, 1e-9));
+        let converted = text.to_float_unit();
+
+        assert_eq!(
+            *converted.origin(),
+            Point::integer(100, 200, 1e-9).to_float_unit()
         );
     }
 
