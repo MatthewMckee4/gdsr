@@ -12,14 +12,14 @@ confirm = true
 
 [changelog.section-labels]
 "Bug Fixes" = ["bug"]
-"Enhancements" = ["enhancement"]
-"Refactoring" = ["refactor"]
+"New Features" = ["enhancement"]
+"Performance" = ["performance"]
+"IO" = ["io"]
+"Geometry" = ["geometry"]
 "Documentation" = ["documentation"]
-"Testing" = ["testing"]
-"Dependencies" = ["dependencies"]
 
 [changelog]
 ignore-contributors = ["dependabot[bot]"]
-ignore-labels = ["Internal", "ci", "release", "wontfix", "good first issue", "help wanted"]
+ignore-labels = ["Internal", "ci", "release", "wontfix", "good first issue", "help wanted", "duplicate", "needs-decision", "breaking-change"]
 include-contributors = true
 changelog-heading = "{version}"
