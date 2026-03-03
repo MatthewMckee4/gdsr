@@ -1,4 +1,4 @@
-use crate::{DataType, Layer, Movable, Point, Transformable, Unit};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 
 mod io;
 mod path_type;
@@ -88,6 +88,12 @@ impl Movable for Path {
     }
 }
 
+impl Dimensions for Path {
+    fn bounding_box(&self) -> (Point, Point) {
+        crate::utils::geometry::bounding_box(&self.points)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +170,35 @@ mod tests {
         let points = vec![Point::integer(0, 0, 1e-9), Point::float(100.0, 100.0, 1e-6)];
         let path = Path::new(points, 0, 0, None, None);
         assert_eq!(path.points().len(), 2);
+    }
+
+    #[test]
+    fn test_path_bounding_box() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 5, 1e-9),
+            Point::integer(20, -3, 1e-9),
+        ];
+        let path = Path::new(points, 1, 0, None, None);
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::integer(0, -3, 1e-9));
+        assert_eq!(max, Point::integer(20, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_path_bounding_box_empty() {
+        let path = Path::default();
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::default());
+        assert_eq!(max, Point::default());
+    }
+
+    #[test]
+    fn test_path_bounding_box_single_point() {
+        let points = vec![Point::integer(5, 10, 1e-9)];
+        let path = Path::new(points, 1, 0, None, None);
+        let (min, max) = path.bounding_box();
+        assert_eq!(min, Point::integer(5, 10, 1e-9));
+        assert_eq!(max, Point::integer(5, 10, 1e-9));
     }
 }
