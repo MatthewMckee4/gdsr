@@ -6,6 +6,12 @@ pub struct Scale {
     centre: Point,
 }
 
+impl std::fmt::Display for Scale {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Scale by {} about {}", self.factor, self.centre)
+    }
+}
+
 impl Scale {
     pub const fn new(factor: f64, centre: Point) -> Self {
         Self { factor, centre }
@@ -79,6 +85,14 @@ mod tests {
         let expected = Point::integer(20, 10, 1e-9);
         assert_eq!(scaled.x(), expected.x());
         assert_eq!(scaled.y(), expected.y());
+    }
+
+    #[test]
+    fn test_scale_display() {
+        let scale = Scale::new(2.5, Point::integer(10, 20, 1e-9));
+        let display_str = format!("{scale}");
+        assert!(display_str.contains("Scale by 2.5 about"));
+        assert!(display_str.contains("Point("));
     }
 
     #[test]

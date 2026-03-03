@@ -6,6 +6,12 @@ pub struct Rotation {
     centre: Point,
 }
 
+impl std::fmt::Display for Rotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Rotation of {} rad about {}", self.angle, self.centre)
+    }
+}
+
 impl Rotation {
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
@@ -72,6 +78,14 @@ mod tests {
 
         // Point at centre should remain unchanged
         assert_eq!(rotated, centre);
+    }
+
+    #[test]
+    fn test_rotation_display() {
+        let rotation = Rotation::new(FRAC_PI_2, Point::integer(10, 20, 1e-9));
+        let display_str = format!("{rotation}");
+        assert!(display_str.contains(&format!("Rotation of {FRAC_PI_2} rad about")));
+        assert!(display_str.contains("Point("));
     }
 
     #[test]

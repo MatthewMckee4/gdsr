@@ -6,6 +6,16 @@ pub struct Reflection {
     centre: Point,
 }
 
+impl std::fmt::Display for Reflection {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Reflection with angle {} rad about {}",
+            self.angle, self.centre
+        )
+    }
+}
+
 impl Reflection {
     pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
         Self { angle, centre }
@@ -127,6 +137,14 @@ mod tests {
         assert!((reflection.angle - expected_angle).abs() < 1e-10);
         // Centre should be midpoint
         assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_reflection_display() {
+        let reflection = Reflection::new(0.5, Point::integer(10, 20, 1e-9));
+        let display_str = format!("{reflection}");
+        assert!(display_str.contains("Reflection with angle 0.5 rad about"));
+        assert!(display_str.contains("Point("));
     }
 
     #[test]
