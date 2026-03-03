@@ -144,12 +144,9 @@ mod tests {
 
     #[test]
     fn test_vertical_presentation_display_and_debug() {
-        assert_eq!(format!("{}", VerticalPresentation::Top), "Vertical Top");
-        assert_eq!(format!("{:?}", VerticalPresentation::Middle), "Middle");
-        assert_eq!(
-            format!("{}", VerticalPresentation::Bottom),
-            "Vertical Bottom"
-        );
+        insta::assert_snapshot!(VerticalPresentation::Top.to_string(), @"Vertical Top");
+        insta::assert_snapshot!(format!("{:?}", VerticalPresentation::Middle), @"Middle");
+        insta::assert_snapshot!(VerticalPresentation::Bottom.to_string(), @"Vertical Bottom");
     }
 
     #[test]
@@ -214,15 +211,9 @@ mod tests {
 
     #[test]
     fn test_horizontal_presentation_display_and_debug() {
-        assert_eq!(
-            format!("{}", HorizontalPresentation::Left),
-            "Horizontal Left"
-        );
-        assert_eq!(format!("{:?}", HorizontalPresentation::Centre), "Centre");
-        assert_eq!(
-            format!("{}", HorizontalPresentation::Right),
-            "Horizontal Right"
-        );
+        insta::assert_snapshot!(HorizontalPresentation::Left.to_string(), @"Horizontal Left");
+        insta::assert_snapshot!(format!("{:?}", HorizontalPresentation::Centre), @"Centre");
+        insta::assert_snapshot!(HorizontalPresentation::Right.to_string(), @"Horizontal Right");
     }
 
     #[test]

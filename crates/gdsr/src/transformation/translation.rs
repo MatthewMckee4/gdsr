@@ -28,9 +28,7 @@ mod tests {
     #[test]
     fn test_translation_display() {
         let translation = Translation::new(Point::integer(5, -3, 1e-9));
-        let display_str = format!("{translation}");
-        assert!(display_str.contains("Translation by"));
-        assert!(display_str.contains("Point("));
+        insta::assert_snapshot!(translation.to_string());
     }
 
     #[test]

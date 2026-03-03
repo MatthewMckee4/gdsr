@@ -763,29 +763,25 @@ mod tests {
         #[test]
         fn test_display_integer() {
             let unit = Unit::integer(100, 1e-9);
-            let display = format!("{unit}");
-            assert_eq!(display, "100 (1.000e-9)");
+            insta::assert_snapshot!(unit.to_string(), @"100 (1.000e-9)");
         }
 
         #[test]
         fn test_display_float() {
             let unit = Unit::float(1.5, 1e-6);
-            let display = format!("{unit}");
-            assert_eq!(display, "1.500000 (1.000e-6)");
+            insta::assert_snapshot!(unit.to_string(), @"1.500000 (1.000e-6)");
         }
 
         #[test]
         fn test_display_negative_integer() {
             let unit = Unit::integer(-50, 1e-9);
-            let display = format!("{unit}");
-            assert_eq!(display, "-50 (1.000e-9)");
+            insta::assert_snapshot!(unit.to_string(), @"-50 (1.000e-9)");
         }
 
         #[test]
         fn test_display_negative_float() {
             let unit = Unit::float(-2.75, 1e-6);
-            let display = format!("{unit}");
-            assert_eq!(display, "-2.750000 (1.000e-6)");
+            insta::assert_snapshot!(unit.to_string(), @"-2.750000 (1.000e-6)");
         }
 
         #[test]

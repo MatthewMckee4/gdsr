@@ -102,9 +102,7 @@ mod tests {
     #[test]
     fn test_instance_display() {
         let instance = Instance::from("test_cell");
-        let display_str = format!("{instance}");
-        assert!(display_str.contains("Cell instance"));
-        assert!(display_str.contains("test_cell"));
+        insta::assert_snapshot!(instance.to_string(), @"Cell instance: test_cell");
     }
 
     #[test]
@@ -170,8 +168,6 @@ mod tests {
             0,
         );
         let instance = Instance::from(polygon);
-        let display_str = format!("{instance}");
-        assert!(display_str.contains("Element instance"));
-        assert!(display_str.contains("Polygon"));
+        insta::assert_snapshot!(instance.to_string());
     }
 }

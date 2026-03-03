@@ -1,0 +1,5 @@
+---
+source: crates/gdsr/src/elements/reference/instance/mod.rs
+expression: instance.to_string()
+---
+Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0

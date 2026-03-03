@@ -194,15 +194,13 @@ mod tests {
         library.add_cell(cell1);
         library.add_cell(cell2);
 
-        let display_str = format!("{library}");
-        assert_eq!(display_str, "Library 'my_library' with 2 cells");
+        insta::assert_snapshot!(library.to_string(), @"Library 'my_library' with 2 cells");
     }
 
     #[test]
     fn test_library_display_empty() {
         let library: Library = Library::new("empty_lib");
-        let display_str = format!("{library}");
-        assert_eq!(display_str, "Library 'empty_lib' with 0 cells");
+        insta::assert_snapshot!(library.to_string(), @"Library 'empty_lib' with 0 cells");
     }
 
     #[test]
@@ -220,8 +218,6 @@ mod tests {
     #[test]
     fn test_library_debug() {
         let library: Library = Library::new("debug_lib");
-        let debug_str = format!("{library:?}");
-        assert!(debug_str.contains("debug_lib"));
-        assert!(debug_str.contains("Library"));
+        insta::assert_snapshot!(format!("{library:?}"));
     }
 }

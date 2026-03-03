@@ -60,9 +60,9 @@ mod tests {
 
     #[test]
     fn test_path_type_debug() {
-        assert_eq!(format!("{:?}", PathType::Square), "Square");
-        assert_eq!(format!("{:?}", PathType::Round), "Round");
-        assert_eq!(format!("{:?}", PathType::Overlap), "Overlap");
+        insta::assert_snapshot!(format!("{:?}", PathType::Square), @"Square");
+        insta::assert_snapshot!(format!("{:?}", PathType::Round), @"Round");
+        insta::assert_snapshot!(format!("{:?}", PathType::Overlap), @"Overlap");
     }
 
     #[test]
