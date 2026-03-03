@@ -1,5 +1,7 @@
 # GDSR
 
+[![Crates.io](https://img.shields.io/crates/v/gdsr)](https://crates.io/crates/gdsr)
+
 GDSII manipulation, written in rust.
 
 > [!WARNING]
@@ -65,7 +67,7 @@ This gives us the following GDS file:
 
 ## Documentation
 
-seal's documentation is available at [matthewmckee4.github.io/gdsr](https://matthewmckee4.github.io/gdsr/)
+gdsr's documentation is available at [matthewmckee4.github.io/gdsr](https://matthewmckee4.github.io/gdsr/)
 
 ## Need help?
 
