@@ -135,7 +135,7 @@ jobs:
         run: uv run --script scripts/prepare_docs.py
 
       - name: Build docs
-        run: uv run --isolated --only-group docs zensical build
+        run: uv run --isolated --with-requirements docs/requirements.txt zensical build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0

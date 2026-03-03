@@ -11,7 +11,8 @@ on:
 
 permissions: {}
 
-env: {}
+env:
+  PYTHON_VERSION: "3.14"
 
 jobs:
   determine_changes:
@@ -85,6 +86,7 @@ jobs:
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: false
 
       - name: Prepare docs
         run: uv run --script scripts/prepare_docs.py
