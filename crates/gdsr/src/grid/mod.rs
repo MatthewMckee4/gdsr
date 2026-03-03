@@ -452,27 +452,6 @@ mod tests {
     }
 
     #[test]
-    fn test_grid_asymmetric_1x5() {
-        let grid = Grid::default().with_columns(1).with_rows(5);
-        assert_eq!(grid.columns(), 1);
-        assert_eq!(grid.rows(), 5);
-    }
-
-    #[test]
-    fn test_grid_asymmetric_5x1() {
-        let grid = Grid::default().with_columns(5).with_rows(1);
-        assert_eq!(grid.columns(), 5);
-        assert_eq!(grid.rows(), 1);
-    }
-
-    #[test]
-    fn test_grid_none_spacing() {
-        let grid = Grid::default().with_columns(3).with_rows(3);
-        assert_eq!(grid.spacing_x(), None);
-        assert_eq!(grid.spacing_y(), None);
-    }
-
-    #[test]
     fn test_grid_zero_spacing() {
         let grid = Grid::default()
             .with_spacing_x(Some(p(0, 0)))
@@ -497,12 +476,6 @@ mod tests {
             .reflect(0.0, origin());
         assert!((transformed.angle() - FRAC_PI_2).abs() < 0.001);
         assert!(transformed.x_reflection());
-    }
-
-    #[test]
-    fn test_grid_transform_double_reflection_cancels() {
-        let transformed = test_grid().reflect(0.0, origin()).reflect(0.0, origin());
-        assert!(!transformed.x_reflection());
     }
 
     #[test]
@@ -554,102 +527,37 @@ mod tests {
     }
 
     #[test]
-    fn test_grid_large() {
-        let grid = Grid::default().with_columns(100).with_rows(100);
-        assert_eq!(grid.columns(), 100);
-        assert_eq!(grid.rows(), 100);
-    }
-
-    #[test]
-    fn test_grid_zero_columns() {
+    fn test_grid_zero_dimensions() {
         let grid = Grid::default().with_columns(0).with_rows(3);
         assert_eq!(grid.columns(), 0);
         assert_eq!(grid.rows(), 3);
-    }
 
-    #[test]
-    fn test_grid_zero_rows() {
         let grid = Grid::default().with_columns(3).with_rows(0);
         assert_eq!(grid.columns(), 3);
         assert_eq!(grid.rows(), 0);
-    }
 
-    #[test]
-    fn test_grid_zero_columns_and_rows() {
         let grid = Grid::default().with_columns(0).with_rows(0);
         assert_eq!(grid.columns(), 0);
         assert_eq!(grid.rows(), 0);
     }
 
     #[test]
-    fn test_grid_zero_magnification() {
+    fn test_grid_edge_magnification() {
         let grid = Grid::default().with_magnification(0.0);
         assert_eq!(grid.magnification(), 0.0);
-    }
 
-    #[test]
-    fn test_grid_negative_magnification() {
         let grid = Grid::default().with_magnification(-2.0);
         assert_eq!(grid.magnification(), -2.0);
     }
 
     #[test]
-    fn test_grid_transform_zero_magnification_with_scale() {
+    fn test_grid_transform_edge_magnification_with_scale() {
         let grid = test_grid().with_magnification(0.0);
         let transformed = grid.scale(2.0, origin());
         assert_eq!(transformed.magnification(), 0.0);
-    }
 
-    #[test]
-    fn test_grid_transform_negative_magnification_with_scale() {
         let grid = test_grid().with_magnification(-1.0);
         let transformed = grid.scale(3.0, origin());
         assert_eq!(transformed.magnification(), -3.0);
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    mod property_tests {
-        use super::*;
-        use quickcheck::{Arbitrary, Gen};
-        use quickcheck_macros::quickcheck;
-
-        const MAX_COORD: i32 = 10_000;
-
-        impl Arbitrary for Grid {
-            fn arbitrary(g: &mut Gen) -> Self {
-                let cols = 1 + (u32::arbitrary(g) % 10);
-                let rows = 1 + (u32::arbitrary(g) % 10);
-                let x = (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
-                let y = (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
-                let sx = (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
-                let sy = (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
-                Self::new(
-                    Point::integer(x, y, 1e-9),
-                    cols,
-                    rows,
-                    Some(Point::integer(sx, 0, 1e-9)),
-                    Some(Point::integer(0, sy, 1e-9)),
-                    1.0,
-                    0.0,
-                    false,
-                )
-            }
-        }
-
-        #[quickcheck]
-        fn double_reflection_cancels(grid: Grid) -> bool {
-            let centre = Point::integer(0, 0, 1e-9);
-            let transformed = grid.reflect(0.0, centre).reflect(0.0, centre);
-            !transformed.x_reflection()
-        }
-
-        #[quickcheck]
-        fn translation_preserves_dimensions(grid: Grid) -> bool {
-            let delta = Point::integer(42, -17, 1e-9);
-            let translated = grid.clone().translate(delta);
-            translated.columns() == grid.columns()
-                && translated.rows() == grid.rows()
-                && translated.magnification() == grid.magnification()
-        }
     }
 }

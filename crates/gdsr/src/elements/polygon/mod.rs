@@ -3,6 +3,8 @@ use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 mod io;
 mod utils;
 
+#[cfg(test)]
+pub(crate) use utils::close_points;
 pub use utils::get_correct_polygon_points_format;
 
 /// A closed polygon defined by a sequence of points on a specific layer.
@@ -132,31 +134,6 @@ impl Dimensions for Polygon {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use quickcheck::{Arbitrary, Gen};
-
-    const MAX_VALUE: i32 = 10_000;
-    const MIN_POLYGON_VERTICES: usize = 3;
-    const MAX_EXTRA_VERTICES: usize = 20;
-
-    impl Arbitrary for Polygon {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
-            let units = units_options[usize::arbitrary(g) % units_options.len()];
-            let num_vertices =
-                MIN_POLYGON_VERTICES + (usize::arbitrary(g) % (MAX_EXTRA_VERTICES + 1));
-            let points: Vec<Point> = (0..num_vertices)
-                .map(|_| {
-                    let x = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
-                    let y = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
-                    Point::integer(x, y, units)
-                })
-                .collect();
-            let layer = u16::arbitrary(g);
-            let data_type = u16::arbitrary(g);
-            Self::new(points, layer, data_type)
-        }
-    }
 
     #[test]
     fn test_polygon_creation() {
@@ -356,73 +333,5 @@ mod tests {
         let polygon = Polygon::new(vec![], 1, 0);
         let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
         assert_eq!(moved.points().len(), 0);
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    mod property_tests {
-        use super::*;
-        use quickcheck_macros::quickcheck;
-
-        #[quickcheck]
-        fn area_is_non_negative(polygon: Polygon) -> bool {
-            polygon.area().float_value() >= 0.0
-        }
-
-        #[quickcheck]
-        fn perimeter_is_non_negative(polygon: Polygon) -> bool {
-            polygon.perimeter().float_value() >= 0.0
-        }
-
-        #[quickcheck]
-        fn translation_preserves_area(polygon: Polygon, dx: i32, dy: i32) -> bool {
-            let units = polygon.points()[0].units().0;
-            let dx = (dx % 10_000).clamp(-10_000, 10_000);
-            let dy = (dy % 10_000).clamp(-10_000, 10_000);
-            let delta = Point::integer(dx, dy, units);
-            let translated = polygon.clone().translate(delta);
-            polygon.area() == translated.area()
-        }
-
-        #[quickcheck]
-        fn translation_preserves_perimeter(polygon: Polygon, dx: i32, dy: i32) -> bool {
-            let units = polygon.points()[0].units().0;
-            let dx = (dx % 10_000).clamp(-10_000, 10_000);
-            let dy = (dy % 10_000).clamp(-10_000, 10_000);
-            let delta = Point::integer(dx, dy, units);
-            let translated = polygon.clone().translate(delta);
-            polygon.perimeter() == translated.perimeter()
-        }
-
-        /// Rotation should preserve area (within floating point tolerance).
-        #[quickcheck]
-        fn rotation_preserves_area(polygon: Polygon) -> bool {
-            let units = polygon.points()[0].units().0;
-            let centre = Point::integer(0, 0, units);
-            let rotated = polygon.clone().rotate(std::f64::consts::FRAC_PI_2, centre);
-            let original_area = polygon.area().float_value();
-            let rotated_area = rotated.area().float_value();
-            if original_area == 0.0 {
-                return rotated_area == 0.0;
-            }
-            ((original_area - rotated_area) / original_area).abs() < 1e-6
-        }
-
-        #[quickcheck]
-        fn bounding_box_contains_all_points(polygon: Polygon) -> bool {
-            let (min, max) = polygon.bounding_box();
-            polygon.points().iter().all(|p| {
-                p.x().float_value() >= min.x().float_value()
-                    && p.x().float_value() <= max.x().float_value()
-                    && p.y().float_value() >= min.y().float_value()
-                    && p.y().float_value() <= max.y().float_value()
-            })
-        }
-
-        #[quickcheck]
-        fn close_points_is_idempotent(polygon: Polygon) -> bool {
-            let once = utils::close_points(polygon.points().to_vec());
-            let twice = utils::close_points(once.clone());
-            once == twice
-        }
     }
 }

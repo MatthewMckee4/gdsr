@@ -125,48 +125,6 @@ impl Dimensions for Path {
 mod tests {
     use super::*;
 
-    use quickcheck::{Arbitrary, Gen};
-
-    const MAX_VALUE: i32 = 10_000;
-    const MIN_PATH_POINTS: usize = 2;
-    const MAX_EXTRA_POINTS: usize = 18;
-
-    impl Arbitrary for PathType {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let types = [Self::Square, Self::Round, Self::Overlap];
-            types[usize::arbitrary(g) % types.len()]
-        }
-    }
-
-    impl Arbitrary for Path {
-        fn arbitrary(g: &mut Gen) -> Self {
-            let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
-            let units = units_options[usize::arbitrary(g) % units_options.len()];
-            let num_points = MIN_PATH_POINTS + (usize::arbitrary(g) % (MAX_EXTRA_POINTS + 1));
-            let points: Vec<Point> = (0..num_points)
-                .map(|_| {
-                    let x = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
-                    let y = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
-                    Point::integer(x, y, units)
-                })
-                .collect();
-            let layer = u16::arbitrary(g);
-            let data_type = u16::arbitrary(g);
-            let path_type = if bool::arbitrary(g) {
-                Some(PathType::arbitrary(g))
-            } else {
-                None
-            };
-            let width = if bool::arbitrary(g) {
-                let w = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
-                Some(Unit::integer(w, units))
-            } else {
-                None
-            };
-            Self::new(points, layer, data_type, path_type, width)
-        }
-    }
-
     #[test]
     fn test_path_creation() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
@@ -314,35 +272,5 @@ mod tests {
         let (min, max) = path.bounding_box();
         assert_eq!(min, Point::integer(5, 10, 1e-9));
         assert_eq!(max, Point::integer(5, 10, 1e-9));
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    mod property_tests {
-        use super::*;
-        use quickcheck_macros::quickcheck;
-
-        #[quickcheck]
-        fn bounding_box_contains_all_points(path: Path) -> bool {
-            if path.points().is_empty() {
-                return true;
-            }
-            let (min, max) = path.bounding_box();
-            path.points().iter().all(|p| {
-                p.x().float_value() >= min.x().float_value()
-                    && p.x().float_value() <= max.x().float_value()
-                    && p.y().float_value() >= min.y().float_value()
-                    && p.y().float_value() <= max.y().float_value()
-            })
-        }
-
-        #[quickcheck]
-        fn translation_preserves_point_count(path: Path, dx: i32, dy: i32) -> bool {
-            let units = path.points()[0].units().0;
-            let dx = (dx % 10_000).clamp(-10_000, 10_000);
-            let dy = (dy % 10_000).clamp(-10_000, 10_000);
-            let delta = Point::integer(dx, dy, units);
-            let translated = path.clone().translate(delta);
-            translated.points().len() == path.points().len()
-        }
     }
 }
