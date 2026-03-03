@@ -88,13 +88,12 @@ impl Transformable for Polygon {
 }
 
 impl Movable for Polygon {
-    fn move_to(mut self, target: Point) -> Self {
-        self.points = self
-            .points()
-            .iter()
-            .map(|point| point.move_to(target))
-            .collect();
-        self
+    fn move_to(self, target: Point) -> Self {
+        let Some(first_point) = self.points().first() else {
+            return self;
+        };
+        let delta = target - *first_point;
+        self.move_by(delta)
     }
 }
 
@@ -250,5 +249,31 @@ mod tests {
         let (min, max) = polygon.bounding_box();
         assert_eq!(min, Point::integer(-5, -3, 1e-9));
         assert_eq!(max, Point::integer(7, 8, 1e-9));
+    }
+
+    #[test]
+    fn test_polygon_move_to() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+            Point::integer(0, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        let target = Point::integer(5, 5, 1e-9);
+        let moved = polygon.move_to(target);
+
+        assert_eq!(moved.points()[0], Point::integer(5, 5, 1e-9));
+        assert_eq!(moved.points()[1], Point::integer(15, 5, 1e-9));
+        assert_eq!(moved.points()[2], Point::integer(15, 15, 1e-9));
+        assert_eq!(moved.points()[3], Point::integer(5, 15, 1e-9));
+        assert_eq!(moved.points()[4], Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_polygon_move_to_empty() {
+        let polygon = Polygon::new(vec![], 1, 0);
+        let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
+        assert_eq!(moved.points().len(), 0);
     }
 }
