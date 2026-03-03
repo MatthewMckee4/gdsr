@@ -152,20 +152,24 @@ impl Grid {
 
     /// Converts origin and spacing points to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.origin = self.origin.to_integer_unit();
-        self.spacing_x = self.spacing_x.map(|p| p.to_integer_unit());
-        self.spacing_y = self.spacing_y.map(|p| p.to_integer_unit());
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            origin: self.origin.to_integer_unit(),
+            spacing_x: self.spacing_x.as_ref().map(Point::to_integer_unit),
+            spacing_y: self.spacing_y.as_ref().map(Point::to_integer_unit),
+            ..self
+        }
     }
 
     /// Converts origin and spacing points to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.origin = self.origin.to_float_unit();
-        self.spacing_x = self.spacing_x.map(|p| p.to_float_unit());
-        self.spacing_y = self.spacing_y.map(|p| p.to_float_unit());
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            origin: self.origin.to_float_unit(),
+            spacing_x: self.spacing_x.as_ref().map(Point::to_float_unit),
+            spacing_y: self.spacing_y.as_ref().map(Point::to_float_unit),
+            ..self
+        }
     }
 }
 

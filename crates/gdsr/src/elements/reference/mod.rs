@@ -35,16 +35,20 @@ impl Reference {
 
     /// Converts grid to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.grid = self.grid.to_integer_unit();
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            grid: self.grid.to_integer_unit(),
+            ..self
+        }
     }
 
     /// Converts grid to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.grid = self.grid.to_float_unit();
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            grid: self.grid.to_float_unit(),
+            ..self
+        }
     }
 
     pub fn get_elements_in_grid(&self, element: &Element) -> Vec<Element> {

@@ -146,16 +146,20 @@ impl Text {
 
     /// Converts origin to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.origin = self.origin.to_integer_unit();
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            origin: self.origin.to_integer_unit(),
+            ..self
+        }
     }
 
     /// Converts origin to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.origin = self.origin.to_float_unit();
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            origin: self.origin.to_float_unit(),
+            ..self
+        }
     }
 }
 

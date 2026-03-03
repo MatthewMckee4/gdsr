@@ -53,22 +53,22 @@ impl Path {
 
     /// Converts all points and width to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.points = self
-            .points
-            .into_iter()
-            .map(|p| p.to_integer_unit())
-            .collect();
-        self.width = self.width.map(Unit::to_integer_unit);
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            points: self.points.iter().map(Point::to_integer_unit).collect(),
+            width: self.width.map(Unit::to_integer_unit),
+            ..self
+        }
     }
 
     /// Converts all points and width to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.points = self.points.into_iter().map(|p| p.to_float_unit()).collect();
-        self.width = self.width.map(Unit::to_float_unit);
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            points: self.points.iter().map(Point::to_float_unit).collect(),
+            width: self.width.map(Unit::to_float_unit),
+            ..self
+        }
     }
 }
 

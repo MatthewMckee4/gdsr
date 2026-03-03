@@ -48,20 +48,20 @@ impl Polygon {
 
     /// Converts all points to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.points = self
-            .points
-            .into_iter()
-            .map(|p| p.to_integer_unit())
-            .collect();
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            points: self.points.iter().map(Point::to_integer_unit).collect(),
+            ..self
+        }
     }
 
     /// Converts all points to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.points = self.points.into_iter().map(|p| p.to_float_unit()).collect();
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            points: self.points.iter().map(Point::to_float_unit).collect(),
+            ..self
+        }
     }
 
     /// Check if a point lies on the edge of the polygon

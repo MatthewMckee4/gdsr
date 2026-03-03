@@ -59,38 +59,42 @@ impl Cell {
 
     /// Converts all elements to integer units.
     #[must_use]
-    pub fn to_integer_unit(mut self) -> Self {
-        self.polygons = self
-            .polygons
-            .into_iter()
-            .map(Polygon::to_integer_unit)
-            .collect();
-        self.paths = self.paths.into_iter().map(Path::to_integer_unit).collect();
-        self.texts = self.texts.into_iter().map(Text::to_integer_unit).collect();
-        self.references = self
-            .references
-            .into_iter()
-            .map(Reference::to_integer_unit)
-            .collect();
-        self
+    pub fn to_integer_unit(self) -> Self {
+        Self {
+            polygons: self
+                .polygons
+                .into_iter()
+                .map(Polygon::to_integer_unit)
+                .collect(),
+            paths: self.paths.into_iter().map(Path::to_integer_unit).collect(),
+            texts: self.texts.into_iter().map(Text::to_integer_unit).collect(),
+            references: self
+                .references
+                .into_iter()
+                .map(Reference::to_integer_unit)
+                .collect(),
+            ..self
+        }
     }
 
     /// Converts all elements to float units.
     #[must_use]
-    pub fn to_float_unit(mut self) -> Self {
-        self.polygons = self
-            .polygons
-            .into_iter()
-            .map(Polygon::to_float_unit)
-            .collect();
-        self.paths = self.paths.into_iter().map(Path::to_float_unit).collect();
-        self.texts = self.texts.into_iter().map(Text::to_float_unit).collect();
-        self.references = self
-            .references
-            .into_iter()
-            .map(Reference::to_float_unit)
-            .collect();
-        self
+    pub fn to_float_unit(self) -> Self {
+        Self {
+            polygons: self
+                .polygons
+                .into_iter()
+                .map(Polygon::to_float_unit)
+                .collect(),
+            paths: self.paths.into_iter().map(Path::to_float_unit).collect(),
+            texts: self.texts.into_iter().map(Text::to_float_unit).collect(),
+            references: self
+                .references
+                .into_iter()
+                .map(Reference::to_float_unit)
+                .collect(),
+            ..self
+        }
     }
 
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
