@@ -698,4 +698,215 @@ mod tests {
 
         assert_eq!(elements.len(), 100);
     }
+
+    #[test]
+    fn test_reference_flatten_nonexistent_cell() {
+        let library = Library::new("main");
+        let reference = Reference::new("nonexistent_cell");
+
+        let flattened = reference.flatten(None, &library);
+        assert!(flattened.is_empty());
+    }
+
+    #[test]
+    fn test_reference_flatten_nonexistent_cell_with_grid() {
+        let library = Library::new("main");
+        let grid = Grid::default()
+            .with_columns(3)
+            .with_rows(3)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new("missing_cell").with_grid(grid);
+
+        let flattened = reference.flatten(None, &library);
+        assert!(flattened.is_empty());
+    }
+
+    #[test]
+    fn test_reference_flatten_empty_cell() {
+        let mut library = Library::new("main");
+        let cell = crate::Cell::new("empty_cell");
+        library.add_cell(cell);
+
+        let reference = Reference::new("empty_cell");
+
+        let flattened = reference.flatten(None, &library);
+        assert!(flattened.is_empty());
+    }
+
+    #[test]
+    fn test_reference_flatten_empty_cell_with_grid() {
+        let mut library = Library::new("main");
+        let cell = crate::Cell::new("empty_cell");
+        library.add_cell(cell);
+
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new("empty_cell").with_grid(grid);
+
+        let flattened = reference.flatten(None, &library);
+        assert!(flattened.is_empty());
+    }
+
+    #[test]
+    fn test_reference_depth_limited_flatten_nested() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let mut inner_cell = crate::Cell::new("inner");
+        inner_cell.add(polygon);
+        library.add_cell(inner_cell);
+
+        let mut outer_cell = crate::Cell::new("outer");
+        outer_cell.add(Reference::new("inner"));
+        library.add_cell(outer_cell);
+
+        // depth=1 should resolve outer_cell but leave inner references unresolved
+        let reference = Reference::new("outer");
+        let flattened_depth_1 = reference.clone().flatten(Some(1), &library);
+        assert_eq!(flattened_depth_1.len(), 1);
+        assert!(flattened_depth_1[0].as_reference().is_some());
+
+        // depth=2 should fully resolve to the polygon
+        let flattened_depth_2 = reference.flatten(Some(2), &library);
+        assert_eq!(flattened_depth_2.len(), 1);
+        assert!(flattened_depth_2[0].as_polygon().is_some());
+    }
+
+    #[test]
+    fn test_reference_depth_limited_flatten_triple_nested() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(5, 0, 1e-9),
+                Point::integer(5, 5, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let mut cell_a = crate::Cell::new("a");
+        cell_a.add(polygon);
+        library.add_cell(cell_a);
+
+        let mut cell_b = crate::Cell::new("b");
+        cell_b.add(Reference::new("a"));
+        library.add_cell(cell_b);
+
+        let mut cell_c = crate::Cell::new("c");
+        cell_c.add(Reference::new("b"));
+        library.add_cell(cell_c);
+
+        let reference = Reference::new("c");
+
+        // depth=0 returns the reference itself
+        let d0 = reference.clone().flatten(Some(0), &library);
+        assert_eq!(d0.len(), 1);
+        assert!(d0[0].as_reference().is_some());
+
+        // depth=1 resolves c -> ref(b), still a reference
+        let d1 = reference.clone().flatten(Some(1), &library);
+        assert_eq!(d1.len(), 1);
+        assert!(d1[0].as_reference().is_some());
+
+        // depth=2 resolves c -> b -> ref(a), still a reference
+        let d2 = reference.clone().flatten(Some(2), &library);
+        assert_eq!(d2.len(), 1);
+        assert!(d2[0].as_reference().is_some());
+
+        // depth=3 fully resolves to the polygon
+        let d3 = reference.flatten(Some(3), &library);
+        assert_eq!(d3.len(), 1);
+        assert!(d3[0].as_polygon().is_some());
+    }
+
+    #[test]
+    fn test_reference_zero_column_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(0)
+            .with_rows(3)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert!(elements.is_empty());
+    }
+
+    #[test]
+    fn test_reference_zero_row_grid_expansion() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(3)
+            .with_rows(0)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+
+        let element = Element::Polygon(polygon);
+        let elements = reference.get_elements_in_grid(&element);
+
+        assert!(elements.is_empty());
+    }
+
+    #[test]
+    fn test_reference_flatten_with_zero_column_grid() {
+        let library = Library::new("main");
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(0)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
+
+        let flattened = reference.flatten(None, &library);
+        assert!(flattened.is_empty());
+    }
 }

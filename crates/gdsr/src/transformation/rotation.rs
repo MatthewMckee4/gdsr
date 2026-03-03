@@ -103,4 +103,42 @@ mod tests {
         assert!((rotated.x() - expected.x()).absolute_value().abs() < 1e-6);
         assert!((rotated.y() - expected.y()).absolute_value().abs() < 1e-6);
     }
+
+    /// Rotation by 2pi + pi/2 should produce the same result as pi/2 alone.
+    #[test]
+    fn test_rotation_greater_than_2pi() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let point = Point::integer(10, 0, 1e-9);
+
+        let rotation_large = Rotation::new(std::f64::consts::TAU + FRAC_PI_2, origin);
+        let rotation_normal = Rotation::new(FRAC_PI_2, origin);
+
+        let result_large = rotation_large.apply_to_point(&point);
+        let result_normal = rotation_normal.apply_to_point(&point);
+
+        assert!(
+            (result_large.x() - result_normal.x())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (result_large.y() - result_normal.y())
+                .absolute_value()
+                .abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn test_rotation_negative_angle() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let rotation = Rotation::new(-FRAC_PI_2, origin);
+        let point = Point::integer(10, 0, 1e-9);
+        let rotated = rotation.apply_to_point(&point);
+
+        let expected = Point::integer(0, -10, 1e-9);
+        assert!((rotated.x() - expected.x()).absolute_value().abs() < 1e-6);
+        assert!((rotated.y() - expected.y()).absolute_value().abs() < 1e-6);
+    }
 }

@@ -851,4 +851,125 @@ mod tests {
         assert_eq!(grid.columns(), 100);
         assert_eq!(grid.rows(), 100);
     }
+
+    #[test]
+    fn test_grid_zero_columns() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            0,
+            3,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 0);
+        assert_eq!(grid.rows(), 3);
+    }
+
+    #[test]
+    fn test_grid_zero_rows() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            3,
+            0,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 3);
+        assert_eq!(grid.rows(), 0);
+    }
+
+    #[test]
+    fn test_grid_zero_columns_and_rows() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            0,
+            0,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            1.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.columns(), 0);
+        assert_eq!(grid.rows(), 0);
+    }
+
+    #[test]
+    fn test_grid_zero_magnification() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            0.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.magnification(), 0.0);
+    }
+
+    #[test]
+    fn test_grid_negative_magnification() {
+        let grid = Grid::new(
+            Point::integer(0, 0, 1e-9),
+            2,
+            2,
+            Some(Point::integer(10, 0, 1e-9)),
+            Some(Point::integer(0, 10, 1e-9)),
+            -2.0,
+            0.0,
+            false,
+        );
+
+        assert_eq!(grid.magnification(), -2.0);
+    }
+
+    #[test]
+    fn test_grid_transform_zero_magnification_with_scale() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            2,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            0.0,
+            0.0,
+            false,
+        );
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = grid.scale(2.0, centre);
+
+        assert_eq!(transformed.magnification(), 0.0);
+    }
+
+    #[test]
+    fn test_grid_transform_negative_magnification_with_scale() {
+        let grid = Grid::new(
+            Point::integer(10, 20, 1e-9),
+            2,
+            2,
+            Some(Point::integer(5, 0, 1e-9)),
+            Some(Point::integer(0, 5, 1e-9)),
+            -1.0,
+            0.0,
+            false,
+        );
+
+        let centre = Point::integer(0, 0, 1e-9);
+        let transformed = grid.scale(3.0, centre);
+
+        assert_eq!(transformed.magnification(), -3.0);
+    }
 }

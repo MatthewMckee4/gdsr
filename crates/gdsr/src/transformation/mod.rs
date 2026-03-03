@@ -638,4 +638,136 @@ mod tests {
             point_approx_eq(&result, &point, 1e-6)
         }
     }
+
+    #[test]
+    fn test_scale_by_zero() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let scale = Scale::new(0.0, origin);
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+
+        let point = Point::integer(5, 10, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &Point::integer(0, 0, 1e-9));
+    }
+
+    #[test]
+    fn test_scale_by_zero_nonorigin_centre() {
+        let centre = Point::integer(10, 10, 1e-9);
+        let scale = Scale::new(0.0, centre);
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+
+        let point = Point::integer(5, 20, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &centre);
+    }
+
+    #[test]
+    fn test_negative_scale() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let scale = Scale::new(-1.0, origin);
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+
+        let point = Point::integer(5, 10, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &Point::integer(-5, -10, 1e-9));
+    }
+
+    #[test]
+    fn test_negative_scale_with_nonorigin_centre() {
+        let centre = Point::integer(10, 10, 1e-9);
+        let scale = Scale::new(-1.0, centre);
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+
+        let point = Point::integer(15, 20, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &Point::integer(5, 0, 1e-9));
+    }
+
+    #[test]
+    fn test_rotation_greater_than_2pi() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let angle = std::f64::consts::TAU + std::f64::consts::FRAC_PI_2;
+        let rotation = Rotation::new(angle, origin);
+        let mut transformation = Transformation::default();
+        transformation.with_rotation(Some(rotation));
+
+        let point = Point::integer(10, 0, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let just_90 = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let expected = just_90.apply_to_point(&point);
+        assert_point_approx_eq(&result, &expected);
+    }
+
+    #[test]
+    fn test_rotation_negative_angle() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let rotation = Rotation::new(-std::f64::consts::FRAC_PI_2, origin);
+        let mut transformation = Transformation::default();
+        transformation.with_rotation(Some(rotation));
+
+        let point = Point::integer(10, 0, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &Point::integer(0, -10, 1e-9));
+    }
+
+    #[test]
+    fn test_all_transformations_simultaneously() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let reflection = Reflection::new(0.0, origin);
+        let rotation = Rotation::new(std::f64::consts::FRAC_PI_4, origin);
+        let scale = Scale::new(3.0, origin);
+        let translation = Translation::new(Point::integer(100, 200, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_reflection(Some(reflection.clone()));
+        transformation.with_rotation(Some(rotation.clone()));
+        transformation.with_scale(Some(scale.clone()));
+        transformation.with_translation(Some(translation.clone()));
+
+        let point = Point::integer(10, 5, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        let step1 = reflection.apply_to_point(&point);
+        let step2 = rotation.apply_to_point(&step1);
+        let step3 = scale.apply_to_point(&step2);
+        let expected = translation.apply_to_point(&step3);
+
+        assert_point_approx_eq(&result, &expected);
+    }
+
+    #[test]
+    fn test_scale_by_zero_then_translate() {
+        let origin = Point::integer(0, 0, 1e-9);
+        let scale = Scale::new(0.0, origin);
+        let translation = Translation::new(Point::integer(10, 20, 1e-9));
+
+        let mut transformation = Transformation::default();
+        transformation.with_scale(Some(scale));
+        transformation.with_translation(Some(translation));
+
+        let point = Point::integer(99, 99, 1e-9);
+        let result = transformation.apply_to_point(&point);
+
+        assert_point_approx_eq(&result, &Point::integer(10, 20, 1e-9));
+    }
+
+    #[test]
+    fn test_from_self_reference() {
+        let translation = Translation::new(Point::integer(5, 10, 1e-9));
+        let mut original = Transformation::default();
+        original.with_translation(Some(translation));
+
+        let cloned: Transformation = Transformation::from(&original);
+        assert_eq!(cloned, original);
+    }
 }

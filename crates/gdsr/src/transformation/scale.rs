@@ -109,4 +109,49 @@ mod tests {
         assert_eq!(scaled.x(), expected.x());
         assert_eq!(scaled.y(), expected.y());
     }
+
+    #[test]
+    fn test_scale_by_zero() {
+        let scale = Scale::new(0.0, Point::integer(0, 0, 1e-9));
+        let point = Point::integer(10, 20, 1e-9);
+        let scaled = scale.apply_to_point(&point);
+
+        assert_eq!(scaled.x().absolute_value(), 0.0);
+        assert_eq!(scaled.y().absolute_value(), 0.0);
+    }
+
+    #[test]
+    fn test_scale_by_zero_nonorigin_centre() {
+        let centre = Point::integer(5, 5, 1e-9);
+        let scale = Scale::new(0.0, centre);
+        let point = Point::integer(10, 20, 1e-9);
+        let scaled = scale.apply_to_point(&point);
+
+        assert_eq!(scaled.x(), centre.x());
+        assert_eq!(scaled.y(), centre.y());
+    }
+
+    #[test]
+    fn test_scale_negative() {
+        let scale = Scale::new(-1.0, Point::integer(0, 0, 1e-9));
+        let point = Point::integer(10, 5, 1e-9);
+        let scaled = scale.apply_to_point(&point);
+
+        let expected = Point::integer(-10, -5, 1e-9);
+        assert_eq!(scaled.x(), expected.x());
+        assert_eq!(scaled.y(), expected.y());
+    }
+
+    #[test]
+    fn test_scale_negative_with_centre() {
+        let centre = Point::integer(10, 10, 1e-9);
+        let scale = Scale::new(-2.0, centre);
+        let point = Point::integer(15, 20, 1e-9);
+        let scaled = scale.apply_to_point(&point);
+
+        // (15-10)*-2 + 10 = 0, (20-10)*-2 + 10 = -10
+        let expected = Point::integer(0, -10, 1e-9);
+        assert_eq!(scaled.x(), expected.x());
+        assert_eq!(scaled.y(), expected.y());
+    }
 }
