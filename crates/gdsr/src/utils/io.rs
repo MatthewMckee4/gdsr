@@ -93,78 +93,71 @@ pub const MAX_COL_ROW: u32 = 32767;
 pub const MIN_POLYGON_POINTS: usize = 4;
 
 /// Returns an `InvalidInput` error if the layer is out of the GDS2 spec range (0-255).
-pub fn validate_layer(layer: u16) -> io::Result<()> {
+pub fn validate_layer(layer: u16) -> Result<(), GdsError> {
     if layer > MAX_LAYER {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Layer {layer} exceeds maximum value of {MAX_LAYER}"),
-        ));
+        return Err(GdsError::ValidationError {
+            message: format!("Layer {layer} exceeds maximum value of {MAX_LAYER}"),
+        });
     }
     Ok(())
 }
 
-/// Returns an `InvalidInput` error if the data type is out of the GDS2 spec range (0-255).
-pub fn validate_data_type(data_type: u16) -> io::Result<()> {
+/// Returns a validation error if the data type is out of the GDS2 spec range (0-255).
+pub fn validate_data_type(data_type: u16) -> Result<(), GdsError> {
     if data_type > MAX_DATA_TYPE {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Data type {data_type} exceeds maximum value of {MAX_DATA_TYPE}"),
-        ));
+        return Err(GdsError::ValidationError {
+            message: format!("Data type {data_type} exceeds maximum value of {MAX_DATA_TYPE}"),
+        });
     }
     Ok(())
 }
 
-/// Returns an `InvalidInput` error if the string exceeds 512 characters.
-pub fn validate_string_length(s: &str) -> io::Result<()> {
+/// Returns a validation error if the string exceeds 512 characters.
+pub fn validate_string_length(s: &str) -> Result<(), GdsError> {
     if s.len() > MAX_STRING_LENGTH {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
+        return Err(GdsError::ValidationError {
+            message: format!(
                 "String length {} exceeds maximum of {MAX_STRING_LENGTH} characters",
                 s.len()
             ),
-        ));
+        });
     }
     Ok(())
 }
 
-/// Returns an `InvalidInput` error if the structure name exceeds 32 characters or contains
+/// Returns a validation error if the structure name exceeds 32 characters or contains
 /// invalid characters (only alphanumeric, `_`, `?`, `$` are allowed).
-pub fn validate_structure_name(name: &str) -> io::Result<()> {
+pub fn validate_structure_name(name: &str) -> Result<(), GdsError> {
     if name.len() > MAX_STRUCTURE_NAME_LENGTH {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
+        return Err(GdsError::ValidationError {
+            message: format!(
                 "Structure name length {} exceeds maximum of {MAX_STRUCTURE_NAME_LENGTH} characters",
                 name.len()
             ),
-        ));
+        });
     }
     if let Some(c) = name
         .chars()
         .find(|c| !c.is_ascii_alphanumeric() && *c != '_' && *c != '?' && *c != '$')
     {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Structure name contains invalid character: '{c}'"),
-        ));
+        return Err(GdsError::ValidationError {
+            message: format!("Structure name contains invalid character: '{c}'"),
+        });
     }
     Ok(())
 }
 
-/// Returns an `InvalidInput` error if columns or rows exceed 32767.
-pub fn validate_col_row(columns: u32, rows: u32) -> io::Result<()> {
+/// Returns a validation error if columns or rows exceed 32767.
+pub fn validate_col_row(columns: u32, rows: u32) -> Result<(), GdsError> {
     if columns > MAX_COL_ROW {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Column count {columns} exceeds maximum value of {MAX_COL_ROW}"),
-        ));
+        return Err(GdsError::ValidationError {
+            message: format!("Column count {columns} exceeds maximum value of {MAX_COL_ROW}"),
+        });
     }
     if rows > MAX_COL_ROW {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Row count {rows} exceeds maximum value of {MAX_COL_ROW}"),
-        ));
+        return Err(GdsError::ValidationError {
+            message: format!("Row count {rows} exceeds maximum value of {MAX_COL_ROW}"),
+        });
     }
     Ok(())
 }

@@ -64,13 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn test_scale_clone() {
-        let scale = Scale::new(3.0, Point::integer(5, 5, 1e-9));
-        let cloned = scale.clone();
-        assert_eq!(scale, cloned);
-    }
-
-    #[test]
     fn test_scale_apply_at_centre() {
         let centre = Point::integer(10, 10, 1e-9);
         let scale = Scale::new(2.0, centre);

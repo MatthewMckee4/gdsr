@@ -90,13 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn test_reflection_clone() {
-        let reflection = Reflection::new(30.0, Point::integer(5, 5, 1e-9));
-        let cloned = reflection.clone();
-        assert_eq!(reflection, cloned);
-    }
-
-    #[test]
     fn test_reflection_apply_at_centre() {
         let centre = Point::integer(10, 10, 1e-9);
         let reflection = Reflection::new(45.0, centre);

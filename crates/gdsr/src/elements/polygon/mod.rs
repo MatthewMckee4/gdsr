@@ -374,19 +374,37 @@ mod tests {
         }
 
         #[quickcheck]
-        fn translation_preserves_area(polygon: Polygon) -> bool {
+        fn translation_preserves_area(polygon: Polygon, dx: i32, dy: i32) -> bool {
             let units = polygon.points()[0].units().0;
-            let delta = Point::integer(42, -17, units);
+            let dx = (dx % 10_000).clamp(-10_000, 10_000);
+            let dy = (dy % 10_000).clamp(-10_000, 10_000);
+            let delta = Point::integer(dx, dy, units);
             let translated = polygon.clone().translate(delta);
             polygon.area() == translated.area()
         }
 
         #[quickcheck]
-        fn translation_preserves_perimeter(polygon: Polygon) -> bool {
+        fn translation_preserves_perimeter(polygon: Polygon, dx: i32, dy: i32) -> bool {
             let units = polygon.points()[0].units().0;
-            let delta = Point::integer(42, -17, units);
+            let dx = (dx % 10_000).clamp(-10_000, 10_000);
+            let dy = (dy % 10_000).clamp(-10_000, 10_000);
+            let delta = Point::integer(dx, dy, units);
             let translated = polygon.clone().translate(delta);
             polygon.perimeter() == translated.perimeter()
+        }
+
+        /// Rotation should preserve area (within floating point tolerance).
+        #[quickcheck]
+        fn rotation_preserves_area(polygon: Polygon) -> bool {
+            let units = polygon.points()[0].units().0;
+            let centre = Point::integer(0, 0, units);
+            let rotated = polygon.clone().rotate(std::f64::consts::FRAC_PI_2, centre);
+            let original_area = polygon.area().float_value();
+            let rotated_area = rotated.area().float_value();
+            if original_area == 0.0 {
+                return rotated_area == 0.0;
+            }
+            ((original_area - rotated_area) / original_area).abs() < 1e-6
         }
 
         #[quickcheck]

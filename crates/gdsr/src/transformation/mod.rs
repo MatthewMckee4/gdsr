@@ -337,16 +337,6 @@ mod tests {
         assert!(transformation.scale.is_none());
     }
 
-    #[test]
-    fn test_clone() {
-        let translation = Translation::new(Point::integer(10, 20, 1e-9));
-        let mut transformation = Transformation::default();
-        transformation.with_translation(Some(translation));
-
-        let cloned = transformation.clone();
-        assert_eq!(cloned.translation, transformation.translation);
-    }
-
     fn assert_point_approx_eq(actual: &Point, expected: &Point) {
         assert!(
             (actual.x() - expected.x()).absolute_value().abs() < 1e-6,

@@ -72,11 +72,4 @@ mod tests {
         let result = translation.apply_to_point(&point);
         assert_eq!(result, Point::integer(1_500_000, -500_000, 1e-9));
     }
-
-    #[test]
-    fn test_translation_clone() {
-        let translation = Translation::new(Point::integer(5, 5, 1e-9));
-        let cloned = translation.clone();
-        assert_eq!(translation, cloned);
-    }
 }

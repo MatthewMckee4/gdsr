@@ -5,6 +5,8 @@ mod error;
 mod grid;
 mod library;
 mod point;
+#[cfg(test)]
+pub(crate) mod test_fixtures;
 mod traits;
 mod transformation;
 mod types;

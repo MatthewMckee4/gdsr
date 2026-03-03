@@ -232,8 +232,48 @@ mod tests {
     use std::f64::consts::PI;
 
     use insta::assert_debug_snapshot;
+    use quickcheck::{Arbitrary, Gen};
 
     use super::*;
+
+    const MAX_VALUE: i32 = 10_000;
+
+    impl Arbitrary for Text {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
+            let units = units_options[usize::arbitrary(g) % units_options.len()];
+            let x = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+            let y = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+            let origin = Point::integer(x, y, units);
+            let len = 1 + (usize::arbitrary(g) % 20);
+            let value: String = (0..len)
+                .map(|_| (b'a' + (u8::arbitrary(g) % 26)) as char)
+                .collect();
+            let layer = u16::arbitrary(g) % 256;
+            let datatype = u16::arbitrary(g) % 256;
+            let vp_options = [
+                presentation::VerticalPresentation::Top,
+                presentation::VerticalPresentation::Middle,
+                presentation::VerticalPresentation::Bottom,
+            ];
+            let hp_options = [
+                presentation::HorizontalPresentation::Left,
+                presentation::HorizontalPresentation::Centre,
+                presentation::HorizontalPresentation::Right,
+            ];
+            Self::new(
+                &value,
+                origin,
+                layer,
+                datatype,
+                1.0,
+                0.0,
+                false,
+                vp_options[usize::arbitrary(g) % vp_options.len()],
+                hp_options[usize::arbitrary(g) % hp_options.len()],
+            )
+        }
+    }
 
     #[test]
     fn test_text_creation() {
@@ -516,5 +556,25 @@ mod tests {
             horizontal_presentation: Centre,
         }
         "#);
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    mod property_tests {
+        use super::*;
+        use quickcheck_macros::quickcheck;
+
+        #[quickcheck]
+        fn double_reflection_cancels(text: Text) -> bool {
+            let centre = Point::integer(0, 0, text.origin().units().0);
+            let reflected_twice = text.clone().reflect(0.0, centre).reflect(0.0, centre);
+            reflected_twice.x_reflection() == text.x_reflection()
+        }
+
+        #[quickcheck]
+        fn scale_multiplies_magnification(text: Text) -> bool {
+            let centre = Point::integer(0, 0, text.origin().units().0);
+            let scaled = text.clone().scale(2.0, centre);
+            (scaled.magnification() - text.magnification() * 2.0).abs() < 1e-10
+        }
     }
 }

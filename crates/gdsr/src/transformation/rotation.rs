@@ -69,13 +69,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_clone() {
-        let rotation = Rotation::new(30.0, Point::integer(5, 5, 1e-9));
-        let cloned = rotation.clone();
-        assert_eq!(rotation, cloned);
-    }
-
-    #[test]
     fn test_rotation_apply_at_centre() {
         let centre = Point::integer(10, 10, 1e-9);
         let rotation = Rotation::new(90.0, centre);

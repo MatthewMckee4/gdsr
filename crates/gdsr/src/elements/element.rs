@@ -165,388 +165,159 @@ impl Dimensions for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Grid, Point};
+    use crate::test_fixtures::*;
+
+    fn all_elements() -> [Element; 4] {
+        [
+            simple_path().into(),
+            simple_polygon().into(),
+            simple_text().into(),
+            simple_reference().with_grid(simple_grid()).into(),
+        ]
+    }
 
     #[test]
     fn test_element_from_path() {
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            None,
-            None,
-        );
+        let path = simple_path();
         let element: Element = path.clone().into();
 
         assert!(element.as_polygon().is_none());
         assert!(element.as_reference().is_none());
         assert!(element.as_text().is_none());
-
-        let p = element.as_path().unwrap().clone();
-
-        assert_eq!(p, path);
+        assert_eq!(element.as_path().unwrap(), &path);
 
         insta::assert_snapshot!(element.to_string(), @"Path with 2 points on layer 1 with data type 0, Square and width 0 (1.000e-9)");
     }
 
     #[test]
     fn test_element_from_polygon() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
+        let polygon = simple_polygon();
         let element: Element = polygon.clone().into();
 
         assert!(element.as_path().is_none());
-
-        let p = element.as_polygon().unwrap().clone();
-
-        assert_eq!(p, polygon);
+        assert_eq!(element.as_polygon().unwrap(), &polygon);
 
         insta::assert_snapshot!(element.to_string(), @"Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0");
     }
 
     #[test]
     fn test_element_from_text() {
-        let text = Text::default();
-
+        let text = simple_text();
         let element: Element = text.clone().into();
 
-        let t = element.as_text().unwrap().clone();
-
-        assert_eq!(t, text);
+        assert_eq!(element.as_text().unwrap(), &text);
 
         insta::assert_snapshot!(element.to_string(), @"Text '' vertical: Middle, horizontal: Centre at Point(0 (1.000e-9), 0 (1.000e-9))");
     }
 
     #[test]
     fn test_element_from_reference() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-
-        let grid = Grid::default()
-            .with_columns(2)
-            .with_rows(2)
-            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
-            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
-
-        let reference = Reference::new(polygon.clone()).with_grid(grid);
-
+        let reference = simple_reference().with_grid(simple_grid());
         let element: Element = reference.clone().into();
 
-        let r = element.as_reference().unwrap().clone();
-
-        assert_eq!(r, reference);
+        assert_eq!(element.as_reference().unwrap(), &reference);
 
         insta::assert_snapshot!(element.to_string(), @"Reference to Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0 with grid Grid at Point(0 (1.000e-9), 0 (1.000e-9)) with 2 columns and 2 rows, spacing (Point(10 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 10 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
 
     #[test]
-    fn test_element_to_integer_unit_polygon() {
-        let polygon = Polygon::new(
-            [
-                Point::float(1.5, 2.5, 1e-6),
-                Point::float(10.0, 0.0, 1e-6),
-                Point::float(10.0, 10.0, 1e-6),
-            ],
-            1,
-            0,
-        );
+    fn test_element_to_integer_unit_preserves_variant() {
+        for element in all_elements() {
+            let converted = element.clone().to_integer_unit();
+            assert_eq!(
+                std::mem::discriminant(&element),
+                std::mem::discriminant(&converted)
+            );
+        }
+    }
+
+    #[test]
+    fn test_element_to_float_unit_preserves_variant() {
+        for element in all_elements() {
+            let converted = element.clone().to_float_unit();
+            assert_eq!(
+                std::mem::discriminant(&element),
+                std::mem::discriminant(&converted)
+            );
+        }
+    }
+
+    #[test]
+    fn test_element_to_integer_unit_converts_points() {
+        let polygon = Polygon::new([pf(1.5, 2.5), pf(10.0, 0.0), pf(10.0, 10.0)], 1, 0);
         let element: Element = polygon.into();
         let converted = element.to_integer_unit();
 
-        assert!(converted.as_polygon().is_some());
         for point in converted.as_polygon().unwrap().points() {
             assert_eq!(*point, point.to_integer_unit());
         }
     }
 
     #[test]
-    fn test_element_to_float_unit_path() {
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            None,
-            Some(crate::Unit::default_integer(10)),
-        );
-        let element: Element = path.into();
+    fn test_element_to_float_unit_converts_points() {
+        let element: Element = simple_polygon().into();
         let converted = element.to_float_unit();
 
-        assert!(converted.as_path().is_some());
-        for point in converted.as_path().unwrap().points() {
+        for point in converted.as_polygon().unwrap().points() {
             assert_eq!(*point, point.to_float_unit());
         }
     }
 
     #[test]
-    fn test_element_to_integer_unit_text() {
-        let text = Text::default();
-        let element: Element = text.into();
-        let converted = element.to_integer_unit();
-
-        assert!(converted.as_text().is_some());
-    }
-
-    #[test]
-    fn test_element_to_float_unit_reference() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let reference = Reference::new(polygon);
-        let element: Element = reference.into();
-        let converted = element.to_float_unit();
-
-        assert!(converted.as_reference().is_some());
-    }
-
-    #[test]
-    fn test_element_transform_polygon() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let element: Element = polygon.into();
-
-        let centre = Point::integer(5, 5, 1e-9);
-        let transformed = element.clone().rotate(std::f64::consts::PI / 2.0, centre);
-
-        assert!(transformed.as_polygon().is_some());
-    }
-
-    #[test]
-    fn test_element_transform_path() {
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            None,
-            None,
-        );
-        let element: Element = path.into();
-
-        let centre = Point::integer(0, 0, 1e-9);
-        let transformed = element.clone().scale(2.0, centre);
-
-        assert!(transformed.as_path().is_some());
-    }
-
-    #[test]
-    fn test_element_transform_text() {
-        let text = Text::default();
-        let element: Element = text.into();
-
-        let centre = Point::integer(0, 0, 1e-9);
-        let transformed = element.clone().reflect(0.0, centre);
-
-        assert!(transformed.as_text().is_some());
-    }
-
-    #[test]
-    fn test_element_transform_reference() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-
-        let grid = Grid::default()
-            .with_columns(2)
-            .with_rows(2)
-            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
-            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
-
-        let reference = Reference::new(polygon).with_grid(grid);
-        let element: Element = reference.into();
-
-        let delta = Point::integer(5, 5, 1e-9);
-        let transformed = element.clone().translate(delta);
-
-        assert!(transformed.as_reference().is_some());
+    fn test_element_transform_preserves_variant() {
+        let centre = origin();
+        for element in all_elements() {
+            let rotated = element.clone().rotate(std::f64::consts::PI / 2.0, centre);
+            assert_eq!(
+                std::mem::discriminant(&element),
+                std::mem::discriminant(&rotated)
+            );
+        }
     }
 
     #[test]
     fn test_element_move_to() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let element: Element = polygon.into();
-
-        let target = Point::integer(20, 20, 1e-9);
-        let moved = element.move_to(target);
-
+        let element: Element = simple_polygon().into();
+        let moved = element.move_to(p(20, 20));
         assert!(moved.as_polygon().is_some());
     }
 
     #[test]
     fn test_element_move_by() {
-        let path = Path::new(
-            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-            1,
-            0,
-            None,
-            None,
-        );
-        let element: Element = path.into();
-
-        let delta = Point::integer(5, 5, 1e-9);
-        let moved = element.move_by(delta);
-
+        let element: Element = simple_path().into();
+        let moved = element.move_by(p(5, 5));
         assert!(moved.as_path().is_some());
     }
 
     #[test]
     fn test_element_bounding_box_polygon() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let element: Element = polygon.into();
+        let element: Element = simple_polygon().into();
         let (min, max) = element.bounding_box();
-        assert_eq!(min, Point::integer(0, 0, 1e-9));
-        assert_eq!(max, Point::integer(10, 10, 1e-9));
+        assert_eq!(min, p(0, 0));
+        assert_eq!(max, p(10, 10));
     }
 
     #[test]
     fn test_element_bounding_box_path() {
-        let path = Path::new(
-            vec![Point::integer(-5, 3, 1e-9), Point::integer(10, 7, 1e-9)],
-            1,
-            0,
-            None,
-            None,
-        );
+        let path = Path::new(vec![p(-5, 3), p(10, 7)], 1, 0, None, None);
         let element: Element = path.into();
         let (min, max) = element.bounding_box();
-        assert_eq!(min, Point::integer(-5, 3, 1e-9));
-        assert_eq!(max, Point::integer(10, 7, 1e-9));
+        assert_eq!(min, p(-5, 3));
+        assert_eq!(max, p(10, 7));
     }
 
     #[test]
     fn test_element_bounding_box_text() {
-        let text = Text::default().set_origin(Point::integer(5, 10, 1e-9));
+        let text = Text::default().set_origin(p(5, 10));
         let element: Element = text.into();
         let (min, max) = element.bounding_box();
-        assert_eq!(min, Point::integer(5, 10, 1e-9));
-        assert_eq!(max, Point::integer(5, 10, 1e-9));
-    }
-
-    #[test]
-    fn test_element_to_integer_unit_path() {
-        let path = Path::new(
-            vec![Point::float(1.5, 2.5, 1e-6), Point::float(10.0, 0.0, 1e-6)],
-            1,
-            0,
-            None,
-            Some(crate::Unit::default_integer(10)),
-        );
-        let element: Element = path.into();
-        let converted = element.to_integer_unit();
-
-        assert!(converted.as_path().is_some());
-        for point in converted.as_path().unwrap().points() {
-            assert_eq!(*point, point.to_integer_unit());
-        }
-    }
-
-    #[test]
-    fn test_element_to_integer_unit_reference() {
-        let polygon = Polygon::new(
-            [
-                Point::float(1.5, 2.5, 1e-6),
-                Point::float(10.0, 0.0, 1e-6),
-                Point::float(10.0, 10.0, 1e-6),
-            ],
-            1,
-            0,
-        );
-        let reference = Reference::new(polygon);
-        let element: Element = reference.into();
-        let converted = element.to_integer_unit();
-
-        assert!(converted.as_reference().is_some());
-    }
-
-    #[test]
-    fn test_element_to_float_unit_polygon() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let element: Element = polygon.into();
-        let converted = element.to_float_unit();
-
-        assert!(converted.as_polygon().is_some());
-        for point in converted.as_polygon().unwrap().points() {
-            assert_eq!(*point, point.to_float_unit());
-        }
-    }
-
-    #[test]
-    fn test_element_to_float_unit_text() {
-        let text = Text::default();
-        let element: Element = text.into();
-        let converted = element.to_float_unit();
-
-        assert!(converted.as_text().is_some());
+        assert_eq!(min, p(5, 10));
+        assert_eq!(max, p(5, 10));
     }
 
     #[test]
     fn test_element_bounding_box_reference() {
-        let polygon = Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-            ],
-            1,
-            0,
-        );
-        let reference = Reference::new(polygon);
-        let element: Element = reference.into();
+        let element: Element = simple_reference().into();
         let (min, max) = element.bounding_box();
         assert_eq!(min, Point::default());
         assert_eq!(max, Point::default());
