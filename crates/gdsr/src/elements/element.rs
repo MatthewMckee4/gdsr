@@ -44,6 +44,28 @@ impl Element {
             None
         }
     }
+
+    /// Converts the inner element to integer units.
+    #[must_use]
+    pub fn to_integer_unit(self) -> Self {
+        match self {
+            Self::Path(path) => Self::Path(path.to_integer_unit()),
+            Self::Polygon(polygon) => Self::Polygon(polygon.to_integer_unit()),
+            Self::Text(text) => Self::Text(text.to_integer_unit()),
+            Self::Reference(reference) => Self::Reference(reference.to_integer_unit()),
+        }
+    }
+
+    /// Converts the inner element to float units.
+    #[must_use]
+    pub fn to_float_unit(self) -> Self {
+        match self {
+            Self::Path(path) => Self::Path(path.to_float_unit()),
+            Self::Polygon(polygon) => Self::Polygon(polygon.to_float_unit()),
+            Self::Text(text) => Self::Text(text.to_float_unit()),
+            Self::Reference(reference) => Self::Reference(reference.to_float_unit()),
+        }
+    }
 }
 
 impl std::fmt::Display for Element {
@@ -205,6 +227,71 @@ mod tests {
         assert_eq!(r, reference);
 
         insta::assert_snapshot!(element.to_string(), @"Reference to Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0 with grid Grid at Point(0 (1.000e-9), 0 (1.000e-9)) with 2 columns and 2 rows, spacing (Point(10 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 10 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
+    }
+
+    #[test]
+    fn test_element_to_integer_unit_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::float(1.5, 2.5, 1e-6),
+                Point::float(10.0, 0.0, 1e-6),
+                Point::float(10.0, 10.0, 1e-6),
+            ],
+            1,
+            0,
+        );
+        let element: Element = polygon.into();
+        let converted = element.to_integer_unit();
+
+        assert!(converted.as_polygon().is_some());
+        for point in converted.as_polygon().unwrap().points() {
+            assert_eq!(*point, point.to_integer_unit());
+        }
+    }
+
+    #[test]
+    fn test_element_to_float_unit_path() {
+        let path = Path::new(
+            vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
+            1,
+            0,
+            None,
+            Some(crate::Unit::default_integer(10)),
+        );
+        let element: Element = path.into();
+        let converted = element.to_float_unit();
+
+        assert!(converted.as_path().is_some());
+        for point in converted.as_path().unwrap().points() {
+            assert_eq!(*point, point.to_float_unit());
+        }
+    }
+
+    #[test]
+    fn test_element_to_integer_unit_text() {
+        let text = Text::default();
+        let element: Element = text.into();
+        let converted = element.to_integer_unit();
+
+        assert!(converted.as_text().is_some());
+    }
+
+    #[test]
+    fn test_element_to_float_unit_reference() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let reference = Reference::new(polygon);
+        let element: Element = reference.into();
+        let converted = element.to_float_unit();
+
+        assert!(converted.as_reference().is_some());
     }
 
     #[test]

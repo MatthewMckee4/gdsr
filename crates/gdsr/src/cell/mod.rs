@@ -57,6 +57,42 @@ impl Cell {
         }
     }
 
+    /// Converts all elements to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.polygons = self
+            .polygons
+            .into_iter()
+            .map(Polygon::to_integer_unit)
+            .collect();
+        self.paths = self.paths.into_iter().map(Path::to_integer_unit).collect();
+        self.texts = self.texts.into_iter().map(Text::to_integer_unit).collect();
+        self.references = self
+            .references
+            .into_iter()
+            .map(Reference::to_integer_unit)
+            .collect();
+        self
+    }
+
+    /// Converts all elements to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.polygons = self
+            .polygons
+            .into_iter()
+            .map(Polygon::to_float_unit)
+            .collect();
+        self.paths = self.paths.into_iter().map(Path::to_float_unit).collect();
+        self.texts = self.texts.into_iter().map(Text::to_float_unit).collect();
+        self.references = self
+            .references
+            .into_iter()
+            .map(Reference::to_float_unit)
+            .collect();
+        self
+    }
+
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
         let mut elements: Vec<Element> = Vec::new();
@@ -219,6 +255,58 @@ mod tests {
         cell.add(polygon);
 
         insta::assert_snapshot!(cell.to_string(), @"Cell 'test_cell' with 1 polygon(s), 0 path(s), 0 text(s)");
+    }
+
+    #[test]
+    fn test_cell_to_integer_unit() {
+        let mut cell = Cell::new("test");
+        cell.add(Polygon::new(
+            vec![
+                Point::float(1.5, 2.5, 1e-6),
+                Point::float(10.0, 0.0, 1e-6),
+                Point::float(10.0, 10.0, 1e-6),
+            ],
+            1,
+            0,
+        ));
+        cell.add(Path::new(
+            vec![Point::float(0.0, 0.0, 1e-6)],
+            0,
+            0,
+            None,
+            None,
+        ));
+        cell.add(Text::default().set_origin(Point::float(5.0, 5.0, 1e-6)));
+
+        let converted = cell.to_integer_unit();
+
+        assert_eq!(converted.polygons().len(), 1);
+        assert_eq!(converted.paths().len(), 1);
+        assert_eq!(converted.texts().len(), 1);
+        for point in converted.polygons()[0].points() {
+            assert_eq!(*point, point.to_integer_unit());
+        }
+    }
+
+    #[test]
+    fn test_cell_to_float_unit() {
+        let mut cell = Cell::new("test");
+        cell.add(Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        ));
+
+        let converted = cell.to_float_unit();
+
+        assert_eq!(converted.polygons().len(), 1);
+        for point in converted.polygons()[0].points() {
+            assert_eq!(*point, point.to_float_unit());
+        }
     }
 
     #[test]

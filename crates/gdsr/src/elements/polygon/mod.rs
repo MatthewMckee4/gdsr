@@ -46,6 +46,24 @@ impl Polygon {
         crate::utils::geometry::is_point_inside(point, &self.points)
     }
 
+    /// Converts all points to integer units.
+    #[must_use]
+    pub fn to_integer_unit(mut self) -> Self {
+        self.points = self
+            .points
+            .into_iter()
+            .map(|p| p.to_integer_unit())
+            .collect();
+        self
+    }
+
+    /// Converts all points to float units.
+    #[must_use]
+    pub fn to_float_unit(mut self) -> Self {
+        self.points = self.points.into_iter().map(|p| p.to_float_unit()).collect();
+        self
+    }
+
     /// Check if a point lies on the edge of the polygon
     pub fn is_point_on_edge(&self, point: &Point) -> bool {
         crate::utils::geometry::is_point_on_edge(point, &self.points)
@@ -268,6 +286,36 @@ mod tests {
         assert_eq!(moved.points()[2], Point::integer(15, 15, 1e-9));
         assert_eq!(moved.points()[3], Point::integer(5, 15, 1e-9));
         assert_eq!(moved.points()[4], Point::integer(5, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_polygon_to_integer_unit() {
+        let points = vec![
+            Point::float(1.5, 2.5, 1e-6),
+            Point::float(10.0, 0.0, 1e-6),
+            Point::float(10.0, 10.0, 1e-6),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        let converted = polygon.to_integer_unit();
+
+        for point in converted.points() {
+            assert_eq!(*point, point.to_integer_unit());
+        }
+    }
+
+    #[test]
+    fn test_polygon_to_float_unit() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+        ];
+        let polygon = Polygon::new(points, 1, 0);
+        let converted = polygon.to_float_unit();
+
+        for point in converted.points() {
+            assert_eq!(*point, point.to_float_unit());
+        }
     }
 
     #[test]
