@@ -10,7 +10,14 @@ use crate::utils::io::{
 impl ToGds for Polygon {
     fn to_gds_impl(&self, buffer: &mut impl std::io::Write, database_units: f64) -> io::Result<()> {
         if self.points().len() > MAX_POINTS {
-            return Ok(());
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "Polygon has {} points, which exceeds the maximum of {}",
+                    self.points().len(),
+                    MAX_POINTS
+                ),
+            ));
         }
 
         let polygon_head = [

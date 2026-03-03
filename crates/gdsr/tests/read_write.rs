@@ -907,17 +907,9 @@ fn test_invalid_polygon() {
 
     library.add_cell(cell);
 
-    let _res = library.write_file(&gds_path, 1e-9, 1e-9);
+    let res = library.write_file(&gds_path, 1e-9, 1e-9);
 
-    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
-
-    let mut expected_library = Library::new("reference_test");
-
-    let cell = Cell::new("cell");
-
-    expected_library.add_cell(cell);
-
-    assert_eq!(expected_library, new_library);
+    assert!(res.is_err());
 }
 
 #[test]
