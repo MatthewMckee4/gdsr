@@ -1621,4 +1621,355 @@ mod tests {
         assert_eq!(polygons.len(), 1);
         assert!(polygons[0].points.is_empty());
     }
+
+    #[test]
+    fn test_record_reader_nodata_with_valid_utf8_payload() {
+        let payload = b"hello";
+        let data = build_record(GDSRecord::EndEl as u8, GDSDataType::NoData as u8, payload);
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        let (record, rdata) = result.unwrap();
+        assert!(matches!(record, GDSRecord::EndEl));
+        if let GDSRecordData::Str(s) = rdata {
+            assert_eq!(s, "hello");
+        } else {
+            panic!("Expected Str data for NoData with payload");
+        }
+    }
+
+    struct ErrorReader;
+
+    impl Read for ErrorReader {
+        fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "simulated error",
+            ))
+        }
+    }
+
+    #[test]
+    fn test_record_reader_non_eof_io_error() {
+        let mut reader = RecordReader::new(BufReader::new(ErrorReader));
+        let result = reader.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_err());
+    }
+
+    #[test]
+    fn test_write_transformation_angle_only() {
+        let mut buf = Vec::new();
+        write_transformation_to_file(&mut buf, 45.0, 1.0, false).unwrap();
+        assert!(!buf.is_empty());
+
+        let mut buf2 = Vec::new();
+        write_transformation_to_file(&mut buf2, 45.0, 2.0, false).unwrap();
+        assert!(buf2.len() > buf.len());
+    }
+
+    #[test]
+    fn test_record_reader_invalid_utf8_in_ascii_string_returns_error() {
+        let payload = [0xFF, 0xFE, 0x80, 0x81];
+        let data = build_record(
+            GDSRecord::LibName as u8,
+            GDSDataType::AsciiString as u8,
+            &payload,
+        );
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_record_reader_invalid_utf8_in_nodata_with_payload_returns_error() {
+        let payload = [0xFF, 0xFE, 0x80, 0x81];
+        let data = build_record(GDSRecord::EndEl as u8, GDSDataType::NoData as u8, &payload);
+        let mut reader = make_reader(&data);
+        let result = reader.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_gds_mismatched_data_types_are_silently_ignored() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+
+        data.extend_from_slice(&build_record(
+            GDSRecord::BgnStr as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00; 24],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::StrName as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+
+        // Path with wrong data types for Layer, DataType, Width, PathType
+        data.extend_from_slice(&build_record(
+            GDSRecord::Path as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Layer as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 8],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::DataType as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 8],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Width as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::PathType as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 8],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+
+        // Text with wrong data types for Presentation, String, XY
+        data.extend_from_slice(&build_record(
+            GDSRecord::Text as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Presentation as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 8],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::String as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+
+        // Reference (ARef) with wrong data types for SName, ColRow, STrans, Mag, Angle
+        data.extend_from_slice(&build_record(
+            GDSRecord::ARef as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::SName as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::ColRow as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 16],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::STrans as u8,
+            GDSDataType::EightByteReal as u8,
+            &[0x00; 8],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Mag as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::Angle as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &0i16.to_be_bytes(),
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndStr as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mismatched.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert_eq!(library.cells.len(), 1);
+    }
+
+    #[test]
+    fn test_from_gds_endel_outside_cell_is_ignored() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("endel_no_cell.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert!(library.cells.is_empty());
+    }
+
+    #[test]
+    fn test_from_gds_xy_reference_with_unexpected_point_count() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.extend_from_slice(&build_record(
+            GDSRecord::BgnStr as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00; 24],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::StrName as u8,
+            GDSDataType::AsciiString as u8,
+            b"cell",
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::ARef as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+
+        // XY with 2 points (neither 1 nor 3)
+        let mut xy_payload = Vec::new();
+        for val in [10i32, 20, 30, 40] {
+            xy_payload.extend_from_slice(&val.to_be_bytes());
+        }
+        data.extend_from_slice(&build_record(
+            GDSRecord::XY as u8,
+            GDSDataType::FourByteSignedInteger as u8,
+            &xy_payload,
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndEl as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndStr as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("xy_2pts.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert_eq!(library.cells.len(), 1);
+    }
+
+    #[test]
+    fn test_from_gds_records_outside_element_context() {
+        let mut data = Vec::new();
+        write_gds_head_to_file("test", 1e-3, 1e-9, &mut data).unwrap();
+        data.extend_from_slice(&build_record(
+            GDSRecord::BgnStr as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00; 24],
+        ));
+        data.extend_from_slice(&build_record(
+            GDSRecord::StrName as u8,
+            GDSDataType::AsciiString as u8,
+            b"cell",
+        ));
+
+        // SName outside reference context
+        data.extend_from_slice(&build_record(
+            GDSRecord::SName as u8,
+            GDSDataType::AsciiString as u8,
+            b"refname",
+        ));
+        // Presentation outside text context
+        data.extend_from_slice(&build_record(
+            GDSRecord::Presentation as u8,
+            GDSDataType::BitArray as u8,
+            &0i16.to_be_bytes(),
+        ));
+        // XY outside any element context
+        let mut xy_payload = Vec::new();
+        for val in [10i32, 20] {
+            xy_payload.extend_from_slice(&val.to_be_bytes());
+        }
+        data.extend_from_slice(&build_record(
+            GDSRecord::XY as u8,
+            GDSDataType::FourByteSignedInteger as u8,
+            &xy_payload,
+        ));
+
+        data.extend_from_slice(&build_record(
+            GDSRecord::EndStr as u8,
+            GDSDataType::NoData as u8,
+            &[],
+        ));
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out_of_context.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert_eq!(library.cells.len(), 1);
+    }
+
+    #[test]
+    fn test_from_gds_units_with_wrong_data_type() {
+        let mut data = Vec::new();
+        // Write header manually without using write_gds_head_to_file,
+        // so we can inject a Units record with wrong data type.
+        let now = chrono::Local::now().naive_utc();
+        let head_start = [
+            6u16,
+            combine_record_and_data_type(GDSRecord::Header, GDSDataType::TwoByteSignedInteger),
+            0x0258,
+            28,
+            combine_record_and_data_type(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger),
+            now.year() as u16,
+            now.month() as u16,
+            now.day() as u16,
+            now.hour() as u16,
+            now.minute() as u16,
+            now.second() as u16,
+            now.year() as u16,
+            now.month() as u16,
+            now.day() as u16,
+            now.hour() as u16,
+            now.minute() as u16,
+            now.second() as u16,
+        ];
+        write_u16_array_to_file(&mut data, &head_start).unwrap();
+        write_string_with_record_to_file(&mut data, GDSRecord::LibName, "test").unwrap();
+
+        // Units with I16 instead of F64
+        data.extend_from_slice(&build_record(
+            GDSRecord::Units as u8,
+            GDSDataType::TwoByteSignedInteger as u8,
+            &[0x00, 0x01, 0x00, 0x02],
+        ));
+
+        write_gds_tail_to_file(&mut data).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad_units.gds");
+        std::fs::write(&path, &data).unwrap();
+        let library = from_gds(&path, None).unwrap();
+        assert!(library.cells.is_empty());
+    }
 }

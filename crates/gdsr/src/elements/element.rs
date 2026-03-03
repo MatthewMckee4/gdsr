@@ -470,6 +470,71 @@ mod tests {
     }
 
     #[test]
+    fn test_element_to_integer_unit_path() {
+        let path = Path::new(
+            vec![Point::float(1.5, 2.5, 1e-6), Point::float(10.0, 0.0, 1e-6)],
+            1,
+            0,
+            None,
+            Some(crate::Unit::default_integer(10)),
+        );
+        let element: Element = path.into();
+        let converted = element.to_integer_unit();
+
+        assert!(converted.as_path().is_some());
+        for point in converted.as_path().unwrap().points() {
+            assert_eq!(*point, point.to_integer_unit());
+        }
+    }
+
+    #[test]
+    fn test_element_to_integer_unit_reference() {
+        let polygon = Polygon::new(
+            [
+                Point::float(1.5, 2.5, 1e-6),
+                Point::float(10.0, 0.0, 1e-6),
+                Point::float(10.0, 10.0, 1e-6),
+            ],
+            1,
+            0,
+        );
+        let reference = Reference::new(polygon);
+        let element: Element = reference.into();
+        let converted = element.to_integer_unit();
+
+        assert!(converted.as_reference().is_some());
+    }
+
+    #[test]
+    fn test_element_to_float_unit_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let element: Element = polygon.into();
+        let converted = element.to_float_unit();
+
+        assert!(converted.as_polygon().is_some());
+        for point in converted.as_polygon().unwrap().points() {
+            assert_eq!(*point, point.to_float_unit());
+        }
+    }
+
+    #[test]
+    fn test_element_to_float_unit_text() {
+        let text = Text::default();
+        let element: Element = text.into();
+        let converted = element.to_float_unit();
+
+        assert!(converted.as_text().is_some());
+    }
+
+    #[test]
     fn test_element_bounding_box_reference() {
         let polygon = Polygon::new(
             [
