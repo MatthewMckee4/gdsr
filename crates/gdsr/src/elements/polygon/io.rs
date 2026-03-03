@@ -13,14 +13,13 @@ impl ToGds for Polygon {
         database_units: f64,
     ) -> Result<(), GdsError> {
         if self.points().len() > MAX_POINTS {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
+            return Err(GdsError::ValidationError {
+                message: format!(
                     "Polygon has {} points, which exceeds the maximum of {}",
                     self.points().len(),
                     MAX_POINTS
                 ),
-            ));
+            });
         }
 
         let polygon_head = [
