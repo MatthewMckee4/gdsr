@@ -101,27 +101,8 @@ jobs:
         with:
           tool: cargo-nextest
 
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
-        with:
-          python-version: "3.10"
-
-      - name: Setup Python
-        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4.9.1
-        id: setup-python
-        with:
-          python-version: "3.10"
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
-        with:
-          command: build
-
       - name: Run tests
-        env:
-          PYO3_PYTHON: ${{ steps.setup-python.outputs.python-path }}
-          KARVA_MAX_PARALLELISM: 2
-        run: |
-          cargo nextest run
+        run: cargo nextest run
 
   build-docs:
     name: "Build docs"
