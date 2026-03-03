@@ -1,6 +1,7 @@
 [package]
 name = "gdsr"
 version = "0.0.1-alpha.0"
+description = "A GDSII reader and writer for Rust"
 
 edition = { workspace = true }
 rust-version = { workspace = true }
