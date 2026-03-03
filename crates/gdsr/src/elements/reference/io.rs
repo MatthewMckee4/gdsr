@@ -44,9 +44,17 @@ impl Reference {
         database_units: f64,
         cell_name: &str,
     ) -> std::io::Result<()> {
+        let is_single_instance = self.grid().columns() == 1 && self.grid().rows() == 1;
+
+        let record_type = if is_single_instance {
+            GDSRecord::SRef
+        } else {
+            GDSRecord::ARef
+        };
+
         let buffer_start = [
             4,
-            combine_record_and_data_type(GDSRecord::ARef, GDSDataType::NoData),
+            combine_record_and_data_type(record_type, GDSDataType::NoData),
         ];
 
         write_u16_array_to_file(buffer, &buffer_start)?;
@@ -59,46 +67,51 @@ impl Reference {
 
         write_transformation_to_file(buffer, angle, magnification, x_reflection)?;
 
-        let buffer_array = [
-            8,
-            combine_record_and_data_type(GDSRecord::ColRow, GDSDataType::TwoByteSignedInteger),
-            self.grid().columns() as u16,
-            self.grid().rows() as u16,
-        ];
-
-        write_u16_array_to_file(buffer, &buffer_array)?;
-
         let origin = self
             .grid()
             .origin()
             .rotate_around_point(self.grid().angle(), &self.grid().origin());
 
-        match (self.grid.spacing_x(), self.grid.spacing_y()) {
-            (Some(spacing_x), Some(spacing_y)) => {
-                let point2 = ((origin + spacing_x) * self.grid().columns())
-                    .rotate_around_point(self.grid().angle(), &origin);
+        if is_single_instance {
+            let reference_points = [origin];
+            write_points_to_file(buffer, &reference_points, database_units)?;
+        } else {
+            let buffer_array = [
+                8,
+                combine_record_and_data_type(GDSRecord::ColRow, GDSDataType::TwoByteSignedInteger),
+                self.grid().columns() as u16,
+                self.grid().rows() as u16,
+            ];
 
-                let point3 = ((origin + spacing_y) * self.grid().rows())
-                    .rotate_around_point(self.grid().angle(), &origin);
+            write_u16_array_to_file(buffer, &buffer_array)?;
 
-                let reference_points = [origin, point2, point3];
-                write_points_to_file(buffer, &reference_points, database_units)?;
-            }
-            (Some(spacing_x), None) => {
-                let point2 = ((origin + spacing_x) * self.grid().columns())
-                    .rotate_around_point(self.grid().angle(), &origin);
-                let reference_points = [origin, point2, origin];
-                write_points_to_file(buffer, &reference_points, database_units)?;
-            }
-            (None, Some(spacing_y)) => {
-                let point3 = ((origin + spacing_y) * self.grid().rows())
-                    .rotate_around_point(self.grid().angle(), &origin);
-                let reference_points = [origin, origin, point3];
-                write_points_to_file(buffer, &reference_points, database_units)?;
-            }
-            _ => {
-                let reference_points = [origin];
-                write_points_to_file(buffer, &reference_points, database_units)?;
+            match (self.grid.spacing_x(), self.grid.spacing_y()) {
+                (Some(spacing_x), Some(spacing_y)) => {
+                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                        .rotate_around_point(self.grid().angle(), &origin);
+
+                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                        .rotate_around_point(self.grid().angle(), &origin);
+
+                    let reference_points = [origin, point2, point3];
+                    write_points_to_file(buffer, &reference_points, database_units)?;
+                }
+                (Some(spacing_x), None) => {
+                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                        .rotate_around_point(self.grid().angle(), &origin);
+                    let reference_points = [origin, point2, origin];
+                    write_points_to_file(buffer, &reference_points, database_units)?;
+                }
+                (None, Some(spacing_y)) => {
+                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                        .rotate_around_point(self.grid().angle(), &origin);
+                    let reference_points = [origin, origin, point3];
+                    write_points_to_file(buffer, &reference_points, database_units)?;
+                }
+                _ => {
+                    let reference_points = [origin];
+                    write_points_to_file(buffer, &reference_points, database_units)?;
+                }
             }
         }
 

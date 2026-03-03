@@ -1,4 +1,5 @@
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
+use std::fs;
 
 use gdsr::*;
 use rstest::rstest;
@@ -1114,5 +1115,234 @@ fn test_multiple_cells_referencing_same_cell() {
 
     let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
 
+    assert_eq!(library, new_library);
+}
+
+/// Returns true if the raw GDS bytes contain the given record type marker.
+fn gds_bytes_contain_record(bytes: &[u8], record_byte: u8) -> bool {
+    let mut offset = 0;
+    while offset + 4 <= bytes.len() {
+        let size = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]) as usize;
+        if size < 4 {
+            break;
+        }
+        if bytes[offset + 2] == record_byte {
+            return true;
+        }
+        offset += size;
+    }
+    false
+}
+
+const SREF_RECORD_BYTE: u8 = 0x0A;
+const AREF_RECORD_BYTE: u8 = 0x0B;
+
+#[test]
+fn test_single_instance_reference_writes_sref() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("sref.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("sref_test");
+
+    let mut ref_cell = Cell::new("inner");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    let mut top = Cell::new("top");
+    top.add(
+        Reference::new("inner".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(50, 50, units))),
+    );
+    library.add_cell(top);
+
+    library.write_file(&gds_path, 1e-9, 1e-9).unwrap();
+
+    let raw = fs::read(&gds_path).unwrap();
+    assert!(gds_bytes_contain_record(&raw, SREF_RECORD_BYTE));
+    assert!(!gds_bytes_contain_record(&raw, AREF_RECORD_BYTE));
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_multi_instance_reference_writes_aref() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("aref.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("aref_test");
+
+    let mut ref_cell = Cell::new("inner");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    let mut top = Cell::new("top");
+    top.add(
+        Reference::new("inner".to_string()).with_grid(
+            Grid::default()
+                .with_origin(Point::integer(0, 0, units))
+                .with_columns(2)
+                .with_rows(3)
+                .with_spacing_x(Some(Point::integer(20, 0, units)))
+                .with_spacing_y(Some(Point::integer(0, 20, units))),
+        ),
+    );
+    library.add_cell(top);
+
+    library.write_file(&gds_path, 1e-9, 1e-9).unwrap();
+
+    let raw = fs::read(&gds_path).unwrap();
+    assert!(gds_bytes_contain_record(&raw, AREF_RECORD_BYTE));
+    assert!(!gds_bytes_contain_record(&raw, SREF_RECORD_BYTE));
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_sref_roundtrip_preserves_origin() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("sref_origin.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("sref_origin_test");
+
+    let mut ref_cell = Cell::new("base");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(5, 0, units),
+            Point::integer(5, 5, units),
+            Point::integer(0, 5, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    let origin = Point::integer(123, 456, units);
+    let mut top = Cell::new("top");
+    top.add(Reference::new("base".to_string()).with_grid(Grid::default().with_origin(origin)));
+    library.add_cell(top);
+
+    library.write_file(&gds_path, 1e-9, 1e-9).unwrap();
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+    let top_cell = new_library.get_cell("top").unwrap();
+    let reference = top_cell.references().first().unwrap();
+
+    assert_eq!(reference.grid().origin(), origin);
+    assert_eq!(reference.grid().columns(), 1);
+    assert_eq!(reference.grid().rows(), 1);
+}
+
+#[test]
+fn test_sref_with_transformation_roundtrip() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("sref_transform.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("sref_transform_test");
+
+    let mut ref_cell = Cell::new("base");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    let mut top = Cell::new("top");
+    top.add(
+        Reference::new("base".to_string()).with_grid(
+            Grid::default()
+                .with_origin(Point::integer(100, 200, units))
+                .with_magnification(2.0)
+                .with_angle(FRAC_PI_2)
+                .with_x_reflection(true),
+        ),
+    );
+    library.add_cell(top);
+
+    library.write_file(&gds_path, 1e-9, 1e-9).unwrap();
+
+    let raw = fs::read(&gds_path).unwrap();
+    assert!(gds_bytes_contain_record(&raw, SREF_RECORD_BYTE));
+    assert!(!gds_bytes_contain_record(&raw, AREF_RECORD_BYTE));
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
+    assert_eq!(library, new_library);
+}
+
+#[test]
+fn test_mixed_sref_and_aref_in_same_cell() {
+    let temp_dir = tempdir().unwrap();
+    let gds_path = temp_dir.path().join("mixed_refs.gds");
+
+    let units = 1e-9;
+    let mut library = Library::new("mixed_refs_test");
+
+    let mut ref_cell = Cell::new("base");
+    ref_cell.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+            Point::integer(0, 10, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(ref_cell);
+
+    let mut top = Cell::new("top");
+    top.add(
+        Reference::new("base".to_string())
+            .with_grid(Grid::default().with_origin(Point::integer(0, 0, units))),
+    );
+    top.add(
+        Reference::new("base".to_string()).with_grid(
+            Grid::default()
+                .with_origin(Point::integer(100, 0, units))
+                .with_columns(3)
+                .with_rows(2)
+                .with_spacing_x(Some(Point::integer(20, 0, units)))
+                .with_spacing_y(Some(Point::integer(0, 20, units))),
+        ),
+    );
+    library.add_cell(top);
+
+    library.write_file(&gds_path, 1e-9, 1e-9).unwrap();
+
+    let raw = fs::read(&gds_path).unwrap();
+    assert!(gds_bytes_contain_record(&raw, SREF_RECORD_BYTE));
+    assert!(gds_bytes_contain_record(&raw, AREF_RECORD_BYTE));
+
+    let new_library = Library::read_file(&gds_path, Some(DEFAULT_INTEGER_UNITS)).unwrap();
     assert_eq!(library, new_library);
 }
