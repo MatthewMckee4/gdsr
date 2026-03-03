@@ -353,6 +353,93 @@ mod tests {
     }
 
     #[test]
+    fn test_bounding_box_collinear_points() {
+        let points = vec![
+            Point::integer(1, 5, 1e-9),
+            Point::integer(3, 5, 1e-9),
+            Point::integer(7, 5, 1e-9),
+        ];
+        let (min, max) = bounding_box(&points);
+        assert_eq!(min, Point::integer(1, 5, 1e-9));
+        assert_eq!(max, Point::integer(7, 5, 1e-9));
+    }
+
+    #[test]
+    fn test_bounding_box_large_coordinates() {
+        let points = vec![
+            Point::integer(1_000_000, -2_000_000, 1e-9),
+            Point::integer(-3_000_000, 4_000_000, 1e-9),
+        ];
+        let (min, max) = bounding_box(&points);
+        assert_eq!(min, Point::integer(-3_000_000, -2_000_000, 1e-9));
+        assert_eq!(max, Point::integer(1_000_000, 4_000_000, 1e-9));
+    }
+
+    #[test]
+    fn test_area_concave_polygon() {
+        let concave = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(4.0, 0.0, 1e-6),
+            Point::float(4.0, 4.0, 1e-6),
+            Point::float(2.0, 2.0, 1e-6),
+            Point::float(0.0, 4.0, 1e-6),
+        ];
+        let area_result = area(&concave);
+        assert_eq!(area_result, Unit::float(12.0, 1e-6));
+    }
+
+    #[test]
+    fn test_perimeter_triangle() {
+        let triangle = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(3.0, 0.0, 1e-6),
+            Point::float(0.0, 4.0, 1e-6),
+            Point::float(0.0, 0.0, 1e-6),
+        ];
+        let perimeter_result = perimeter(&triangle);
+        assert_eq!(perimeter_result, Unit::float(12.0, 1e-6));
+    }
+
+    #[test]
+    fn test_perimeter_single_point() {
+        let points = [Point::integer(1, 1, 1e-9)];
+        assert_eq!(perimeter(&points), Unit::float(0.0, 1e-6));
+    }
+
+    #[test]
+    fn test_perimeter_two_points() {
+        let points = [Point::float(0.0, 0.0, 1e-6), Point::float(3.0, 4.0, 1e-6)];
+        let perimeter_result = perimeter(&points);
+        assert_eq!(perimeter_result, Unit::float(5.0, 1e-6));
+    }
+
+    #[test]
+    fn test_is_point_inside_concave_polygon() {
+        let concave = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(4.0, 0.0, 1e-6),
+            Point::float(4.0, 4.0, 1e-6),
+            Point::float(2.0, 2.0, 1e-6),
+            Point::float(0.0, 4.0, 1e-6),
+        ];
+        assert!(is_point_inside(&Point::float(1.0, 1.0, 1e-6), &concave));
+        assert!(!is_point_inside(&Point::float(2.0, 3.0, 1e-6), &concave));
+    }
+
+    /// Vertices are not considered "on edge" because geo's `Line::contains` excludes endpoints.
+    #[test]
+    fn test_is_point_on_edge_vertex() {
+        let triangle = [
+            Point::float(0.0, 0.0, 1e-6),
+            Point::float(2.0, 0.0, 1e-6),
+            Point::float(1.0, 2.0, 1e-6),
+        ];
+        assert!(!is_point_on_edge(&Point::float(0.0, 0.0, 1e-6), &triangle));
+        assert!(!is_point_on_edge(&Point::float(2.0, 0.0, 1e-6), &triangle));
+        assert!(!is_point_on_edge(&Point::float(1.0, 2.0, 1e-6), &triangle));
+    }
+
+    #[test]
     #[allow(clippy::approx_constant)]
     fn test_round_to_decimals() {
         assert_eq!(round_to_decimals(3.14159, 2), 3.14);
