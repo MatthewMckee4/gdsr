@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke};
 use gdsr::{Dimensions, Element};
 
+use crate::colors::LayerColorMap;
 use crate::viewport::Viewport;
 
 /// World-space axis-aligned bounding box with named fields.
@@ -42,20 +45,20 @@ impl WorldBBox {
 /// Trait for viewer-drawable elements. Provides layer info, bounding box, and drawing.
 pub trait Drawable {
     /// Returns all `(layer, data_type)` pairs this element contributes to.
-    /// Empty for references (which are expanded before drawing).
     fn layer_keys(&self) -> Vec<(u16, u16)>;
 
     /// Returns the world-space bounding box, or `None` for elements without geometry.
     fn world_bbox(&self) -> Option<WorldBBox>;
 
-    /// Draws this element onto the painter.
+    /// Draws this element onto the painter, resolving its own color and visibility.
     fn draw(
         &self,
         painter: &egui::Painter,
         viewport: &Viewport,
         rect: Rect,
         visible: &WorldBBox,
-        color: Color32,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     );
 }
 
@@ -83,8 +86,14 @@ impl Drawable for gdsr::Polygon {
         viewport: &Viewport,
         rect: Rect,
         visible: &WorldBBox,
-        color: Color32,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     ) {
+        let key = (self.layer(), self.data_type());
+        if hidden_layers.contains(&key) {
+            return;
+        }
+
         let points = self.points();
         if points.len() < 3 {
             return;
@@ -106,6 +115,7 @@ impl Drawable for gdsr::Polygon {
             return;
         }
 
+        let color = layer_colors.get(key.0, key.1);
         let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
@@ -184,8 +194,14 @@ impl Drawable for gdsr::Path {
         viewport: &Viewport,
         rect: Rect,
         visible: &WorldBBox,
-        color: Color32,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     ) {
+        let key = (self.layer(), self.data_type());
+        if hidden_layers.contains(&key) {
+            return;
+        }
+
         let points = self.points();
         if points.len() < 2 {
             return;
@@ -206,6 +222,8 @@ impl Drawable for gdsr::Path {
         if sw < 1.0 && sh < 1.0 {
             return;
         }
+
+        let color = layer_colors.get(key.0, key.1);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
             let stroke = Stroke::new(1.0, color);
@@ -249,8 +267,14 @@ impl Drawable for gdsr::Text {
         viewport: &Viewport,
         rect: Rect,
         _visible: &WorldBBox,
-        color: Color32,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     ) {
+        let key = (self.layer(), 0);
+        if hidden_layers.contains(&key) {
+            return;
+        }
+
         let origin = self.origin();
         let screen_pos = viewport.world_to_screen(
             origin.x().absolute_value(),
@@ -268,6 +292,7 @@ impl Drawable for gdsr::Text {
         }
         let font_size = font_size.min(48.0);
 
+        let color = layer_colors.get(key.0, key.1);
         painter.text(
             screen_pos,
             egui::Align2::LEFT_BOTTOM,
@@ -280,21 +305,47 @@ impl Drawable for gdsr::Text {
 
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(u16, u16)> {
-        vec![]
+        match self.instance().as_element() {
+            Some(element) => element.layer_keys(),
+            None => vec![],
+        }
     }
 
     fn world_bbox(&self) -> Option<WorldBBox> {
-        None
+        let element = self.instance().as_element()?;
+        let mut result: Option<WorldBBox> = None;
+        for el in self.get_elements_in_grid(element) {
+            if let Some(bbox) = el.world_bbox() {
+                result = Some(match result {
+                    Some(acc) => acc.merge(&bbox),
+                    None => bbox,
+                });
+            }
+        }
+        result
     }
 
     fn draw(
         &self,
-        _painter: &egui::Painter,
-        _viewport: &Viewport,
-        _rect: Rect,
-        _visible: &WorldBBox,
-        _color: Color32,
+        painter: &egui::Painter,
+        viewport: &Viewport,
+        rect: Rect,
+        visible: &WorldBBox,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     ) {
+        if let Some(element) = self.instance().as_element() {
+            for el in self.get_elements_in_grid(element) {
+                el.draw(
+                    painter,
+                    viewport,
+                    rect,
+                    visible,
+                    hidden_layers,
+                    layer_colors,
+                );
+            }
+        }
     }
 }
 
@@ -323,13 +374,44 @@ impl Drawable for Element {
         viewport: &Viewport,
         rect: Rect,
         visible: &WorldBBox,
-        color: Color32,
+        hidden_layers: &HashSet<(u16, u16)>,
+        layer_colors: &mut LayerColorMap,
     ) {
         match self {
-            Self::Polygon(p) => p.draw(painter, viewport, rect, visible, color),
-            Self::Path(p) => p.draw(painter, viewport, rect, visible, color),
-            Self::Text(t) => t.draw(painter, viewport, rect, visible, color),
-            Self::Reference(r) => r.draw(painter, viewport, rect, visible, color),
+            Self::Polygon(p) => p.draw(
+                painter,
+                viewport,
+                rect,
+                visible,
+                hidden_layers,
+                layer_colors,
+            ),
+            Self::Path(p) => p.draw(
+                painter,
+                viewport,
+                rect,
+                visible,
+                hidden_layers,
+                layer_colors,
+            ),
+            Self::Text(t) => t.draw(
+                painter,
+                viewport,
+                rect,
+                visible,
+                hidden_layers,
+                layer_colors,
+            ),
+            Self::Reference(r) => {
+                r.draw(
+                    painter,
+                    viewport,
+                    rect,
+                    visible,
+                    hidden_layers,
+                    layer_colors,
+                );
+            }
         }
     }
 }

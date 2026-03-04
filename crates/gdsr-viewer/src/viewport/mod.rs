@@ -1,5 +1,4 @@
 pub(crate) mod bounds;
-mod draw;
 
 pub use bounds::compute_bounds;
 
@@ -9,7 +8,7 @@ use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::Element;
 
 use crate::colors::LayerColorMap;
-use crate::drawable::WorldBBox;
+use crate::drawable::{Drawable, WorldBBox};
 use crate::spatial::SpatialGrid;
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
@@ -73,6 +72,10 @@ impl Viewport {
     }
 }
 
+/// Screen-pixel threshold below which a grid cell draws as a single LOAD rectangle
+/// instead of rendering individual elements.
+const CELL_LOAD_THRESHOLD_PX: f32 = 24.0;
+
 /// Draws the viewport and handles pan/zoom interaction.
 ///
 /// Returns the mouse position in world coordinates if the pointer is inside the viewport.
@@ -114,26 +117,50 @@ pub fn draw_viewport(
     let visible = viewport.visible_world_rect(rect);
 
     if let Some(grid) = spatial_grid {
-        draw::draw_with_grid(
-            &painter,
-            viewport,
-            rect,
-            &visible,
-            elements,
-            hidden_layers,
-            layer_colors,
-            grid,
-        );
+        for cell in grid.query_visible(&visible) {
+            let s_min = viewport.world_to_screen(cell.bbox.min_x, cell.bbox.min_y, rect);
+            let s_max = viewport.world_to_screen(cell.bbox.max_x, cell.bbox.max_y, rect);
+            let sw = (s_max.x - s_min.x).abs();
+            let sh = (s_min.y - s_max.y).abs();
+
+            if sw < 1.0 && sh < 1.0 {
+                continue;
+            }
+
+            if sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
+                if !hidden_layers.contains(&cell.dominant_layer) {
+                    let color = layer_colors.get(cell.dominant_layer.0, cell.dominant_layer.1);
+                    let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+                    let cell_rect = Rect::from_two_pos(s_min, s_max);
+                    painter.rect_filled(cell_rect, 0.0, fill);
+                }
+                continue;
+            }
+
+            for &idx in &cell.indices {
+                if let Some(element) = elements.get(idx as usize) {
+                    element.draw(
+                        &painter,
+                        viewport,
+                        rect,
+                        &visible,
+                        hidden_layers,
+                        layer_colors,
+                    );
+                }
+            }
+        }
     } else {
-        draw::draw_elements_flat(
-            &painter,
-            viewport,
-            rect,
-            &visible,
-            elements,
-            hidden_layers,
-            layer_colors,
-        );
+        for element in elements {
+            element.draw(
+                &painter,
+                viewport,
+                rect,
+                &visible,
+                hidden_layers,
+                layer_colors,
+            );
+        }
     }
 
     response
