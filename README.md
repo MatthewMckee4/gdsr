@@ -6,6 +6,10 @@
 
 GDSII manipulation, written in rust.
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/MatthewMckee4/gdsr/main/scripts/benchmark/results/benchmark.svg" alt="GDS I/O Benchmark" width="70%">
+</div>
+
 > [!WARNING]
 > This is a work in progress and is not yet ready for production use.
 

@@ -1,0 +1,12 @@
+[package]
+name = "benchmark-gdsr"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "benchmark_gdsr"
+path = "benchmark_gdsr.rs"
+
+[dependencies]
+gdsr = { path = "../.." }
