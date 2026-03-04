@@ -2,7 +2,11 @@ mod app;
 mod colors;
 mod loader;
 mod panels;
+#[cfg(test)]
+mod property_tests;
 mod spatial;
+#[cfg(test)]
+mod testutil;
 mod viewport;
 
 fn main() -> eframe::Result<()> {

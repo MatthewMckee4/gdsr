@@ -6,13 +6,18 @@ use crate::viewport::element_bbox;
 
 const GRID_SIZE: usize = 256;
 
+/// A single cell in the spatial grid, containing element indices that overlap it.
 pub struct GridCell {
+    /// Indices into the element slice passed to `SpatialGrid::build`.
     pub indices: Vec<u32>,
-    /// Tight bounding box: `[min_x, min_y, max_x, max_y]`
+    /// Tight bounding box of all elements in this cell: `[min_x, min_y, max_x, max_y]`.
     pub bbox: [f64; 4],
+    /// The most frequently occurring `(layer, data_type)` pair among elements in this cell.
     pub dominant_layer: (u16, u16),
 }
 
+/// A 256x256 uniform grid that maps world-space regions to element indices,
+/// enabling fast visible-area queries and cell-level LOAD during rendering.
 pub struct SpatialGrid {
     cells: Vec<Option<GridCell>>,
     world_min_x: f64,
@@ -21,6 +26,7 @@ pub struct SpatialGrid {
     cell_height: f64,
 }
 
+/// Extracts the `(layer, data_type)` pair from an element. References return `(0, 0)`.
 fn element_layer(element: &Element) -> (u16, u16) {
     match element {
         Element::Polygon(p) => (p.layer(), p.data_type()),
@@ -31,6 +37,8 @@ fn element_layer(element: &Element) -> (u16, u16) {
 }
 
 impl SpatialGrid {
+    /// Builds the spatial grid from elements and their pre-computed bounding box.
+    /// Each element is inserted into every grid cell its bbox overlaps.
     pub fn build(elements: &[Element], bounds: (f64, f64, f64, f64)) -> Self {
         let (min_x, min_y, max_x, max_y) = bounds;
         let epsilon = 1e-12;
@@ -98,6 +106,7 @@ impl SpatialGrid {
         }
     }
 
+    /// Returns an iterator over grid cells that overlap the given visible world-space rectangle.
     pub fn query_visible(&self, visible: &[f64; 4]) -> impl Iterator<Item = &GridCell> {
         let col_min = ((visible[0] - self.world_min_x) / self.cell_width).floor() as isize - 1;
         let col_max = ((visible[2] - self.world_min_x) / self.cell_width).ceil() as isize + 1;
@@ -121,17 +130,7 @@ impl SpatialGrid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gdsr::{HorizontalPresentation, Path, Point, Polygon, Text, Unit, VerticalPresentation};
-
-    fn make_polygon(points: Vec<(i32, i32)>, layer: u16, data_type: u16) -> Element {
-        Element::Polygon(Polygon::new(
-            points
-                .into_iter()
-                .map(|(x, y)| Point::default_integer(x, y)),
-            layer,
-            data_type,
-        ))
-    }
+    use crate::testutil::helpers::*;
 
     #[test]
     fn build_empty() {
@@ -152,7 +151,7 @@ mod tests {
 
     #[test]
     fn build_single_element() {
-        let poly = make_polygon(vec![(0, 0), (1000, 0), (1000, 1000)], 1, 0);
+        let poly = polygon(vec![(0, 0), (1000, 0), (1000, 1000)], 1, 0);
         let bounds = (0.0, 0.0, 1000.0 * 1e-9, 1000.0 * 1e-9);
         let grid = SpatialGrid::build(&[poly], bounds);
 
@@ -170,8 +169,8 @@ mod tests {
     #[test]
     fn build_assigns_correct_cell() {
         let scale = 1e-9;
-        let p1 = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
-        let p2 = make_polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
+        let p1 = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let p2 = polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
 
         let bounds = (0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&[p1, p2], bounds);
@@ -192,8 +191,8 @@ mod tests {
     #[test]
     fn query_returns_only_visible_elements() {
         let scale = 1e-9;
-        let p1 = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
-        let p2 = make_polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
+        let p1 = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let p2 = polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
 
         let bounds = (0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&[p1, p2], bounds);
@@ -208,8 +207,8 @@ mod tests {
     #[test]
     fn query_full_extent_returns_all() {
         let scale = 1e-9;
-        let p1 = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
-        let p2 = make_polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
+        let p1 = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let p2 = polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
 
         let bounds = (0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&[p1, p2], bounds);
@@ -223,7 +222,7 @@ mod tests {
     fn query_finds_element_partially_overlapping_viewport() {
         let scale = 1e-9;
         // Element spans from 400..600 in a 0..1000 world
-        let p = make_polygon(vec![(400, 400), (600, 400), (600, 600), (400, 600)], 1, 0);
+        let p = polygon(vec![(400, 400), (600, 400), (600, 600), (400, 600)], 1, 0);
         let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[p], bounds);
 
@@ -239,10 +238,10 @@ mod tests {
     #[test]
     fn dominant_layer_most_frequent() {
         let elems: Vec<Element> = vec![
-            make_polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
-            make_polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
-            make_polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
-            make_polygon(vec![(0, 0), (10, 0), (10, 10)], 2, 0),
+            polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
+            polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
+            polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
+            polygon(vec![(0, 0), (10, 0), (10, 10)], 2, 0),
         ];
 
         let scale = 1e-9;
@@ -259,7 +258,7 @@ mod tests {
     #[test]
     fn build_skips_references() {
         let reference = Element::Reference(gdsr::Reference::default());
-        let poly = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
         let scale = 1e-9;
         let bounds = (0.0, 0.0, 100.0 * scale, 100.0 * scale);
         let grid = SpatialGrid::build(&[reference, poly], bounds);
@@ -272,7 +271,7 @@ mod tests {
     #[test]
     fn cell_bbox_is_tight() {
         let scale = 1e-9;
-        let poly = make_polygon(vec![(100, 200), (300, 200), (300, 400), (100, 400)], 1, 0);
+        let poly = polygon(vec![(100, 200), (300, 200), (300, 400), (100, 400)], 1, 0);
         let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[poly], bounds);
 
@@ -288,7 +287,7 @@ mod tests {
     fn large_element_found_from_opposite_edge() {
         let scale = 1e-9;
         // Element spans the entire world
-        let p = make_polygon(vec![(0, 0), (1000, 0), (1000, 1000), (0, 1000)], 1, 0);
+        let p = polygon(vec![(0, 0), (1000, 0), (1000, 1000), (0, 1000)], 1, 0);
         let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[p], bounds);
 
@@ -305,64 +304,34 @@ mod tests {
 
     #[test]
     fn element_layer_polygon() {
-        let poly = Polygon::new(
-            vec![
-                Point::default_integer(0, 0),
-                Point::default_integer(1, 0),
-                Point::default_integer(1, 1),
-            ],
-            5,
-            3,
+        assert_eq!(
+            element_layer(&polygon(vec![(0, 0), (1, 0), (1, 1)], 5, 3)),
+            (5, 3)
         );
-        assert_eq!(element_layer(&Element::Polygon(poly)), (5, 3));
     }
 
     #[test]
     fn element_layer_path() {
-        let path = Path::new(
-            vec![Point::default_integer(0, 0), Point::default_integer(1, 1)],
-            7,
-            2,
-            None,
-            None,
+        assert_eq!(
+            element_layer(&path(vec![(0, 0), (1, 1)], 7, 2, None)),
+            (7, 2)
         );
-        assert_eq!(element_layer(&Element::Path(path)), (7, 2));
     }
 
     #[test]
     fn element_layer_text() {
-        let text = Text::new(
-            "t",
-            Point::default_integer(0, 0),
-            4,
-            0,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::default(),
-            HorizontalPresentation::default(),
-        );
-        assert_eq!(element_layer(&Element::Text(text)), (4, 0));
+        assert_eq!(element_layer(&text("t", 0, 0, 4)), (4, 0));
     }
 
     #[test]
     fn element_layer_reference() {
-        let reference = Element::Reference(gdsr::Reference::default());
-        assert_eq!(element_layer(&reference), (0, 0));
+        assert_eq!(element_layer(&reference()), (0, 0));
     }
 
     #[test]
     fn element_bbox_polygon() {
-        let poly = Polygon::new(
-            vec![
-                Point::default_integer(100, 200),
-                Point::default_integer(300, 400),
-                Point::default_integer(500, 100),
-            ],
-            1,
-            0,
-        );
-        let bbox = element_bbox(&Element::Polygon(poly)).expect("should have bbox");
+        let bbox = element_bbox(&polygon(vec![(100, 200), (300, 400), (500, 100)], 1, 0))
+            .expect("should have bbox");
         let scale = 1e-9;
         assert!((bbox[0] - 100.0 * scale).abs() < 1e-15);
         assert!((bbox[1] - 100.0 * scale).abs() < 1e-15);
@@ -372,17 +341,8 @@ mod tests {
 
     #[test]
     fn element_bbox_path() {
-        let path = Path::new(
-            vec![
-                Point::default_integer(10, 20),
-                Point::default_integer(30, 40),
-            ],
-            1,
-            0,
-            None,
-            Some(Unit::default_integer(5)),
-        );
-        let bbox = element_bbox(&Element::Path(path)).expect("should have bbox");
+        let bbox =
+            element_bbox(&path(vec![(10, 20), (30, 40)], 1, 0, Some(5))).expect("should have bbox");
         let scale = 1e-9;
         assert!((bbox[0] - 10.0 * scale).abs() < 1e-15);
         assert!((bbox[1] - 20.0 * scale).abs() < 1e-15);
@@ -392,18 +352,7 @@ mod tests {
 
     #[test]
     fn element_bbox_text() {
-        let text = Text::new(
-            "hello",
-            Point::default_integer(500, 600),
-            1,
-            0,
-            1.0,
-            0.0,
-            false,
-            VerticalPresentation::default(),
-            HorizontalPresentation::default(),
-        );
-        let bbox = element_bbox(&Element::Text(text)).expect("should have bbox");
+        let bbox = element_bbox(&text("hello", 500, 600, 1)).expect("should have bbox");
         let scale = 1e-9;
         assert!((bbox[0] - 500.0 * scale).abs() < 1e-15);
         assert!((bbox[1] - 600.0 * scale).abs() < 1e-15);
@@ -413,7 +362,6 @@ mod tests {
 
     #[test]
     fn element_bbox_reference() {
-        let reference = Element::Reference(gdsr::Reference::default());
-        assert!(element_bbox(&reference).is_none());
+        assert!(element_bbox(&reference()).is_none());
     }
 }

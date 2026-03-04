@@ -1415,6 +1415,8 @@ dependencies = [
  "env_logger",
  "gdsr",
  "log",
+ "quickcheck",
+ "quickcheck_macros",
  "rfd",
 ]
 
