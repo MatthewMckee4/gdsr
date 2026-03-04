@@ -1,5 +1,6 @@
 - ALWAYS read CONTRIBUTING.md for guidelines on how to run tools
 - ALWAYS attempt to add a test case for changed behavior. Get your tests to pass — if you didn't run the tests, your code does not work.
+- ALWAYS test UI changes by testing the underlying pure logic (coordinate transforms, state management, data processing) rather than rendering. Extract testable logic from UI code.
 - PREFER property tests, e.g., at `src/property_tests/...` over unit tests.
 - ALWAYS use snapshot tests when running a command in integration tests.
 - PREFER running specific tests over running the entire test suite

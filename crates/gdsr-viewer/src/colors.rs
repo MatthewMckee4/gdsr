@@ -38,3 +38,43 @@ impl LayerColorMap {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_layer_returns_same_color() {
+        let mut map = LayerColorMap::default();
+        let c1 = map.get(1, 0);
+        let c2 = map.get(1, 0);
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn different_layers_get_different_colors() {
+        let mut map = LayerColorMap::default();
+        let c1 = map.get(1, 0);
+        let c2 = map.get(2, 0);
+        assert_ne!(c1, c2);
+    }
+
+    #[test]
+    fn different_datatypes_get_different_colors() {
+        let mut map = LayerColorMap::default();
+        let c1 = map.get(1, 0);
+        let c2 = map.get(1, 1);
+        assert_ne!(c1, c2);
+    }
+
+    #[test]
+    fn colors_wrap_around_palette() {
+        let mut map = LayerColorMap::default();
+        let first = map.get(0, 0);
+        for i in 1..PALETTE.len() as u16 {
+            map.get(i, 0);
+        }
+        let wrapped = map.get(PALETTE.len() as u16, 0);
+        assert_eq!(first, wrapped);
+    }
+}

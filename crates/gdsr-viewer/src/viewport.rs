@@ -22,7 +22,7 @@ impl Default for Viewport {
 }
 
 impl Viewport {
-    fn world_to_screen(&self, wx: f64, wy: f64, rect: Rect) -> Pos2 {
+    pub fn world_to_screen(&self, wx: f64, wy: f64, rect: Rect) -> Pos2 {
         let cx = f64::from(rect.center().x);
         let cy = f64::from(rect.center().y);
         let sx = cx + (wx - self.center_x) * self.zoom;
@@ -270,6 +270,11 @@ fn draw_text(
     );
 }
 
+#[cfg(test)]
+fn test_rect() -> Rect {
+    Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
+}
+
 /// Computes the bounding box of the given elements in world coordinates.
 /// Returns `None` if there are no geometric elements.
 pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
@@ -312,5 +317,188 @@ pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
         Some((min_x, min_y, max_x, max_y))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gdsr::{HorizontalPresentation, Path, Point, Polygon, Text, Unit, VerticalPresentation};
+
+    const EPSILON: f64 = 1e-6;
+
+    /// `world_to_screen` followed by `screen_to_world` should return the original point.
+    #[test]
+    fn world_screen_roundtrip_at_origin() {
+        let vp = Viewport::default();
+        let rect = test_rect();
+        let (wx, wy) = (0.0, 0.0);
+        let screen = vp.world_to_screen(wx, wy, rect);
+        let (rx, ry) = vp.screen_to_world(screen.x, screen.y, rect);
+        assert!((rx - wx).abs() < EPSILON);
+        assert!((ry - wy).abs() < EPSILON);
+    }
+
+    #[test]
+    fn world_screen_roundtrip_off_center() {
+        let vp = Viewport {
+            center_x: 100.0,
+            center_y: -50.0,
+            zoom: 1000.0,
+        };
+        let rect = test_rect();
+        let (wx, wy) = (123.456, -78.9);
+        let screen = vp.world_to_screen(wx, wy, rect);
+        let (rx, ry) = vp.screen_to_world(screen.x, screen.y, rect);
+        assert!((rx - wx).abs() < EPSILON);
+        assert!((ry - wy).abs() < EPSILON);
+    }
+
+    /// The viewport center should map to the screen center.
+    #[test]
+    fn center_maps_to_screen_center() {
+        let vp = Viewport {
+            center_x: 42.0,
+            center_y: 17.0,
+            zoom: 500.0,
+        };
+        let rect = test_rect();
+        let screen = vp.world_to_screen(42.0, 17.0, rect);
+        assert!((f64::from(screen.x) - f64::from(rect.center().x)).abs() < EPSILON);
+        assert!((f64::from(screen.y) - f64::from(rect.center().y)).abs() < EPSILON);
+    }
+
+    /// Y-axis is flipped: increasing world Y should decrease screen Y.
+    #[test]
+    fn y_axis_is_flipped() {
+        let vp = Viewport::default();
+        let rect = test_rect();
+        let low = vp.world_to_screen(0.0, 0.0, rect);
+        let high = vp.world_to_screen(0.0, 1.0, rect);
+        assert!(high.y < low.y);
+    }
+
+    #[test]
+    fn zoom_to_fit_centers_on_bounds() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        vp.zoom_to_fit(10.0, 20.0, 30.0, 40.0, rect);
+        assert!((vp.center_x - 20.0).abs() < EPSILON);
+        assert!((vp.center_y - 30.0).abs() < EPSILON);
+    }
+
+    #[test]
+    fn zoom_to_fit_bounds_are_within_viewport() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        vp.zoom_to_fit(-1.0, -2.0, 3.0, 4.0, rect);
+
+        let min_screen = vp.world_to_screen(-1.0, -2.0, rect);
+        let max_screen = vp.world_to_screen(3.0, 4.0, rect);
+
+        assert!(min_screen.x >= rect.min.x);
+        assert!(max_screen.x <= rect.max.x);
+        // Y is flipped so max_world_y maps to smaller screen_y
+        assert!(max_screen.y >= rect.min.y);
+        assert!(min_screen.y <= rect.max.y);
+    }
+
+    #[test]
+    fn compute_bounds_empty_returns_none() {
+        assert!(compute_bounds(&[]).is_none());
+    }
+
+    #[test]
+    fn compute_bounds_ignores_references() {
+        let reference = Element::Reference(gdsr::Reference::default());
+        assert!(compute_bounds(&[reference]).is_none());
+    }
+
+    #[test]
+    fn compute_bounds_polygon() {
+        let polygon = Polygon::new(
+            vec![
+                Point::default_integer(0, 0),
+                Point::default_integer(1000, 0),
+                Point::default_integer(1000, 2000),
+            ],
+            1,
+            0,
+        );
+        let bounds = compute_bounds(&[Element::Polygon(polygon)]);
+        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
+        assert!((min_x - 0.0).abs() < EPSILON);
+        assert!((min_y - 0.0).abs() < EPSILON);
+        assert!((max_x - 1000.0 * 1e-9).abs() < EPSILON);
+        assert!((max_y - 2000.0 * 1e-9).abs() < EPSILON);
+    }
+
+    #[test]
+    fn compute_bounds_path() {
+        let path = Path::new(
+            vec![
+                Point::default_integer(100, 200),
+                Point::default_integer(300, 400),
+            ],
+            1,
+            0,
+            None,
+            Some(Unit::default_integer(10)),
+        );
+        let bounds = compute_bounds(&[Element::Path(path)]);
+        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
+        assert!((min_x - 100.0 * 1e-9).abs() < EPSILON);
+        assert!((min_y - 200.0 * 1e-9).abs() < EPSILON);
+        assert!((max_x - 300.0 * 1e-9).abs() < EPSILON);
+        assert!((max_y - 400.0 * 1e-9).abs() < EPSILON);
+    }
+
+    #[test]
+    fn compute_bounds_text() {
+        let text = Text::new(
+            "hello",
+            Point::default_integer(500, 600),
+            1,
+            0,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        );
+        let bounds = compute_bounds(&[Element::Text(text)]);
+        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
+        assert!((min_x - 500.0 * 1e-9).abs() < EPSILON);
+        assert!((min_y - 600.0 * 1e-9).abs() < EPSILON);
+        assert_eq!(min_x, max_x);
+        assert_eq!(min_y, max_y);
+    }
+
+    #[test]
+    fn compute_bounds_mixed_elements() {
+        let polygon = Polygon::new(
+            vec![
+                Point::default_integer(0, 0),
+                Point::default_integer(100, 0),
+                Point::default_integer(100, 100),
+            ],
+            1,
+            0,
+        );
+        let text = Text::new(
+            "far",
+            Point::default_integer(500, 500),
+            2,
+            0,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        );
+        let bounds = compute_bounds(&[Element::Polygon(polygon), Element::Text(text)]);
+        let (min_x, min_y, _, _) = bounds.expect("should have bounds");
+        assert!((min_x - 0.0).abs() < EPSILON);
+        assert!((min_y - 0.0).abs() < EPSILON);
     }
 }
