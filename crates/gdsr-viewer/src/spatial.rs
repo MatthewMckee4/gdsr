@@ -75,33 +75,39 @@ impl SpatialGrid {
                 continue;
             };
 
-            let cx = f64::midpoint(bbox[0], bbox[2]);
-            let cy = f64::midpoint(bbox[1], bbox[3]);
-
-            let col = ((cx - min_x) / cell_width) as usize;
-            let row = ((cy - min_y) / cell_height) as usize;
-            let col = col.min(GRID_SIZE - 1);
-            let row = row.min(GRID_SIZE - 1);
-
-            let cell_idx = row * GRID_SIZE + col;
-            let cell = cells[cell_idx].get_or_insert_with(|| GridCell {
-                indices: Vec::new(),
-                bbox: [f64::MAX, f64::MAX, f64::MIN, f64::MIN],
-                dominant_layer: (0, 0),
-            });
-
-            cell.indices.push(i as u32);
-            cell.bbox[0] = cell.bbox[0].min(bbox[0]);
-            cell.bbox[1] = cell.bbox[1].min(bbox[1]);
-            cell.bbox[2] = cell.bbox[2].max(bbox[2]);
-            cell.bbox[3] = cell.bbox[3].max(bbox[3]);
+            // Insert into every grid cell the element's bbox overlaps
+            let col_min = ((bbox[0] - min_x) / cell_width) as usize;
+            let col_max = ((bbox[2] - min_x) / cell_width) as usize;
+            let row_min = ((bbox[1] - min_y) / cell_height) as usize;
+            let row_max = ((bbox[3] - min_y) / cell_height) as usize;
+            let col_min = col_min.min(GRID_SIZE - 1);
+            let col_max = col_max.min(GRID_SIZE - 1);
+            let row_min = row_min.min(GRID_SIZE - 1);
+            let row_max = row_max.min(GRID_SIZE - 1);
 
             let layer = element_layer(element);
-            *layer_counts
-                .entry(cell_idx)
-                .or_default()
-                .entry(layer)
-                .or_insert(0) += 1;
+            for row in row_min..=row_max {
+                for col in col_min..=col_max {
+                    let cell_idx = row * GRID_SIZE + col;
+                    let cell = cells[cell_idx].get_or_insert_with(|| GridCell {
+                        indices: Vec::new(),
+                        bbox: [f64::MAX, f64::MAX, f64::MIN, f64::MIN],
+                        dominant_layer: (0, 0),
+                    });
+
+                    cell.indices.push(i as u32);
+                    cell.bbox[0] = cell.bbox[0].min(bbox[0]);
+                    cell.bbox[1] = cell.bbox[1].min(bbox[1]);
+                    cell.bbox[2] = cell.bbox[2].max(bbox[2]);
+                    cell.bbox[3] = cell.bbox[3].max(bbox[3]);
+
+                    *layer_counts
+                        .entry(cell_idx)
+                        .or_default()
+                        .entry(layer)
+                        .or_insert(0) += 1;
+                }
+            }
         }
 
         // Set dominant layer for each cell
@@ -163,21 +169,36 @@ mod tests {
         assert!(grid.cells.iter().all(Option::is_none));
     }
 
+    /// Collects all unique element indices found across queried cells.
+    fn query_element_indices(grid: &SpatialGrid, visible: &[f64; 4]) -> Vec<u32> {
+        let mut indices: Vec<u32> = grid
+            .query_visible(visible)
+            .flat_map(|c| c.indices.iter().copied())
+            .collect();
+        indices.sort_unstable();
+        indices.dedup();
+        indices
+    }
+
     #[test]
     fn build_single_element() {
         let poly = make_polygon(vec![(0, 0), (1000, 0), (1000, 1000)], 1, 0);
         let bounds = (0.0, 0.0, 1000.0 * 1e-9, 1000.0 * 1e-9);
         let grid = SpatialGrid::build(&[poly], bounds);
 
-        let non_empty: Vec<_> = grid.cells.iter().filter_map(|c| c.as_ref()).collect();
-        assert_eq!(non_empty.len(), 1);
-        assert_eq!(non_empty[0].indices, vec![0]);
-        assert_eq!(non_empty[0].dominant_layer, (1, 0));
+        // Element should be findable via full-extent query
+        let all = query_element_indices(&grid, &[0.0, 0.0, 1000.0 * 1e-9, 1000.0 * 1e-9]);
+        assert_eq!(all, vec![0]);
+
+        // Every non-empty cell should reference element 0 with layer (1, 0)
+        for cell in grid.cells.iter().flatten() {
+            assert!(cell.indices.contains(&0));
+            assert_eq!(cell.dominant_layer, (1, 0));
+        }
     }
 
     #[test]
     fn build_assigns_correct_cell() {
-        // Place two polygons in opposite corners of the world
         let scale = 1e-9;
         let p1 = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
         let p2 = make_polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
@@ -185,18 +206,21 @@ mod tests {
         let bounds = (0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&[p1, p2], bounds);
 
-        let non_empty: Vec<_> = grid.cells.iter().filter_map(|c| c.as_ref()).collect();
-        assert_eq!(non_empty.len(), 2);
+        // Both elements should be findable
+        let all = query_element_indices(&grid, &[0.0, 0.0, 10000.0 * scale, 10000.0 * scale]);
+        assert_eq!(all, vec![0, 1]);
 
-        // They should be in different cells
-        let cell_with_0 = non_empty.iter().find(|c| c.indices.contains(&0));
-        let cell_with_1 = non_empty.iter().find(|c| c.indices.contains(&1));
-        assert!(cell_with_0.is_some());
-        assert!(cell_with_1.is_some());
+        // They should not share any cells (far apart, small relative to grid)
+        for cell in grid.cells.iter().flatten() {
+            assert!(
+                !cell.indices.contains(&0) || !cell.indices.contains(&1),
+                "small distant elements should not share cells"
+            );
+        }
     }
 
     #[test]
-    fn query_returns_only_visible_cells() {
+    fn query_returns_only_visible_elements() {
         let scale = 1e-9;
         let p1 = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
         let p2 = make_polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
@@ -204,11 +228,11 @@ mod tests {
         let bounds = (0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&[p1, p2], bounds);
 
-        // Query only the bottom-left corner
+        // Query only the bottom-left corner — should find p1 but not p2
         let visible = [0.0, 0.0, 1000.0 * scale, 1000.0 * scale];
-        let results: Vec<_> = grid.query_visible(&visible).collect();
-        assert_eq!(results.len(), 1);
-        assert!(results[0].indices.contains(&0));
+        let indices = query_element_indices(&grid, &visible);
+        assert!(indices.contains(&0));
+        assert!(!indices.contains(&1));
     }
 
     #[test]
@@ -221,13 +245,29 @@ mod tests {
         let grid = SpatialGrid::build(&[p1, p2], bounds);
 
         let visible = [0.0, 0.0, 10000.0 * scale, 10000.0 * scale];
-        let results: Vec<_> = grid.query_visible(&visible).collect();
-        assert_eq!(results.len(), 2);
+        let indices = query_element_indices(&grid, &visible);
+        assert_eq!(indices, vec![0, 1]);
+    }
+
+    #[test]
+    fn query_finds_element_partially_overlapping_viewport() {
+        let scale = 1e-9;
+        // Element spans from 400..600 in a 0..1000 world
+        let p = make_polygon(vec![(400, 400), (600, 400), (600, 600), (400, 600)], 1, 0);
+        let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[p], bounds);
+
+        // Viewport covers 0..500 — partially overlaps the element
+        let visible = [0.0, 0.0, 500.0 * scale, 500.0 * scale];
+        let indices = query_element_indices(&grid, &visible);
+        assert!(
+            indices.contains(&0),
+            "partially overlapping element must be found"
+        );
     }
 
     #[test]
     fn dominant_layer_most_frequent() {
-        // All elements share the same centroid so they land in the same grid cell
         let elems: Vec<Element> = vec![
             make_polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
             make_polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 0),
@@ -239,9 +279,11 @@ mod tests {
         let bounds = (0.0, 0.0, 100.0 * scale, 100.0 * scale);
         let grid = SpatialGrid::build(&elems, bounds);
 
-        let non_empty: Vec<_> = grid.cells.iter().filter_map(|c| c.as_ref()).collect();
-        assert_eq!(non_empty.len(), 1);
-        assert_eq!(non_empty[0].dominant_layer, (5, 0));
+        // All 4 elements overlap the same region; every cell containing them should
+        // have dominant layer (5, 0) since 3 of 4 elements are on that layer.
+        for cell in grid.cells.iter().flatten() {
+            assert_eq!(cell.dominant_layer, (5, 0));
+        }
     }
 
     #[test]
