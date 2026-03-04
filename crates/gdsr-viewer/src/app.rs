@@ -6,6 +6,7 @@ use std::thread;
 use gdsr::{Element, Library};
 
 use crate::colors::LayerColorMap;
+use crate::drawable::Drawable;
 use crate::panels;
 use crate::spatial::SpatialGrid;
 use crate::viewport::{self, Viewport};
@@ -100,9 +101,9 @@ impl ViewerApp {
 
     /// Adjusts the viewport to fit all currently loaded elements.
     fn zoom_to_fit(&mut self) {
-        if let Some((min_x, min_y, max_x, max_y)) = viewport::compute_bounds(&self.cell.elements) {
+        if let Some(bounds) = viewport::compute_bounds(&self.cell.elements) {
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
-            self.viewport.zoom_to_fit(min_x, min_y, max_x, max_y, rect);
+            self.viewport.zoom_to_fit(&bounds, rect);
         }
     }
 }
@@ -136,26 +137,10 @@ impl eframe::App for ViewerApp {
             loop {
                 match rx.try_recv() {
                     Ok(element) => {
-                        match &element {
-                            Element::Polygon(p) => {
-                                let key = (p.layer(), p.data_type());
-                                if self.cell.layers.insert(key) {
-                                    self.layer_colors.get(key.0, key.1);
-                                }
+                        for key in element.layer_keys() {
+                            if self.cell.layers.insert(key) {
+                                self.layer_colors.get(key.0, key.1);
                             }
-                            Element::Path(p) => {
-                                let key = (p.layer(), p.data_type());
-                                if self.cell.layers.insert(key) {
-                                    self.layer_colors.get(key.0, key.1);
-                                }
-                            }
-                            Element::Text(t) => {
-                                let key = (t.layer(), 0);
-                                if self.cell.layers.insert(key) {
-                                    self.layer_colors.get(key.0, key.1);
-                                }
-                            }
-                            Element::Reference(_) => {}
                         }
                         self.cell.elements.push(element);
                     }
@@ -165,7 +150,7 @@ impl eframe::App for ViewerApp {
                         self.cell.element_receiver = None;
                         if let Some(bounds) = viewport::compute_bounds(&self.cell.elements) {
                             self.cell.spatial_grid =
-                                Some(SpatialGrid::build(&self.cell.elements, bounds));
+                                Some(SpatialGrid::build(&self.cell.elements, &bounds));
                         }
                         self.zoom_to_fit();
                         break;

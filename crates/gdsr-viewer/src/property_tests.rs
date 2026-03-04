@@ -1,10 +1,11 @@
 use egui::{Pos2, Rect};
 use quickcheck_macros::quickcheck;
 
+use crate::drawable::{Drawable, WorldBBox};
 use crate::spatial::SpatialGrid;
 use crate::testutil::helpers;
 use crate::viewport::Viewport;
-use crate::viewport::bounds::{bbox_overlaps, compute_bounds, element_bbox};
+use crate::viewport::bounds::compute_bounds;
 
 fn test_rect() -> Rect {
     Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
@@ -84,7 +85,8 @@ fn zoom_to_fit_makes_bounds_visible(min_x: f64, min_y: f64, width: f64, height: 
 
     let mut vp = Viewport::default();
     let rect = test_rect();
-    vp.zoom_to_fit(min_x, min_y, max_x, max_y, rect);
+    let bounds = WorldBBox::new(min_x, min_y, max_x, max_y);
+    vp.zoom_to_fit(&bounds, rect);
 
     let s_min = vp.world_to_screen(min_x, min_y, rect);
     let s_max = vp.world_to_screen(max_x, max_y, rect);
@@ -106,7 +108,7 @@ fn element_bbox_contains_all_points(x1: i16, y1: i16, x2: i16, y2: i16, x3: i16,
         1,
         0,
     );
-    let Some(bbox) = element_bbox(&elem) else {
+    let Some(bbox) = elem.world_bbox() else {
         return false;
     };
 
@@ -115,10 +117,10 @@ fn element_bbox_contains_all_points(x1: i16, y1: i16, x2: i16, y2: i16, x3: i16,
     points.iter().all(|&(x, y)| {
         let wx = f64::from(x) * scale;
         let wy = f64::from(y) * scale;
-        wx >= bbox[0] - 1e-15
-            && wx <= bbox[2] + 1e-15
-            && wy >= bbox[1] - 1e-15
-            && wy <= bbox[3] + 1e-15
+        wx >= bbox.min_x - 1e-15
+            && wx <= bbox.max_x + 1e-15
+            && wy >= bbox.min_y - 1e-15
+            && wy <= bbox.max_y + 1e-15
     })
 }
 
@@ -154,16 +156,16 @@ fn compute_bounds_is_superset(
         ),
     ];
 
-    let Some((cb_min_x, cb_min_y, cb_max_x, cb_max_y)) = compute_bounds(&elems) else {
+    let Some(cb) = compute_bounds(&elems) else {
         return false;
     };
 
     elems.iter().all(|e| {
-        if let Some(bbox) = element_bbox(e) {
-            bbox[0] >= cb_min_x - 1e-15
-                && bbox[1] >= cb_min_y - 1e-15
-                && bbox[2] <= cb_max_x + 1e-15
-                && bbox[3] <= cb_max_y + 1e-15
+        if let Some(bbox) = e.world_bbox() {
+            bbox.min_x >= cb.min_x - 1e-15
+                && bbox.min_y >= cb.min_y - 1e-15
+                && bbox.max_x <= cb.max_x + 1e-15
+                && bbox.max_y <= cb.max_y + 1e-15
         } else {
             true
         }
@@ -185,9 +187,9 @@ fn bbox_overlaps_is_symmetric(
     if vals.iter().any(|v| !v.is_finite()) {
         return true;
     }
-    let a = [ax, ay, ax + aw.abs(), ay + ah.abs()];
-    let b = [bx, by, bx + bw.abs(), by + bh.abs()];
-    bbox_overlaps(&a, &b) == bbox_overlaps(&b, &a)
+    let a = WorldBBox::new(ax, ay, ax + aw.abs(), ay + ah.abs());
+    let b = WorldBBox::new(bx, by, bx + bw.abs(), by + bh.abs());
+    a.overlaps(&b) == b.overlaps(&a)
 }
 
 #[quickcheck]
@@ -217,7 +219,7 @@ fn spatial_grid_full_query_finds_all(x1: i8, y1: i8, x2: i8, y2: i8) -> bool {
     let Some(bounds) = compute_bounds(&elems) else {
         return false;
     };
-    let grid = SpatialGrid::build(&elems, bounds);
+    let grid = SpatialGrid::build(&elems, &bounds);
 
     let all_x: Vec<f64> = [x1, x2]
         .iter()
@@ -233,7 +235,7 @@ fn spatial_grid_full_query_finds_all(x1: i8, y1: i8, x2: i8, y2: i8) -> bool {
     let min_y = all_y.iter().copied().fold(f64::MAX, f64::min);
     let max_y = all_y.iter().copied().fold(f64::MIN, f64::max);
 
-    let visible = [min_x, min_y, max_x, max_y];
+    let visible = WorldBBox::new(min_x, min_y, max_x, max_y);
     let mut indices: Vec<u32> = grid
         .query_visible(&visible)
         .flat_map(|c| c.indices.iter().copied())

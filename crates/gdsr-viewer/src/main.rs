@@ -1,5 +1,6 @@
 mod app;
 mod colors;
+mod drawable;
 mod loader;
 mod panels;
 #[cfg(test)]

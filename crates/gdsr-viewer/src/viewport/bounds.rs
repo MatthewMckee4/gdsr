@@ -1,49 +1,22 @@
-use gdsr::{Dimensions, Element};
+use gdsr::Element;
 
-/// Returns `true` if two axis-aligned bounding boxes overlap.
-pub(crate) fn bbox_overlaps(bbox: &[f64; 4], visible: &[f64; 4]) -> bool {
-    bbox[2] >= visible[0] && bbox[0] <= visible[2] && bbox[3] >= visible[1] && bbox[1] <= visible[3]
-}
-
-/// Returns the world-space bounding box of a single element as `[min_x, min_y, max_x, max_y]`.
-/// Returns `None` for references.
-pub fn element_bbox(element: &Element) -> Option<[f64; 4]> {
-    if matches!(element, Element::Reference(_)) {
-        return None;
-    }
-    let (min_pt, max_pt) = element.bounding_box();
-    Some([
-        min_pt.x().absolute_value(),
-        min_pt.y().absolute_value(),
-        max_pt.x().absolute_value(),
-        max_pt.y().absolute_value(),
-    ])
-}
+use crate::drawable::{Drawable, WorldBBox};
 
 /// Computes the bounding box of the given elements in world coordinates.
 /// Returns `None` if there are no geometric elements.
-pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-    let mut found = false;
+pub fn compute_bounds(elements: &[Element]) -> Option<WorldBBox> {
+    let mut result: Option<WorldBBox> = None;
 
     for element in elements {
-        if let Some(bbox) = element_bbox(element) {
-            min_x = min_x.min(bbox[0]);
-            min_y = min_y.min(bbox[1]);
-            max_x = max_x.max(bbox[2]);
-            max_y = max_y.max(bbox[3]);
-            found = true;
+        if let Some(bbox) = element.world_bbox() {
+            result = Some(match result {
+                Some(acc) => acc.merge(&bbox),
+                None => bbox,
+            });
         }
     }
 
-    if found {
-        Some((min_x, min_y, max_x, max_y))
-    } else {
-        None
-    }
+    result
 }
 
 #[cfg(test)]
@@ -66,61 +39,67 @@ mod tests {
     #[test]
     fn compute_bounds_polygon() {
         let elem = polygon(vec![(0, 0), (1000, 0), (1000, 2000)], 1, 0);
-        let (min_x, min_y, max_x, max_y) = compute_bounds(&[elem]).expect("should have bounds");
-        assert!((min_x - 0.0).abs() < EPSILON);
-        assert!((min_y - 0.0).abs() < EPSILON);
-        assert!((max_x - 1000.0 * 1e-9).abs() < EPSILON);
-        assert!((max_y - 2000.0 * 1e-9).abs() < EPSILON);
+        let bounds = compute_bounds(&[elem]).expect("should have bounds");
+        assert!((bounds.min_x - 0.0).abs() < EPSILON);
+        assert!((bounds.min_y - 0.0).abs() < EPSILON);
+        assert!((bounds.max_x - 1000.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_y - 2000.0 * 1e-9).abs() < EPSILON);
     }
 
     #[test]
     fn compute_bounds_path() {
         let elem = path(vec![(100, 200), (300, 400)], 1, 0, Some(10));
-        let (min_x, min_y, max_x, max_y) = compute_bounds(&[elem]).expect("should have bounds");
-        assert!((min_x - 100.0 * 1e-9).abs() < EPSILON);
-        assert!((min_y - 200.0 * 1e-9).abs() < EPSILON);
-        assert!((max_x - 300.0 * 1e-9).abs() < EPSILON);
-        assert!((max_y - 400.0 * 1e-9).abs() < EPSILON);
+        let bounds = compute_bounds(&[elem]).expect("should have bounds");
+        assert!((bounds.min_x - 100.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.min_y - 200.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_x - 300.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_y - 400.0 * 1e-9).abs() < EPSILON);
     }
 
     #[test]
     fn compute_bounds_text() {
         let elem = text("hello", 500, 600, 1);
-        let (min_x, min_y, max_x, max_y) = compute_bounds(&[elem]).expect("should have bounds");
-        assert!((min_x - 500.0 * 1e-9).abs() < EPSILON);
-        assert!((min_y - 600.0 * 1e-9).abs() < EPSILON);
-        assert_eq!(min_x, max_x);
-        assert_eq!(min_y, max_y);
+        let bounds = compute_bounds(&[elem]).expect("should have bounds");
+        assert!((bounds.min_x - 500.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.min_y - 600.0 * 1e-9).abs() < EPSILON);
+        assert_eq!(bounds.min_x, bounds.max_x);
+        assert_eq!(bounds.min_y, bounds.max_y);
     }
 
     #[test]
     fn compute_bounds_mixed_elements() {
         let poly = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
         let txt = text("far", 500, 500, 2);
-        let (min_x, min_y, _, _) = compute_bounds(&[poly, txt]).expect("should have bounds");
-        assert!((min_x - 0.0).abs() < EPSILON);
-        assert!((min_y - 0.0).abs() < EPSILON);
+        let bounds = compute_bounds(&[poly, txt]).expect("should have bounds");
+        assert!((bounds.min_x - 0.0).abs() < EPSILON);
+        assert!((bounds.min_y - 0.0).abs() < EPSILON);
     }
 
     #[test]
     fn bbox_overlaps_fully_contained() {
-        assert!(bbox_overlaps(&[1.0, 1.0, 2.0, 2.0], &[0.0, 0.0, 3.0, 3.0]));
+        let a = WorldBBox::new(1.0, 1.0, 2.0, 2.0);
+        let b = WorldBBox::new(0.0, 0.0, 3.0, 3.0);
+        assert!(a.overlaps(&b));
     }
 
     #[test]
     fn bbox_overlaps_disjoint() {
-        assert!(!bbox_overlaps(&[0.0, 0.0, 1.0, 1.0], &[2.0, 2.0, 3.0, 3.0]));
+        let a = WorldBBox::new(0.0, 0.0, 1.0, 1.0);
+        let b = WorldBBox::new(2.0, 2.0, 3.0, 3.0);
+        assert!(!a.overlaps(&b));
     }
 
     #[test]
     fn bbox_overlaps_touching_edge() {
-        assert!(bbox_overlaps(&[0.0, 0.0, 1.0, 1.0], &[1.0, 0.0, 2.0, 1.0]));
+        let a = WorldBBox::new(0.0, 0.0, 1.0, 1.0);
+        let b = WorldBBox::new(1.0, 0.0, 2.0, 1.0);
+        assert!(a.overlaps(&b));
     }
 
     #[test]
     fn bbox_overlaps_is_symmetric() {
-        let a = [0.0, 0.0, 2.0, 2.0];
-        let b = [1.0, 1.0, 3.0, 3.0];
-        assert_eq!(bbox_overlaps(&a, &b), bbox_overlaps(&b, &a));
+        let a = WorldBBox::new(0.0, 0.0, 2.0, 2.0);
+        let b = WorldBBox::new(1.0, 1.0, 3.0, 3.0);
+        assert_eq!(a.overlaps(&b), b.overlaps(&a));
     }
 }

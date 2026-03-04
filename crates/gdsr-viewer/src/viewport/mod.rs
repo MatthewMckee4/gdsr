@@ -1,7 +1,7 @@
 pub(crate) mod bounds;
 mod draw;
 
-pub use bounds::{compute_bounds, element_bbox};
+pub use bounds::compute_bounds;
 
 use std::collections::HashSet;
 
@@ -9,6 +9,7 @@ use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::Element;
 
 use crate::colors::LayerColorMap;
+use crate::drawable::WorldBBox;
 use crate::spatial::SpatialGrid;
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
@@ -49,20 +50,20 @@ impl Viewport {
         (wx, wy)
     }
 
-    /// Returns the visible world-space rectangle as `[min_x, min_y, max_x, max_y]`.
-    pub fn visible_world_rect(&self, rect: Rect) -> [f64; 4] {
+    /// Returns the visible world-space rectangle.
+    pub fn visible_world_rect(&self, rect: Rect) -> WorldBBox {
         let (min_x, max_y) = self.screen_to_world(rect.min.x, rect.min.y, rect);
         let (max_x, min_y) = self.screen_to_world(rect.max.x, rect.max.y, rect);
-        [min_x, min_y, max_x, max_y]
+        WorldBBox::new(min_x, min_y, max_x, max_y)
     }
 
     /// Adjusts center and zoom to fit the given bounding box in the viewport rect.
-    pub fn zoom_to_fit(&mut self, min_x: f64, min_y: f64, max_x: f64, max_y: f64, rect: Rect) {
-        self.center_x = f64::midpoint(min_x, max_x);
-        self.center_y = f64::midpoint(min_y, max_y);
+    pub fn zoom_to_fit(&mut self, bounds: &WorldBBox, rect: Rect) {
+        self.center_x = f64::midpoint(bounds.min_x, bounds.max_x);
+        self.center_y = f64::midpoint(bounds.min_y, bounds.max_y);
 
-        let world_w = max_x - min_x;
-        let world_h = max_y - min_y;
+        let world_w = bounds.max_x - bounds.min_x;
+        let world_h = bounds.max_y - bounds.min_y;
 
         if world_w > 0.0 && world_h > 0.0 {
             let zoom_x = f64::from(rect.width()) / world_w;
@@ -204,7 +205,8 @@ mod tests {
     fn zoom_to_fit_centers_on_bounds() {
         let mut vp = Viewport::default();
         let rect = test_rect();
-        vp.zoom_to_fit(10.0, 20.0, 30.0, 40.0, rect);
+        let bounds = WorldBBox::new(10.0, 20.0, 30.0, 40.0);
+        vp.zoom_to_fit(&bounds, rect);
         assert!((vp.center_x - 20.0).abs() < EPSILON);
         assert!((vp.center_y - 30.0).abs() < EPSILON);
     }
@@ -213,7 +215,8 @@ mod tests {
     fn zoom_to_fit_bounds_are_within_viewport() {
         let mut vp = Viewport::default();
         let rect = test_rect();
-        vp.zoom_to_fit(-1.0, -2.0, 3.0, 4.0, rect);
+        let bounds = WorldBBox::new(-1.0, -2.0, 3.0, 4.0);
+        vp.zoom_to_fit(&bounds, rect);
 
         let min_screen = vp.world_to_screen(-1.0, -2.0, rect);
         let max_screen = vp.world_to_screen(3.0, 4.0, rect);
@@ -235,12 +238,12 @@ mod tests {
         let vis = vp.visible_world_rect(rect);
 
         let (wx_tl, wy_tl) = vp.screen_to_world(rect.min.x, rect.min.y, rect);
-        assert!((vis[0] - wx_tl).abs() < EPSILON);
-        assert!((vis[3] - wy_tl).abs() < EPSILON);
+        assert!((vis.min_x - wx_tl).abs() < EPSILON);
+        assert!((vis.max_y - wy_tl).abs() < EPSILON);
 
         let (wx_br, wy_br) = vp.screen_to_world(rect.max.x, rect.max.y, rect);
-        assert!((vis[2] - wx_br).abs() < EPSILON);
-        assert!((vis[1] - wy_br).abs() < EPSILON);
+        assert!((vis.max_x - wx_br).abs() < EPSILON);
+        assert!((vis.min_y - wy_br).abs() < EPSILON);
     }
 
     /// Simulates the zoom logic from `draw_viewport`: zoom by `factor` anchored at `cursor`.
