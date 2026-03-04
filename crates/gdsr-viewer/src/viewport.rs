@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
-use egui::{Color32, FontId, Mesh, Pos2, Rect, Sense, Shape, Stroke};
+use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::Element;
 
 use crate::colors::LayerColorMap;
+use crate::drawable::{Drawable, WorldBBox};
 use crate::spatial::SpatialGrid;
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
@@ -42,20 +43,20 @@ impl Viewport {
         (wx, wy)
     }
 
-    /// Returns the visible world-space rectangle as `[min_x, min_y, max_x, max_y]`.
-    pub fn visible_world_rect(&self, rect: Rect) -> [f64; 4] {
+    /// Returns the visible world-space rectangle.
+    pub fn visible_world_rect(&self, rect: Rect) -> WorldBBox {
         let (min_x, max_y) = self.screen_to_world(rect.min.x, rect.min.y, rect);
         let (max_x, min_y) = self.screen_to_world(rect.max.x, rect.max.y, rect);
-        [min_x, min_y, max_x, max_y]
+        WorldBBox::new(min_x, min_y, max_x, max_y)
     }
 
     /// Adjusts center and zoom to fit the given bounding box in the viewport rect.
-    pub fn zoom_to_fit(&mut self, min_x: f64, min_y: f64, max_x: f64, max_y: f64, rect: Rect) {
-        self.center_x = f64::midpoint(min_x, max_x);
-        self.center_y = f64::midpoint(min_y, max_y);
+    pub fn zoom_to_fit(&mut self, bounds: &WorldBBox, rect: Rect) {
+        self.center_x = f64::midpoint(bounds.min_x, bounds.max_x);
+        self.center_y = f64::midpoint(bounds.min_y, bounds.max_y);
 
-        let world_w = max_x - min_x;
-        let world_h = max_y - min_y;
+        let world_w = bounds.max_x - bounds.min_x;
+        let world_h = bounds.max_y - bounds.min_y;
 
         if world_w > 0.0 && world_h > 0.0 {
             let zoom_x = f64::from(rect.width()) / world_w;
@@ -143,7 +144,7 @@ fn draw_elements_flat(
     painter: &egui::Painter,
     viewport: &Viewport,
     rect: Rect,
-    visible: &[f64; 4],
+    visible: &WorldBBox,
     elements: &[Element],
     hidden_layers: &HashSet<(u16, u16)>,
     layer_colors: &mut LayerColorMap,
@@ -165,51 +166,17 @@ fn draw_element(
     painter: &egui::Painter,
     viewport: &Viewport,
     rect: Rect,
-    visible: &[f64; 4],
+    visible: &WorldBBox,
     element: &Element,
     hidden_layers: &HashSet<(u16, u16)>,
     layer_colors: &mut LayerColorMap,
 ) {
-    match element {
-        Element::Polygon(polygon) => {
-            let layer = polygon.layer();
-            let dt = polygon.data_type();
-            if hidden_layers.contains(&(layer, dt)) {
-                return;
-            }
-            draw_polygon(
-                painter,
-                viewport,
-                rect,
-                visible,
-                polygon,
-                layer_colors.get(layer, dt),
-            );
-        }
-        Element::Path(path) => {
-            let layer = path.layer();
-            let dt = path.data_type();
-            if hidden_layers.contains(&(layer, dt)) {
-                return;
-            }
-            draw_path(
-                painter,
-                viewport,
-                rect,
-                visible,
-                path,
-                layer_colors.get(layer, dt),
-            );
-        }
-        Element::Text(text) => {
-            let layer = text.layer();
-            if hidden_layers.contains(&(layer, 0)) {
-                return;
-            }
-            draw_text(painter, viewport, rect, text, layer_colors.get(layer, 0));
-        }
-        Element::Reference(_) => {}
+    let key = element.layer_key();
+    if hidden_layers.contains(&key) {
+        return;
     }
+    let color = layer_colors.get(key.0, key.1);
+    element.draw(painter, viewport, rect, visible, color);
 }
 
 /// Screen-pixel threshold below which a grid cell draws as a single LOAD rectangle.
@@ -219,15 +186,15 @@ fn draw_with_grid(
     painter: &egui::Painter,
     viewport: &Viewport,
     rect: Rect,
-    visible: &[f64; 4],
+    visible: &WorldBBox,
     elements: &[Element],
     hidden_layers: &HashSet<(u16, u16)>,
     layer_colors: &mut LayerColorMap,
     grid: &SpatialGrid,
 ) {
     for cell in grid.query_visible(visible) {
-        let s_min = viewport.world_to_screen(cell.bbox[0], cell.bbox[1], rect);
-        let s_max = viewport.world_to_screen(cell.bbox[2], cell.bbox[3], rect);
+        let s_min = viewport.world_to_screen(cell.bbox.min_x, cell.bbox.min_y, rect);
+        let s_max = viewport.world_to_screen(cell.bbox.max_x, cell.bbox.max_y, rect);
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs(); // Y flipped
 
@@ -261,267 +228,26 @@ fn draw_with_grid(
     }
 }
 
-/// Screen-pixel threshold below which polygons render as a filled bounding box instead of
-/// full triangulation. Avoids expensive earcut calls for elements that are just a few pixels.
-const BBOX_FALLBACK_PX: f32 = 8.0;
-
-fn draw_polygon(
-    painter: &egui::Painter,
-    viewport: &Viewport,
-    rect: Rect,
-    visible: &[f64; 4],
-    polygon: &gdsr::Polygon,
-    color: Color32,
-) {
-    let points = polygon.points();
-    if points.len() < 3 {
-        return;
-    }
-
-    // World-space bounding box — cull before any vertex conversion
-    let (mut w_min_x, mut w_min_y) = (f64::MAX, f64::MAX);
-    let (mut w_max_x, mut w_max_y) = (f64::MIN, f64::MIN);
-    for p in points {
-        let x = p.x().absolute_value();
-        let y = p.y().absolute_value();
-        w_min_x = w_min_x.min(x);
-        w_min_y = w_min_y.min(y);
-        w_max_x = w_max_x.max(x);
-        w_max_y = w_max_y.max(y);
-    }
-    if w_max_x < visible[0] || w_min_x > visible[2] || w_max_y < visible[1] || w_min_y > visible[3]
-    {
-        return;
-    }
-
-    // Convert only the bounding box corners to screen space to measure pixel size
-    let s_min = viewport.world_to_screen(w_min_x, w_min_y, rect);
-    let s_max = viewport.world_to_screen(w_max_x, w_max_y, rect);
-    let sw = (s_max.x - s_min.x).abs();
-    let sh = (s_min.y - s_max.y).abs(); // Y flipped
-
-    // Skip sub-pixel elements
-    if sw < 2.0 && sh < 2.0 {
-        return;
-    }
-
-    let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
-
-    // Small on screen — draw filled bounding box instead of triangulating
-    if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
-        let bbox = Rect::from_two_pos(s_min, s_max);
-        painter.rect_filled(bbox, 0.0, fill);
-        painter.rect_stroke(
-            bbox,
-            0.0,
-            Stroke::new(1.0, color),
-            egui::StrokeKind::Outside,
-        );
-        return;
-    }
-
-    // Full rendering path: convert all vertices to screen coordinates
-    let screen_pts: Vec<Pos2> = points
-        .iter()
-        .map(|p| viewport.world_to_screen(p.x().absolute_value(), p.y().absolute_value(), rect))
-        .collect();
-
-    // Remove the closing point if present (earcutr expects open polygons)
-    let open_pts = if screen_pts.len() >= 2 && screen_pts.first() == screen_pts.last() {
-        &screen_pts[..screen_pts.len() - 1]
-    } else {
-        &screen_pts
-    };
-
-    if open_pts.len() < 3 {
-        return;
-    }
-
-    let coords: Vec<f64> = open_pts
-        .iter()
-        .flat_map(|p| [f64::from(p.x), f64::from(p.y)])
-        .collect();
-
-    if let Ok(indices) = earcutr::earcut(&coords, &[], 2) {
-        let mut mesh = Mesh::default();
-        for pt in open_pts {
-            mesh.vertices.push(egui::epaint::Vertex {
-                pos: *pt,
-                uv: egui::epaint::WHITE_UV,
-                color: fill,
-            });
-        }
-        for idx in indices {
-            mesh.indices.push(idx as u32);
-        }
-        painter.add(Shape::mesh(mesh));
-    }
-
-    let stroke = Stroke::new(1.0, color);
-    for i in 0..open_pts.len() {
-        let next = (i + 1) % open_pts.len();
-        painter.line_segment([open_pts[i], open_pts[next]], stroke);
-    }
-}
-
-fn draw_path(
-    painter: &egui::Painter,
-    viewport: &Viewport,
-    rect: Rect,
-    visible: &[f64; 4],
-    path: &gdsr::Path,
-    color: Color32,
-) {
-    let points = path.points();
-    if points.len() < 2 {
-        return;
-    }
-
-    // World-space bounding box — cull before vertex conversion
-    let (mut w_min_x, mut w_min_y) = (f64::MAX, f64::MAX);
-    let (mut w_max_x, mut w_max_y) = (f64::MIN, f64::MIN);
-    for p in points {
-        let x = p.x().absolute_value();
-        let y = p.y().absolute_value();
-        w_min_x = w_min_x.min(x);
-        w_min_y = w_min_y.min(y);
-        w_max_x = w_max_x.max(x);
-        w_max_y = w_max_y.max(y);
-    }
-    if w_max_x < visible[0] || w_min_x > visible[2] || w_max_y < visible[1] || w_min_y > visible[3]
-    {
-        return;
-    }
-
-    // Screen-space size check
-    let s_min = viewport.world_to_screen(w_min_x, w_min_y, rect);
-    let s_max = viewport.world_to_screen(w_max_x, w_max_y, rect);
-    let sw = (s_max.x - s_min.x).abs();
-    let sh = (s_min.y - s_max.y).abs();
-    if sw < 1.0 && sh < 1.0 {
-        return;
-    }
-
-    // Small on screen — draw a single line segment between bbox corners
-    if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
-        let stroke = Stroke::new(1.0, color);
-        painter.line_segment([s_min, s_max], stroke);
-        return;
-    }
-
-    let screen_pts: Vec<Pos2> = points
-        .iter()
-        .map(|p| viewport.world_to_screen(p.x().absolute_value(), p.y().absolute_value(), rect))
-        .collect();
-
-    let width_px = path
-        .width()
-        .map(|w| (w.absolute_value() * viewport.zoom) as f32)
-        .unwrap_or(1.0)
-        .clamp(1.0, 20.0);
-
-    let stroke = Stroke::new(width_px, color);
-    for pair in screen_pts.windows(2) {
-        painter.line_segment([pair[0], pair[1]], stroke);
-    }
-}
-
-fn draw_text(
-    painter: &egui::Painter,
-    viewport: &Viewport,
-    rect: Rect,
-    text: &gdsr::Text,
-    color: Color32,
-) {
-    let origin = text.origin();
-    let screen_pos = viewport.world_to_screen(
-        origin.x().absolute_value(),
-        origin.y().absolute_value(),
-        rect,
-    );
-
-    // Skip if outside viewport
-    if !rect.contains(screen_pos) {
-        return;
-    }
-
-    let font_size = (12.0 * viewport.zoom.log10().max(1.0)) as f32;
-    if font_size < 4.0 {
-        return;
-    }
-    let font_size = font_size.min(48.0);
-
-    painter.text(
-        screen_pos,
-        egui::Align2::LEFT_BOTTOM,
-        text.text(),
-        FontId::monospace(font_size),
-        color,
-    );
-}
-
 #[cfg(test)]
 fn test_rect() -> Rect {
     Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
 }
 
-/// Returns the world-space bounding box of a single element as `[min_x, min_y, max_x, max_y]`.
-/// Returns `None` for references and elements with no points.
-pub fn element_bbox(element: &Element) -> Option<[f64; 4]> {
-    let points: &[gdsr::Point] = match element {
-        Element::Polygon(p) => p.points(),
-        Element::Path(p) => p.points(),
-        Element::Text(t) => {
-            let x = t.origin().x().absolute_value();
-            let y = t.origin().y().absolute_value();
-            return Some([x, y, x, y]);
-        }
-        Element::Reference(_) => return None,
-    };
-
-    if points.is_empty() {
-        return None;
-    }
-
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-    for p in points {
-        let x = p.x().absolute_value();
-        let y = p.y().absolute_value();
-        min_x = min_x.min(x);
-        min_y = min_y.min(y);
-        max_x = max_x.max(x);
-        max_y = max_y.max(y);
-    }
-    Some([min_x, min_y, max_x, max_y])
-}
-
 /// Computes the bounding box of the given elements in world coordinates.
 /// Returns `None` if there are no geometric elements.
-pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-    let mut found = false;
+pub fn compute_bounds(elements: &[Element]) -> Option<WorldBBox> {
+    let mut result: Option<WorldBBox> = None;
 
     for element in elements {
-        if let Some(bbox) = element_bbox(element) {
-            min_x = min_x.min(bbox[0]);
-            min_y = min_y.min(bbox[1]);
-            max_x = max_x.max(bbox[2]);
-            max_y = max_y.max(bbox[3]);
-            found = true;
+        if let Some(bbox) = element.world_bbox() {
+            result = Some(match result {
+                Some(acc) => acc.merge(&bbox),
+                None => bbox,
+            });
         }
     }
 
-    if found {
-        Some((min_x, min_y, max_x, max_y))
-    } else {
-        None
-    }
+    result
 }
 
 #[cfg(test)]
@@ -586,7 +312,7 @@ mod tests {
     fn zoom_to_fit_centers_on_bounds() {
         let mut vp = Viewport::default();
         let rect = test_rect();
-        vp.zoom_to_fit(10.0, 20.0, 30.0, 40.0, rect);
+        vp.zoom_to_fit(&WorldBBox::new(10.0, 20.0, 30.0, 40.0), rect);
         assert!((vp.center_x - 20.0).abs() < EPSILON);
         assert!((vp.center_y - 30.0).abs() < EPSILON);
     }
@@ -595,7 +321,7 @@ mod tests {
     fn zoom_to_fit_bounds_are_within_viewport() {
         let mut vp = Viewport::default();
         let rect = test_rect();
-        vp.zoom_to_fit(-1.0, -2.0, 3.0, 4.0, rect);
+        vp.zoom_to_fit(&WorldBBox::new(-1.0, -2.0, 3.0, 4.0), rect);
 
         let min_screen = vp.world_to_screen(-1.0, -2.0, rect);
         let max_screen = vp.world_to_screen(3.0, 4.0, rect);
@@ -619,13 +345,13 @@ mod tests {
 
         // Top-left screen corner → max world Y (Y flipped)
         let (wx_tl, wy_tl) = vp.screen_to_world(rect.min.x, rect.min.y, rect);
-        assert!((vis[0] - wx_tl).abs() < EPSILON);
-        assert!((vis[3] - wy_tl).abs() < EPSILON); // max_y
+        assert!((vis.min_x - wx_tl).abs() < EPSILON);
+        assert!((vis.max_y - wy_tl).abs() < EPSILON);
 
         // Bottom-right screen corner → min world Y
         let (wx_br, wy_br) = vp.screen_to_world(rect.max.x, rect.max.y, rect);
-        assert!((vis[2] - wx_br).abs() < EPSILON);
-        assert!((vis[1] - wy_br).abs() < EPSILON); // min_y
+        assert!((vis.max_x - wx_br).abs() < EPSILON);
+        assert!((vis.min_y - wy_br).abs() < EPSILON);
     }
 
     /// Simulates the zoom logic from `draw_viewport`: zoom by `factor` anchored at `cursor`.
@@ -698,12 +424,11 @@ mod tests {
             1,
             0,
         );
-        let bounds = compute_bounds(&[Element::Polygon(polygon)]);
-        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
-        assert!((min_x - 0.0).abs() < EPSILON);
-        assert!((min_y - 0.0).abs() < EPSILON);
-        assert!((max_x - 1000.0 * 1e-9).abs() < EPSILON);
-        assert!((max_y - 2000.0 * 1e-9).abs() < EPSILON);
+        let bounds = compute_bounds(&[Element::Polygon(polygon)]).expect("should have bounds");
+        assert!((bounds.min_x - 0.0).abs() < EPSILON);
+        assert!((bounds.min_y - 0.0).abs() < EPSILON);
+        assert!((bounds.max_x - 1000.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_y - 2000.0 * 1e-9).abs() < EPSILON);
     }
 
     #[test]
@@ -718,12 +443,11 @@ mod tests {
             None,
             Some(Unit::default_integer(10)),
         );
-        let bounds = compute_bounds(&[Element::Path(path)]);
-        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
-        assert!((min_x - 100.0 * 1e-9).abs() < EPSILON);
-        assert!((min_y - 200.0 * 1e-9).abs() < EPSILON);
-        assert!((max_x - 300.0 * 1e-9).abs() < EPSILON);
-        assert!((max_y - 400.0 * 1e-9).abs() < EPSILON);
+        let bounds = compute_bounds(&[Element::Path(path)]).expect("should have bounds");
+        assert!((bounds.min_x - 100.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.min_y - 200.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_x - 300.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.max_y - 400.0 * 1e-9).abs() < EPSILON);
     }
 
     #[test]
@@ -739,12 +463,11 @@ mod tests {
             VerticalPresentation::default(),
             HorizontalPresentation::default(),
         );
-        let bounds = compute_bounds(&[Element::Text(text)]);
-        let (min_x, min_y, max_x, max_y) = bounds.expect("should have bounds");
-        assert!((min_x - 500.0 * 1e-9).abs() < EPSILON);
-        assert!((min_y - 600.0 * 1e-9).abs() < EPSILON);
-        assert_eq!(min_x, max_x);
-        assert_eq!(min_y, max_y);
+        let bounds = compute_bounds(&[Element::Text(text)]).expect("should have bounds");
+        assert!((bounds.min_x - 500.0 * 1e-9).abs() < EPSILON);
+        assert!((bounds.min_y - 600.0 * 1e-9).abs() < EPSILON);
+        assert_eq!(bounds.min_x, bounds.max_x);
+        assert_eq!(bounds.min_y, bounds.max_y);
     }
 
     #[test]
@@ -769,9 +492,9 @@ mod tests {
             VerticalPresentation::default(),
             HorizontalPresentation::default(),
         );
-        let bounds = compute_bounds(&[Element::Polygon(polygon), Element::Text(text)]);
-        let (min_x, min_y, _, _) = bounds.expect("should have bounds");
-        assert!((min_x - 0.0).abs() < EPSILON);
-        assert!((min_y - 0.0).abs() < EPSILON);
+        let bounds = compute_bounds(&[Element::Polygon(polygon), Element::Text(text)])
+            .expect("should have bounds");
+        assert!((bounds.min_x - 0.0).abs() < EPSILON);
+        assert!((bounds.min_y - 0.0).abs() < EPSILON);
     }
 }

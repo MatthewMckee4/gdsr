@@ -6,6 +6,7 @@ use std::thread;
 use gdsr::{Element, Library};
 
 use crate::colors::LayerColorMap;
+use crate::drawable::Drawable;
 use crate::panels;
 use crate::spatial::SpatialGrid;
 use crate::viewport::{self, Viewport};
@@ -82,9 +83,9 @@ impl ViewerApp {
     }
 
     fn zoom_to_fit(&mut self) {
-        if let Some((min_x, min_y, max_x, max_y)) = viewport::compute_bounds(&self.elements) {
+        if let Some(bounds) = viewport::compute_bounds(&self.elements) {
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
-            self.viewport.zoom_to_fit(min_x, min_y, max_x, max_y, rect);
+            self.viewport.zoom_to_fit(&bounds, rect);
         }
     }
 }
@@ -120,19 +121,19 @@ impl eframe::App for ViewerApp {
                     Ok(element) => {
                         match &element {
                             Element::Polygon(p) => {
-                                let key = (p.layer(), p.data_type());
+                                let key = p.layer_key();
                                 if self.layers.insert(key) {
                                     self.layer_colors.get(key.0, key.1);
                                 }
                             }
                             Element::Path(p) => {
-                                let key = (p.layer(), p.data_type());
+                                let key = p.layer_key();
                                 if self.layers.insert(key) {
                                     self.layer_colors.get(key.0, key.1);
                                 }
                             }
                             Element::Text(t) => {
-                                let key = (t.layer(), 0);
+                                let key = t.layer_key();
                                 if self.layers.insert(key) {
                                     self.layer_colors.get(key.0, key.1);
                                 }
@@ -146,7 +147,7 @@ impl eframe::App for ViewerApp {
                         self.elements_loading = false;
                         self.element_receiver = None;
                         if let Some(bounds) = viewport::compute_bounds(&self.elements) {
-                            self.spatial_grid = Some(SpatialGrid::build(&self.elements, bounds));
+                            self.spatial_grid = Some(SpatialGrid::build(&self.elements, &bounds));
                         }
                         self.zoom_to_fit();
                         break;
