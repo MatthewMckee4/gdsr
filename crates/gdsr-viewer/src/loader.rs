@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
@@ -12,12 +12,12 @@ pub fn load_file_dialog() -> Option<(PathBuf, mpsc::Receiver<Result<Library, Str
         .add_filter("GDS files", &["gds", "gds2", "gdsii"])
         .pick_file()?;
 
-    Some(load_request(path))
+    Some(load_request(&path))
 }
 
-pub fn load_request(path: PathBuf) -> (PathBuf, mpsc::Receiver<Result<Library, String>>) {
+pub fn load_request(path: &Path) -> (PathBuf, mpsc::Receiver<Result<Library, String>>) {
     let (tx, rx) = mpsc::channel();
-    let path_clone = path.clone();
+    let path_clone = path.to_path_buf();
 
     thread::spawn(move || {
         let result = Library::read_file(&path_clone, None).map_err(|e| e.to_string());

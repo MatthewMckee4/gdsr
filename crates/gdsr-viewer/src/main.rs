@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use clap::Parser;
 
 mod app;
 mod colors;
@@ -6,16 +6,19 @@ mod loader;
 mod panels;
 mod viewport;
 
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(value_name = "FILE")]
+    file: Option<std::path::PathBuf>,
+}
+
 fn main() -> eframe::Result<()> {
     env_logger::init();
 
-    let args: Option<String> = env::args().skip(1).next();
+    let args = Args::parse();
 
-    let app = match args {
-        Some(arg) => {
-            let path = PathBuf::from(&arg);
-            app::ViewerApp::with_path(path)
-        }
+    let app = match args.file {
+        Some(file) => app::ViewerApp::with_path(&file),
         None => app::ViewerApp::default(),
     };
 

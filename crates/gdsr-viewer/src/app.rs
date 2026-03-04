@@ -1,5 +1,5 @@
 use std::collections::{BTreeSet, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self};
 
 use gdsr::{Element, Library};
@@ -26,10 +26,10 @@ pub struct ViewerApp {
 }
 
 impl ViewerApp {
-    pub fn with_path(path: PathBuf) -> Self {
+    pub fn with_path(path: &Path) -> Self {
         let (path, rx) = crate::loader::load_request(path);
         Self {
-            file_path: Some(path.to_path_buf()),
+            file_path: Some(path.clone()),
             load_receiver: Some((path, rx)),
             loading: true,
             error_message: None,

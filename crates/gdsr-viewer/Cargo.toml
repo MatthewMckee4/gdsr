@@ -9,6 +9,7 @@ authors = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+clap = { version = "4.5.55", features = ["derive"] }
 earcutr = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
