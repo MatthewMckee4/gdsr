@@ -27,16 +27,13 @@ pub struct ViewerApp {
 
 impl ViewerApp {
     pub fn with_path(path: PathBuf) -> Self {
-        if let Some((path, rx)) = crate::loader::load_request(path.clone()) {
-            Self {
-                file_path: Some(path.clone()),
-                load_receiver: Some((path.clone(), rx)),
-                loading: true,
-                error_message: None,
-                ..Default::default()
-            }
-        } else {
-            Self::default()
+        let (path, rx) = crate::loader::load_request(path);
+        Self {
+            file_path: Some(path.to_path_buf()),
+            load_receiver: Some((path, rx)),
+            loading: true,
+            error_message: None,
+            ..Default::default()
         }
     }
 
