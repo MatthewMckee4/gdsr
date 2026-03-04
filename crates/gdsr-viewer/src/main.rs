@@ -13,14 +13,10 @@ fn main() -> eframe::Result<()> {
 
     let app = match args {
         Some(arg) => {
-            println!("There is an argument: {arg}");
             let path = PathBuf::from(&arg);
             app::ViewerApp::with_path(path)
         }
-        None => {
-            println!("There are no arguments");
-            app::ViewerApp::default()
-        }
+        None => app::ViewerApp::default(),
     };
 
     let options = eframe::NativeOptions {
