@@ -17,15 +17,12 @@ chrono = "0.4.42"
 
 [dev-dependencies]
 approx = "0.5"
+criterion = { package = "codspeed-criterion-compat-walltime", version = "4" }
 insta = "1.44.3"
 quickcheck = "1.0.3"
 quickcheck_macros = "1"
 rstest = "0.23.0"
 tempfile = "3.23"
-
-[dev-dependencies.criterion]
-package = "codspeed-criterion-compat-walltime"
-version = "4"
 
 [[bench]]
 name = "io"
