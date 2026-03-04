@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self};
+use std::sync::mpsc;
+use std::thread;
 
 use gdsr::{Element, Library};
 
