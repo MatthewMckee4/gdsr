@@ -84,12 +84,15 @@ pub fn draw_viewport(
         if scroll != 0.0 {
             let (wx, wy) = viewport.screen_to_world(hover_pos.x, hover_pos.y, rect);
             let factor = 1.0 + f64::from(scroll) * 0.002;
-            viewport.zoom *= factor;
-            viewport.zoom = viewport.zoom.clamp(1e-3, 1e15);
-            // Adjust center so the world point under the cursor stays fixed
-            let new_screen = viewport.world_to_screen(wx, wy, rect);
-            viewport.center_x += f64::from(hover_pos.x - new_screen.x) / viewport.zoom;
-            viewport.center_y -= f64::from(hover_pos.y - new_screen.y) / viewport.zoom;
+            let new_zoom = (viewport.zoom * factor).clamp(1e-3, 1e15);
+            // Anchor: the world point under the cursor must stay at hover_pos
+            let cx = f64::from(rect.center().x);
+            let cy = f64::from(rect.center().y);
+            let sx = f64::from(hover_pos.x);
+            let sy = f64::from(hover_pos.y);
+            viewport.center_x = wx - (sx - cx) / new_zoom;
+            viewport.center_y = wy + (sy - cy) / new_zoom;
+            viewport.zoom = new_zoom;
         }
     }
 
@@ -421,6 +424,54 @@ mod tests {
         // Y is flipped so max_world_y maps to smaller screen_y
         assert!(max_screen.y >= rect.min.y);
         assert!(min_screen.y <= rect.max.y);
+    }
+
+    /// Simulates the zoom logic from `draw_viewport`: zoom by `factor` anchored at `cursor`.
+    fn apply_zoom(vp: &mut Viewport, rect: Rect, cursor: Pos2, factor: f64) {
+        let (wx, wy) = vp.screen_to_world(cursor.x, cursor.y, rect);
+        let new_zoom = (vp.zoom * factor).clamp(1e-3, 1e15);
+        let cx = f64::from(rect.center().x);
+        let cy = f64::from(rect.center().y);
+        vp.center_x = wx - (f64::from(cursor.x) - cx) / new_zoom;
+        vp.center_y = wy + (f64::from(cursor.y) - cy) / new_zoom;
+        vp.zoom = new_zoom;
+    }
+
+    #[test]
+    fn zoom_preserves_world_point_under_cursor() {
+        let rect = test_rect();
+        let cursor = Pos2::new(200.0, 150.0);
+        let mut vp = Viewport {
+            center_x: 50.0,
+            center_y: 30.0,
+            zoom: 200.0,
+        };
+
+        let (wx, wy) = vp.screen_to_world(cursor.x, cursor.y, rect);
+        apply_zoom(&mut vp, rect, cursor, 1.5);
+        let after = vp.world_to_screen(wx, wy, rect);
+
+        assert!((f64::from(after.x - cursor.x)).abs() < 0.01);
+        assert!((f64::from(after.y - cursor.y)).abs() < 0.01);
+    }
+
+    #[test]
+    fn zoom_in_then_out_returns_to_original() {
+        let rect = test_rect();
+        let cursor = Pos2::new(600.0, 400.0);
+        let mut vp = Viewport {
+            center_x: 10.0,
+            center_y: 20.0,
+            zoom: 500.0,
+        };
+        let (orig_cx, orig_cy, orig_z) = (vp.center_x, vp.center_y, vp.zoom);
+
+        apply_zoom(&mut vp, rect, cursor, 2.0);
+        apply_zoom(&mut vp, rect, cursor, 0.5);
+
+        assert!((vp.zoom - orig_z).abs() < EPSILON);
+        assert!((vp.center_x - orig_cx).abs() < EPSILON);
+        assert!((vp.center_y - orig_cy).abs() < EPSILON);
     }
 
     #[test]
