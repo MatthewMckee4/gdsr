@@ -9,6 +9,16 @@ An interactive GDS file viewer built with [egui](https://github.com/emilk/egui).
 - Layer visibility toggles with color coding
 - Cell selector dropdown
 
+## Prerequisites
+
+On Linux, install the required system libraries:
+
+```sh
+sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+```
+
+No extra dependencies are needed on macOS or Windows.
+
 ## Usage
 
 ```sh
