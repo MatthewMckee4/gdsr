@@ -159,3 +159,40 @@ jobs:
           files: lcov.info
           slug: MatthewMckee4/gdsr
           fail_ci_if_error: true
+
+  benchmarks:
+    name: "benchmarks"
+
+    runs-on: ubuntu-latest
+
+    needs: determine_changes
+
+    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install cargo-codspeed"
+        uses: taiki-e/install-action@a416ddeedbd372e614cc1386e8b642692f66865e # v2.57.1
+        with:
+          tool: cargo-codspeed
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+        with:
+          run: cargo codspeed run
+          mode: walltime

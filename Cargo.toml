@@ -23,6 +23,14 @@ quickcheck_macros = "1"
 rstest = "0.23.0"
 tempfile = "3.23"
 
+[dev-dependencies.criterion]
+package = "codspeed-criterion-compat-walltime"
+version = "4"
+
+[[bench]]
+name = "io"
+harness = false
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
