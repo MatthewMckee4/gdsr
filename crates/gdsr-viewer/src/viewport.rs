@@ -594,6 +594,124 @@ mod tests {
     }
 
     #[test]
+    fn visible_world_rect_matches_screen_corners() {
+        let vp = Viewport {
+            center_x: 5.0,
+            center_y: 10.0,
+            zoom: 100.0,
+        };
+        let rect = test_rect();
+        let vis = vp.visible_world_rect(rect);
+
+        // Top-left screen corner → max world Y (Y flipped)
+        let (wx_tl, wy_tl) = vp.screen_to_world(rect.min.x, rect.min.y, rect);
+        assert!((vis[0] - wx_tl).abs() < EPSILON);
+        assert!((vis[3] - wy_tl).abs() < EPSILON); // max_y
+
+        // Bottom-right screen corner → min world Y
+        let (wx_br, wy_br) = vp.screen_to_world(rect.max.x, rect.max.y, rect);
+        assert!((vis[2] - wx_br).abs() < EPSILON);
+        assert!((vis[1] - wy_br).abs() < EPSILON); // min_y
+    }
+
+    /// After zooming, the world point that was under the cursor should still
+    /// map to the same screen position.
+    #[test]
+    fn zoom_preserves_world_point_under_cursor() {
+        let rect = test_rect();
+        // Cursor at (200, 150) — off-center
+        let cursor_sx = 200.0_f32;
+        let cursor_sy = 150.0_f32;
+
+        let mut vp = Viewport {
+            center_x: 50.0,
+            center_y: 30.0,
+            zoom: 200.0,
+        };
+
+        // Record world point under cursor before zoom
+        let (wx, wy) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
+
+        // Simulate zoom: same logic as draw_viewport
+        let factor = 1.5;
+        let new_zoom = (vp.zoom * factor).clamp(1e-3, 1e15);
+        let cx = f64::from(rect.center().x);
+        let cy = f64::from(rect.center().y);
+        let sx = f64::from(cursor_sx);
+        let sy = f64::from(cursor_sy);
+        vp.center_x = wx - (sx - cx) / new_zoom;
+        vp.center_y = wy + (sy - cy) / new_zoom;
+        vp.zoom = new_zoom;
+
+        // The same world point should now map back to the cursor position
+        let screen_after = vp.world_to_screen(wx, wy, rect);
+        assert!(
+            (f64::from(screen_after.x) - f64::from(cursor_sx)).abs() < 0.01,
+            "x drifted: {} vs {}",
+            screen_after.x,
+            cursor_sx
+        );
+        assert!(
+            (f64::from(screen_after.y) - f64::from(cursor_sy)).abs() < 0.01,
+            "y drifted: {} vs {}",
+            screen_after.y,
+            cursor_sy
+        );
+    }
+
+    /// Zooming in and then out by the inverse factor should return to the original viewport state.
+    #[test]
+    fn zoom_in_then_out_returns_to_original() {
+        let rect = test_rect();
+        let cursor_sx = 600.0_f32;
+        let cursor_sy = 400.0_f32;
+
+        let original_center_x = 10.0;
+        let original_center_y = 20.0;
+        let original_zoom = 500.0;
+
+        let mut vp = Viewport {
+            center_x: original_center_x,
+            center_y: original_center_y,
+            zoom: original_zoom,
+        };
+
+        // Zoom in
+        let (wx, wy) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
+        let factor_in = 2.0;
+        let new_zoom = vp.zoom * factor_in;
+        let cx = f64::from(rect.center().x);
+        let cy = f64::from(rect.center().y);
+        let sx = f64::from(cursor_sx);
+        let sy = f64::from(cursor_sy);
+        vp.center_x = wx - (sx - cx) / new_zoom;
+        vp.center_y = wy + (sy - cy) / new_zoom;
+        vp.zoom = new_zoom;
+
+        // Zoom out by inverse
+        let (wx2, wy2) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
+        let factor_out = 0.5;
+        let new_zoom2 = vp.zoom * factor_out;
+        vp.center_x = wx2 - (sx - cx) / new_zoom2;
+        vp.center_y = wy2 + (sy - cy) / new_zoom2;
+        vp.zoom = new_zoom2;
+
+        assert!((vp.zoom - original_zoom).abs() < EPSILON);
+        assert!(
+            (vp.center_x - original_center_x).abs() < EPSILON,
+            "center_x drifted: {} vs {}",
+            vp.center_x,
+            original_center_x
+        );
+        assert!(
+            (vp.center_y - original_center_y).abs() < EPSILON,
+            "center_y drifted: {} vs {}",
+            vp.center_y,
+            original_center_y
+        );
+    }
+
+    #[test]
     fn compute_bounds_empty_returns_none() {
         assert!(compute_bounds(&[]).is_none());
     }

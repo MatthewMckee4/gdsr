@@ -287,6 +287,101 @@ mod tests {
     }
 
     #[test]
+    fn build_skips_references() {
+        let reference = Element::Reference(gdsr::Reference::default());
+        let poly = make_polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let scale = 1e-9;
+        let bounds = (0.0, 0.0, 100.0 * scale, 100.0 * scale);
+        let grid = SpatialGrid::build(&[reference, poly], bounds);
+
+        let all = query_element_indices(&grid, &[0.0, 0.0, 100.0 * scale, 100.0 * scale]);
+        // Only the polygon (index 1) should appear; reference (index 0) is skipped
+        assert_eq!(all, vec![1]);
+    }
+
+    #[test]
+    fn cell_bbox_is_tight() {
+        let scale = 1e-9;
+        let poly = make_polygon(vec![(100, 200), (300, 200), (300, 400), (100, 400)], 1, 0);
+        let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], bounds);
+
+        for cell in grid.cells.iter().flatten() {
+            assert!((cell.bbox[0] - 100.0 * scale).abs() < 1e-15);
+            assert!((cell.bbox[1] - 200.0 * scale).abs() < 1e-15);
+            assert!((cell.bbox[2] - 300.0 * scale).abs() < 1e-15);
+            assert!((cell.bbox[3] - 400.0 * scale).abs() < 1e-15);
+        }
+    }
+
+    #[test]
+    fn large_element_found_from_opposite_edge() {
+        let scale = 1e-9;
+        // Element spans the entire world
+        let p = make_polygon(vec![(0, 0), (1000, 0), (1000, 1000), (0, 1000)], 1, 0);
+        let bounds = (0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[p], bounds);
+
+        // Query just the top-right corner
+        let visible = [900.0 * scale, 900.0 * scale, 1000.0 * scale, 1000.0 * scale];
+        let indices = query_element_indices(&grid, &visible);
+        assert!(indices.contains(&0));
+
+        // Query just the bottom-left corner
+        let visible = [0.0, 0.0, 100.0 * scale, 100.0 * scale];
+        let indices = query_element_indices(&grid, &visible);
+        assert!(indices.contains(&0));
+    }
+
+    #[test]
+    fn element_layer_polygon() {
+        let poly = Polygon::new(
+            vec![
+                Point::default_integer(0, 0),
+                Point::default_integer(1, 0),
+                Point::default_integer(1, 1),
+            ],
+            5,
+            3,
+        );
+        assert_eq!(element_layer(&Element::Polygon(poly)), (5, 3));
+    }
+
+    #[test]
+    fn element_layer_path() {
+        let path = Path::new(
+            vec![Point::default_integer(0, 0), Point::default_integer(1, 1)],
+            7,
+            2,
+            None,
+            None,
+        );
+        assert_eq!(element_layer(&Element::Path(path)), (7, 2));
+    }
+
+    #[test]
+    fn element_layer_text() {
+        let text = Text::new(
+            "t",
+            Point::default_integer(0, 0),
+            4,
+            0,
+            1.0,
+            0.0,
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        );
+        assert_eq!(element_layer(&Element::Text(text)), (4, 0));
+    }
+
+    #[test]
+    fn element_layer_reference() {
+        let reference = Element::Reference(gdsr::Reference::default());
+        assert_eq!(element_layer(&reference), (0, 0));
+    }
+
+    #[test]
     fn element_bbox_polygon() {
         let poly = Polygon::new(
             vec![
