@@ -256,8 +256,8 @@ macro_rules! impl_scalar_op {
 
 impl_scalar_op!(Mul, mul,
     f64 => { int: |v: i32, s: f64| (f64::from(v) * s).round() as i32, float: |v: f64, s| v * s },
-    i32 => { int: |v: i32, s| v * s, float: |v: f64, s| v * f64::from(s) },
-    u32 => { int: |v: i32, s| v * s as i32, float: |v: f64, s| v * f64::from(s) },
+    i32 => { int: |v: i32, s: i32| (f64::from(v) * f64::from(s)).round() as i32, float: |v: f64, s| v * f64::from(s) },
+    u32 => { int: |v: i32, s: u32| (f64::from(v) * f64::from(s)).round() as i32, float: |v: f64, s| v * f64::from(s) },
 );
 
 impl_scalar_op!(Div, div,
@@ -665,6 +665,27 @@ mod tests {
             let u2 = Unit::integer(10, 1e-3);
             let result = u1 * u2;
             assert_eq!(result, Unit::float(50.0, 1e-3));
+        }
+
+        /// Large values that would overflow i32 if multiplied directly.
+        #[test]
+        fn integer_by_u32_no_overflow() {
+            let u = Unit::integer(i32::MAX, 1e-9);
+            let result = u * 2u32;
+            assert_eq!(
+                result,
+                Unit::integer((f64::from(i32::MAX) * 2.0).round() as i32, 1e-9)
+            );
+        }
+
+        #[test]
+        fn integer_by_i32_no_overflow() {
+            let u = Unit::integer(i32::MAX, 1e-9);
+            let result = u * 2i32;
+            assert_eq!(
+                result,
+                Unit::integer((f64::from(i32::MAX) * 2.0).round() as i32, 1e-9)
+            );
         }
     }
 
