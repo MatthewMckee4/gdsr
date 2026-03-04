@@ -303,9 +303,24 @@ mod tests {
     }
 
     #[test]
-    fn layer_keys_reference() {
+    fn layer_keys_reference_empty() {
         let elem = reference();
         assert!(elem.layer_keys().is_empty());
+    }
+
+    #[test]
+    fn layer_keys_reference_with_element() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(10, 0),
+                gdsr::Point::default_integer(10, 10),
+            ],
+            5,
+            3,
+        );
+        let reference = Element::Reference(gdsr::Reference::new(poly));
+        assert_eq!(reference.layer_keys(), vec![(5, 3)]);
     }
 
     #[test]
@@ -345,7 +360,52 @@ mod tests {
     }
 
     #[test]
-    fn world_bbox_reference() {
+    fn world_bbox_reference_empty() {
         assert!(reference().world_bbox().is_none());
+    }
+
+    #[test]
+    fn world_bbox_reference_with_element() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 0),
+                gdsr::Point::default_integer(100, 200),
+            ],
+            1,
+            0,
+        );
+        let reference = Element::Reference(gdsr::Reference::new(poly));
+        let bbox = reference.world_bbox().expect("should have bbox");
+        let scale = 1e-9;
+        assert!((bbox.min_x - 0.0).abs() < 1e-15);
+        assert!((bbox.min_y - 0.0).abs() < 1e-15);
+        assert!((bbox.max_x - 100.0 * scale).abs() < 1e-15);
+        assert!((bbox.max_y - 200.0 * scale).abs() < 1e-15);
+    }
+
+    #[test]
+    fn world_bbox_reference_with_grid() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(10, 0),
+                gdsr::Point::default_integer(10, 10),
+            ],
+            1,
+            0,
+        );
+        let grid = gdsr::Grid::default()
+            .with_columns(2)
+            .with_rows(1)
+            .with_spacing_x(Some(gdsr::Point::default_integer(20, 0)));
+        let reference = Element::Reference(gdsr::Reference::new(poly).with_grid(grid));
+        let bbox = reference.world_bbox().expect("should have bbox");
+        let scale = 1e-9;
+        assert!((bbox.min_x - 0.0).abs() < 1e-15);
+        assert!((bbox.min_y - 0.0).abs() < 1e-15);
+        // Second copy at x+20, so max_x should be (20+10)*scale = 30*scale
+        assert!((bbox.max_x - 30.0 * scale).abs() < 1e-15);
+        assert!((bbox.max_y - 10.0 * scale).abs() < 1e-15);
     }
 }
