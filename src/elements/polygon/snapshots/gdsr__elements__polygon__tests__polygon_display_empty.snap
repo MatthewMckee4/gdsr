@@ -1,5 +1,0 @@
----
-source: src/elements/polygon/mod.rs
-expression: polygon.to_string()
----
-Polygon with 0 points on layer 1, data type 0

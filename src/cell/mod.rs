@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_cell_new() {
-        let cell: Cell = Cell::new("test_cell");
+        let cell = Cell::new("test_cell");
         assert_eq!(cell.name, "test_cell");
         assert!(cell.polygons().is_empty());
         assert!(cell.paths().is_empty());
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_cell_default() {
-        let cell: Cell = Cell::default();
+        let cell = Cell::default();
         assert_eq!(cell.name, "");
         assert!(cell.polygons.is_empty());
         assert!(cell.paths.is_empty());

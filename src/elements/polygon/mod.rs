@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn test_polygon_display_empty() {
         let polygon = Polygon::new(vec![], 1, 0);
-        insta::assert_snapshot!(polygon.to_string());
+        insta::assert_snapshot!(polygon.to_string(), @"Polygon with 0 points on layer 1, data type 0");
     }
 
     #[test]
