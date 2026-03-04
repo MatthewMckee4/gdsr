@@ -426,98 +426,52 @@ mod tests {
         assert!(min_screen.y <= rect.max.y);
     }
 
-    /// After zooming, the world point that was under the cursor should still
-    /// map to the same screen position.
+    /// Simulates the zoom logic from `draw_viewport`: zoom by `factor` anchored at `cursor`.
+    fn apply_zoom(vp: &mut Viewport, rect: Rect, cursor: Pos2, factor: f64) {
+        let (wx, wy) = vp.screen_to_world(cursor.x, cursor.y, rect);
+        let new_zoom = (vp.zoom * factor).clamp(1e-3, 1e15);
+        let cx = f64::from(rect.center().x);
+        let cy = f64::from(rect.center().y);
+        vp.center_x = wx - (f64::from(cursor.x) - cx) / new_zoom;
+        vp.center_y = wy + (f64::from(cursor.y) - cy) / new_zoom;
+        vp.zoom = new_zoom;
+    }
+
     #[test]
     fn zoom_preserves_world_point_under_cursor() {
         let rect = test_rect();
-        let cursor_sx = 200.0_f32;
-        let cursor_sy = 150.0_f32;
-
+        let cursor = Pos2::new(200.0, 150.0);
         let mut vp = Viewport {
             center_x: 50.0,
             center_y: 30.0,
             zoom: 200.0,
         };
 
-        let (wx, wy) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
+        let (wx, wy) = vp.screen_to_world(cursor.x, cursor.y, rect);
+        apply_zoom(&mut vp, rect, cursor, 1.5);
+        let after = vp.world_to_screen(wx, wy, rect);
 
-        // Simulate zoom: same logic as draw_viewport
-        let factor = 1.5;
-        let new_zoom = (vp.zoom * factor).clamp(1e-3, 1e15);
-        let cx = f64::from(rect.center().x);
-        let cy = f64::from(rect.center().y);
-        let sx = f64::from(cursor_sx);
-        let sy = f64::from(cursor_sy);
-        vp.center_x = wx - (sx - cx) / new_zoom;
-        vp.center_y = wy + (sy - cy) / new_zoom;
-        vp.zoom = new_zoom;
-
-        let screen_after = vp.world_to_screen(wx, wy, rect);
-        assert!(
-            (f64::from(screen_after.x) - f64::from(cursor_sx)).abs() < 0.01,
-            "x drifted: {} vs {}",
-            screen_after.x,
-            cursor_sx
-        );
-        assert!(
-            (f64::from(screen_after.y) - f64::from(cursor_sy)).abs() < 0.01,
-            "y drifted: {} vs {}",
-            screen_after.y,
-            cursor_sy
-        );
+        assert!((f64::from(after.x - cursor.x)).abs() < 0.01);
+        assert!((f64::from(after.y - cursor.y)).abs() < 0.01);
     }
 
-    /// Zooming in and then out by the inverse factor should return to the original viewport state.
     #[test]
     fn zoom_in_then_out_returns_to_original() {
         let rect = test_rect();
-        let cursor_sx = 600.0_f32;
-        let cursor_sy = 400.0_f32;
-
-        let original_center_x = 10.0;
-        let original_center_y = 20.0;
-        let original_zoom = 500.0;
-
+        let cursor = Pos2::new(600.0, 400.0);
         let mut vp = Viewport {
-            center_x: original_center_x,
-            center_y: original_center_y,
-            zoom: original_zoom,
+            center_x: 10.0,
+            center_y: 20.0,
+            zoom: 500.0,
         };
+        let (orig_cx, orig_cy, orig_z) = (vp.center_x, vp.center_y, vp.zoom);
 
-        // Zoom in
-        let (wx, wy) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
-        let factor_in = 2.0;
-        let new_zoom = vp.zoom * factor_in;
-        let cx = f64::from(rect.center().x);
-        let cy = f64::from(rect.center().y);
-        let sx = f64::from(cursor_sx);
-        let sy = f64::from(cursor_sy);
-        vp.center_x = wx - (sx - cx) / new_zoom;
-        vp.center_y = wy + (sy - cy) / new_zoom;
-        vp.zoom = new_zoom;
+        apply_zoom(&mut vp, rect, cursor, 2.0);
+        apply_zoom(&mut vp, rect, cursor, 0.5);
 
-        // Zoom out by inverse
-        let (wx2, wy2) = vp.screen_to_world(cursor_sx, cursor_sy, rect);
-        let factor_out = 0.5;
-        let new_zoom2 = vp.zoom * factor_out;
-        vp.center_x = wx2 - (sx - cx) / new_zoom2;
-        vp.center_y = wy2 + (sy - cy) / new_zoom2;
-        vp.zoom = new_zoom2;
-
-        assert!((vp.zoom - original_zoom).abs() < EPSILON);
-        assert!(
-            (vp.center_x - original_center_x).abs() < EPSILON,
-            "center_x drifted: {} vs {}",
-            vp.center_x,
-            original_center_x
-        );
-        assert!(
-            (vp.center_y - original_center_y).abs() < EPSILON,
-            "center_y drifted: {} vs {}",
-            vp.center_y,
-            original_center_y
-        );
+        assert!((vp.zoom - orig_z).abs() < EPSILON);
+        assert!((vp.center_x - orig_cx).abs() < EPSILON);
+        assert!((vp.center_y - orig_cy).abs() < EPSILON);
     }
 
     #[test]
