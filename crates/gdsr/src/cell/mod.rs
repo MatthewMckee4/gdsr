@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crate::{
     Dimensions, Element, Library, Movable, Path, Point, Polygon, Reference, Text, Transformable,
     Transformation,
@@ -103,6 +105,45 @@ impl Cell {
                 .map(Reference::to_float_unit)
                 .collect(),
             ..self
+        }
+    }
+
+    /// Like [`get_elements`](Self::get_elements) but sends elements through a channel as they're
+    /// produced, enabling progressive rendering. Stops early if the receiver is dropped.
+    pub fn stream_elements(
+        &self,
+        depth: Option<usize>,
+        library: &Library,
+        tx: &mpsc::Sender<Element>,
+    ) {
+        let depth = depth.unwrap_or(usize::MAX);
+
+        for polygon in &self.polygons {
+            if tx.send(Element::Polygon(polygon.clone())).is_err() {
+                return;
+            }
+        }
+
+        for path in &self.paths {
+            if tx.send(Element::Path(path.clone())).is_err() {
+                return;
+            }
+        }
+
+        for text in &self.texts {
+            if tx.send(Element::Text(text.clone())).is_err() {
+                return;
+            }
+        }
+
+        for reference in &self.references {
+            if reference
+                .clone()
+                .stream_flatten(Some(depth), library, tx)
+                .is_err()
+            {
+                return;
+            }
         }
     }
 
@@ -440,5 +481,68 @@ mod tests {
         let (min, max) = cell.bounding_box();
         assert_eq!(min, Point::integer(0, 0, 1e-9));
         assert_eq!(max, Point::integer(20, 20, 1e-9));
+    }
+
+    #[test]
+    fn stream_elements_matches_get_elements() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let path = Path::new(
+            vec![Point::integer(0, 0, 1e-9), Point::integer(5, 5, 1e-9)],
+            2,
+            0,
+            None,
+            None,
+        );
+        let text = Text::default().set_origin(Point::integer(3, 3, 1e-9));
+
+        let mut inner = Cell::new("inner");
+        inner.add(polygon.clone());
+        library.add_cell(inner);
+
+        let mut cell = Cell::new("test_cell");
+        cell.add(polygon);
+        cell.add(path);
+        cell.add(text);
+        cell.add(Reference::new("inner"));
+
+        let expected = cell.get_elements(None, &library);
+
+        let (tx, rx) = mpsc::channel();
+        cell.stream_elements(None, &library, &tx);
+        drop(tx);
+        let streamed: Vec<Element> = rx.iter().collect();
+
+        assert_eq!(expected.len(), streamed.len());
+        assert_eq!(expected, streamed);
+    }
+
+    #[test]
+    fn stream_elements_cancellation() {
+        let library = Library::new("main");
+
+        let mut cell = Cell::new("test_cell");
+        cell.add(Polygon::new(
+            vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        ));
+
+        let (tx, rx) = mpsc::channel();
+        drop(rx);
+        cell.stream_elements(None, &library, &tx);
     }
 }

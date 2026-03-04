@@ -4,6 +4,7 @@ mod app;
 mod colors;
 mod loader;
 mod panels;
+mod spatial;
 mod viewport;
 
 #[derive(Parser, Debug)]
