@@ -189,7 +189,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build
+        run: cargo codspeed build -m walltime
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
