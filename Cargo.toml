@@ -1,35 +1,26 @@
-[package]
-name = "gdsr"
-version = "0.0.1-alpha.1"
-description = "A GDSII reader and writer for Rust"
-readme = "README.md"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
 edition = "2024"
 rust-version = "1.85"
 homepage = "https://github.com/MatthewMckee4/gdsr"
-documentation = "https://github.com/MatthewMckee4/gdsr"
-repository = "https://github.com/MatthewMckee4/gdsr"
 authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
-[dependencies]
+[workspace.dependencies]
+approx = "0.5"
 bytemuck = "1.24.0"
 chrono = "0.4.42"
-rayon = "1"
-
-[dev-dependencies]
-approx = "0.5"
-criterion = { package = "codspeed-criterion-compat-walltime", version = "4" }
 insta = "1.44.3"
 quickcheck = "1.0.3"
 quickcheck_macros = "1"
+rayon = "1"
 rstest = "0.23.0"
 tempfile = "3.23"
 
-[[bench]]
-name = "io"
-harness = false
-
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
@@ -60,7 +51,6 @@ rc_mutex = "warn"
 rest_pat_in_fully_bound_structs = "warn"
 if_not_else = "allow"
 use_self = "warn"
-
 cast_precision_loss = "allow"
 cast_possible_truncation = "allow"
 cast_sign_loss = "allow"

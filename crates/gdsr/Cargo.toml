@@ -1,0 +1,33 @@
+[package]
+name = "gdsr"
+version = "0.0.1-alpha.1"
+description = "A GDSII reader and writer for Rust"
+readme = "README.md"
+documentation = "https://github.com/MatthewMckee4/gdsr"
+repository = "https://github.com/MatthewMckee4/gdsr"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+bytemuck = { workspace = true }
+chrono = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }
+criterion = { package = "codspeed-criterion-compat-walltime", version = "4" }
+insta = { workspace = true }
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
+rstest = { workspace = true }
+tempfile = { workspace = true }
+
+[[bench]]
+name = "io"
+harness = false
+
+[lints]
+workspace = true

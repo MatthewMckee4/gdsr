@@ -1,5 +1,5 @@
 ---
-source: src/elements/reference/mod.rs
+source: crates/gdsr/src/elements/reference/mod.rs
 expression: flattened
 ---
 [
