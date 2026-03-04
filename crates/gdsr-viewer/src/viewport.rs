@@ -154,6 +154,7 @@ fn draw_polygon(
         .collect();
 
     // Quick visibility check: skip if bounding box is completely outside the viewport
+    // or too small to see (sub-pixel)
     let (mut min_x, mut min_y) = (f32::MAX, f32::MAX);
     let (mut max_x, mut max_y) = (f32::MIN, f32::MIN);
     for pt in &screen_pts {
@@ -163,6 +164,10 @@ fn draw_polygon(
         max_y = max_y.max(pt.y);
     }
     if max_x < rect.min.x || min_x > rect.max.x || max_y < rect.min.y || min_y > rect.max.y {
+        return;
+    }
+    // Skip polygons smaller than 2 pixels in either dimension
+    if (max_x - min_x) < 2.0 && (max_y - min_y) < 2.0 {
         return;
     }
 
@@ -223,6 +228,22 @@ fn draw_path(
         .iter()
         .map(|p| viewport.world_to_screen(p.x().absolute_value(), p.y().absolute_value(), rect))
         .collect();
+
+    // Frustum culling and sub-pixel skip
+    let (mut min_x, mut min_y) = (f32::MAX, f32::MAX);
+    let (mut max_x, mut max_y) = (f32::MIN, f32::MIN);
+    for pt in &screen_pts {
+        min_x = min_x.min(pt.x);
+        min_y = min_y.min(pt.y);
+        max_x = max_x.max(pt.x);
+        max_y = max_y.max(pt.y);
+    }
+    if max_x < rect.min.x || min_x > rect.max.x || max_y < rect.min.y || min_y > rect.max.y {
+        return;
+    }
+    if (max_x - min_x) < 1.0 && (max_y - min_y) < 1.0 {
+        return;
+    }
 
     let width_px = path
         .width()

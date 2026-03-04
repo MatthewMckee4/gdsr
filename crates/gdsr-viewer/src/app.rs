@@ -53,12 +53,26 @@ impl ViewerApp {
 
     fn select_cell(&mut self, name: &str) {
         self.selected_cell = Some(name.to_string());
+        self.error_message = None;
 
         if let Some(library) = &self.library {
             if let Some(cell) = library.get_cell(name) {
-                self.elements = cell.get_elements(None, library);
-                self.collect_layers();
-                self.zoom_to_fit();
+                // Catch panics from the library (e.g. integer overflow in unit arithmetic)
+                let cell_clone = cell.clone();
+                let lib_ref = library.clone();
+                if let Ok(elements) =
+                    std::panic::catch_unwind(move || cell_clone.get_elements(None, &lib_ref))
+                {
+                    self.elements = elements;
+                    self.collect_layers();
+                    self.zoom_to_fit();
+                } else {
+                    self.elements.clear();
+                    self.layers.clear();
+                    self.error_message = Some(format!(
+                        "Failed to flatten cell '{name}' (internal overflow)"
+                    ));
+                }
             }
         }
     }
