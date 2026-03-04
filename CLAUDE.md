@@ -18,3 +18,4 @@
 - PREFER function comments over inline comments.
 - AVOID adding new dependencies. Prefer using existing dependencies or the standard library. Only add a dependency when it is clearly necessary.
 - ALWAYS add new dependencies to `[workspace.dependencies]` in the root `Cargo.toml` and reference them with `= { workspace = true }` in crate-level `Cargo.toml` files.
+- NEVER commit directly to main. Always create a feature branch and open a pull request.
