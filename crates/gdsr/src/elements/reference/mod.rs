@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crate::{Element, Grid, Library, Movable, Point, Transformable, Transformation};
 
 pub mod instance;
@@ -95,6 +97,76 @@ impl Reference {
         }
 
         elements
+    }
+
+    /// Sends each element in the grid through the channel. Returns `Err(())` if the receiver
+    /// has been dropped.
+    fn send_elements_in_grid(
+        &self,
+        element: &Element,
+        tx: &mpsc::Sender<Element>,
+    ) -> Result<(), ()> {
+        for el in self.get_elements_in_grid(element) {
+            tx.send(el).map_err(|_| ())?;
+        }
+        Ok(())
+    }
+
+    /// Like [`flatten`](Self::flatten) but sends elements through a channel as they're produced,
+    /// enabling progressive rendering. Returns `Err(())` if the receiver is dropped.
+    #[expect(
+        clippy::result_unit_err,
+        reason = "() signals cancellation via dropped receiver"
+    )]
+    pub fn stream_flatten(
+        self,
+        depth: Option<usize>,
+        library: &Library,
+        tx: &mpsc::Sender<Element>,
+    ) -> Result<(), ()> {
+        let depth = depth.unwrap_or(usize::MAX);
+        if depth == 0 {
+            tx.send(Element::Reference(self)).map_err(|_| ())?;
+            return Ok(());
+        }
+        match &self.instance {
+            Instance::Cell(cell_name) => {
+                if let Some(cell) = library.get_cell(cell_name) {
+                    for polygon in cell.polygons() {
+                        self.send_elements_in_grid(&Element::Polygon(polygon.clone()), tx)?;
+                    }
+                    for path in cell.paths() {
+                        self.send_elements_in_grid(&Element::Path(path.clone()), tx)?;
+                    }
+                    for text in cell.texts() {
+                        self.send_elements_in_grid(&Element::Text(text.clone()), tx)?;
+                    }
+                    for reference in cell.references() {
+                        for grid_el in
+                            self.get_elements_in_grid(&Element::Reference(reference.clone()))
+                        {
+                            if let Element::Reference(grid_ref) = grid_el {
+                                grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
+                            }
+                        }
+                    }
+                }
+            }
+            Instance::Element(element) => match element.as_ref().as_ref() {
+                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                    self.send_elements_in_grid(element, tx)?;
+                }
+                Element::Reference(reference) => {
+                    for grid_el in self.get_elements_in_grid(&Element::Reference(reference.clone()))
+                    {
+                        if let Element::Reference(grid_ref) = grid_el {
+                            grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
+                        }
+                    }
+                }
+            },
+        }
+        Ok(())
     }
 
     /// Recursively flattens this reference into concrete elements, resolving cell references
@@ -908,5 +980,103 @@ mod tests {
 
         let flattened = reference.flatten(None, &library);
         assert!(flattened.is_empty());
+    }
+
+    #[test]
+    fn stream_flatten_matches_flatten() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let mut cell = crate::Cell::new("test_cell");
+        cell.add(polygon.clone());
+        library.add_cell(cell);
+
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new("test_cell").with_grid(grid);
+
+        let flattened = reference.clone().flatten(None, &library);
+
+        let (tx, rx) = mpsc::channel();
+        reference
+            .stream_flatten(None, &library, &tx)
+            .expect("stream should succeed");
+        drop(tx);
+        let streamed: Vec<Element> = rx.iter().collect();
+
+        assert_eq!(flattened.len(), streamed.len());
+        assert_eq!(flattened, streamed);
+    }
+
+    #[test]
+    fn stream_flatten_element_reference_matches_flatten() {
+        let library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(2)
+            .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
+            .with_spacing_y(Some(Point::integer(0, 10, 1e-9)));
+
+        let reference = Reference::new(polygon).with_grid(grid);
+
+        let flattened = reference.clone().flatten(None, &library);
+
+        let (tx, rx) = mpsc::channel();
+        reference
+            .stream_flatten(None, &library, &tx)
+            .expect("stream should succeed");
+        drop(tx);
+        let streamed: Vec<Element> = rx.iter().collect();
+
+        assert_eq!(flattened, streamed);
+    }
+
+    #[test]
+    fn stream_flatten_cancellation_returns_err() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+
+        let mut cell = crate::Cell::new("test_cell");
+        cell.add(polygon);
+        library.add_cell(cell);
+
+        let reference = Reference::new("test_cell");
+
+        let (tx, rx) = mpsc::channel();
+        drop(rx);
+        let result = reference.stream_flatten(None, &library, &tx);
+        assert!(result.is_err());
     }
 }
