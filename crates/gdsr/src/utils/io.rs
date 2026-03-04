@@ -8,7 +8,7 @@ use crate::cell::Cell;
 use crate::config::gds_file_types::{
     GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type,
 };
-use crate::elements::text::utils::get_presentations_from_value;
+use crate::elements::text::get_presentations_from_value;
 use crate::elements::{Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;

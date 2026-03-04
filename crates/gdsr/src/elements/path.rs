@@ -1,9 +1,39 @@
+use std::io::Write;
+
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::error::GdsError;
+use crate::traits::ToGds;
+use crate::utils::io::{
+    validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
+    write_u16_array_to_file,
+};
 use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 
-mod io;
-mod path_type;
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum PathType {
+    #[default]
+    Square = 0,
+    Round = 1,
+    Overlap = 2,
+}
 
-pub use path_type::PathType;
+impl PathType {
+    pub const fn new(value: i32) -> Self {
+        match value {
+            1 => Self::Round,
+            2 => Self::Overlap,
+            _ => Self::Square,
+        }
+    }
+
+    pub const fn value(&self) -> u16 {
+        *self as u16
+    }
+
+    pub fn values() -> Vec<Self> {
+        vec![Self::Square, Self::Round, Self::Overlap]
+    }
+}
 
 /// An open path defined by a sequence of points, with optional width and end cap type.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -121,9 +151,128 @@ impl Dimensions for Path {
     }
 }
 
+impl ToGds for Path {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
+        validate_layer(self.layer())?;
+        validate_data_type(self.data_type())?;
+
+        if self.points().len() < 2 {
+            return Err(GdsError::ValidationError {
+                message: "Path must have at least 2 points".to_string(),
+            });
+        }
+
+        let mut buffer = Vec::new();
+
+        let path_head = [
+            4,
+            combine_record_and_data_type(GDSRecord::Path, GDSDataType::NoData),
+            6,
+            combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
+            self.layer(),
+            6,
+            combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
+            self.data_type(),
+        ];
+
+        write_u16_array_to_file(&mut buffer, &path_head)?;
+
+        if let Some(path_type) = self.path_type() {
+            let path_type_value = path_type.value();
+
+            let path_type_head = [
+                6,
+                combine_record_and_data_type(
+                    GDSRecord::PathType,
+                    GDSDataType::TwoByteSignedInteger,
+                ),
+                path_type_value,
+            ];
+
+            write_u16_array_to_file(&mut buffer, &path_type_head)?;
+        }
+
+        if let Some(width) = self.width() {
+            let scaled_width = width.scale_to(database_units);
+            let width_value = scaled_width.as_integer_unit().value as u32;
+
+            let width_head = [
+                8,
+                combine_record_and_data_type(GDSRecord::Width, GDSDataType::FourByteSignedInteger),
+            ];
+
+            write_u16_array_to_file(&mut buffer, &width_head)?;
+
+            let bytes = width_value.to_be_bytes();
+
+            buffer.write_all(&bytes)?;
+        }
+
+        write_points_to_file(&mut buffer, self.points(), database_units)?;
+
+        write_element_tail_to_file(&mut buffer)?;
+
+        Ok(buffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_path_type_new() {
+        assert_eq!(PathType::new(0), PathType::Square);
+        assert_eq!(PathType::new(1), PathType::Round);
+        assert_eq!(PathType::new(2), PathType::Overlap);
+        assert_eq!(PathType::new(-1), PathType::Square);
+        assert_eq!(PathType::new(999), PathType::Square);
+    }
+
+    #[test]
+    fn test_path_type_value() {
+        assert_eq!(PathType::Square.value(), 0);
+        assert_eq!(PathType::Round.value(), 1);
+        assert_eq!(PathType::Overlap.value(), 2);
+    }
+
+    #[test]
+    fn test_path_type_values() {
+        let values = PathType::values();
+        assert_eq!(values.len(), 3);
+        assert!(values.contains(&PathType::Square));
+        assert!(values.contains(&PathType::Round));
+        assert!(values.contains(&PathType::Overlap));
+    }
+
+    #[test]
+    fn test_path_type_default() {
+        assert_eq!(PathType::default(), PathType::Square);
+    }
+
+    #[test]
+    fn test_path_type_debug() {
+        insta::assert_snapshot!(format!("{:?}", PathType::Square), @"Square");
+        insta::assert_snapshot!(format!("{:?}", PathType::Round), @"Round");
+        insta::assert_snapshot!(format!("{:?}", PathType::Overlap), @"Overlap");
+    }
+
+    #[test]
+    fn test_path_type_clone_and_copy() {
+        let path_type = PathType::Round;
+        let cloned = path_type;
+        let copied = path_type;
+
+        assert_eq!(path_type, cloned);
+        assert_eq!(path_type, copied);
+    }
+
+    #[test]
+    fn test_path_type_partial_eq() {
+        assert_eq!(PathType::Square, PathType::Square);
+        assert_ne!(PathType::Square, PathType::Round);
+        assert_ne!(PathType::Round, PathType::Overlap);
+    }
 
     #[test]
     fn test_path_creation() {
