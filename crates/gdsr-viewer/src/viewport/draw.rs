@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke};
-use gdsr::Element;
+use gdsr::{Dimensions, Element};
 
 use super::Viewport;
 use crate::colors::LayerColorMap;
 use crate::spatial::SpatialGrid;
-use crate::viewport::bounds::{bbox_overlaps, points_bbox};
+use crate::viewport::bounds::bbox_overlaps;
 
 /// Fallback drawing path: iterates over every element without spatial indexing.
 pub(crate) fn draw_elements_flat(
@@ -154,9 +154,13 @@ fn draw_polygon(
         return;
     }
 
-    let Some(bbox) = points_bbox(points) else {
-        return;
-    };
+    let (min_pt, max_pt) = polygon.bounding_box();
+    let bbox = [
+        min_pt.x().absolute_value(),
+        min_pt.y().absolute_value(),
+        max_pt.x().absolute_value(),
+        max_pt.y().absolute_value(),
+    ];
     if !bbox_overlaps(&bbox, visible) {
         return;
     }
@@ -242,9 +246,13 @@ fn draw_path(
         return;
     }
 
-    let Some(bbox) = points_bbox(points) else {
-        return;
-    };
+    let (min_pt, max_pt) = path.bounding_box();
+    let bbox = [
+        min_pt.x().absolute_value(),
+        min_pt.y().absolute_value(),
+        max_pt.x().absolute_value(),
+        max_pt.y().absolute_value(),
+    ];
     if !bbox_overlaps(&bbox, visible) {
         return;
     }

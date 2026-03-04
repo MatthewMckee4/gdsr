@@ -1,23 +1,4 @@
-use gdsr::Element;
-
-/// Computes the axis-aligned bounding box of a slice of points as `[min_x, min_y, max_x, max_y]`.
-/// Returns `None` if the slice is empty.
-pub(crate) fn points_bbox(points: &[gdsr::Point]) -> Option<[f64; 4]> {
-    let first = points.first()?;
-    let mut min_x = first.x().absolute_value();
-    let mut min_y = first.y().absolute_value();
-    let mut max_x = min_x;
-    let mut max_y = min_y;
-    for p in &points[1..] {
-        let x = p.x().absolute_value();
-        let y = p.y().absolute_value();
-        min_x = min_x.min(x);
-        min_y = min_y.min(y);
-        max_x = max_x.max(x);
-        max_y = max_y.max(y);
-    }
-    Some([min_x, min_y, max_x, max_y])
-}
+use gdsr::{Dimensions, Element};
 
 /// Returns `true` if two axis-aligned bounding boxes overlap.
 pub(crate) fn bbox_overlaps(bbox: &[f64; 4], visible: &[f64; 4]) -> bool {
@@ -25,18 +6,18 @@ pub(crate) fn bbox_overlaps(bbox: &[f64; 4], visible: &[f64; 4]) -> bool {
 }
 
 /// Returns the world-space bounding box of a single element as `[min_x, min_y, max_x, max_y]`.
-/// Returns `None` for references and elements with no points.
+/// Returns `None` for references.
 pub fn element_bbox(element: &Element) -> Option<[f64; 4]> {
-    match element {
-        Element::Polygon(p) => points_bbox(p.points()),
-        Element::Path(p) => points_bbox(p.points()),
-        Element::Text(t) => {
-            let x = t.origin().x().absolute_value();
-            let y = t.origin().y().absolute_value();
-            Some([x, y, x, y])
-        }
-        Element::Reference(_) => None,
+    if matches!(element, Element::Reference(_)) {
+        return None;
     }
+    let (min_pt, max_pt) = element.bounding_box();
+    Some([
+        min_pt.x().absolute_value(),
+        min_pt.y().absolute_value(),
+        max_pt.x().absolute_value(),
+        max_pt.y().absolute_value(),
+    ])
 }
 
 /// Computes the bounding box of the given elements in world coordinates.
@@ -69,7 +50,6 @@ pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
 mod tests {
     use super::*;
     use crate::testutil::helpers::*;
-    use gdsr::Point;
 
     const EPSILON: f64 = 1e-6;
 
@@ -120,22 +100,6 @@ mod tests {
         let (min_x, min_y, _, _) = compute_bounds(&[poly, txt]).expect("should have bounds");
         assert!((min_x - 0.0).abs() < EPSILON);
         assert!((min_y - 0.0).abs() < EPSILON);
-    }
-
-    #[test]
-    fn points_bbox_empty() {
-        assert!(points_bbox(&[]).is_none());
-    }
-
-    #[test]
-    fn points_bbox_single_point() {
-        let points = vec![Point::default_integer(100, 200)];
-        let bbox = points_bbox(&points).expect("should have bbox");
-        let scale = 1e-9;
-        assert!((bbox[0] - 100.0 * scale).abs() < 1e-15);
-        assert!((bbox[1] - 200.0 * scale).abs() < 1e-15);
-        assert_eq!(bbox[0], bbox[2]);
-        assert_eq!(bbox[1], bbox[3]);
     }
 
     #[test]
