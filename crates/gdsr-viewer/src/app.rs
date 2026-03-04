@@ -7,6 +7,7 @@ use gdsr::{Element, Library};
 
 use crate::colors::LayerColorMap;
 use crate::panels;
+use crate::spatial::SpatialGrid;
 use crate::viewport::{self, Viewport};
 
 #[derive(Default)]
@@ -23,6 +24,7 @@ pub struct ViewerApp {
     layer_colors: LayerColorMap,
     hidden_layers: HashSet<(u16, u16)>,
     load_receiver: Option<(PathBuf, mpsc::Receiver<Result<Library, String>>)>,
+    spatial_grid: Option<SpatialGrid>,
     mouse_world_pos: Option<(f64, f64)>,
     error_message: Option<String>,
     loading: bool,
@@ -61,6 +63,7 @@ impl ViewerApp {
         self.element_receiver = None;
         self.elements.clear();
         self.layers.clear();
+        self.spatial_grid = None;
 
         if let Some(library) = &self.library {
             if let Some(cell) = library.get_cell(name) {
@@ -142,6 +145,9 @@ impl eframe::App for ViewerApp {
                     Err(mpsc::TryRecvError::Disconnected) => {
                         self.elements_loading = false;
                         self.element_receiver = None;
+                        if let Some(bounds) = viewport::compute_bounds(&self.elements) {
+                            self.spatial_grid = Some(SpatialGrid::build(&self.elements, bounds));
+                        }
                         self.zoom_to_fit();
                         break;
                     }
@@ -226,6 +232,7 @@ impl eframe::App for ViewerApp {
                 &self.elements,
                 &self.hidden_layers,
                 &mut self.layer_colors,
+                self.spatial_grid.as_ref(),
             );
         });
     }

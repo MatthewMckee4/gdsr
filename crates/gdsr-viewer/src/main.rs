@@ -2,6 +2,7 @@ mod app;
 mod colors;
 mod loader;
 mod panels;
+mod spatial;
 mod viewport;
 
 fn main() -> eframe::Result<()> {
