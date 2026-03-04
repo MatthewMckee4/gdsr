@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use super::Path;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
 use crate::error::GdsError;
@@ -8,11 +10,7 @@ use crate::utils::io::{
 };
 
 impl ToGds for Path {
-    fn to_gds_impl(
-        &self,
-        buffer: &mut impl std::io::Write,
-        database_units: f64,
-    ) -> Result<(), GdsError> {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
         validate_layer(self.layer())?;
         validate_data_type(self.data_type())?;
 
@@ -21,6 +19,8 @@ impl ToGds for Path {
                 message: "Path must have at least 2 points".to_string(),
             });
         }
+
+        let mut buffer = Vec::new();
 
         let path_head = [
             4,
@@ -33,7 +33,7 @@ impl ToGds for Path {
             self.data_type(),
         ];
 
-        write_u16_array_to_file(buffer, &path_head)?;
+        write_u16_array_to_file(&mut buffer, &path_head)?;
 
         if let Some(path_type) = self.path_type() {
             let path_type_value = path_type.value();
@@ -47,7 +47,7 @@ impl ToGds for Path {
                 path_type_value,
             ];
 
-            write_u16_array_to_file(buffer, &path_type_head)?;
+            write_u16_array_to_file(&mut buffer, &path_type_head)?;
         }
 
         if let Some(width) = self.width() {
@@ -59,15 +59,17 @@ impl ToGds for Path {
                 combine_record_and_data_type(GDSRecord::Width, GDSDataType::FourByteSignedInteger),
             ];
 
-            write_u16_array_to_file(buffer, &width_head)?;
+            write_u16_array_to_file(&mut buffer, &width_head)?;
 
             let bytes = width_value.to_be_bytes();
 
             buffer.write_all(&bytes)?;
         }
 
-        write_points_to_file(buffer, self.points(), database_units)?;
+        write_points_to_file(&mut buffer, self.points(), database_units)?;
 
-        write_element_tail_to_file(buffer)
+        write_element_tail_to_file(&mut buffer)?;
+
+        Ok(buffer)
     }
 }

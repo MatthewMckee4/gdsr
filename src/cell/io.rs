@@ -9,11 +9,9 @@ use crate::utils::io::{
 };
 
 impl ToGds for Cell {
-    fn to_gds_impl(
-        &self,
-        buffer: &mut impl std::io::Write,
-        database_units: f64,
-    ) -> Result<(), GdsError> {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
+        use rayon::prelude::*;
+
         validate_structure_name(&self.name)?;
 
         let now = Local::now();
@@ -36,24 +34,46 @@ impl ToGds for Cell {
             timestamp.second() as u16,
         ];
 
-        write_u16_array_to_file(buffer, &cell_head)?;
+        let mut buffer = Vec::new();
 
-        write_string_with_record_to_file(buffer, GDSRecord::StrName, &self.name)?;
+        write_u16_array_to_file(&mut buffer, &cell_head)?;
 
-        for path in &self.paths {
-            path.to_gds_impl(buffer, database_units)?;
+        write_string_with_record_to_file(&mut buffer, GDSRecord::StrName, &self.name)?;
+
+        let path_bufs: Result<Vec<_>, _> = self
+            .paths
+            .par_iter()
+            .map(|p| p.to_gds_impl(database_units))
+            .collect();
+        for b in path_bufs? {
+            buffer.extend_from_slice(&b);
         }
 
-        for polygon in &self.polygons {
-            polygon.to_gds_impl(buffer, database_units)?;
+        let polygon_bufs: Result<Vec<_>, _> = self
+            .polygons
+            .par_iter()
+            .map(|p| p.to_gds_impl(database_units))
+            .collect();
+        for b in polygon_bufs? {
+            buffer.extend_from_slice(&b);
         }
 
-        for text in &self.texts {
-            text.to_gds_impl(buffer, database_units)?;
+        let text_bufs: Result<Vec<_>, _> = self
+            .texts
+            .par_iter()
+            .map(|t| t.to_gds_impl(database_units))
+            .collect();
+        for b in text_bufs? {
+            buffer.extend_from_slice(&b);
         }
 
-        for reference in &self.references {
-            reference.to_gds_impl(buffer, database_units)?;
+        let ref_bufs: Result<Vec<_>, _> = self
+            .references
+            .par_iter()
+            .map(|r| r.to_gds_impl(database_units))
+            .collect();
+        for b in ref_bufs? {
+            buffer.extend_from_slice(&b);
         }
 
         let cell_tail = [
@@ -61,8 +81,8 @@ impl ToGds for Cell {
             combine_record_and_data_type(GDSRecord::EndStr, GDSDataType::NoData),
         ];
 
-        write_u16_array_to_file(buffer, &cell_tail)?;
+        write_u16_array_to_file(&mut buffer, &cell_tail)?;
 
-        Ok(())
+        Ok(buffer)
     }
 }

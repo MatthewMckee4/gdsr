@@ -72,13 +72,8 @@ impl Library {
         user_units: f64,
         database_units: f64,
     ) -> Result<(), GdsError> {
-        write_gds(
-            file_name,
-            &self.name,
-            user_units,
-            database_units,
-            self.cells.values(),
-        )
+        let cells: Vec<&Cell> = self.cells.values().collect();
+        write_gds(file_name, &self.name, user_units, database_units, &cells)
     }
 
     /// Read a library from a GDS file.

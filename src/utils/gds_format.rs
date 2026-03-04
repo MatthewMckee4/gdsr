@@ -40,12 +40,14 @@ pub fn eight_byte_real(value: f64) -> [u8; 8] {
     result
 }
 
-pub fn u16_array_to_big_endian(array: &[u16]) -> Vec<u16> {
-    let mut result = Vec::with_capacity(array.len());
+pub fn write_u16_array_as_big_endian(
+    buffer: &mut impl std::io::Write,
+    array: &[u16],
+) -> std::io::Result<()> {
     for value in array {
-        result.push(value.to_be());
+        buffer.write_all(&value.to_be_bytes())?;
     }
-    result
+    Ok(())
 }
 
 #[cfg(test)]

@@ -9,15 +9,13 @@ use crate::utils::io::{
 };
 
 impl ToGds for Text {
-    fn to_gds_impl(
-        &self,
-        buffer: &mut impl std::io::Write,
-        database_units: f64,
-    ) -> Result<(), GdsError> {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
         validate_layer(self.layer())?;
         validate_string_length(self.text())?;
 
-        let buffer_start = vec![
+        let mut buffer = Vec::new();
+
+        let buffer_start = [
             4,
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
             6,
@@ -34,18 +32,20 @@ impl ToGds for Text {
             ),
         ];
 
-        write_u16_array_to_file(buffer, &buffer_start)?;
+        write_u16_array_to_file(&mut buffer, &buffer_start)?;
 
         let angle = self.angle();
         let magnification = self.magnification();
         let x_reflection = self.x_reflection();
 
-        write_transformation_to_file(buffer, angle, magnification, x_reflection)?;
+        write_transformation_to_file(&mut buffer, angle, magnification, x_reflection)?;
 
-        write_points_to_file(buffer, &[*self.origin()], database_units)?;
+        write_points_to_file(&mut buffer, &[*self.origin()], database_units)?;
 
-        write_string_with_record_to_file(buffer, GDSRecord::String, self.text())?;
+        write_string_with_record_to_file(&mut buffer, GDSRecord::String, self.text())?;
 
-        write_element_tail_to_file(buffer)
+        write_element_tail_to_file(&mut buffer)?;
+
+        Ok(buffer)
     }
 }

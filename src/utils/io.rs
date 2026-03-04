@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{self, BufReader, Read, Write};
 
-use bytemuck::cast_slice;
 use chrono::{Datelike, Local, Timelike};
 
 use crate::cell::Cell;
@@ -14,7 +13,7 @@ use crate::elements::{Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
-use crate::utils::gds_format::{eight_byte_real, u16_array_to_big_endian};
+use crate::utils::gds_format::{eight_byte_real, write_u16_array_as_big_endian};
 use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, ToGds, Unit};
 
 pub fn write_gds_head_to_file(
@@ -72,8 +71,7 @@ pub fn write_u16_array_to_file(
     buffer: &mut impl std::io::Write,
     array: &[u16],
 ) -> Result<(), GdsError> {
-    let u16_array_to_big_endian = u16_array_to_big_endian(array);
-    Ok(buffer.write_all(cast_slice(&u16_array_to_big_endian))?)
+    Ok(write_u16_array_as_big_endian(buffer, array)?)
 }
 
 pub fn write_float_to_eight_byte_real_to_file(
@@ -167,11 +165,9 @@ pub fn write_points_to_file(
     points: &[Point],
     database_units: f64,
 ) -> Result<(), GdsError> {
-    let integer_points: Vec<Point> = points.iter().map(Point::to_integer_unit).collect();
+    let num_points = points.len().min(MAX_POINTS);
 
-    let points_to_write = integer_points.get(..MAX_POINTS).unwrap_or(&integer_points);
-
-    let record_size = 4 + (points_to_write.len() * 8) as u16;
+    let record_size = 4 + (num_points * 8) as u16;
     let xy_header_buffer = [
         record_size,
         combine_record_and_data_type(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
@@ -179,7 +175,8 @@ pub fn write_points_to_file(
 
     write_u16_array_to_file(buffer, &xy_header_buffer)?;
 
-    for point in points_to_write {
+    for point in points.iter().take(num_points) {
+        let point = point.to_integer_unit();
         let x_real = point.x().absolute_value();
         let y_real = point.y().absolute_value();
 
@@ -206,44 +203,45 @@ pub fn write_string_with_record_to_file(
     record: GDSRecord,
     string: &str,
 ) -> Result<(), GdsError> {
-    let mut len = string.len();
-    if len % 2 != 0 {
-        len += 1;
-    }
-
-    let mut lib_name_bytes = string.as_bytes().to_vec();
-
-    if string.len() % 2 != 0 {
-        lib_name_bytes.push(0);
-    }
+    let byte_len = string.len();
+    let padded_len = byte_len + (byte_len % 2);
 
     let string_start = [
-        (4 + len) as u16,
+        (4 + padded_len) as u16,
         combine_record_and_data_type(record, GDSDataType::AsciiString),
     ];
 
     write_u16_array_to_file(buffer, &string_start)?;
 
-    Ok(buffer.write_all(&lib_name_bytes)?)
+    buffer.write_all(string.as_bytes())?;
+    if byte_len % 2 != 0 {
+        buffer.write_all(&[0])?;
+    }
+
+    Ok(())
 }
 
-pub fn write_gds<'a, P: AsRef<std::path::Path>>(
+pub fn write_gds<P: AsRef<std::path::Path>>(
     file_name: P,
     library_name: &str,
     user_units: f64,
     database_units: f64,
-    cells: impl Iterator<Item = &'a Cell>,
+    cells: &[&Cell],
 ) -> Result<(), GdsError> {
+    use rayon::prelude::*;
+
+    let cell_buffers: Result<Vec<Vec<u8>>, GdsError> = cells
+        .par_iter()
+        .map(|cell| cell.to_gds_impl(database_units))
+        .collect();
+    let cell_buffers = cell_buffers?;
+
     let mut file = File::create(file_name)?;
-
     write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
-
-    for cell in cells {
-        cell.to_gds_impl(&mut file, database_units)?;
+    for buf in &cell_buffers {
+        file.write_all(buf)?;
     }
-
     write_gds_tail_to_file(&mut file)?;
-
     Ok(file.flush()?)
 }
 

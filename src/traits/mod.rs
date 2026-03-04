@@ -4,8 +4,8 @@ use crate::{AngleInRadians, Point};
 
 /// Trait for types that can be serialized to the GDSII binary format.
 pub trait ToGds {
-    /// Writes the GDSII binary representation to the given buffer.
-    fn to_gds_impl(&self, buffer: &mut impl std::io::Write, scale: f64) -> Result<(), GdsError>;
+    /// Returns the GDSII binary representation as a byte vector.
+    fn to_gds_impl(&self, scale: f64) -> Result<Vec<u8>, GdsError>;
 }
 
 /// Trait for types that can be geometrically transformed (rotated, scaled, reflected, translated).

@@ -8,11 +8,7 @@ use crate::utils::io::{
 };
 
 impl ToGds for Polygon {
-    fn to_gds_impl(
-        &self,
-        buffer: &mut impl std::io::Write,
-        database_units: f64,
-    ) -> Result<(), GdsError> {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
         if self.points().len() > MAX_POINTS {
             return Err(GdsError::ValidationError {
                 message: format!(
@@ -35,6 +31,8 @@ impl ToGds for Polygon {
             });
         }
 
+        let mut buffer = Vec::new();
+
         let polygon_head = [
             4,
             combine_record_and_data_type(GDSRecord::Boundary, GDSDataType::NoData),
@@ -46,10 +44,12 @@ impl ToGds for Polygon {
             self.data_type(),
         ];
 
-        write_u16_array_to_file(buffer, &polygon_head)?;
+        write_u16_array_to_file(&mut buffer, &polygon_head)?;
 
-        write_points_to_file(buffer, self.points(), database_units)?;
+        write_points_to_file(&mut buffer, self.points(), database_units)?;
 
-        write_element_tail_to_file(buffer)
+        write_element_tail_to_file(&mut buffer)?;
+
+        Ok(buffer)
     }
 }
