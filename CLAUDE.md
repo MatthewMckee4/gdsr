@@ -1,0 +1,17 @@
+- ALWAYS read CONTRIBUTING.md for guidelines on how to run tools
+- ALWAYS attempt to add a test case for changed behavior. Get your tests to pass — if you didn't run the tests, your code does not work.
+- PREFER property tests, e.g., at `src/property_tests/...` over unit tests.
+- ALWAYS use snapshot tests when running a command in integration tests.
+- PREFER running specific tests over running the entire test suite
+- ALWAYS run `cargo nextest run` to run all tests.
+- ALWAYS run `uvx prek run -a` at the end of a task.
+- FOLLOW existing code style. Check neighboring files for patterns.
+- AVOID writing significant amounts of new code. Look for existing methods and utilities first.
+- AVOID using `panic!`, `unreachable!`, `.unwrap()`, unsafe code, and clippy rule ignores. Encode constraints in the type system instead.
+- PREFER patterns like `if let` to handle fallibility
+- PREFER `#[expect()]` over `[allow()]` if clippy must be disabled
+- PREFER let chains (`if let` combined with `&&`) over nested `if let` statements
+- PREFER short imports over fully-qualified paths for readability.
+- AVOID redundant comments and section separators (e.g., `// --- Section ---`) in test files. Use comments to explain invariants and why something unusual was done, not to narrate code.
+- AVOID useless inline comments in tests (e.g., `// Run tests`, `// Accept remaining`, `// Review again`). The code should speak for itself. Only add comments when the intent is non-obvious.
+- PREFER function comments over inline comments.
