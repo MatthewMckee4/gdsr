@@ -207,7 +207,7 @@ macro_rules! impl_binary_op {
                         value: v1,
                         units: u1,
                     }) => Self::Integer(IntegerUnit {
-                        value: v1 $op scaled_rhs.integer_value(),
+                        value: (f64::from(v1) $op f64::from(scaled_rhs.integer_value())).round() as i32,
                         units: u1,
                     }),
                     Self::Float(FloatUnit {
@@ -548,6 +548,18 @@ mod tests {
             let u2 = Unit::float(50.0, 1e-3);
             let result = u1 + u2;
             assert_eq!(result, Unit::float(50100.0, 1e-6));
+        }
+
+        /// Adding two large integers that would overflow i32 directly.
+        #[test]
+        fn integers_no_overflow() {
+            let u1 = Unit::integer(i32::MAX, 1e-9);
+            let u2 = Unit::integer(1, 1e-9);
+            let result = u1 + u2;
+            assert_eq!(
+                result,
+                Unit::integer((f64::from(i32::MAX) + 1.0).round() as i32, 1e-9)
+            );
         }
     }
 
