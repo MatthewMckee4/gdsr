@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::mpsc::{self};
 
 use gdsr::{Element, Library};
 
@@ -26,6 +26,20 @@ pub struct ViewerApp {
 }
 
 impl ViewerApp {
+    pub fn with_path(path: PathBuf) -> Self {
+        if let Some((path, rx)) = crate::loader::load_request(path.clone()) {
+            Self {
+                file_path: Some(path.clone()),
+                load_receiver: Some((path.clone(), rx)),
+                loading: true,
+                error_message: None,
+                ..Default::default()
+            }
+        } else {
+            Self::default()
+        }
+    }
+
     fn open_file_dialog(&mut self) {
         if let Some((path, rx)) = crate::loader::load_file_dialog() {
             self.load_receiver = Some((path, rx));
