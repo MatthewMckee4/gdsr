@@ -15,3 +15,5 @@
 - AVOID redundant comments and section separators (e.g., `// --- Section ---`) in test files. Use comments to explain invariants and why something unusual was done, not to narrate code.
 - AVOID useless inline comments in tests (e.g., `// Run tests`, `// Accept remaining`, `// Review again`). The code should speak for itself. Only add comments when the intent is non-obvious.
 - PREFER function comments over inline comments.
+- AVOID adding new dependencies. Prefer using existing dependencies or the standard library. Only add a dependency when it is clearly necessary.
+- ALWAYS add new dependencies to `[workspace.dependencies]` in the root `Cargo.toml` and reference them with `= { workspace = true }` in crate-level `Cargo.toml` files.

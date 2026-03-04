@@ -13,6 +13,13 @@ GDSII manipulation, written in Rust.
 > [!WARNING]
 > This is a work in progress and is not yet ready for production use.
 
+## Crates
+
+| Crate | Description |
+| ---------------------------------- | -------------------------- |
+| [gdsr](crates/gdsr/) | GDSII manipulation library |
+| [gdsr-viewer](crates/gdsr-viewer/) | Interactive GDS file viewer |
+
 ## Getting Started
 
 Check out the [gdsr README](https://github.com/MatthewMckee4/gdsr/blob/main/crates/gdsr/README.md) for more information about the Rust crate.

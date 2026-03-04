@@ -1,0 +1,21 @@
+[package]
+name = "gdsr-viewer"
+version = "0.1.0"
+description = "An interactive GDS file viewer"
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+earcutr = { workspace = true }
+eframe = { workspace = true }
+egui = { workspace = true }
+env_logger = { workspace = true }
+gdsr = { workspace = true }
+log = { workspace = true }
+rfd = { workspace = true }
+
+[lints]
+workspace = true

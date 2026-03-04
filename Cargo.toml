@@ -10,13 +10,21 @@ authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
 [workspace.dependencies]
+gdsr = { path = "crates/gdsr" }
+
 approx = "0.5"
 bytemuck = "1.24.0"
 chrono = "0.4.42"
+earcutr = "0.4"
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
+egui = "0.31"
+env_logger = "0.11"
 insta = "1.44.3"
+log = "0.4"
 quickcheck = "1.0.3"
 quickcheck_macros = "1"
 rayon = "1"
+rfd = "0.15"
 rstest = "0.23.0"
 tempfile = "3.23"
 

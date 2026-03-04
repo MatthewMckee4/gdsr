@@ -1,0 +1,75 @@
+use std::collections::{BTreeSet, HashSet};
+
+use egui::{ComboBox, Ui, Vec2};
+
+use crate::colors::LayerColorMap;
+
+/// Draws the side panel with cell selector, layer toggles, and zoom-to-fit button.
+/// Returns `true` if zoom-to-fit was requested.
+pub fn draw_side_panel(
+    ui: &mut Ui,
+    cell_names: &[String],
+    selected_cell: &mut Option<String>,
+    cell_changed: &mut bool,
+    layers: &BTreeSet<(u16, u16)>,
+    hidden_layers: &mut HashSet<(u16, u16)>,
+    layer_colors: &mut LayerColorMap,
+) -> bool {
+    let mut zoom_to_fit = false;
+
+    ui.heading("Cells");
+    let current_label = selected_cell.as_deref().unwrap_or("(none)");
+
+    ComboBox::from_label("")
+        .selected_text(current_label)
+        .width(ui.available_width() - 16.0)
+        .show_ui(ui, |ui| {
+            for name in cell_names {
+                let is_selected = selected_cell.as_deref() == Some(name.as_str());
+                if ui.selectable_label(is_selected, name).clicked() && !is_selected {
+                    *selected_cell = Some(name.clone());
+                    *cell_changed = true;
+                }
+            }
+        });
+
+    ui.add_space(12.0);
+    ui.separator();
+    ui.add_space(4.0);
+
+    ui.heading("Layers");
+    egui::ScrollArea::vertical()
+        .max_height(ui.available_height() - 40.0)
+        .show(ui, |ui| {
+            for &(layer, dt) in layers {
+                let color = layer_colors.get(layer, dt);
+                let visible = !hidden_layers.contains(&(layer, dt));
+
+                ui.horizontal(|ui| {
+                    // Color swatch
+                    let (response, painter) =
+                        ui.allocate_painter(Vec2::new(14.0, 14.0), egui::Sense::hover());
+                    painter.rect_filled(response.rect, 2.0, color);
+
+                    let mut checked = visible;
+                    if ui
+                        .checkbox(&mut checked, format!("L{layer} D{dt}"))
+                        .changed()
+                    {
+                        if checked {
+                            hidden_layers.remove(&(layer, dt));
+                        } else {
+                            hidden_layers.insert((layer, dt));
+                        }
+                    }
+                });
+            }
+        });
+
+    ui.add_space(8.0);
+    if ui.button("Zoom to Fit").clicked() {
+        zoom_to_fit = true;
+    }
+
+    zoom_to_fit
+}
