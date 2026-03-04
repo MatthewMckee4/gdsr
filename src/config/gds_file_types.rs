@@ -1,6 +1,5 @@
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GDSRecord {
     Header = 0x00,
     BgnLib = 0x01,
@@ -135,8 +134,7 @@ impl TryFrom<u8> for GDSRecord {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GDSDataType {
     NoData = 0,
     BitArray = 1,
@@ -180,145 +178,110 @@ pub const fn combine_record_and_data_type(record: GDSRecord, data_type: GDSDataT
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_gds_record_try_from_valid() {
-        assert!(matches!(GDSRecord::try_from(0x00), Ok(GDSRecord::Header)));
-        assert!(matches!(GDSRecord::try_from(0x01), Ok(GDSRecord::BgnLib)));
-        assert!(matches!(GDSRecord::try_from(0x02), Ok(GDSRecord::LibName)));
-        assert!(matches!(GDSRecord::try_from(0x03), Ok(GDSRecord::Units)));
-        assert!(matches!(GDSRecord::try_from(0x04), Ok(GDSRecord::EndLib)));
-        assert!(matches!(GDSRecord::try_from(0x05), Ok(GDSRecord::BgnStr)));
-        assert!(matches!(GDSRecord::try_from(0x06), Ok(GDSRecord::StrName)));
-        assert!(matches!(GDSRecord::try_from(0x07), Ok(GDSRecord::EndStr)));
-        assert!(matches!(GDSRecord::try_from(0x08), Ok(GDSRecord::Boundary)));
-        assert!(matches!(GDSRecord::try_from(0x09), Ok(GDSRecord::Path)));
-        assert!(matches!(GDSRecord::try_from(0x0A), Ok(GDSRecord::SRef)));
-        assert!(matches!(GDSRecord::try_from(0x0B), Ok(GDSRecord::ARef)));
-        assert!(matches!(GDSRecord::try_from(0x0C), Ok(GDSRecord::Text)));
-        assert!(matches!(GDSRecord::try_from(0x0D), Ok(GDSRecord::Layer)));
-        assert!(matches!(GDSRecord::try_from(0x0E), Ok(GDSRecord::DataType)));
-        assert!(matches!(GDSRecord::try_from(0x0F), Ok(GDSRecord::Width)));
-        assert!(matches!(GDSRecord::try_from(0x10), Ok(GDSRecord::XY)));
-        assert!(matches!(GDSRecord::try_from(0x11), Ok(GDSRecord::EndEl)));
-        assert!(matches!(GDSRecord::try_from(0x12), Ok(GDSRecord::SName)));
-        assert!(matches!(GDSRecord::try_from(0x13), Ok(GDSRecord::ColRow)));
-        assert!(matches!(GDSRecord::try_from(0x14), Ok(GDSRecord::TextNode)));
-        assert!(matches!(GDSRecord::try_from(0x15), Ok(GDSRecord::Node)));
-        assert!(matches!(GDSRecord::try_from(0x16), Ok(GDSRecord::TextType)));
-        assert!(matches!(
-            GDSRecord::try_from(0x17),
-            Ok(GDSRecord::Presentation)
-        ));
-        assert!(matches!(GDSRecord::try_from(0x18), Ok(GDSRecord::Spacing)));
-        assert!(matches!(GDSRecord::try_from(0x19), Ok(GDSRecord::String)));
-        assert!(matches!(GDSRecord::try_from(0x1A), Ok(GDSRecord::STrans)));
-        assert!(matches!(GDSRecord::try_from(0x1B), Ok(GDSRecord::Mag)));
-        assert!(matches!(GDSRecord::try_from(0x1C), Ok(GDSRecord::Angle)));
-        assert!(matches!(GDSRecord::try_from(0x1D), Ok(GDSRecord::UInteger)));
-        assert!(matches!(GDSRecord::try_from(0x1E), Ok(GDSRecord::UString)));
-        assert!(matches!(GDSRecord::try_from(0x1F), Ok(GDSRecord::RefLibs)));
-        assert!(matches!(GDSRecord::try_from(0x20), Ok(GDSRecord::Fonts)));
-        assert!(matches!(GDSRecord::try_from(0x21), Ok(GDSRecord::PathType)));
-        assert!(matches!(
-            GDSRecord::try_from(0x22),
-            Ok(GDSRecord::Generations)
-        ));
-        assert!(matches!(
-            GDSRecord::try_from(0x23),
-            Ok(GDSRecord::AttrTable)
-        ));
-        assert!(matches!(GDSRecord::try_from(0x24), Ok(GDSRecord::StyTable)));
-        assert!(matches!(GDSRecord::try_from(0x25), Ok(GDSRecord::StrType)));
-        assert!(matches!(GDSRecord::try_from(0x26), Ok(GDSRecord::ElFlags)));
-        assert!(matches!(GDSRecord::try_from(0x27), Ok(GDSRecord::ElKey)));
-        assert!(matches!(GDSRecord::try_from(0x28), Ok(GDSRecord::LinkType)));
-        assert!(matches!(GDSRecord::try_from(0x29), Ok(GDSRecord::LinkKeys)));
-        assert!(matches!(GDSRecord::try_from(0x2A), Ok(GDSRecord::NodeType)));
-        assert!(matches!(GDSRecord::try_from(0x2B), Ok(GDSRecord::PropAttr)));
-        assert!(matches!(
-            GDSRecord::try_from(0x2C),
-            Ok(GDSRecord::PropValue)
-        ));
-        assert!(matches!(GDSRecord::try_from(0x2D), Ok(GDSRecord::Box)));
-        assert!(matches!(GDSRecord::try_from(0x2E), Ok(GDSRecord::BoxType)));
-        assert!(matches!(GDSRecord::try_from(0x2F), Ok(GDSRecord::Plex)));
-        assert!(matches!(GDSRecord::try_from(0x30), Ok(GDSRecord::BgnExtn)));
-        assert!(matches!(GDSRecord::try_from(0x31), Ok(GDSRecord::EndExtn)));
-        assert!(matches!(GDSRecord::try_from(0x32), Ok(GDSRecord::TapeNum)));
-        assert!(matches!(GDSRecord::try_from(0x33), Ok(GDSRecord::TapeCode)));
-        assert!(matches!(GDSRecord::try_from(0x34), Ok(GDSRecord::StrClass)));
-        assert!(matches!(GDSRecord::try_from(0x35), Ok(GDSRecord::Reserved)));
-        assert!(matches!(GDSRecord::try_from(0x36), Ok(GDSRecord::Format)));
-        assert!(matches!(GDSRecord::try_from(0x37), Ok(GDSRecord::Mask)));
-        assert!(matches!(GDSRecord::try_from(0x38), Ok(GDSRecord::EndMasks)));
-        assert!(matches!(
-            GDSRecord::try_from(0x39),
-            Ok(GDSRecord::LibDirSize)
-        ));
-        assert!(matches!(GDSRecord::try_from(0x3A), Ok(GDSRecord::SrfName)));
-        assert!(matches!(
-            GDSRecord::try_from(0x3B),
-            Ok(GDSRecord::LibSecure)
-        ));
+    #[rstest]
+    #[case(0x00, GDSRecord::Header)]
+    #[case(0x01, GDSRecord::BgnLib)]
+    #[case(0x02, GDSRecord::LibName)]
+    #[case(0x03, GDSRecord::Units)]
+    #[case(0x04, GDSRecord::EndLib)]
+    #[case(0x05, GDSRecord::BgnStr)]
+    #[case(0x06, GDSRecord::StrName)]
+    #[case(0x07, GDSRecord::EndStr)]
+    #[case(0x08, GDSRecord::Boundary)]
+    #[case(0x09, GDSRecord::Path)]
+    #[case(0x0A, GDSRecord::SRef)]
+    #[case(0x0B, GDSRecord::ARef)]
+    #[case(0x0C, GDSRecord::Text)]
+    #[case(0x0D, GDSRecord::Layer)]
+    #[case(0x0E, GDSRecord::DataType)]
+    #[case(0x0F, GDSRecord::Width)]
+    #[case(0x10, GDSRecord::XY)]
+    #[case(0x11, GDSRecord::EndEl)]
+    #[case(0x12, GDSRecord::SName)]
+    #[case(0x13, GDSRecord::ColRow)]
+    #[case(0x14, GDSRecord::TextNode)]
+    #[case(0x15, GDSRecord::Node)]
+    #[case(0x16, GDSRecord::TextType)]
+    #[case(0x17, GDSRecord::Presentation)]
+    #[case(0x18, GDSRecord::Spacing)]
+    #[case(0x19, GDSRecord::String)]
+    #[case(0x1A, GDSRecord::STrans)]
+    #[case(0x1B, GDSRecord::Mag)]
+    #[case(0x1C, GDSRecord::Angle)]
+    #[case(0x1D, GDSRecord::UInteger)]
+    #[case(0x1E, GDSRecord::UString)]
+    #[case(0x1F, GDSRecord::RefLibs)]
+    #[case(0x20, GDSRecord::Fonts)]
+    #[case(0x21, GDSRecord::PathType)]
+    #[case(0x22, GDSRecord::Generations)]
+    #[case(0x23, GDSRecord::AttrTable)]
+    #[case(0x24, GDSRecord::StyTable)]
+    #[case(0x25, GDSRecord::StrType)]
+    #[case(0x26, GDSRecord::ElFlags)]
+    #[case(0x27, GDSRecord::ElKey)]
+    #[case(0x28, GDSRecord::LinkType)]
+    #[case(0x29, GDSRecord::LinkKeys)]
+    #[case(0x2A, GDSRecord::NodeType)]
+    #[case(0x2B, GDSRecord::PropAttr)]
+    #[case(0x2C, GDSRecord::PropValue)]
+    #[case(0x2D, GDSRecord::Box)]
+    #[case(0x2E, GDSRecord::BoxType)]
+    #[case(0x2F, GDSRecord::Plex)]
+    #[case(0x30, GDSRecord::BgnExtn)]
+    #[case(0x31, GDSRecord::EndExtn)]
+    #[case(0x32, GDSRecord::TapeNum)]
+    #[case(0x33, GDSRecord::TapeCode)]
+    #[case(0x34, GDSRecord::StrClass)]
+    #[case(0x35, GDSRecord::Reserved)]
+    #[case(0x36, GDSRecord::Format)]
+    #[case(0x37, GDSRecord::Mask)]
+    #[case(0x38, GDSRecord::EndMasks)]
+    #[case(0x39, GDSRecord::LibDirSize)]
+    #[case(0x3A, GDSRecord::SrfName)]
+    #[case(0x3B, GDSRecord::LibSecure)]
+    fn gds_record_try_from_valid(#[case] input: u8, #[case] expected: GDSRecord) {
+        assert_eq!(GDSRecord::try_from(input), Ok(expected));
     }
 
-    #[test]
-    fn test_gds_record_try_from_invalid() {
-        assert!(GDSRecord::try_from(0xFF).is_err());
-        assert!(GDSRecord::try_from(0x3C).is_err());
-        assert!(GDSRecord::try_from(0x50).is_err());
+    #[rstest]
+    #[case(0x3C)]
+    #[case(0x50)]
+    #[case(0xFF)]
+    fn gds_record_try_from_invalid(#[case] input: u8) {
+        assert!(GDSRecord::try_from(input).is_err());
     }
 
-    #[test]
-    fn test_gds_data_type_try_from_valid() {
-        assert!(matches!(GDSDataType::try_from(0), Ok(GDSDataType::NoData)));
-        assert!(matches!(
-            GDSDataType::try_from(1),
-            Ok(GDSDataType::BitArray)
-        ));
-        assert!(matches!(
-            GDSDataType::try_from(2),
-            Ok(GDSDataType::TwoByteSignedInteger)
-        ));
-        assert!(matches!(
-            GDSDataType::try_from(3),
-            Ok(GDSDataType::FourByteSignedInteger)
-        ));
-        assert!(matches!(
-            GDSDataType::try_from(4),
-            Ok(GDSDataType::FourByteReal)
-        ));
-        assert!(matches!(
-            GDSDataType::try_from(5),
-            Ok(GDSDataType::EightByteReal)
-        ));
-        assert!(matches!(
-            GDSDataType::try_from(6),
-            Ok(GDSDataType::AsciiString)
-        ));
+    #[rstest]
+    #[case(0, GDSDataType::NoData)]
+    #[case(1, GDSDataType::BitArray)]
+    #[case(2, GDSDataType::TwoByteSignedInteger)]
+    #[case(3, GDSDataType::FourByteSignedInteger)]
+    #[case(4, GDSDataType::FourByteReal)]
+    #[case(5, GDSDataType::EightByteReal)]
+    #[case(6, GDSDataType::AsciiString)]
+    fn gds_data_type_try_from_valid(#[case] input: u8, #[case] expected: GDSDataType) {
+        assert_eq!(GDSDataType::try_from(input), Ok(expected));
     }
 
-    #[test]
-    fn test_gds_data_type_try_from_invalid() {
-        assert!(GDSDataType::try_from(7).is_err());
-        assert!(GDSDataType::try_from(255).is_err());
+    #[rstest]
+    #[case(7)]
+    #[case(255)]
+    fn gds_data_type_try_from_invalid(#[case] input: u8) {
+        assert!(GDSDataType::try_from(input).is_err());
     }
 
-    #[test]
-    fn test_combine_record_and_data_type() {
-        let result = combine_record_and_data_type(GDSRecord::Header, GDSDataType::NoData);
-        assert_eq!(result, 0x0000);
-
-        let result =
-            combine_record_and_data_type(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger);
-        assert_eq!(result, 0x0102);
-
-        let result = combine_record_and_data_type(GDSRecord::Units, GDSDataType::EightByteReal);
-        assert_eq!(result, 0x0305);
-
-        let result =
-            combine_record_and_data_type(GDSRecord::PathType, GDSDataType::TwoByteSignedInteger);
-        assert_eq!(result, 0x2102);
+    #[rstest]
+    #[case(GDSRecord::Header, GDSDataType::NoData, 0x0000)]
+    #[case(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger, 0x0102)]
+    #[case(GDSRecord::Units, GDSDataType::EightByteReal, 0x0305)]
+    #[case(GDSRecord::PathType, GDSDataType::TwoByteSignedInteger, 0x2102)]
+    fn combine_record_and_data_type_produces_correct_value(
+        #[case] record: GDSRecord,
+        #[case] data_type: GDSDataType,
+        #[case] expected: u16,
+    ) {
+        assert_eq!(combine_record_and_data_type(record, data_type), expected);
     }
 }
