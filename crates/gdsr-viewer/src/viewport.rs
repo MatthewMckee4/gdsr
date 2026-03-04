@@ -465,6 +465,39 @@ fn test_rect() -> Rect {
     Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
 }
 
+/// Returns the world-space bounding box of a single element as `[min_x, min_y, max_x, max_y]`.
+/// Returns `None` for references and elements with no points.
+pub fn element_bbox(element: &Element) -> Option<[f64; 4]> {
+    let points: &[gdsr::Point] = match element {
+        Element::Polygon(p) => p.points(),
+        Element::Path(p) => p.points(),
+        Element::Text(t) => {
+            let x = t.origin().x().absolute_value();
+            let y = t.origin().y().absolute_value();
+            return Some([x, y, x, y]);
+        }
+        Element::Reference(_) => return None,
+    };
+
+    if points.is_empty() {
+        return None;
+    }
+
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+    for p in points {
+        let x = p.x().absolute_value();
+        let y = p.y().absolute_value();
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+    Some([min_x, min_y, max_x, max_y])
+}
+
 /// Computes the bounding box of the given elements in world coordinates.
 /// Returns `None` if there are no geometric elements.
 pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
@@ -475,30 +508,11 @@ pub fn compute_bounds(elements: &[Element]) -> Option<(f64, f64, f64, f64)> {
     let mut found = false;
 
     for element in elements {
-        let points: &[gdsr::Point] = match element {
-            Element::Polygon(p) => p.points(),
-            Element::Path(p) => p.points(),
-            Element::Text(t) => {
-                let o = t.origin();
-                let x = o.x().absolute_value();
-                let y = o.y().absolute_value();
-                min_x = min_x.min(x);
-                min_y = min_y.min(y);
-                max_x = max_x.max(x);
-                max_y = max_y.max(y);
-                found = true;
-                continue;
-            }
-            Element::Reference(_) => continue,
-        };
-
-        for p in points {
-            let x = p.x().absolute_value();
-            let y = p.y().absolute_value();
-            min_x = min_x.min(x);
-            min_y = min_y.min(y);
-            max_x = max_x.max(x);
-            max_y = max_y.max(y);
+        if let Some(bbox) = element_bbox(element) {
+            min_x = min_x.min(bbox[0]);
+            min_y = min_y.min(bbox[1]);
+            max_x = max_x.max(bbox[2]);
+            max_y = max_y.max(bbox[3]);
             found = true;
         }
     }

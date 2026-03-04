@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use gdsr::Element;
 
+use crate::viewport::element_bbox;
+
 const GRID_SIZE: usize = 256;
 
 pub struct GridCell {
@@ -17,38 +19,6 @@ pub struct SpatialGrid {
     world_min_y: f64,
     cell_width: f64,
     cell_height: f64,
-}
-
-fn element_bbox(element: &Element) -> Option<[f64; 4]> {
-    match element {
-        Element::Polygon(p) => points_bbox(p.points()),
-        Element::Path(p) => points_bbox(p.points()),
-        Element::Text(t) => {
-            let x = t.origin().x().absolute_value();
-            let y = t.origin().y().absolute_value();
-            Some([x, y, x, y])
-        }
-        Element::Reference(_) => None,
-    }
-}
-
-fn points_bbox(points: &[gdsr::Point]) -> Option<[f64; 4]> {
-    if points.is_empty() {
-        return None;
-    }
-    let mut min_x = f64::MAX;
-    let mut min_y = f64::MAX;
-    let mut max_x = f64::MIN;
-    let mut max_y = f64::MIN;
-    for p in points {
-        let x = p.x().absolute_value();
-        let y = p.y().absolute_value();
-        min_x = min_x.min(x);
-        min_y = min_y.min(y);
-        max_x = max_x.max(x);
-        max_y = max_y.max(y);
-    }
-    Some([min_x, min_y, max_x, max_y])
 }
 
 fn element_layer(element: &Element) -> (u16, u16) {
