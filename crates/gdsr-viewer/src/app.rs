@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::thread;
 
 use gdsr::{Element, Library};
 
@@ -15,6 +16,8 @@ pub struct ViewerApp {
     selected_cell: Option<String>,
     cell_names: Vec<String>,
     elements: Vec<Element>,
+    element_receiver: Option<mpsc::Receiver<Element>>,
+    elements_loading: bool,
     layers: BTreeSet<(u16, u16)>,
     viewport: Viewport,
     layer_colors: LayerColorMap,
@@ -54,41 +57,29 @@ impl ViewerApp {
     fn select_cell(&mut self, name: &str) {
         self.selected_cell = Some(name.to_string());
 
+        // Drop old receiver to cancel any in-flight streaming thread
+        self.element_receiver = None;
+        self.elements.clear();
+        self.layers.clear();
+
         if let Some(library) = &self.library {
             if let Some(cell) = library.get_cell(name) {
-                self.elements = cell.get_elements(None, library);
-                self.collect_layers();
-                self.zoom_to_fit();
-            }
-        }
-    }
+                let cell = cell.clone();
+                let library = library.clone();
+                let (tx, rx) = mpsc::channel();
 
-    fn collect_layers(&mut self) {
-        self.layers.clear();
-        for element in &self.elements {
-            match element {
-                Element::Polygon(p) => {
-                    self.layers.insert((p.layer(), p.data_type()));
-                }
-                Element::Path(p) => {
-                    self.layers.insert((p.layer(), p.data_type()));
-                }
-                Element::Text(t) => {
-                    self.layers.insert((t.layer(), 0));
-                }
-                Element::Reference(_) => {}
-            }
-        }
+                thread::spawn(move || {
+                    cell.stream_elements(None, &library, &tx);
+                });
 
-        // Pre-assign colors for all layers
-        for &(layer, dt) in &self.layers {
-            self.layer_colors.get(layer, dt);
+                self.element_receiver = Some(rx);
+                self.elements_loading = true;
+            }
         }
     }
 
     fn zoom_to_fit(&mut self) {
         if let Some((min_x, min_y, max_x, max_y)) = viewport::compute_bounds(&self.elements) {
-            // Use a reasonable default rect for initial zoom; will be corrected on first frame
             let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
             self.viewport.zoom_to_fit(min_x, min_y, max_x, max_y, rect);
         }
@@ -119,6 +110,49 @@ impl eframe::App for ViewerApp {
             }
         }
 
+        // Drain element streaming channel
+        if let Some(rx) = &self.element_receiver {
+            loop {
+                match rx.try_recv() {
+                    Ok(element) => {
+                        match &element {
+                            Element::Polygon(p) => {
+                                let key = (p.layer(), p.data_type());
+                                if self.layers.insert(key) {
+                                    self.layer_colors.get(key.0, key.1);
+                                }
+                            }
+                            Element::Path(p) => {
+                                let key = (p.layer(), p.data_type());
+                                if self.layers.insert(key) {
+                                    self.layer_colors.get(key.0, key.1);
+                                }
+                            }
+                            Element::Text(t) => {
+                                let key = (t.layer(), 0);
+                                if self.layers.insert(key) {
+                                    self.layer_colors.get(key.0, key.1);
+                                }
+                            }
+                            Element::Reference(_) => {}
+                        }
+                        self.elements.push(element);
+                    }
+                    Err(mpsc::TryRecvError::Empty) => break,
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        self.elements_loading = false;
+                        self.element_receiver = None;
+                        self.zoom_to_fit();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if self.elements_loading {
+            ctx.request_repaint();
+        }
+
         // Top menu bar
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -136,6 +170,8 @@ impl eframe::App for ViewerApp {
             ui.horizontal(|ui| {
                 if self.loading {
                     ui.label("Loading...");
+                } else if self.elements_loading {
+                    ui.label(format!("Expanding elements... ({})", self.elements.len()));
                 } else if let Some(err) = &self.error_message {
                     ui.colored_label(egui::Color32::RED, format!("Error: {err}"));
                 } else if let Some(path) = &self.file_path {
