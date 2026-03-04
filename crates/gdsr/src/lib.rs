@@ -15,7 +15,7 @@ mod units;
 mod utils;
 
 pub use cell::Cell;
-pub use elements::text::presentation::{HorizontalPresentation, VerticalPresentation};
+pub use elements::text::{HorizontalPresentation, VerticalPresentation};
 pub use elements::{Element, Instance, Path, PathType, Polygon, Reference, Text};
 pub use error::GdsError;
 pub use grid::Grid;

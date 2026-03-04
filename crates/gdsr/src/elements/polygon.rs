@@ -1,11 +1,33 @@
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
+use crate::error::GdsError;
+use crate::traits::ToGds;
+use crate::utils::io::{
+    MAX_POINTS, MIN_POLYGON_POINTS, validate_data_type, validate_layer, write_element_tail_to_file,
+    write_points_to_file, write_u16_array_to_file,
+};
 use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
 
-mod io;
-mod utils;
+fn are_points_closed(points: &[Point]) -> bool {
+    let points_vec: Vec<Point> = points.to_vec();
+    if points_vec.is_empty() {
+        return true;
+    }
+    points_vec.first() == points_vec.last()
+}
 
-#[cfg(test)]
-pub(crate) use utils::close_points;
-pub use utils::get_correct_polygon_points_format;
+pub(crate) fn close_points(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
+    let mut points_vec = points.into_iter().collect::<Vec<_>>();
+    if !are_points_closed(&points_vec) {
+        if let Some(first) = points_vec.first().copied() {
+            points_vec.push(first);
+        }
+    }
+    points_vec
+}
+
+pub fn get_correct_polygon_points_format(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
+    close_points(points)
+}
 
 /// A closed polygon defined by a sequence of points on a specific layer.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -20,7 +42,7 @@ impl Polygon {
     /// The polygon is automatically closed if needed.
     pub fn new(points: impl IntoIterator<Item = Point>, layer: Layer, data_type: DataType) -> Self {
         Self {
-            points: utils::get_correct_polygon_points_format(points),
+            points: get_correct_polygon_points_format(points),
             layer,
             data_type,
         }
@@ -131,9 +153,91 @@ impl Dimensions for Polygon {
     }
 }
 
+impl ToGds for Polygon {
+    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
+        if self.points().len() > MAX_POINTS {
+            return Err(GdsError::ValidationError {
+                message: format!(
+                    "Polygon has {} points, which exceeds the maximum of {}",
+                    self.points().len(),
+                    MAX_POINTS
+                ),
+            });
+        }
+
+        validate_layer(self.layer())?;
+        validate_data_type(self.data_type())?;
+
+        if self.points().len() < MIN_POLYGON_POINTS {
+            return Err(GdsError::ValidationError {
+                message: format!(
+                    "Polygon must have at least {MIN_POLYGON_POINTS} points (3 vertices + closing point), got {}",
+                    self.points().len()
+                ),
+            });
+        }
+
+        let mut buffer = Vec::new();
+
+        let polygon_head = [
+            4,
+            combine_record_and_data_type(GDSRecord::Boundary, GDSDataType::NoData),
+            6,
+            combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
+            self.layer(),
+            6,
+            combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
+            self.data_type(),
+        ];
+
+        write_u16_array_to_file(&mut buffer, &polygon_head)?;
+
+        write_points_to_file(&mut buffer, self.points(), database_units)?;
+
+        write_element_tail_to_file(&mut buffer)?;
+
+        Ok(buffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_close_points_not_closed() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
+        ];
+        let closed = close_points(points.clone());
+
+        assert_eq!(closed.len(), 4);
+        assert_eq!(closed[0], points[0]);
+        assert_eq!(closed[closed.len() - 1], points[0]);
+    }
+
+    #[test]
+    fn test_close_points_already_closed() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(5, 0, 1e-9),
+            Point::integer(5, 5, 1e-9),
+            Point::integer(0, 0, 1e-9),
+        ];
+        let closed = close_points(points.clone());
+
+        assert_eq!(closed.len(), points.len());
+    }
+
+    #[test]
+    fn test_close_points_empty() {
+        let points: Vec<Point> = vec![];
+        let closed = close_points(points);
+
+        assert_eq!(closed.len(), 0);
+    }
 
     #[test]
     fn test_polygon_creation() {

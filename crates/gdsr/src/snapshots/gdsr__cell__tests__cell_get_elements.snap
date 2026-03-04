@@ -1,5 +1,5 @@
 ---
-source: crates/gdsr/src/cell/mod.rs
+source: crates/gdsr/src/cell.rs
 expression: elements
 ---
 [
