@@ -257,6 +257,7 @@ impl eframe::App for ViewerApp {
                         &cell.layers,
                         layer_state,
                         cell.cell_stats.as_ref(),
+                        &mut cell.search_query,
                     );
                 }
             });
