@@ -5,7 +5,7 @@ use crate::utils::io::{
     validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
     write_u16_array_to_file,
 };
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable};
 
 /// Maximum number of points allowed in a GDS II Node element.
 pub const MAX_NODE_POINTS: usize = 50;
@@ -47,6 +47,15 @@ impl Node {
     /// Returns the node type.
     pub const fn node_type(&self) -> DataType {
         self.node_type
+    }
+
+    /// Remaps the layer and node type using the given mapping.
+    /// If the current (layer, `node_type`) pair is found in the mapping, it is replaced.
+    pub fn remap_layers(&mut self, mapping: &LayerMapping) {
+        if let Some(&(new_layer, new_node_type)) = mapping.get(&(self.layer, self.node_type)) {
+            self.layer = new_layer;
+            self.node_type = new_node_type;
+        }
     }
 
     /// Converts all points to integer units.

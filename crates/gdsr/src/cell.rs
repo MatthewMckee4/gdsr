@@ -159,6 +159,9 @@ impl Cell {
         for gds_box in &mut self.boxes {
             gds_box.remap_layers(mapping);
         }
+        for node in &mut self.nodes {
+            node.remap_layers(mapping);
+        }
         for text in &mut self.texts {
             text.remap_layers(mapping);
         }

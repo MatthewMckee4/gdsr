@@ -83,6 +83,7 @@ impl Element {
             Self::Path(path) => path.remap_layers(mapping),
             Self::Polygon(polygon) => polygon.remap_layers(mapping),
             Self::Box(gds_box) => gds_box.remap_layers(mapping),
+            Self::Node(node) => node.remap_layers(mapping),
             Self::Text(text) => text.remap_layers(mapping),
             Self::Reference(reference) => reference.remap_layers(mapping),
         }
