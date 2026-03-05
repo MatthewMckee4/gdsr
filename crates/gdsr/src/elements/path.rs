@@ -125,6 +125,57 @@ impl Path {
         }
     }
 
+    /// Expands this path to the polygon vertices representing its filled area.
+    ///
+    /// Returns `None` if the path has no width or fewer than 2 points.
+    /// `arc_segments` controls the number of segments used for round end caps.
+    pub fn to_polygon_points(&self, arc_segments: usize) -> Option<Vec<Point>> {
+        let width = self.width?;
+        if self.points.len() < 2 {
+            return None;
+        }
+
+        let half_width = width.absolute_value() / 2.0;
+        if half_width <= 0.0 {
+            return None;
+        }
+
+        let path_type = self.r#type.unwrap_or_default();
+        let begin_ext = self.begin_extension.map_or(0.0, |u| u.absolute_value());
+        let end_ext = self.end_extension.map_or(0.0, |u| u.absolute_value());
+
+        let units = self.points[0].units().0;
+        let centerline: Vec<(f64, f64)> = self
+            .points
+            .iter()
+            .map(|p| (p.x().float_value(), p.y().float_value()))
+            .collect();
+
+        let half_width_scaled = half_width / units;
+        let begin_ext_scaled = begin_ext / units;
+        let end_ext_scaled = end_ext / units;
+
+        let expanded = crate::geometry::expand_path_to_polygon(
+            &centerline,
+            half_width_scaled,
+            path_type,
+            begin_ext_scaled,
+            end_ext_scaled,
+            arc_segments,
+        );
+
+        if expanded.is_empty() {
+            return None;
+        }
+
+        Some(
+            expanded
+                .into_iter()
+                .map(|(x, y)| Point::float(x, y, units))
+                .collect(),
+        )
+    }
+
     /// Converts all points, width, and extensions to float units.
     #[must_use]
     pub fn to_float_unit(self) -> Self {

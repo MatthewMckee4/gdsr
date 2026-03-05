@@ -333,20 +333,66 @@ impl Drawable for gdsr::Path {
             return;
         }
 
+        if let Some(poly_pts) = self.to_polygon_points(16) {
+            ctx.screen_pts_buf.clear();
+            ctx.screen_pts_buf.extend(poly_pts.iter().map(|p| {
+                ctx.viewport.world_to_screen(
+                    p.x().absolute_value(),
+                    p.y().absolute_value(),
+                    ctx.rect,
+                )
+            }));
+
+            let open_len = if ctx.screen_pts_buf.len() >= 2
+                && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
+            {
+                ctx.screen_pts_buf.len() - 1
+            } else {
+                ctx.screen_pts_buf.len()
+            };
+
+            if open_len >= 3 {
+                let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+
+                let coords: Vec<f64> = ctx.screen_pts_buf[..open_len]
+                    .iter()
+                    .flat_map(|p| [f64::from(p.x), f64::from(p.y)])
+                    .collect();
+
+                let indices = earcutr::earcut(&coords, &[], 2).unwrap_or_default();
+
+                let mut mesh = Mesh::default();
+                for pt in &ctx.screen_pts_buf[..open_len] {
+                    mesh.vertices.push(egui::epaint::Vertex {
+                        pos: *pt,
+                        uv: egui::epaint::WHITE_UV,
+                        color: fill,
+                    });
+                }
+                for idx in indices {
+                    mesh.indices.push(idx as u32);
+                }
+                ctx.merge_mesh(key, &mesh);
+
+                let outline = stroke_polyline_to_mesh(
+                    &ctx.screen_pts_buf[..open_len],
+                    Stroke::new(1.0, color),
+                    true,
+                );
+                ctx.merge_mesh(key, &outline);
+                return;
+            }
+        }
+
+        // Fallback: render as 1px centerline stroke
         ctx.screen_pts_buf.clear();
         ctx.screen_pts_buf.extend(points.iter().map(|p| {
             ctx.viewport
                 .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
         }));
 
-        let width_px = self
-            .width()
-            .map(|w| (w.absolute_value() * ctx.viewport.zoom) as f32)
-            .unwrap_or(1.0)
-            .clamp(1.0, 20.0);
-
         let stroke_mesh =
-            stroke_polyline_to_mesh(ctx.screen_pts_buf, Stroke::new(width_px, color), false);
+            stroke_polyline_to_mesh(ctx.screen_pts_buf, Stroke::new(1.0, color), false);
         ctx.merge_mesh(key, &stroke_mesh);
     }
 }
