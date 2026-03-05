@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::elements::{GdsBox, Path, Polygon, Reference, Text};
+use crate::elements::{GdsBox, Node, Path, Polygon, Reference, Text};
 use crate::traits::ToGds;
 use crate::{Dimensions, Instance, Movable, Point, Transformable, Transformation};
 
-/// A GDSII element: one of [`Path`], [`Polygon`], [`GdsBox`], [`Text`], or [`Reference`].
+/// A GDSII element: one of [`Path`], [`Polygon`], [`GdsBox`], [`Node`], [`Text`], or [`Reference`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
     /// A path element.
@@ -13,6 +13,8 @@ pub enum Element {
     Polygon(Polygon),
     /// A box element.
     Box(GdsBox),
+    /// A node element.
+    Node(Node),
     /// A text annotation element.
     Text(Text),
     /// A reference to another cell or element.
@@ -56,6 +58,15 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Node`] if this is a `Node` variant, or `None`.
+    pub fn as_node(&self) -> Option<&Node> {
+        if let Self::Node(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     /// Returns the inner [`Reference`] if this is a `Reference` variant, or `None`.
     pub fn as_reference(&self) -> Option<&Reference> {
         if let Self::Reference(v) = self {
@@ -72,6 +83,7 @@ impl Element {
             Self::Path(path) => Self::Path(path.to_integer_unit()),
             Self::Polygon(polygon) => Self::Polygon(polygon.to_integer_unit()),
             Self::Box(gds_box) => Self::Box(gds_box.to_integer_unit()),
+            Self::Node(node) => Self::Node(node.to_integer_unit()),
             Self::Text(text) => Self::Text(text.to_integer_unit()),
             Self::Reference(reference) => Self::Reference(reference.to_integer_unit()),
         }
@@ -84,6 +96,7 @@ impl Element {
             Self::Path(path) => Self::Path(path.to_float_unit()),
             Self::Polygon(polygon) => Self::Polygon(polygon.to_float_unit()),
             Self::Box(gds_box) => Self::Box(gds_box.to_float_unit()),
+            Self::Node(node) => Self::Node(node.to_float_unit()),
             Self::Text(text) => Self::Text(text.to_float_unit()),
             Self::Reference(reference) => Self::Reference(reference.to_float_unit()),
         }
@@ -96,6 +109,7 @@ impl std::fmt::Display for Element {
             Self::Path(path) => write!(f, "{path}"),
             Self::Polygon(polygon) => write!(f, "{polygon}"),
             Self::Box(gds_box) => write!(f, "{gds_box}"),
+            Self::Node(node) => write!(f, "{node}"),
             Self::Text(text) => write!(f, "{text}"),
             Self::Reference(reference) => write!(f, "{reference}"),
         }
@@ -127,7 +141,7 @@ macro_rules! impl_from_element_reference {
     };
 }
 
-impl_from_element_reference!(Path, Polygon, GdsBox => Box, Text, Reference);
+impl_from_element_reference!(Path, Polygon, GdsBox => Box, Node, Text, Reference);
 
 impl From<Element> for Instance {
     fn from(v: Element) -> Self {
@@ -141,6 +155,7 @@ impl ToGds for Element {
             Self::Path(path) => path.to_gds_impl(scale),
             Self::Polygon(polygon) => polygon.to_gds_impl(scale),
             Self::Box(gds_box) => gds_box.to_gds_impl(scale),
+            Self::Node(node) => node.to_gds_impl(scale),
             Self::Reference(reference) => reference.to_gds_impl(scale),
             Self::Text(text) => text.to_gds_impl(scale),
         }
@@ -153,6 +168,7 @@ impl Transformable for Element {
             Self::Path(path) => Self::Path(path.transform_impl(transformation)),
             Self::Polygon(polygon) => Self::Polygon(polygon.transform_impl(transformation)),
             Self::Box(gds_box) => Self::Box(gds_box.transform_impl(transformation)),
+            Self::Node(node) => Self::Node(node.transform_impl(transformation)),
             Self::Reference(reference) => Self::Reference(reference.transform_impl(transformation)),
             Self::Text(text) => Self::Text(text.transform_impl(transformation)),
         }
@@ -165,6 +181,7 @@ impl Movable for Element {
             Self::Path(path) => Self::Path(path.move_to(target)),
             Self::Polygon(polygon) => Self::Polygon(polygon.move_to(target)),
             Self::Box(gds_box) => Self::Box(gds_box.move_to(target)),
+            Self::Node(node) => Self::Node(node.move_to(target)),
             Self::Reference(reference) => Self::Reference(reference.move_to(target)),
             Self::Text(text) => Self::Text(text.move_to(target)),
         }
@@ -177,6 +194,7 @@ impl Dimensions for Element {
             Self::Path(path) => path.bounding_box(),
             Self::Polygon(polygon) => polygon.bounding_box(),
             Self::Box(gds_box) => gds_box.bounding_box(),
+            Self::Node(node) => node.bounding_box(),
             Self::Text(text) => text.bounding_box(),
             Self::Reference(_) => (Point::default(), Point::default()),
         }
@@ -186,7 +204,7 @@ impl Dimensions for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DataType, GdsBox, Grid, Layer, Point};
+    use crate::{DataType, GdsBox, Grid, Layer, Node, Point};
 
     const UNITS: f64 = 1e-9;
 
@@ -242,11 +260,16 @@ mod tests {
         GdsBox::new(p(0, 0), p(10, 10), Layer::new(1), DataType::new(0))
     }
 
-    fn all_elements() -> [Element; 5] {
+    fn simple_node() -> Node {
+        Node::new(vec![p(0, 0), p(5, 5)], Layer::new(1), DataType::new(0))
+    }
+
+    fn all_elements() -> [Element; 6] {
         [
             simple_path().into(),
             simple_polygon().into(),
             simple_gds_box().into(),
+            simple_node().into(),
             simple_text().into(),
             simple_reference().with_grid(simple_grid()).into(),
         ]
@@ -298,6 +321,21 @@ mod tests {
         assert_eq!(element.as_box().unwrap(), &gds_box);
 
         insta::assert_snapshot!(element.to_string(), @"Box from (0.000000 (1.000e-9), 0.000000 (1.000e-9)) to (10.000000 (1.000e-9), 10.000000 (1.000e-9)) on layer 1, box type 0");
+    }
+
+    #[test]
+    fn test_element_from_node() {
+        let node = simple_node();
+        let element: Element = node.clone().into();
+
+        assert!(element.as_path().is_none());
+        assert!(element.as_polygon().is_none());
+        assert!(element.as_box().is_none());
+        assert!(element.as_text().is_none());
+        assert!(element.as_reference().is_none());
+        assert_eq!(element.as_node().unwrap(), &node);
+
+        insta::assert_snapshot!(element.to_string(), @"Node with 2 point(s) on layer 1, node type 0");
     }
 
     #[test]

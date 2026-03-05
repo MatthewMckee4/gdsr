@@ -16,7 +16,7 @@ mod utils;
 
 pub use cell::Cell;
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
-pub use elements::{Element, GdsBox, Instance, Path, PathType, Polygon, Reference, Text};
+pub use elements::{Element, GdsBox, Instance, Node, Path, PathType, Polygon, Reference, Text};
 pub use error::GdsError;
 pub use grid::Grid;
 pub use library::{DanglingCellReference, Library};

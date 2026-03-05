@@ -3,7 +3,8 @@ use quickcheck_macros::quickcheck;
 use tempfile::tempdir;
 
 use super::arbitrary::{
-    arb_gds_box, arb_gds_path, arb_gds_polygon, arb_gds_text, arb_integer_point, arb_structure_name,
+    arb_gds_box, arb_gds_node, arb_gds_path, arb_gds_polygon, arb_gds_text, arb_integer_point,
+    arb_structure_name,
 };
 use crate::*;
 
@@ -62,12 +63,22 @@ fn box_roundtrip(_seed: u8) -> bool {
 }
 
 #[quickcheck]
+fn node_roundtrip(_seed: u8) -> bool {
+    let mut g = Gen::new(30);
+    let node = arb_gds_node(&mut g);
+    let library = make_library("cell", vec![node.into()]);
+    assert_roundtrip(&library);
+    true
+}
+
+#[quickcheck]
 fn mixed_elements_roundtrip(_seed: u8) -> bool {
     let mut g = Gen::new(30);
     let elements: Vec<Element> = vec![
         arb_gds_polygon(&mut g).into(),
         arb_gds_path(&mut g).into(),
         arb_gds_box(&mut g).into(),
+        arb_gds_node(&mut g).into(),
         arb_gds_text(&mut g).into(),
     ];
     let library = make_library("cell", elements);

@@ -504,6 +504,56 @@ impl Drawable for gdsr::GdsBox {
     }
 }
 
+impl Drawable for gdsr::Node {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
+        vec![(self.layer(), self.node_type())]
+    }
+
+    fn world_bbox(&self) -> Option<WorldBBox> {
+        let (min_pt, max_pt) = self.bounding_box();
+        Some(WorldBBox::new(
+            min_pt.x().absolute_value(),
+            min_pt.y().absolute_value(),
+            max_pt.x().absolute_value(),
+            max_pt.y().absolute_value(),
+        ))
+    }
+
+    fn draw(&self, ctx: &mut DrawContext) {
+        let key = (self.layer(), self.node_type());
+        if ctx.layer_state.hidden_layers.contains(&key) {
+            return;
+        }
+
+        let points = self.points();
+        if points.is_empty() {
+            return;
+        }
+
+        let Some(bbox) = self.world_bbox() else {
+            return;
+        };
+        if !bbox.overlaps(ctx.visible) {
+            return;
+        }
+
+        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
+        let marker_size = 3.0_f32;
+
+        for point in points {
+            let screen = ctx.viewport.world_to_screen(
+                point.x().absolute_value(),
+                point.y().absolute_value(),
+                ctx.rect,
+            );
+            if ctx.rect.contains(screen) {
+                let rect = Rect::from_center_size(screen, egui::Vec2::splat(marker_size * 2.0));
+                ctx.rect_filled(rect, 0.0, color);
+            }
+        }
+    }
+}
+
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self.instance().as_element() {
@@ -549,6 +599,11 @@ impl Drawable for gdsr::Reference {
                             el.draw(ctx);
                         }
                     }
+                    for node in cell.nodes() {
+                        for el in self.get_elements_in_grid(&Element::Node(node.clone())) {
+                            el.draw(ctx);
+                        }
+                    }
                     for text in cell.texts() {
                         for el in self.get_elements_in_grid(&Element::Text(text.clone())) {
                             el.draw(ctx);
@@ -571,6 +626,7 @@ impl Drawable for Element {
         match self {
             Self::Polygon(p) => p.layer_keys(),
             Self::Box(b) => b.layer_keys(),
+            Self::Node(n) => n.layer_keys(),
             Self::Path(p) => p.layer_keys(),
             Self::Text(t) => t.layer_keys(),
             Self::Reference(r) => r.layer_keys(),
@@ -581,6 +637,7 @@ impl Drawable for Element {
         match self {
             Self::Polygon(p) => p.world_bbox(),
             Self::Box(b) => b.world_bbox(),
+            Self::Node(n) => n.world_bbox(),
             Self::Path(p) => p.world_bbox(),
             Self::Text(t) => t.world_bbox(),
             Self::Reference(r) => r.world_bbox(),
@@ -591,6 +648,7 @@ impl Drawable for Element {
         match self {
             Self::Polygon(p) => p.draw(ctx),
             Self::Box(b) => b.draw(ctx),
+            Self::Node(n) => n.draw(ctx),
             Self::Path(p) => p.draw(ctx),
             Self::Text(t) => t.draw(ctx),
             Self::Reference(r) => r.draw(ctx),

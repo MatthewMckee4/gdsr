@@ -9,7 +9,7 @@ use crate::config::gds_file_types::{
     GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type,
 };
 use crate::elements::text::get_presentations_from_value;
-use crate::elements::{GdsBox, Path, PathType, Polygon, Reference, Text};
+use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
@@ -303,6 +303,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
     let mut path: Option<Path> = None;
     let mut polygon: Option<Polygon> = None;
     let mut gds_box: Option<GdsBox> = None;
+    let mut node: Option<Node> = None;
     let mut text: Option<Text> = None;
     let mut reference: Option<Reference> = None;
 
@@ -348,6 +349,9 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 GDSRecord::Box => {
                     gds_box = Some(GdsBox::default());
                 }
+                GDSRecord::Node => {
+                    node = Some(Node::default());
+                }
                 GDSRecord::Path => {
                     path = Some(Path::default());
                 }
@@ -364,6 +368,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                             polygon.layer = layer_value;
                         } else if let Some(gds_box) = &mut gds_box {
                             gds_box.layer = layer_value;
+                        } else if let Some(node) = &mut node {
+                            node.layer = layer_value;
                         } else if let Some(path) = &mut path {
                             path.layer = layer_value;
                         } else if let Some(text) = &mut text {
@@ -385,6 +391,13 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                     if let GDSRecordData::I16(data_type) = data {
                         if let Some(gds_box) = &mut gds_box {
                             gds_box.box_type = DataType::new(data_type[0] as u16);
+                        }
+                    }
+                }
+                GDSRecord::NodeType => {
+                    if let GDSRecordData::I16(data_type) = data {
+                        if let Some(node) = &mut node {
+                            node.node_type = DataType::new(data_type[0] as u16);
                         }
                     }
                 }
@@ -416,6 +429,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                             let (min, max) = crate::geometry::bounding_box(&points);
                             gds_box.bottom_left = min;
                             gds_box.top_right = max;
+                        } else if let Some(node) = &mut node {
+                            node.points = points;
                         } else if let Some(path) = &mut path {
                             path.points = points;
                         } else if let Some(reference) = &mut reference {
@@ -467,6 +482,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                             cell.add(polygon);
                         } else if let Some(gds_box) = gds_box.take() {
                             cell.add(gds_box);
+                        } else if let Some(node) = node.take() {
+                            cell.add(node);
                         } else if let Some(path) = path.take() {
                             cell.add(path);
                         } else if let Some(reference) = reference.take() {
@@ -477,6 +494,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                     }
                     polygon = None;
                     gds_box = None;
+                    node = None;
                     path = None;
                     text = None;
                     reference = None;
