@@ -26,6 +26,7 @@ pub struct ViewerApp {
     viewport: Viewport,
     mouse_world_pos: Option<(f64, f64)>,
     render_cache: RenderCache,
+    hovered_element: Option<usize>,
 }
 
 impl ViewerApp {
@@ -272,6 +273,7 @@ impl eframe::App for ViewerApp {
         let layer_state = &mut self.layer_state;
         let mouse_world_pos = &mut self.mouse_world_pos;
         let render_cache = &mut self.render_cache;
+        let hovered_element = &mut self.hovered_element;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -294,7 +296,27 @@ impl eframe::App for ViewerApp {
                 library,
                 render_cache,
                 tessellation_cache,
+                *hovered_element,
             );
+
+            let prev_hovered = *hovered_element;
+            *hovered_element = None;
+            if let Some((wx, wy)) = *mouse_world_pos {
+                if let Some(grid) = spatial_grid {
+                    let candidates = grid.query_point(wx, wy);
+                    for &idx in candidates.iter().rev() {
+                        if let Some(el) = elements.get(idx as usize) {
+                            if el.hit_test(wx, wy, viewport.zoom) {
+                                *hovered_element = Some(idx as usize);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if *hovered_element != prev_hovered {
+                ctx.request_repaint();
+            }
         });
     }
 }

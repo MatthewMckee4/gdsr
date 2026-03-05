@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use egui::epaint;
-use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
+use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
 use gdsr::{DataType, Dimensions, Element, Layer, Library};
 
 use crate::state::LayerState;
@@ -154,6 +154,43 @@ pub(crate) fn stroke_polyline_to_mesh(points: &[Pos2], stroke: Stroke, closed: b
     mesh
 }
 
+/// Tests whether the point `(px, py)` lies inside the polygon defined by `verts`
+/// using the ray-casting algorithm.
+fn point_in_polygon(px: f64, py: f64, verts: &[(f64, f64)]) -> bool {
+    let n = verts.len();
+    if n < 3 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let (xi, yi) = verts[i];
+        let (xj, yj) = verts[j];
+        if ((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+/// Returns the squared distance from point `(px, py)` to the line segment `(ax, ay)-(bx, by)`.
+fn point_to_segment_dist_sq(px: f64, py: f64, ax: f64, ay: f64, bx: f64, by: f64) -> f64 {
+    let dx = bx - ax;
+    let dy = by - ay;
+    let len_sq = dx * dx + dy * dy;
+    if len_sq < 1e-30 {
+        let ex = px - ax;
+        let ey = py - ay;
+        return ex * ex + ey * ey;
+    }
+    let t = ((px - ax) * dx + (py - ay) * dy) / len_sq;
+    let t = t.clamp(0.0, 1.0);
+    let cx = ax + t * dx - px;
+    let cy = ay + t * dy - py;
+    cx * cx + cy * cy
+}
+
 /// Trait for viewer-drawable elements. Provides layer info, bounding box, and drawing.
 pub trait Drawable {
     /// Returns all `(layer, data_type)` pairs this element contributes to.
@@ -164,6 +201,10 @@ pub trait Drawable {
 
     /// Draws this element onto the painter, resolving its own color and visibility.
     fn draw(&self, ctx: &mut DrawContext);
+
+    /// Returns `true` if the world-space point `(wx, wy)` hits this element.
+    /// `zoom` is pixels-per-world-unit, used for screen-pixel tolerances.
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool;
 }
 
 /// Screen-pixel threshold below which polygons render as a filled bounding box.
@@ -182,6 +223,23 @@ impl Drawable for gdsr::Polygon {
             max_pt.x().absolute_value(),
             max_pt.y().absolute_value(),
         ))
+    }
+
+    fn hit_test(&self, wx: f64, wy: f64, _zoom: f64) -> bool {
+        if let Some(bbox) = self.world_bbox() {
+            if wx < bbox.min_x || wx > bbox.max_x || wy < bbox.min_y || wy > bbox.max_y {
+                return false;
+            }
+        }
+        let pts = self.points();
+        let mut verts: Vec<(f64, f64)> = pts
+            .iter()
+            .map(|p| (p.x().absolute_value(), p.y().absolute_value()))
+            .collect();
+        if verts.len() >= 2 && verts.first() == verts.last() {
+            verts.pop();
+        }
+        point_in_polygon(wx, wy, &verts)
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
@@ -294,6 +352,28 @@ impl Drawable for gdsr::Path {
         ))
     }
 
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        let pts = self.points();
+        if pts.len() < 2 {
+            return false;
+        }
+        let half_width = self
+            .width()
+            .map(|w| w.absolute_value() / 2.0)
+            .unwrap_or(0.0);
+        let min_tolerance = 3.0 / zoom;
+        let tolerance = half_width.max(min_tolerance);
+        let tol_sq = tolerance * tolerance;
+        for pair in pts.windows(2) {
+            let (ax, ay) = (pair[0].x().absolute_value(), pair[0].y().absolute_value());
+            let (bx, by) = (pair[1].x().absolute_value(), pair[1].y().absolute_value());
+            if point_to_segment_dist_sq(wx, wy, ax, ay, bx, by) <= tol_sq {
+                return true;
+            }
+        }
+        false
+    }
+
     fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), self.data_type());
         if ctx.layer_state.hidden_layers.contains(&key) {
@@ -363,6 +443,16 @@ impl Drawable for gdsr::Text {
         Some(WorldBBox::new(x, y, x, y))
     }
 
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        let origin = self.origin();
+        let ox = origin.x().absolute_value();
+        let oy = origin.y().absolute_value();
+        let radius = 5.0 / zoom;
+        let dx = wx - ox;
+        let dy = wy - oy;
+        dx * dx + dy * dy <= radius * radius
+    }
+
     fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), DataType::new(0));
         if ctx.layer_state.hidden_layers.contains(&key) {
@@ -410,6 +500,14 @@ impl Drawable for gdsr::GdsBox {
             max_pt.x().absolute_value(),
             max_pt.y().absolute_value(),
         ))
+    }
+
+    fn hit_test(&self, wx: f64, wy: f64, _zoom: f64) -> bool {
+        if let Some(bbox) = self.world_bbox() {
+            wx >= bbox.min_x && wx <= bbox.max_x && wy >= bbox.min_y && wy <= bbox.max_y
+        } else {
+            false
+        }
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
@@ -519,6 +617,19 @@ impl Drawable for gdsr::Node {
         ))
     }
 
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        let radius = 3.0 / zoom;
+        let r_sq = radius * radius;
+        for p in self.points() {
+            let dx = wx - p.x().absolute_value();
+            let dy = wy - p.y().absolute_value();
+            if dx * dx + dy * dy <= r_sq {
+                return true;
+            }
+        }
+        false
+    }
+
     fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), self.node_type());
         if ctx.layer_state.hidden_layers.contains(&key) {
@@ -574,6 +685,17 @@ impl Drawable for gdsr::Reference {
             }
         }
         result
+    }
+
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        if let Some(element) = self.instance().as_element() {
+            for el in self.get_elements_in_grid(element) {
+                if el.hit_test(wx, wy, zoom) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
@@ -644,6 +766,17 @@ impl Drawable for Element {
         }
     }
 
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        match self {
+            Self::Polygon(p) => p.hit_test(wx, wy, zoom),
+            Self::Box(b) => b.hit_test(wx, wy, zoom),
+            Self::Node(n) => n.hit_test(wx, wy, zoom),
+            Self::Path(p) => p.hit_test(wx, wy, zoom),
+            Self::Text(t) => t.hit_test(wx, wy, zoom),
+            Self::Reference(r) => r.hit_test(wx, wy, zoom),
+        }
+    }
+
     fn draw(&self, ctx: &mut DrawContext) {
         match self {
             Self::Polygon(p) => p.draw(ctx),
@@ -653,5 +786,230 @@ impl Drawable for Element {
             Self::Text(t) => t.draw(ctx),
             Self::Reference(r) => r.draw(ctx),
         }
+    }
+}
+
+const HIGHLIGHT_COLOR: Color32 = Color32::from_rgb(255, 255, 100);
+const HIGHLIGHT_WIDTH: f32 = 2.0;
+
+/// Draws a highlight overlay for the given element using the painter directly (not cached).
+pub fn draw_highlight(
+    element: &Element,
+    viewport: &crate::viewport::Viewport,
+    painter: &egui::Painter,
+    rect: Rect,
+) {
+    let stroke = Stroke::new(HIGHLIGHT_WIDTH, HIGHLIGHT_COLOR);
+    match element {
+        Element::Polygon(p) => {
+            let pts = p.points();
+            if pts.len() < 3 {
+                return;
+            }
+            let screen: Vec<Pos2> = pts
+                .iter()
+                .map(|pt| {
+                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
+                })
+                .collect();
+            let mut open = screen;
+            if open.len() >= 2 && open.first() == open.last() {
+                open.pop();
+            }
+            let mesh = stroke_polyline_to_mesh(&open, stroke, true);
+            painter.add(Shape::mesh(mesh));
+        }
+        Element::Box(b) => {
+            let pts = b.points();
+            let screen: Vec<Pos2> = pts
+                .iter()
+                .map(|pt| {
+                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
+                })
+                .collect();
+            let mut open = screen;
+            if open.len() >= 2 && open.first() == open.last() {
+                open.pop();
+            }
+            let mesh = stroke_polyline_to_mesh(&open, stroke, true);
+            painter.add(Shape::mesh(mesh));
+        }
+        Element::Path(p) => {
+            let pts = p.points();
+            if pts.len() < 2 {
+                return;
+            }
+            let screen: Vec<Pos2> = pts
+                .iter()
+                .map(|pt| {
+                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
+                })
+                .collect();
+            let width_px = p
+                .width()
+                .map(|w| (w.absolute_value() * viewport.zoom) as f32)
+                .unwrap_or(1.0)
+                .clamp(1.0, 20.0);
+            let mesh = stroke_polyline_to_mesh(
+                &screen,
+                Stroke::new(width_px + 2.0, HIGHLIGHT_COLOR),
+                false,
+            );
+            painter.add(Shape::mesh(mesh));
+        }
+        Element::Text(t) => {
+            let origin = t.origin();
+            let screen = viewport.world_to_screen(
+                origin.x().absolute_value(),
+                origin.y().absolute_value(),
+                rect,
+            );
+            let marker_rect = Rect::from_center_size(screen, Vec2::splat(10.0));
+            painter.add(Shape::from(epaint::RectShape::stroke(
+                marker_rect,
+                2.0,
+                stroke,
+                StrokeKind::Outside,
+            )));
+        }
+        Element::Node(n) => {
+            for pt in n.points() {
+                let screen = viewport.world_to_screen(
+                    pt.x().absolute_value(),
+                    pt.y().absolute_value(),
+                    rect,
+                );
+                let marker_rect = Rect::from_center_size(screen, Vec2::splat(10.0));
+                painter.add(Shape::from(epaint::RectShape::stroke(
+                    marker_rect,
+                    2.0,
+                    stroke,
+                    StrokeKind::Outside,
+                )));
+            }
+        }
+        Element::Reference(r) => {
+            if let Some(bbox) = r.world_bbox() {
+                let s_min = viewport.world_to_screen(bbox.min_x, bbox.min_y, rect);
+                let s_max = viewport.world_to_screen(bbox.max_x, bbox.max_y, rect);
+                let highlight_rect = Rect::from_two_pos(s_min, s_max);
+                painter.add(Shape::from(epaint::RectShape::stroke(
+                    highlight_rect,
+                    0.0,
+                    stroke,
+                    StrokeKind::Outside,
+                )));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::helpers::*;
+
+    const SCALE: f64 = 1e-9;
+    const ZOOM: f64 = 1e9;
+
+    #[test]
+    fn polygon_hit_inside() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn polygon_hit_outside() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(!el.hit_test(200.0 * SCALE, 200.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn path_hit_on_segment() {
+        let el = path(vec![(0, 0), (100, 0)], 1, 0, Some(10));
+        assert!(el.hit_test(50.0 * SCALE, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn path_hit_far_from_segment() {
+        let el = path(vec![(0, 0), (100, 0)], 1, 0, Some(10));
+        assert!(!el.hit_test(50.0 * SCALE, 100.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn text_hit_near_origin() {
+        let el = text("hello", 500, 600, 1);
+        assert!(el.hit_test(500.0 * SCALE, 600.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn text_hit_far_from_origin() {
+        let el = text("hello", 500, 600, 1);
+        assert!(!el.hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn gds_box_hit_inside() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(100, 100),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Box(b);
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn gds_box_hit_outside() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(100, 100),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Box(b);
+        assert!(!el.hit_test(200.0 * SCALE, 200.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn node_hit_near_point() {
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(50, 50)],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Node(n);
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn node_hit_far_from_point() {
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(50, 50)],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Node(n);
+        assert!(!el.hit_test(500.0 * SCALE, 500.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn point_in_polygon_triangle() {
+        let tri = [(0.0, 0.0), (10.0, 0.0), (5.0, 10.0)];
+        assert!(point_in_polygon(5.0, 3.0, &tri));
+        assert!(!point_in_polygon(20.0, 20.0, &tri));
+    }
+
+    #[test]
+    fn point_to_segment_dist_on_segment() {
+        let d = point_to_segment_dist_sq(5.0, 0.0, 0.0, 0.0, 10.0, 0.0);
+        assert!(d < 1e-20);
+    }
+
+    #[test]
+    fn point_to_segment_dist_perpendicular() {
+        let d = point_to_segment_dist_sq(5.0, 3.0, 0.0, 0.0, 10.0, 0.0);
+        assert!((d - 9.0).abs() < 1e-10);
     }
 }
