@@ -289,7 +289,14 @@ mod tests {
         cell.add(Reference::new("missing_cell".to_string()));
         library.add_cell(cell);
 
-        insta::assert_debug_snapshot!(library.dangling_cell_references());
+        insta::assert_debug_snapshot!(library.dangling_cell_references(), @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "missing_cell",
+            },
+        ]
+        "#);
     }
 
     #[test]
@@ -309,7 +316,22 @@ mod tests {
         dangling
             .sort_by(|a, b| (&a.cell_name, &a.target_name).cmp(&(&b.cell_name, &b.target_name)));
 
-        insta::assert_debug_snapshot!(dangling);
+        insta::assert_debug_snapshot!(dangling, @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "ghost1",
+            },
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "ghost2",
+            },
+            DanglingCellReference {
+                cell_name: "cell_b",
+                target_name: "ghost3",
+            },
+        ]
+        "#);
     }
 
     #[test]
@@ -341,6 +363,13 @@ mod tests {
         cell.add(Reference::new(inner_ref));
         library.add_cell(cell);
 
-        insta::assert_debug_snapshot!(library.dangling_cell_references());
+        insta::assert_debug_snapshot!(library.dangling_cell_references(), @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "missing_cell",
+            },
+        ]
+        "#);
     }
 }
