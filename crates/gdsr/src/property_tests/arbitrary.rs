@@ -164,6 +164,25 @@ impl Arbitrary for Transformation {
     }
 }
 
+impl Arbitrary for GdsBox {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
+        let units = units_options[usize::arbitrary(g) % units_options.len()];
+        let x1 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let y1 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let x2 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let y2 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let layer = Layer::new(u16::arbitrary(g));
+        let box_type = DataType::new(u16::arbitrary(g));
+        Self::new(
+            Point::integer(x1, y1, units),
+            Point::integer(x2, y2, units),
+            layer,
+            box_type,
+        )
+    }
+}
+
 impl Arbitrary for Polygon {
     fn arbitrary(g: &mut Gen) -> Self {
         let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
@@ -176,8 +195,8 @@ impl Arbitrary for Polygon {
                 Point::integer(x, y, units)
             })
             .collect();
-        let layer = u16::arbitrary(g);
-        let data_type = u16::arbitrary(g);
+        let layer = Layer::new(u16::arbitrary(g));
+        let data_type = DataType::new(u16::arbitrary(g));
         Self::new(points, layer, data_type)
     }
 }
@@ -201,8 +220,8 @@ impl Arbitrary for Path {
                 Point::integer(x, y, units)
             })
             .collect();
-        let layer = u16::arbitrary(g);
-        let data_type = u16::arbitrary(g);
+        let layer = Layer::new(u16::arbitrary(g));
+        let data_type = DataType::new(u16::arbitrary(g));
         let path_type = if bool::arbitrary(g) {
             Some(PathType::arbitrary(g))
         } else {
@@ -214,7 +233,27 @@ impl Arbitrary for Path {
         } else {
             None
         };
-        Self::new(points, layer, data_type, path_type, width)
+        let begin_extension = if bool::arbitrary(g) {
+            let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+            Some(Unit::integer(e, units))
+        } else {
+            None
+        };
+        let end_extension = if bool::arbitrary(g) {
+            let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+            Some(Unit::integer(e, units))
+        } else {
+            None
+        };
+        Self::new(
+            points,
+            layer,
+            data_type,
+            path_type,
+            width,
+            begin_extension,
+            end_extension,
+        )
     }
 }
 
@@ -229,8 +268,8 @@ impl Arbitrary for Text {
         let value: String = (0..len)
             .map(|_| (b'a' + (u8::arbitrary(g) % 26)) as char)
             .collect();
-        let layer = u16::arbitrary(g) % 256;
-        let datatype = u16::arbitrary(g) % 256;
+        let layer = Layer::new(u16::arbitrary(g) % 256);
+        let datatype = DataType::new(u16::arbitrary(g) % 256);
         let vp_options = [
             HorizontalPresentation::Left,
             HorizontalPresentation::Centre,
@@ -278,12 +317,12 @@ impl Arbitrary for Grid {
 
 const GDS_NAME_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_$?";
 
-pub(super) fn arb_layer(g: &mut Gen) -> u16 {
-    u16::arbitrary(g) % 256
+pub(super) fn arb_layer(g: &mut Gen) -> Layer {
+    Layer::new(u16::arbitrary(g) % 256)
 }
 
-pub(super) fn arb_data_type(g: &mut Gen) -> u16 {
-    u16::arbitrary(g) % 256
+pub(super) fn arb_data_type(g: &mut Gen) -> DataType {
+    DataType::new(u16::arbitrary(g) % 256)
 }
 
 pub(super) fn arb_structure_name(g: &mut Gen) -> String {
@@ -306,6 +345,15 @@ pub(super) fn arb_integer_point(g: &mut Gen) -> Point {
     Point::integer(x, y, 1e-9)
 }
 
+pub(super) fn arb_gds_box(g: &mut Gen) -> GdsBox {
+    GdsBox::new(
+        arb_integer_point(g),
+        arb_integer_point(g),
+        arb_layer(g),
+        arb_data_type(g),
+    )
+}
+
 pub(super) fn arb_gds_polygon(g: &mut Gen) -> Polygon {
     let num_vertices = 3 + (usize::arbitrary(g) % 48);
     let points: Vec<Point> = (0..num_vertices).map(|_| arb_integer_point(g)).collect();
@@ -326,7 +374,27 @@ pub(super) fn arb_gds_path(g: &mut Gen) -> Path {
     } else {
         None
     };
-    Path::new(points, arb_layer(g), arb_data_type(g), path_type, width)
+    let begin_extension = if bool::arbitrary(g) {
+        let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+        Some(Unit::integer(e, 1e-9))
+    } else {
+        None
+    };
+    let end_extension = if bool::arbitrary(g) {
+        let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+        Some(Unit::integer(e, 1e-9))
+    } else {
+        None
+    };
+    Path::new(
+        points,
+        arb_layer(g),
+        arb_data_type(g),
+        path_type,
+        width,
+        begin_extension,
+        end_extension,
+    )
 }
 
 /// GDS `TextType` is always written as 0, so we use 0 here for roundtrip compatibility.
@@ -347,7 +415,7 @@ pub(super) fn arb_gds_text(g: &mut Gen) -> Text {
         &value,
         origin,
         arb_layer(g),
-        0,
+        DataType::new(0),
         1.0,
         0.0,
         false,

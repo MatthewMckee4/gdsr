@@ -3,6 +3,7 @@
 - ALWAYS test UI changes by testing the underlying pure logic (coordinate transforms, state management, data processing) rather than rendering. Extract testable logic from UI code.
 - PREFER property tests, e.g., at `src/property_tests/...` over unit tests.
 - ALWAYS use snapshot tests when running a command in integration tests.
+- STRONGLY PREFER inline snapshot tests (`insta::assert_debug_snapshot!(value, @"...")`, `insta::assert_snapshot!(value, @"...")`) over chains of individual `assert_eq!` calls. Only use external snapshot files (without `@`) when the output is very large. Inline snapshots keep expected values visible in the test.
 - PREFER running specific tests over running the entire test suite
 - ALWAYS run `cargo nextest run` to run all tests.
 - ALWAYS run `uvx prek run -a` at the end of a task.

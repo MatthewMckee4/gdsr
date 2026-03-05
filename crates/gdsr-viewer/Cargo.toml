@@ -13,10 +13,15 @@ clap = { version = "4.5.55", features = ["derive"] }
 earcutr = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
+emath = { workspace = true }
 env_logger = { workspace = true }
 gdsr = { workspace = true }
 log = { workspace = true }
 rfd = { workspace = true }
+
+[dev-dependencies]
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 
 [lints]
 workspace = true

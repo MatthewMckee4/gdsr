@@ -4,6 +4,15 @@ use crate::cell::Cell;
 use crate::error::GdsError;
 use crate::utils::io::{from_gds, write_gds};
 
+/// A dangling reference: a cell contains a reference to a target that doesn't exist.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DanglingCellReference {
+    /// The cell containing the dangling reference.
+    pub cell_name: String,
+    /// The name of the missing target cell.
+    pub target_name: String,
+}
+
 /// A GDSII library containing named cells. This is the top-level container for a GDSII design.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Library {
@@ -76,6 +85,26 @@ impl Library {
         write_gds(file_name, &self.name, user_units, database_units, &cells)
     }
 
+    /// Returns all dangling cell references in the library.
+    ///
+    /// A dangling cell reference is a `Reference` whose resolved cell name
+    /// (via [`Reference::referenced_cell_name`]) does not match any cell in the library.
+    /// This recursively resolves through inline element wrappers.
+    pub fn dangling_cell_references(&self) -> Vec<DanglingCellReference> {
+        let mut dangling = Vec::new();
+        for (cell_name, cell) in &self.cells {
+            for target in cell.referenced_cell_names() {
+                if !self.cells.contains_key(target) {
+                    dangling.push(DanglingCellReference {
+                        cell_name: cell_name.clone(),
+                        target_name: target.to_string(),
+                    });
+                }
+            }
+        }
+        dangling
+    }
+
     /// Read a library from a GDS file.
     ///
     /// The given units are not required they are used to normalize the database units
@@ -98,6 +127,9 @@ impl std::fmt::Display for Library {
 
 #[cfg(test)]
 mod tests {
+    use crate::elements::{Polygon, Reference};
+    use crate::{DataType, Layer, Point};
+
     use super::*;
 
     #[test]
@@ -223,5 +255,121 @@ mod tests {
     fn test_library_debug() {
         let library: Library = Library::new("debug_lib");
         insta::assert_snapshot!(format!("{library:?}"), @r#"Library { name: "debug_lib", cells: {} }"#);
+    }
+
+    #[test]
+    fn test_dangling_cell_references_none() {
+        let units = 1e-9;
+        let mut library = Library::new("lib");
+
+        let mut base = Cell::new("base");
+        base.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+        library.add_cell(base);
+
+        let mut top = Cell::new("top");
+        top.add(Reference::new("base".to_string()));
+        library.add_cell(top);
+
+        assert!(library.dangling_cell_references().is_empty());
+    }
+
+    #[test]
+    fn test_dangling_cell_references_detected() {
+        let mut library = Library::new("lib");
+
+        let mut cell = Cell::new("cell_a");
+        cell.add(Reference::new("missing_cell".to_string()));
+        library.add_cell(cell);
+
+        insta::assert_debug_snapshot!(library.dangling_cell_references(), @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "missing_cell",
+            },
+        ]
+        "#);
+    }
+
+    #[test]
+    fn test_dangling_cell_references_multiple() {
+        let mut library = Library::new("lib");
+
+        let mut cell_a = Cell::new("cell_a");
+        cell_a.add(Reference::new("ghost1".to_string()));
+        cell_a.add(Reference::new("ghost2".to_string()));
+        library.add_cell(cell_a);
+
+        let mut cell_b = Cell::new("cell_b");
+        cell_b.add(Reference::new("ghost3".to_string()));
+        library.add_cell(cell_b);
+
+        let mut dangling = library.dangling_cell_references();
+        dangling
+            .sort_by(|a, b| (&a.cell_name, &a.target_name).cmp(&(&b.cell_name, &b.target_name)));
+
+        insta::assert_debug_snapshot!(dangling, @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "ghost1",
+            },
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "ghost2",
+            },
+            DanglingCellReference {
+                cell_name: "cell_b",
+                target_name: "ghost3",
+            },
+        ]
+        "#);
+    }
+
+    #[test]
+    fn test_dangling_cell_references_inline_element() {
+        let units = 1e-9;
+        let mut library = Library::new("lib");
+
+        let mut cell = Cell::new("cell_a");
+        cell.add(Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        )));
+        library.add_cell(cell);
+
+        assert!(library.dangling_cell_references().is_empty());
+    }
+
+    #[test]
+    fn test_dangling_cell_references_nested_inline_element() {
+        let mut library = Library::new("lib");
+
+        let mut cell = Cell::new("cell_a");
+        let inner_ref = Reference::new("missing_cell".to_string());
+        cell.add(Reference::new(inner_ref));
+        library.add_cell(cell);
+
+        insta::assert_debug_snapshot!(library.dangling_cell_references(), @r#"
+        [
+            DanglingCellReference {
+                cell_name: "cell_a",
+                target_name: "missing_cell",
+            },
+        ]
+        "#);
     }
 }

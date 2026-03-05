@@ -100,6 +100,21 @@ impl Reference {
         &self.grid
     }
 
+    /// Returns the name of the referenced cell, recursively resolving through inline element
+    /// wrappers. Returns `None` if the reference chain ends at a non-reference element.
+    pub fn referenced_cell_name(&self) -> Option<&str> {
+        match &self.instance {
+            Instance::Cell(name) => Some(name),
+            Instance::Element(element) => {
+                if let Element::Reference(inner) = element.as_ref().as_ref() {
+                    inner.referenced_cell_name()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Sets the grid layout and returns the modified reference.
     #[must_use]
     pub const fn with_grid(mut self, grid: Grid) -> Self {
@@ -220,7 +235,7 @@ impl Reference {
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                Element::Path(_) | Element::Polygon(_) | Element::Box(_) | Element::Text(_) => {
                     self.send_elements_in_grid(element, tx)?;
                 }
                 Element::Reference(reference) => {
@@ -254,7 +269,7 @@ impl Reference {
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                Element::Path(_) | Element::Polygon(_) | Element::Box(_) | Element::Text(_) => {
                     elements.extend(self.get_elements_in_grid(element));
                 }
 
@@ -424,6 +439,7 @@ impl Reference {
 mod tests {
     use super::*;
     use crate::elements::Polygon;
+    use crate::{DataType, Layer};
 
     mod instance {
         use super::*;
@@ -449,8 +465,8 @@ mod tests {
                     Point::integer(10, 0, 1e-9),
                     Point::integer(10, 10, 1e-9),
                 ],
-                1,
-                0,
+                Layer::new(1),
+                DataType::new(0),
             );
             assert!(Instance::from(polygon).as_element().is_some());
         }
@@ -478,8 +494,10 @@ mod tests {
         fn test_instance_from_path() {
             let path = Path::new(
                 vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)],
-                1,
-                0,
+                Layer::new(1),
+                DataType::new(0),
+                None,
+                None,
                 None,
                 None,
             );
@@ -496,8 +514,8 @@ mod tests {
             let text = Text::new(
                 "test",
                 Point::integer(0, 0, 1e-9),
-                1,
-                0,
+                Layer::new(1),
+                DataType::new(0),
                 1.0,
                 0.0,
                 false,
@@ -526,8 +544,8 @@ mod tests {
                     Point::integer(10, 0, 1e-9),
                     Point::integer(10, 10, 1e-9),
                 ],
-                1,
-                0,
+                Layer::new(1),
+                DataType::new(0),
             );
             let instance = Instance::from(polygon);
             insta::assert_snapshot!(instance.to_string(), @"Element instance: Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 1, data type 0");
@@ -542,8 +560,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -562,6 +580,34 @@ mod tests {
         let reference = Reference::default();
         assert_eq!(reference.grid().columns(), 1);
         assert_eq!(reference.grid().rows(), 1);
+    }
+
+    #[test]
+    fn test_referenced_cell_name_direct() {
+        let reference = Reference::new("target_cell");
+        insta::assert_snapshot!(reference.referenced_cell_name().unwrap(), @"target_cell");
+    }
+
+    #[test]
+    fn test_referenced_cell_name_inline_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let reference = Reference::new(polygon);
+        assert!(reference.referenced_cell_name().is_none());
+    }
+
+    #[test]
+    fn test_referenced_cell_name_nested() {
+        let inner = Reference::new("deep_cell");
+        let outer = Reference::new(inner);
+        insta::assert_snapshot!(outer.referenced_cell_name().unwrap(), @"deep_cell");
     }
 
     #[test]
@@ -584,8 +630,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let reference = Reference::new(polygon.clone());
@@ -620,8 +666,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_origin(Point::float(1.5, 2.5, 1e-6))
@@ -648,8 +694,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_origin(Point::integer(10, 20, 1e-9))
@@ -677,8 +723,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -703,8 +749,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -727,8 +773,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(3)
@@ -752,8 +798,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -778,8 +824,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -806,8 +852,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -831,8 +877,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -858,8 +904,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let mut cell = crate::Cell::new("test_cell");
@@ -886,8 +932,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(1)
@@ -913,8 +959,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(1)
@@ -943,8 +989,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(5)
@@ -973,8 +1019,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default().with_columns(3).with_rows(3);
 
@@ -998,8 +1044,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(3)
@@ -1027,8 +1073,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(3)
@@ -1057,8 +1103,8 @@ mod tests {
                 Point::integer(1, 0, 1e-9),
                 Point::integer(1, 1, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(10)
@@ -1138,8 +1184,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let mut inner_cell = crate::Cell::new("inner");
@@ -1172,8 +1218,8 @@ mod tests {
                 Point::integer(5, 0, 1e-9),
                 Point::integer(5, 5, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let mut cell_a = crate::Cell::new("a");
@@ -1219,8 +1265,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(0)
@@ -1244,8 +1290,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(3)
@@ -1270,8 +1316,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(0)
@@ -1295,8 +1341,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let mut cell = crate::Cell::new("test_cell");
@@ -1334,8 +1380,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = Grid::default()
             .with_columns(2)
@@ -1367,8 +1413,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let mut cell = crate::Cell::new("test_cell");

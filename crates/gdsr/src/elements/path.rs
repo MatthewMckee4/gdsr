@@ -43,16 +43,20 @@ pub struct Path {
     pub(crate) data_type: DataType,
     pub(crate) r#type: Option<PathType>,
     pub(crate) width: Option<Unit>,
+    pub(crate) begin_extension: Option<Unit>,
+    pub(crate) end_extension: Option<Unit>,
 }
 
 impl Path {
-    /// Creates a new path from the given points, layer, data type, optional end cap type, and optional width.
+    /// Creates a new path from the given points, layer, data type, optional end cap type, optional width, and optional extensions.
     pub fn new(
         points: impl IntoIterator<Item = Point>,
         layer: Layer,
         data_type: DataType,
         path_type: Option<PathType>,
         width: Option<Unit>,
+        begin_extension: Option<Unit>,
+        end_extension: Option<Unit>,
     ) -> Self {
         Self {
             points: points.into_iter().collect(),
@@ -60,6 +64,8 @@ impl Path {
             data_type,
             r#type: path_type,
             width,
+            begin_extension,
+            end_extension,
         }
     }
 
@@ -88,22 +94,36 @@ impl Path {
         self.width
     }
 
-    /// Converts all points and width to integer units.
+    /// Returns the beginning extension distance, if set.
+    pub const fn begin_extension(&self) -> Option<Unit> {
+        self.begin_extension
+    }
+
+    /// Returns the end extension distance, if set.
+    pub const fn end_extension(&self) -> Option<Unit> {
+        self.end_extension
+    }
+
+    /// Converts all points, width, and extensions to integer units.
     #[must_use]
     pub fn to_integer_unit(self) -> Self {
         Self {
             points: self.points.iter().map(Point::to_integer_unit).collect(),
             width: self.width.map(Unit::to_integer_unit),
+            begin_extension: self.begin_extension.map(Unit::to_integer_unit),
+            end_extension: self.end_extension.map(Unit::to_integer_unit),
             ..self
         }
     }
 
-    /// Converts all points and width to float units.
+    /// Converts all points, width, and extensions to float units.
     #[must_use]
     pub fn to_float_unit(self) -> Self {
         Self {
             points: self.points.iter().map(Point::to_float_unit).collect(),
             width: self.width.map(Unit::to_float_unit),
+            begin_extension: self.begin_extension.map(Unit::to_float_unit),
+            end_extension: self.end_extension.map(Unit::to_float_unit),
             ..self
         }
     }
@@ -119,7 +139,14 @@ impl std::fmt::Display for Path {
             self.data_type(),
             self.path_type().unwrap_or_default(),
             self.width().unwrap_or_default()
-        )
+        )?;
+        if let Some(begin_ext) = self.begin_extension() {
+            write!(f, ", begin_extension {begin_ext}")?;
+        }
+        if let Some(end_ext) = self.end_extension() {
+            write!(f, ", end_extension {end_ext}")?;
+        }
+        Ok(())
     }
 }
 
@@ -169,10 +196,10 @@ impl ToGds for Path {
             combine_record_and_data_type(GDSRecord::Path, GDSDataType::NoData),
             6,
             combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
-            self.layer(),
+            self.layer().value(),
             6,
             combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
-            self.data_type(),
+            self.data_type().value(),
         ];
 
         write_u16_array_to_file(&mut buffer, &path_head)?;
@@ -206,6 +233,38 @@ impl ToGds for Path {
             let bytes = width_value.to_be_bytes();
 
             buffer.write_all(&bytes)?;
+        }
+
+        if let Some(begin_ext) = self.begin_extension() {
+            let scaled = begin_ext.scale_to(database_units);
+            let value = scaled.as_integer_unit().value as u32;
+            write_u16_array_to_file(
+                &mut buffer,
+                &[
+                    8,
+                    combine_record_and_data_type(
+                        GDSRecord::BgnExtn,
+                        GDSDataType::FourByteSignedInteger,
+                    ),
+                ],
+            )?;
+            buffer.write_all(&value.to_be_bytes())?;
+        }
+
+        if let Some(end_ext) = self.end_extension() {
+            let scaled = end_ext.scale_to(database_units);
+            let value = scaled.as_integer_unit().value as u32;
+            write_u16_array_to_file(
+                &mut buffer,
+                &[
+                    8,
+                    combine_record_and_data_type(
+                        GDSRecord::EndExtn,
+                        GDSDataType::FourByteSignedInteger,
+                    ),
+                ],
+            )?;
+            buffer.write_all(&value.to_be_bytes())?;
         }
 
         write_points_to_file(&mut buffer, self.points(), database_units)?;
@@ -279,17 +338,21 @@ mod tests {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
         let path = Path::new(
             points.clone(),
-            1,
-            2,
+            Layer::new(1),
+            DataType::new(2),
             Some(PathType::Round),
             Some(Unit::default_integer(10)),
+            Some(Unit::default_integer(5)),
+            Some(Unit::default_integer(15)),
         );
 
         assert_eq!(path.points(), &points);
-        assert_eq!(path.layer(), 1);
-        assert_eq!(path.data_type(), 2);
+        assert_eq!(path.layer(), Layer::new(1));
+        assert_eq!(path.data_type(), DataType::new(2));
         assert_eq!(path.path_type(), &Some(PathType::Round));
         assert_eq!(path.width(), Some(Unit::default_integer(10)));
+        assert_eq!(path.begin_extension(), Some(Unit::default_integer(5)));
+        assert_eq!(path.end_extension(), Some(Unit::default_integer(15)));
     }
 
     #[test]
@@ -297,10 +360,12 @@ mod tests {
         let path = Path::default();
 
         assert!(path.points().is_empty());
-        assert_eq!(path.layer(), 0);
-        assert_eq!(path.data_type(), 0);
+        assert_eq!(path.layer(), Layer::new(0));
+        assert_eq!(path.data_type(), DataType::new(0));
         assert_eq!(path.path_type(), &None);
         assert_eq!(path.width(), None);
+        assert_eq!(path.begin_extension(), None);
+        assert_eq!(path.end_extension(), None);
     }
 
     #[test]
@@ -308,10 +373,12 @@ mod tests {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
         let path = Path::new(
             points,
-            5,
-            10,
+            Layer::new(5),
+            DataType::new(10),
             Some(PathType::Square),
             Some(Unit::default_integer(20)),
+            None,
+            None,
         );
 
         insta::assert_snapshot!(path.to_string(), @"Path with 2 points on layer 5 with data type 10, Square and width 20 (1.000e-9)");
@@ -322,10 +389,12 @@ mod tests {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(10, 10, 1e-9)];
         let path1 = Path::new(
             points.clone(),
-            1,
-            2,
+            Layer::new(1),
+            DataType::new(2),
             Some(PathType::Round),
             Some(Unit::default_integer(5)),
+            None,
+            None,
         );
         let path2 = path1.clone();
 
@@ -333,10 +402,12 @@ mod tests {
 
         let path3 = Path::new(
             points,
-            1,
-            2,
+            Layer::new(1),
+            DataType::new(2),
             Some(PathType::Square),
             Some(Unit::default_integer(5)),
+            None,
+            None,
         );
         assert_ne!(path1, path3);
     }
@@ -346,10 +417,12 @@ mod tests {
         let points = vec![Point::float(1.5, 2.5, 1e-6), Point::float(10.0, 10.0, 1e-6)];
         let path = Path::new(
             points,
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
             Some(PathType::Round),
             Some(Unit::default_float(5.0)),
+            None,
+            None,
         );
         let converted = path.to_integer_unit();
 
@@ -365,7 +438,15 @@ mod tests {
     #[test]
     fn test_path_to_float_unit() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::integer(100, 100, 1e-9)];
-        let path = Path::new(points, 1, 0, None, Some(Unit::default_integer(10)));
+        let path = Path::new(
+            points,
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            Some(Unit::default_integer(10)),
+            None,
+            None,
+        );
         let converted = path.to_float_unit();
 
         for point in converted.points() {
@@ -380,7 +461,15 @@ mod tests {
     #[test]
     fn test_path_to_integer_unit_no_width() {
         let points = vec![Point::float(1.0, 2.0, 1e-6)];
-        let path = Path::new(points, 0, 0, None, None);
+        let path = Path::new(
+            points,
+            Layer::new(0),
+            DataType::new(0),
+            None,
+            None,
+            None,
+            None,
+        );
         let converted = path.to_integer_unit();
 
         assert_eq!(converted.width(), None);
@@ -389,7 +478,15 @@ mod tests {
     #[test]
     fn test_path_with_different_unit_points() {
         let points = vec![Point::integer(0, 0, 1e-9), Point::float(100.0, 100.0, 1e-6)];
-        let path = Path::new(points, 0, 0, None, None);
+        let path = Path::new(
+            points,
+            Layer::new(0),
+            DataType::new(0),
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(path.points().len(), 2);
     }
 
@@ -400,7 +497,15 @@ mod tests {
             Point::integer(10, 5, 1e-9),
             Point::integer(20, -3, 1e-9),
         ];
-        let path = Path::new(points, 1, 0, None, None);
+        let path = Path::new(
+            points,
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            None,
+            None,
+            None,
+        );
         let (min, max) = path.bounding_box();
         assert_eq!(min, Point::integer(0, -3, 1e-9));
         assert_eq!(max, Point::integer(20, 5, 1e-9));
@@ -417,7 +522,15 @@ mod tests {
     #[test]
     fn test_path_bounding_box_single_point() {
         let points = vec![Point::integer(5, 10, 1e-9)];
-        let path = Path::new(points, 1, 0, None, None);
+        let path = Path::new(
+            points,
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            None,
+            None,
+            None,
+        );
         let (min, max) = path.bounding_box();
         assert_eq!(min, Point::integer(5, 10, 1e-9));
         assert_eq!(max, Point::integer(5, 10, 1e-9));

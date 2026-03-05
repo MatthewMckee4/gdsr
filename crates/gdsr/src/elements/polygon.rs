@@ -107,14 +107,14 @@ impl std::fmt::Display for Polygon {
         if self.points().is_empty() {
             write!(
                 f,
-                "Polygon with 0 points on layer {:?}, data type {:?}",
+                "Polygon with 0 points on layer {}, data type {}",
                 self.layer(),
                 self.data_type()
             )
         } else {
             write!(
                 f,
-                "Polygon with {} point(s), starting at ({}, {}) on layer {:?}, data type {:?}",
+                "Polygon with {} point(s), starting at ({}, {}) on layer {}, data type {}",
                 self.points().len(),
                 self.points()[0].x(),
                 self.points()[0].y(),
@@ -184,10 +184,10 @@ impl ToGds for Polygon {
             combine_record_and_data_type(GDSRecord::Boundary, GDSDataType::NoData),
             6,
             combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
-            self.layer(),
+            self.layer().value(),
             6,
             combine_record_and_data_type(GDSRecord::DataType, GDSDataType::TwoByteSignedInteger),
-            self.data_type(),
+            self.data_type().value(),
         ];
 
         write_u16_array_to_file(&mut buffer, &polygon_head)?;
@@ -246,10 +246,10 @@ mod tests {
             Point::integer(10, 0, 1e-9),
             Point::integer(10, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
 
-        assert_eq!(polygon.layer(), 1);
-        assert_eq!(polygon.data_type(), 0);
+        assert_eq!(polygon.layer(), Layer::new(1));
+        assert_eq!(polygon.data_type(), DataType::new(0));
         // Should be closed automatically
         assert_eq!(polygon.points().len(), 4);
     }
@@ -258,8 +258,8 @@ mod tests {
     fn test_polygon_default() {
         let polygon = Polygon::default();
         assert_eq!(polygon.points().len(), 0);
-        assert_eq!(polygon.layer(), 0);
-        assert_eq!(polygon.data_type(), 0);
+        assert_eq!(polygon.layer(), Layer::new(0));
+        assert_eq!(polygon.data_type(), DataType::new(0));
     }
 
     #[test]
@@ -269,14 +269,14 @@ mod tests {
             Point::integer(5, 0, 1e-9),
             Point::integer(5, 5, 1e-9),
         ];
-        let polygon = Polygon::new(points, 2, 1);
+        let polygon = Polygon::new(points, Layer::new(2), DataType::new(1));
 
         insta::assert_snapshot!(polygon.to_string(), @"Polygon with 4 point(s), starting at (0 (1.000e-9), 0 (1.000e-9)) on layer 2, data type 1");
     }
 
     #[test]
     fn test_polygon_display_empty() {
-        let polygon = Polygon::new(vec![], 1, 0);
+        let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         insta::assert_snapshot!(polygon.to_string(), @"Polygon with 0 points on layer 1, data type 0");
     }
 
@@ -288,7 +288,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         assert_eq!(polygon.area(), Unit::float(100.0, 1e-9));
 
         let points = vec![
@@ -296,10 +296,10 @@ mod tests {
             Point::integer(10, 0, 1e-9),
             Point::integer(5, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         assert_eq!(polygon.area(), Unit::float(50.0, 1e-9));
 
-        let polygon = Polygon::new(vec![], 1, 0);
+        let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         assert_eq!(polygon.area(), Unit::float(0.0, 1e-9));
     }
 
@@ -311,7 +311,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         assert_eq!(polygon.perimeter(), Unit::float(40.0, 1e-9));
 
         let points = vec![
@@ -319,10 +319,10 @@ mod tests {
             Point::integer(3, 0, 1e-9),
             Point::integer(0, 4, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         assert_eq!(polygon.perimeter(), Unit::float(12.0, 1e-9));
 
-        let polygon = Polygon::new(vec![], 1, 0);
+        let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         assert_eq!(polygon.perimeter(), Unit::float(0.0, 1e-9));
     }
 
@@ -334,7 +334,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
 
         assert!(polygon.is_point_inside(&Point::integer(5, 5, 1e-9)));
         assert!(!polygon.is_point_inside(&Point::integer(15, 15, 1e-9)));
@@ -349,7 +349,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
 
         assert!(polygon.is_point_on_edge(&Point::integer(5, 0, 1e-9)));
         assert!(polygon.is_point_on_edge(&Point::integer(10, 5, 1e-9)));
@@ -367,7 +367,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         let (min, max) = polygon.bounding_box();
         assert_eq!(min, Point::integer(0, 0, 1e-9));
         assert_eq!(max, Point::integer(10, 10, 1e-9));
@@ -377,7 +377,7 @@ mod tests {
             Point::integer(7, 2, 1e-9),
             Point::integer(3, 8, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         let (min, max) = polygon.bounding_box();
         assert_eq!(min, Point::integer(-5, -3, 1e-9));
         assert_eq!(max, Point::integer(7, 8, 1e-9));
@@ -391,7 +391,7 @@ mod tests {
             Point::integer(10, 10, 1e-9),
             Point::integer(0, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         let target = Point::integer(5, 5, 1e-9);
         let moved = polygon.move_to(target);
 
@@ -409,7 +409,7 @@ mod tests {
             Point::float(10.0, 0.0, 1e-6),
             Point::float(10.0, 10.0, 1e-6),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         let converted = polygon.to_integer_unit();
 
         for point in converted.points() {
@@ -424,7 +424,7 @@ mod tests {
             Point::integer(10, 0, 1e-9),
             Point::integer(10, 10, 1e-9),
         ];
-        let polygon = Polygon::new(points, 1, 0);
+        let polygon = Polygon::new(points, Layer::new(1), DataType::new(0));
         let converted = polygon.to_float_unit();
 
         for point in converted.points() {
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_polygon_move_to_empty() {
-        let polygon = Polygon::new(vec![], 1, 0);
+        let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
         assert_eq!(moved.points().len(), 0);
     }

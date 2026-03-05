@@ -1,6 +1,10 @@
 use quickcheck_macros::quickcheck;
 
+use crate::config::gds_file_types::GDSRecord;
+use crate::traits::ToGds;
+use crate::utils::io::RecordReader;
 use crate::*;
+use std::io::{BufReader, Cursor};
 
 #[quickcheck]
 fn bounding_box_contains_all_points(path: Path) -> bool {
@@ -24,4 +28,30 @@ fn translation_preserves_point_count(path: Path, dx: i32, dy: i32) -> bool {
     let delta = Point::integer(dx, dy, units);
     let translated = path.clone().translate(delta);
     translated.points().len() == path.points().len()
+}
+
+/// Verifies that BgnExtn/EndExtn records appear in serialized output iff the path has extensions.
+#[quickcheck]
+fn serialized_path_contains_extension_records(path: Path) -> bool {
+    if path.points().len() < 2 {
+        return true;
+    }
+    let Ok(bytes) = path.to_gds_impl(1e-9) else {
+        return true;
+    };
+
+    let reader = RecordReader::new(BufReader::new(Cursor::new(&bytes)));
+    let mut has_bgn_extn = false;
+    let mut has_end_extn = false;
+    for record in reader {
+        let Ok((rec, _)) = record else { continue };
+        match rec {
+            GDSRecord::BgnExtn => has_bgn_extn = true,
+            GDSRecord::EndExtn => has_end_extn = true,
+            _ => {}
+        }
+    }
+
+    has_bgn_extn == path.begin_extension().is_some()
+        && has_end_extn == path.end_extension().is_some()
 }
