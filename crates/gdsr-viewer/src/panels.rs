@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use egui::{ComboBox, Ui, Vec2};
+use gdsr::{DataType, Layer};
 
 use crate::state::LayerState;
 
@@ -11,7 +12,7 @@ pub fn draw_side_panel(
     cell_names: &[String],
     selected_cell: &mut Option<String>,
     cell_changed: &mut bool,
-    layers: &BTreeSet<(u16, u16)>,
+    layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
 ) -> bool {
     let mut zoom_to_fit = false;

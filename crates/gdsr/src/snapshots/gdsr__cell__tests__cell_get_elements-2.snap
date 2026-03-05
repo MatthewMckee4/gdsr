@@ -6,15 +6,23 @@ expression: moved_elements
     Polygon(
         Polygon {
             points: [],
-            layer: 0,
-            data_type: 0,
+            layer: Layer(
+                0,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
     Path(
         Path {
             points: [],
-            layer: 0,
-            data_type: 0,
+            layer: Layer(
+                0,
+            ),
+            data_type: DataType(
+                0,
+            ),
             type: None,
             width: None,
         },
@@ -36,8 +44,12 @@ expression: moved_elements
                     },
                 ),
             },
-            layer: 0,
-            datatype: 0,
+            layer: Layer(
+                0,
+            ),
+            datatype: DataType(
+                0,
+            ),
             magnification: 1.0,
             angle: 0.0,
             x_reflection: false,
@@ -48,8 +60,12 @@ expression: moved_elements
     Polygon(
         Polygon {
             points: [],
-            layer: 0,
-            data_type: 0,
+            layer: Layer(
+                0,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
 ]

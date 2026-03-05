@@ -176,8 +176,8 @@ impl Arbitrary for Polygon {
                 Point::integer(x, y, units)
             })
             .collect();
-        let layer = u16::arbitrary(g);
-        let data_type = u16::arbitrary(g);
+        let layer = Layer::new(u16::arbitrary(g));
+        let data_type = DataType::new(u16::arbitrary(g));
         Self::new(points, layer, data_type)
     }
 }
@@ -201,8 +201,8 @@ impl Arbitrary for Path {
                 Point::integer(x, y, units)
             })
             .collect();
-        let layer = u16::arbitrary(g);
-        let data_type = u16::arbitrary(g);
+        let layer = Layer::new(u16::arbitrary(g));
+        let data_type = DataType::new(u16::arbitrary(g));
         let path_type = if bool::arbitrary(g) {
             Some(PathType::arbitrary(g))
         } else {
@@ -229,8 +229,8 @@ impl Arbitrary for Text {
         let value: String = (0..len)
             .map(|_| (b'a' + (u8::arbitrary(g) % 26)) as char)
             .collect();
-        let layer = u16::arbitrary(g) % 256;
-        let datatype = u16::arbitrary(g) % 256;
+        let layer = Layer::new(u16::arbitrary(g) % 256);
+        let datatype = DataType::new(u16::arbitrary(g) % 256);
         let vp_options = [
             HorizontalPresentation::Left,
             HorizontalPresentation::Centre,
@@ -278,12 +278,12 @@ impl Arbitrary for Grid {
 
 const GDS_NAME_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_$?";
 
-pub(super) fn arb_layer(g: &mut Gen) -> u16 {
-    u16::arbitrary(g) % 256
+pub(super) fn arb_layer(g: &mut Gen) -> Layer {
+    Layer::new(u16::arbitrary(g) % 256)
 }
 
-pub(super) fn arb_data_type(g: &mut Gen) -> u16 {
-    u16::arbitrary(g) % 256
+pub(super) fn arb_data_type(g: &mut Gen) -> DataType {
+    DataType::new(u16::arbitrary(g) % 256)
 }
 
 pub(super) fn arb_structure_name(g: &mut Gen) -> String {
@@ -347,7 +347,7 @@ pub(super) fn arb_gds_text(g: &mut Gen) -> Text {
         &value,
         origin,
         arb_layer(g),
-        0,
+        DataType::new(0),
         1.0,
         0.0,
         false,

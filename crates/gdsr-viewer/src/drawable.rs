@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use egui::epaint;
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
-use gdsr::{Dimensions, Element, Library};
+use gdsr::{DataType, Dimensions, Element, Layer, Library};
 
 use crate::state::LayerState;
 use crate::viewport::Viewport;
@@ -51,7 +51,7 @@ impl WorldBBox {
 /// avoid per-element allocations.
 pub struct DrawContext<'a> {
     pub painter: &'a egui::Painter,
-    pub layer_meshes: &'a mut HashMap<(u16, u16), Mesh>,
+    pub layer_meshes: &'a mut HashMap<(Layer, DataType), Mesh>,
     pub extra_shapes: &'a mut Vec<Shape>,
     pub viewport: &'a Viewport,
     pub rect: Rect,
@@ -65,7 +65,7 @@ pub struct DrawContext<'a> {
 
 impl DrawContext<'_> {
     /// Merges a mesh's geometry into the batched mesh for the given layer.
-    pub fn merge_mesh(&mut self, key: (u16, u16), src: &Mesh) {
+    pub fn merge_mesh(&mut self, key: (Layer, DataType), src: &Mesh) {
         let dst = self.layer_meshes.entry(key).or_default();
         let base = dst.vertices.len() as u32;
         dst.vertices.extend_from_slice(&src.vertices);
@@ -157,7 +157,7 @@ pub(crate) fn stroke_polyline_to_mesh(points: &[Pos2], stroke: Stroke, closed: b
 /// Trait for viewer-drawable elements. Provides layer info, bounding box, and drawing.
 pub trait Drawable {
     /// Returns all `(layer, data_type)` pairs this element contributes to.
-    fn layer_keys(&self) -> Vec<(u16, u16)>;
+    fn layer_keys(&self) -> Vec<(Layer, DataType)>;
 
     /// Returns the world-space bounding box, or `None` for elements without geometry.
     fn world_bbox(&self) -> Option<WorldBBox>;
@@ -170,7 +170,7 @@ pub trait Drawable {
 const BBOX_FALLBACK_PX: f32 = 8.0;
 
 impl Drawable for gdsr::Polygon {
-    fn layer_keys(&self) -> Vec<(u16, u16)> {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         vec![(self.layer(), self.data_type())]
     }
 
@@ -280,7 +280,7 @@ impl Drawable for gdsr::Polygon {
 }
 
 impl Drawable for gdsr::Path {
-    fn layer_keys(&self) -> Vec<(u16, u16)> {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         vec![(self.layer(), self.data_type())]
     }
 
@@ -352,8 +352,8 @@ impl Drawable for gdsr::Path {
 }
 
 impl Drawable for gdsr::Text {
-    fn layer_keys(&self) -> Vec<(u16, u16)> {
-        vec![(self.layer(), 0)]
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
+        vec![(self.layer(), DataType::new(0))]
     }
 
     fn world_bbox(&self) -> Option<WorldBBox> {
@@ -364,7 +364,7 @@ impl Drawable for gdsr::Text {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
-        let key = (self.layer(), 0);
+        let key = (self.layer(), DataType::new(0));
         if ctx.layer_state.hidden_layers.contains(&key) {
             return;
         }
@@ -398,7 +398,7 @@ impl Drawable for gdsr::Text {
 }
 
 impl Drawable for gdsr::Reference {
-    fn layer_keys(&self) -> Vec<(u16, u16)> {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self.instance().as_element() {
             Some(element) => element.layer_keys(),
             None => vec![],
@@ -455,7 +455,7 @@ impl Drawable for gdsr::Reference {
 }
 
 impl Drawable for Element {
-    fn layer_keys(&self) -> Vec<(u16, u16)> {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self {
             Self::Polygon(p) => p.layer_keys(),
             Self::Path(p) => p.layer_keys(),

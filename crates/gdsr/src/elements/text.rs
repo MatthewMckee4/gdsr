@@ -176,8 +176,8 @@ impl Default for Text {
         Self {
             value: String::new(),
             origin: Point::integer(0, 0, 1e-9),
-            layer: 0,
-            datatype: 0,
+            layer: Layer::new(0),
+            datatype: DataType::new(0),
             magnification: 1.0,
             angle: 0.0,
             x_reflection: false,
@@ -394,7 +394,7 @@ impl ToGds for Text {
             combine_record_and_data_type(GDSRecord::Text, GDSDataType::NoData),
             6,
             combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
-            self.layer(),
+            self.layer().value(),
             6,
             combine_record_and_data_type(GDSRecord::TextType, GDSDataType::TwoByteSignedInteger),
             0,
@@ -698,8 +698,8 @@ mod tests {
         let text = Text::new(
             "Hello World",
             Point::integer(100, 200, 1e-9),
-            5,
-            0,
+            Layer::new(5),
+            DataType::new(0),
             2.0,
             45.0,
             true,
@@ -709,7 +709,7 @@ mod tests {
 
         assert_eq!(text.text(), "Hello World");
         assert_eq!(text.origin(), &Point::integer(100, 200, 1e-9));
-        assert_eq!(text.layer(), 5);
+        assert_eq!(text.layer(), Layer::new(5));
         assert_eq!(text.magnification(), 2.0);
         assert_eq!(text.angle(), 45.0);
         assert!(text.x_reflection());
@@ -721,7 +721,7 @@ mod tests {
 
         assert_eq!(text.text(), "");
         assert_eq!(text.origin(), &Point::integer(0, 0, 1e-9));
-        assert_eq!(text.layer(), 0);
+        assert_eq!(text.layer(), Layer::new(0));
         assert_eq!(text.magnification(), 1.0);
         assert_eq!(text.angle(), 0.0);
         assert!(!text.x_reflection());
@@ -732,8 +732,8 @@ mod tests {
         let text = Text::new(
             "Test Text",
             Point::integer(10, 20, 1e-9),
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
             1.5,
             30.0,
             false,
@@ -759,8 +759,8 @@ mod tests {
 
     #[test]
     fn test_set_layer() {
-        let text = Text::default().set_layer(10);
-        assert_eq!(text.layer(), 10);
+        let text = Text::default().set_layer(Layer::new(10));
+        assert_eq!(text.layer(), Layer::new(10));
     }
 
     #[test]
@@ -801,7 +801,7 @@ mod tests {
         let text = Text::default()
             .set_text("Chained".to_string())
             .set_origin(Point::integer(100, 200, 1e-9))
-            .set_layer(5)
+            .set_layer(Layer::new(5))
             .set_magnification(2.0)
             .set_angle(45.0)
             .set_x_reflection(true)
@@ -810,7 +810,7 @@ mod tests {
 
         assert_eq!(text.text(), "Chained");
         assert_eq!(text.origin(), &Point::integer(100, 200, 1e-9));
-        assert_eq!(text.layer(), 5);
+        assert_eq!(text.layer(), Layer::new(5));
         assert_eq!(text.magnification(), 2.0);
         assert_eq!(text.angle(), 45.0);
         assert!(text.x_reflection());
@@ -866,8 +866,12 @@ mod tests {
                     },
                 ),
             },
-            layer: 0,
-            datatype: 0,
+            layer: Layer(
+                0,
+            ),
+            datatype: DataType(
+                0,
+            ),
             magnification: 1.0,
             angle: 1.5707963267948966,
             x_reflection: false,
@@ -957,8 +961,12 @@ mod tests {
                     },
                 ),
             },
-            layer: 0,
-            datatype: 0,
+            layer: Layer(
+                0,
+            ),
+            datatype: DataType(
+                0,
+            ),
             magnification: 2.0,
             angle: 1.5707963267948966,
             x_reflection: true,

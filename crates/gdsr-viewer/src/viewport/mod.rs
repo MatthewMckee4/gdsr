@@ -5,7 +5,7 @@ pub use bounds::compute_bounds;
 use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Rect, Sense};
-use gdsr::{Element, Library};
+use gdsr::{DataType, Element, Layer, Library};
 
 use crate::drawable::{DrawContext, Drawable, WorldBBox};
 use crate::spatial::SpatialGrid;
@@ -117,7 +117,7 @@ impl Viewport {
             }
         }
 
-        let mut hidden_layers: Vec<(u16, u16)> =
+        let mut hidden_layers: Vec<(Layer, DataType)> =
             layer_state.hidden_layers.iter().copied().collect();
         hidden_layers.sort_unstable();
 
@@ -229,7 +229,8 @@ impl Viewport {
             }
         }
 
-        let batched: Vec<((u16, u16), egui::epaint::Mesh)> = layer_meshes.into_iter().collect();
+        let batched: Vec<((Layer, DataType), egui::epaint::Mesh)> =
+            layer_meshes.into_iter().collect();
         for (_, mesh) in &batched {
             painter.add(egui::Shape::mesh(mesh.clone()));
         }

@@ -63,8 +63,12 @@ expression: flattened
                     ),
                 },
             ],
-            layer: 1,
-            data_type: 0,
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
     Polygon(
@@ -127,8 +131,12 @@ expression: flattened
                     ),
                 },
             ],
-            layer: 1,
-            data_type: 0,
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
     Polygon(
@@ -191,8 +199,12 @@ expression: flattened
                     ),
                 },
             ],
-            layer: 1,
-            data_type: 0,
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
     Polygon(
@@ -255,8 +267,12 @@ expression: flattened
                     ),
                 },
             ],
-            layer: 1,
-            data_type: 0,
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
         },
     ),
 ]

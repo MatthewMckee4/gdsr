@@ -31,15 +31,15 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(20, 20, units),
                 Point::integer(0, 20, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         )
         .into(),
         Text::new(
             "All Elements",
             Point::integer(250, 50, units),
-            3,
-            0,
+            Layer::new(3),
+            DataType::new(0),
             2.0,
             0.0,
             false,
@@ -53,8 +53,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(200, 50, units),
                 Point::integer(200, 100, units),
             ],
-            2,
-            0,
+            Layer::new(2),
+            DataType::new(0),
             Some(PathType::Round),
             Some(Unit::float(5.0, units)),
         )
@@ -65,8 +65,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(200, 50, units),
                 Point::integer(200, 100, units),
             ],
-            2,
-            0,
+            Layer::new(2),
+            DataType::new(0),
             None,
             None,
         )
@@ -77,8 +77,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(10, 0, units),
                 Point::integer(10, 10, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -97,8 +97,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(10, 0, units),
                 Point::integer(10, 10, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -117,8 +117,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(10, 0, units),
                 Point::integer(10, 10, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -138,8 +138,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(20, 20, units),
                 Point::integer(0, 20, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -159,50 +159,8 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(20, 20, units),
                 Point::integer(0, 20, units),
             ],
-            4,
-            0,
-        ))
-        .with_grid(Grid::new(
-            Point::integer(300, 50, units),
-            1,
-            2,
-            None,
-            Some(Point::integer(10, 10, units)),
-            1.0,
-            0.0,
-            false,
-        ))
-        .into(),
-        Reference::new(Polygon::new(
-            [
-                Point::integer(0, 0, units),
-                Point::integer(20, 0, units),
-                Point::integer(20, 20, units),
-                Point::integer(0, 20, units),
-            ],
-            4,
-            0,
-        ))
-        .with_grid(Grid::new(
-            Point::integer(300, 50, units),
-            2,
-            1,
-            Some(Point::integer(10, 10, units)),
-            None,
-            1.0,
-            0.0,
-            false,
-        ))
-        .into(),
-        Reference::new(Polygon::new(
-            [
-                Point::integer(0, 0, units),
-                Point::integer(20, 0, units),
-                Point::integer(20, 20, units),
-                Point::integer(0, 20, units),
-            ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -222,8 +180,50 @@ fn get_elements(units: f64) -> Vec<Element> {
                 Point::integer(20, 20, units),
                 Point::integer(0, 20, units),
             ],
-            4,
-            0,
+            Layer::new(4),
+            DataType::new(0),
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            2,
+            1,
+            Some(Point::integer(10, 10, units)),
+            None,
+            1.0,
+            0.0,
+            false,
+        ))
+        .into(),
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            Layer::new(4),
+            DataType::new(0),
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            2,
+            None,
+            Some(Point::integer(10, 10, units)),
+            1.0,
+            0.0,
+            false,
+        ))
+        .into(),
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            Layer::new(4),
+            DataType::new(0),
         ))
         .with_grid(Grid::new(
             Point::integer(300, 50, units),
@@ -254,16 +254,16 @@ fn test_library_roundtrip_mixed_elements() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     );
     cell.add(polygon);
 
     let text = Text::new(
         "Test Label",
         Point::integer(5, 5, units),
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -278,8 +278,8 @@ fn test_library_roundtrip_mixed_elements() {
             Point::integer(5, 5, units),
             Point::integer(10, 0, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
         Some(PathType::Square),
         Some(Unit::float(2.0, units)),
     );
@@ -292,8 +292,8 @@ fn test_library_roundtrip_mixed_elements() {
             Point::integer(20, 20, units),
             Point::integer(15, 20, units),
         ],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
     );
 
     let reference = Reference::new(ref_polygon.clone()).with_grid(
@@ -340,8 +340,8 @@ fn test_library_roundtrip_different_units() {
                 Point::integer(100, 100, units),
                 Point::integer(0, 100, units),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         let reference = Reference::new(polygon.clone()).with_grid(Grid::new(
@@ -370,8 +370,8 @@ fn test_library_roundtrip_different_units() {
                 Point::integer(100, 100, units),
                 Point::integer(0, 100, units),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
 
         cell2.add(polygon2);
@@ -426,8 +426,8 @@ fn test_complex_path_types_roundtrip() {
             Point::integer(50, 0, units),
             Point::integer(50, 50, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
         Some(PathType::Square),
         Some(Unit::float(5.0, units)),
     ));
@@ -438,16 +438,16 @@ fn test_complex_path_types_roundtrip() {
             Point::integer(150, 0, units),
             Point::integer(150, 50, units),
         ],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(3.0, units)),
     ));
 
     cell.add(Path::new(
         vec![Point::integer(200, 0, units), Point::integer(250, 0, units)],
-        3,
-        0,
+        Layer::new(3),
+        DataType::new(0),
         Some(PathType::Overlap),
         Some(Unit::float(4.0, units)),
     ));
@@ -466,8 +466,8 @@ fn test_text_with_various_presentations() {
     cell.add(Text::new(
         "Top Left",
         Point::integer(0, 0, units),
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -478,8 +478,8 @@ fn test_text_with_various_presentations() {
     cell.add(Text::new(
         "Middle Centre",
         Point::integer(50, 50, units),
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
         1.5,
         45.0,
         false,
@@ -490,8 +490,8 @@ fn test_text_with_various_presentations() {
     cell.add(Text::new(
         "Bottom Right",
         Point::integer(100, 100, units),
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
         2.0,
         90.0,
         true,
@@ -517,8 +517,8 @@ fn test_nested_references() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
 
     let mut cell2 = Cell::new("mid_cell");
@@ -558,8 +558,8 @@ fn test_large_polygon_coordinates() {
             Point::integer(2_000_000, 2_000_000, units),
             Point::integer(1_000_000, 2_000_000, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
 
     library.add_cell(cell);
@@ -583,8 +583,8 @@ fn test_float_coordinates() {
             Point::float(10.5, 10.5, units),
             Point::float(0.5, 10.5, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     );
     cell.add(polygon);
 
@@ -594,8 +594,8 @@ fn test_float_coordinates() {
             Point::float(20.75, 15.25, units),
             Point::float(20.75, 20.75, units),
         ],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(1.5, units)),
     );
@@ -629,8 +629,8 @@ fn test_multiple_cells_different_layers() {
                 Point::integer(layer * 10 + 10, 10, units),
                 Point::integer(layer * 10, 10, units),
             ],
-            layer as u16,
-            0,
+            Layer::new(layer as u16),
+            DataType::new(0),
         ));
 
         library.add_cell(cell);
@@ -658,8 +658,8 @@ fn test_single_cell_with_all_element_types() {
             Point::integer(100, 100, units),
             Point::integer(0, 100, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
 
     cell.add(Path::new(
@@ -668,8 +668,8 @@ fn test_single_cell_with_all_element_types() {
             Point::integer(200, 50, units),
             Point::integer(200, 100, units),
         ],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(5.0, units)),
     ));
@@ -677,8 +677,8 @@ fn test_single_cell_with_all_element_types() {
     cell.add(Text::new(
         "All Elements",
         Point::integer(250, 50, units),
-        3,
-        0,
+        Layer::new(3),
+        DataType::new(0),
         2.0,
         0.0,
         false,
@@ -694,8 +694,8 @@ fn test_single_cell_with_all_element_types() {
             Point::integer(20, 20, units),
             Point::integer(0, 20, units),
         ],
-        4,
-        0,
+        Layer::new(4),
+        DataType::new(0),
     ));
     library.add_cell(ref_cell);
 
@@ -835,8 +835,8 @@ fn test_invalid_path() {
 
     let path = Path::new(
         vec![Point::integer(150, 50, units)],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(5.0, units)),
     );
@@ -866,7 +866,7 @@ fn test_invalid_polygon() {
         polygon_points.push(Point::integer(i, 0, units));
     }
 
-    let polygon = Polygon::new(polygon_points, 1, 0);
+    let polygon = Polygon::new(polygon_points, Layer::new(1), DataType::new(0));
 
     cell.add(polygon);
 
@@ -928,8 +928,8 @@ fn test_max_coordinate_values_roundtrip() {
             Point::integer(i32::MIN, i32::MIN, units),
             Point::integer(i32::MAX, i32::MIN, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
 
     library.add_cell(cell);
@@ -957,8 +957,8 @@ fn test_special_characters_in_cell_names_roundtrip() {
                 Point::integer(10, 10, units),
                 Point::integer(0, 10, units),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
         library.add_cell(cell);
     }
@@ -989,8 +989,8 @@ fn test_all_presentation_combinations_roundtrip() {
             cell.add(Text::new(
                 &format!("{vp}_{hp}"),
                 Point::integer(0, y_offset, units),
-                1,
-                0,
+                Layer::new(1),
+                DataType::new(0),
                 1.0,
                 0.0,
                 false,
@@ -1019,8 +1019,8 @@ fn test_multiple_cells_referencing_same_cell() {
             Point::integer(5, 5, units),
             Point::integer(0, 5, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
     library.add_cell(shared_cell);
 
@@ -1052,8 +1052,8 @@ fn test_polygon_invalid_layer() {
             Point::integer(10, 0, units),
             Point::integer(10, 10, units),
         ],
-        256,
-        0,
+        Layer::new(256),
+        DataType::new(0),
     ));
     library.add_cell(cell);
     assert_write_validation_error(&library);
@@ -1070,8 +1070,8 @@ fn test_polygon_invalid_data_type() {
             Point::integer(10, 0, units),
             Point::integer(10, 10, units),
         ],
-        0,
-        256,
+        Layer::new(0),
+        DataType::new(256),
     ));
     library.add_cell(cell);
     assert_write_validation_error(&library);
@@ -1084,8 +1084,8 @@ fn test_polygon_too_few_points() {
     let mut cell = Cell::new("cell");
     cell.add(Polygon::new(
         [Point::integer(0, 0, units), Point::integer(10, 0, units)],
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
     ));
     library.add_cell(cell);
     assert_write_validation_error(&library);
@@ -1098,8 +1098,8 @@ fn test_path_invalid_layer() {
     let mut cell = Cell::new("cell");
     cell.add(Path::new(
         vec![Point::integer(0, 0, units), Point::integer(10, 0, units)],
-        256,
-        0,
+        Layer::new(256),
+        DataType::new(0),
         None,
         None,
     ));
@@ -1114,8 +1114,8 @@ fn test_path_invalid_data_type() {
     let mut cell = Cell::new("cell");
     cell.add(Path::new(
         vec![Point::integer(0, 0, units), Point::integer(10, 0, units)],
-        0,
-        256,
+        Layer::new(0),
+        DataType::new(256),
         None,
         None,
     ));
@@ -1131,8 +1131,8 @@ fn test_text_invalid_layer() {
     cell.add(Text::new(
         "hello",
         Point::integer(0, 0, units),
-        256,
-        0,
+        Layer::new(256),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -1152,8 +1152,8 @@ fn test_text_string_too_long() {
     cell.add(Text::new(
         &long_string,
         Point::integer(0, 0, units),
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -1173,8 +1173,8 @@ fn test_text_string_at_max_length() {
     cell.add(Text::new(
         &max_string,
         Point::integer(0, 0, units),
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -1237,8 +1237,8 @@ fn test_reference_columns_exceed_max() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
     ));
     library.add_cell(base_cell);
 
@@ -1260,8 +1260,8 @@ fn test_reference_rows_exceed_max() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
     ));
     library.add_cell(base_cell);
 
@@ -1283,8 +1283,8 @@ fn test_reference_col_row_at_max() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        0,
-        0,
+        Layer::new(0),
+        DataType::new(0),
     ));
     library.add_cell(base_cell);
 
@@ -1310,8 +1310,8 @@ fn test_polygon_layer_and_data_type_at_boundary() {
             Point::integer(10, 10, units),
             Point::integer(0, 10, units),
         ],
-        255,
-        255,
+        Layer::new(255),
+        DataType::new(255),
     ));
     library.add_cell(cell);
     let temp_dir = tempdir().unwrap();

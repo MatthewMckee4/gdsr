@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gdsr::Element;
+use gdsr::{DataType, Element, Layer};
 
 use crate::drawable::{Drawable, WorldBBox};
 
@@ -13,7 +13,7 @@ pub struct GridCell {
     /// Tight bounding box of all elements in this cell.
     pub bbox: WorldBBox,
     /// The most frequently occurring `(layer, data_type)` pair among elements in this cell.
-    pub dominant_layer: (u16, u16),
+    pub dominant_layer: (Layer, DataType),
 }
 
 /// A 256x256 uniform grid that maps world-space regions to element indices,
@@ -35,7 +35,7 @@ impl SpatialGrid {
         let cell_height = (bounds.max_y - bounds.min_y + epsilon) / GRID_SIZE as f64;
 
         let mut cells: Vec<Option<GridCell>> = (0..GRID_SIZE * GRID_SIZE).map(|_| None).collect();
-        let mut layer_counts: HashMap<usize, HashMap<(u16, u16), u32>> = HashMap::new();
+        let mut layer_counts: HashMap<usize, HashMap<(Layer, DataType), u32>> = HashMap::new();
 
         for (i, element) in elements.iter().enumerate() {
             let Some(bbox) = element.world_bbox() else {
@@ -52,14 +52,17 @@ impl SpatialGrid {
             let row_max = row_max.min(GRID_SIZE - 1);
 
             let layer_keys = element.layer_keys();
-            let layer = layer_keys.first().copied().unwrap_or((0, 0));
+            let layer = layer_keys
+                .first()
+                .copied()
+                .unwrap_or((Layer::new(0), DataType::new(0)));
             for row in row_min..=row_max {
                 for col in col_min..=col_max {
                     let cell_idx = row * GRID_SIZE + col;
                     let cell = cells[cell_idx].get_or_insert_with(|| GridCell {
                         indices: Vec::new(),
                         bbox: WorldBBox::new(f64::MAX, f64::MAX, f64::MIN, f64::MIN),
-                        dominant_layer: (0, 0),
+                        dominant_layer: (Layer::new(0), DataType::new(0)),
                     });
 
                     cell.indices.push(i as u32);
@@ -149,7 +152,7 @@ mod tests {
 
         for cell in grid.cells.iter().flatten() {
             assert!(cell.indices.contains(&0));
-            assert_eq!(cell.dominant_layer, (1, 0));
+            assert_eq!(cell.dominant_layer, (Layer::new(1), DataType::new(0)));
         }
     }
 
@@ -234,7 +237,7 @@ mod tests {
         let grid = SpatialGrid::build(&elems, &bounds);
 
         for cell in grid.cells.iter().flatten() {
-            assert_eq!(cell.dominant_layer, (5, 0));
+            assert_eq!(cell.dominant_layer, (Layer::new(5), DataType::new(0)));
         }
     }
 
@@ -287,19 +290,19 @@ mod tests {
     #[test]
     fn layer_keys_polygon() {
         let elem = polygon(vec![(0, 0), (1, 0), (1, 1)], 5, 3);
-        assert_eq!(elem.layer_keys(), vec![(5, 3)]);
+        assert_eq!(elem.layer_keys(), vec![(Layer::new(5), DataType::new(3))]);
     }
 
     #[test]
     fn layer_keys_path() {
         let elem = path(vec![(0, 0), (1, 1)], 7, 2, None);
-        assert_eq!(elem.layer_keys(), vec![(7, 2)]);
+        assert_eq!(elem.layer_keys(), vec![(Layer::new(7), DataType::new(2))]);
     }
 
     #[test]
     fn layer_keys_text() {
         let elem = text("t", 0, 0, 4);
-        assert_eq!(elem.layer_keys(), vec![(4, 0)]);
+        assert_eq!(elem.layer_keys(), vec![(Layer::new(4), DataType::new(0))]);
     }
 
     #[test]
@@ -316,11 +319,14 @@ mod tests {
                 gdsr::Point::default_integer(10, 0),
                 gdsr::Point::default_integer(10, 10),
             ],
-            5,
-            3,
+            Layer::new(5),
+            DataType::new(3),
         );
         let reference = Element::Reference(gdsr::Reference::new(poly));
-        assert_eq!(reference.layer_keys(), vec![(5, 3)]);
+        assert_eq!(
+            reference.layer_keys(),
+            vec![(Layer::new(5), DataType::new(3))]
+        );
     }
 
     #[test]
@@ -372,8 +378,8 @@ mod tests {
                 gdsr::Point::default_integer(100, 0),
                 gdsr::Point::default_integer(100, 200),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let reference = Element::Reference(gdsr::Reference::new(poly));
         let bbox = reference.world_bbox().expect("should have bbox");
@@ -392,8 +398,8 @@ mod tests {
                 gdsr::Point::default_integer(10, 0),
                 gdsr::Point::default_integer(10, 10),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let grid = gdsr::Grid::default()
             .with_columns(2)

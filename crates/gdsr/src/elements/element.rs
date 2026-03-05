@@ -161,7 +161,7 @@ impl Dimensions for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Grid, Point};
+    use crate::{DataType, Grid, Layer, Point};
 
     const UNITS: f64 = 1e-9;
 
@@ -178,11 +178,21 @@ mod tests {
     }
 
     fn simple_polygon() -> Polygon {
-        Polygon::new(vec![p(0, 0), p(10, 0), p(10, 10)], 1, 0)
+        Polygon::new(
+            vec![p(0, 0), p(10, 0), p(10, 10)],
+            Layer::new(1),
+            DataType::new(0),
+        )
     }
 
     fn simple_path() -> Path {
-        Path::new(vec![p(0, 0), p(10, 10)], 1, 0, None, None)
+        Path::new(
+            vec![p(0, 0), p(10, 10)],
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            None,
+        )
     }
 
     fn simple_grid() -> Grid {
@@ -278,7 +288,11 @@ mod tests {
 
     #[test]
     fn test_element_to_integer_unit_converts_points() {
-        let polygon = Polygon::new([pf(1.5, 2.5), pf(10.0, 0.0), pf(10.0, 10.0)], 1, 0);
+        let polygon = Polygon::new(
+            [pf(1.5, 2.5), pf(10.0, 0.0), pf(10.0, 10.0)],
+            Layer::new(1),
+            DataType::new(0),
+        );
         let element: Element = polygon.into();
         let converted = element.to_integer_unit();
 
@@ -333,7 +347,13 @@ mod tests {
 
     #[test]
     fn test_element_bounding_box_path() {
-        let path = Path::new(vec![p(-5, 3), p(10, 7)], 1, 0, None, None);
+        let path = Path::new(
+            vec![p(-5, 3), p(10, 7)],
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            None,
+        );
         let element: Element = path.into();
         let (min, max) = element.bounding_box();
         assert_eq!(min, p(-5, 3));

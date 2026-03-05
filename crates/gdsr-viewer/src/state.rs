@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use egui::{Mesh, Pos2, Shape};
 use emath::{TSTransform, Vec2};
-use gdsr::{Element, Library};
+use gdsr::{DataType, Element, Layer, Library};
 
 use crate::colors::LayerColorMap;
 use crate::spatial::SpatialGrid;
@@ -26,7 +26,7 @@ pub struct CellState {
     pub elements: Vec<Element>,
     pub element_receiver: Option<mpsc::Receiver<Element>>,
     pub elements_loading: bool,
-    pub layers: BTreeSet<(u16, u16)>,
+    pub layers: BTreeSet<(Layer, DataType)>,
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
 }
@@ -56,7 +56,7 @@ impl CellState {
 /// Geometry is split into batched layer meshes (few large meshes, cheap to clone)
 /// and extra shapes (text, rect fallbacks).
 pub struct RenderCache {
-    layer_meshes: Vec<((u16, u16), Mesh)>,
+    layer_meshes: Vec<((Layer, DataType), Mesh)>,
     extra_shapes: Vec<Shape>,
     /// Viewport state at the time shapes were rendered.
     render_center_x: f64,
@@ -64,7 +64,7 @@ pub struct RenderCache {
     render_zoom: f64,
     render_rect_center: Pos2,
     /// Invalidation metadata — if any of these change, full re-render.
-    hidden_layers: Vec<(u16, u16)>,
+    hidden_layers: Vec<(Layer, DataType)>,
     element_count: usize,
     populated: bool,
 }
@@ -89,7 +89,7 @@ impl RenderCache {
     /// Returns `true` when a full re-render is needed (cannot use delta transform).
     pub fn needs_full_render(
         &self,
-        hidden_layers: &[(u16, u16)],
+        hidden_layers: &[(Layer, DataType)],
         element_count: usize,
         current_center_x: f64,
         current_center_y: f64,
@@ -142,13 +142,13 @@ impl RenderCache {
     /// Stores batched layer meshes, extra shapes, and the viewport state.
     pub fn update(
         &mut self,
-        layer_meshes: Vec<((u16, u16), Mesh)>,
+        layer_meshes: Vec<((Layer, DataType), Mesh)>,
         extra_shapes: Vec<Shape>,
         center_x: f64,
         center_y: f64,
         zoom: f64,
         rect_center: Pos2,
-        hidden_layers: Vec<(u16, u16)>,
+        hidden_layers: Vec<(Layer, DataType)>,
         element_count: usize,
     ) {
         self.layer_meshes = layer_meshes;
@@ -162,7 +162,7 @@ impl RenderCache {
         self.populated = true;
     }
 
-    pub fn layer_meshes(&self) -> &[((u16, u16), Mesh)] {
+    pub fn layer_meshes(&self) -> &[((Layer, DataType), Mesh)] {
         &self.layer_meshes
     }
 
@@ -242,7 +242,14 @@ mod tests {
     #[test]
     fn rerender_on_hidden_layer_change() {
         let cache = populated_cache();
-        assert!(cache.needs_full_render(&[(1, 0)], 42, 0.0, 0.0, 1.0, test_rect()));
+        assert!(cache.needs_full_render(
+            &[(Layer::new(1), DataType::new(0))],
+            42,
+            0.0,
+            0.0,
+            1.0,
+            test_rect()
+        ));
     }
 
     #[test]
@@ -349,5 +356,5 @@ mod tests {
 #[derive(Default)]
 pub struct LayerState {
     pub layer_colors: LayerColorMap,
-    pub hidden_layers: HashSet<(u16, u16)>,
+    pub hidden_layers: HashSet<(Layer, DataType)>,
 }
