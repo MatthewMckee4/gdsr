@@ -201,17 +201,14 @@ impl eframe::App for ViewerApp {
                         self.viewport.zoom_at_center(1.2);
                     }
                     if ui
-                        .add(egui::Button::new("Zoom Out").shortcut_text("−"))
+                        .add(egui::Button::new("Zoom Out").shortcut_text("-"))
                         .clicked()
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.viewport.zoom_at_center(1.0 / 1.2);
                     }
                     ui.separator();
-                    ui.add(egui::Button::new("Pan Left").shortcut_text("←"));
-                    ui.add(egui::Button::new("Pan Right").shortcut_text("→"));
-                    ui.add(egui::Button::new("Pan Up").shortcut_text("↑"));
-                    ui.add(egui::Button::new("Pan Down").shortcut_text("↓"));
+                    ui.label("Pan: Arrow Keys");
                 });
             });
         });
