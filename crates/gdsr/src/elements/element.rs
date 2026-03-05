@@ -76,6 +76,60 @@ impl Element {
         }
     }
 
+    /// Returns the inner [`Path`] mutably if this is a `Path` variant, or `None`.
+    pub fn as_path_mut(&mut self) -> Option<&mut Path> {
+        if let Self::Path(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the inner [`Polygon`] mutably if this is a `Polygon` variant, or `None`.
+    pub fn as_polygon_mut(&mut self) -> Option<&mut Polygon> {
+        if let Self::Polygon(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the inner [`Text`] mutably if this is a `Text` variant, or `None`.
+    pub fn as_text_mut(&mut self) -> Option<&mut Text> {
+        if let Self::Text(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the inner [`GdsBox`] mutably if this is a `Box` variant, or `None`.
+    pub fn as_box_mut(&mut self) -> Option<&mut GdsBox> {
+        if let Self::Box(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the inner [`Node`] mutably if this is a `Node` variant, or `None`.
+    pub fn as_node_mut(&mut self) -> Option<&mut Node> {
+        if let Self::Node(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the inner [`Reference`] mutably if this is a `Reference` variant, or `None`.
+    pub fn as_reference_mut(&mut self) -> Option<&mut Reference> {
+        if let Self::Reference(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     /// Remaps the layer and data type using the given mapping.
     /// For references, remaps the inline element if present.
     pub fn remap_layers(&mut self, mapping: &crate::LayerMapping) {

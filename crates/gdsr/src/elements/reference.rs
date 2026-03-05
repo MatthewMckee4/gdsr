@@ -223,22 +223,17 @@ impl Reference {
         match &self.instance {
             Instance::Cell(cell_name) => {
                 if let Some(cell) = library.get_cell(cell_name) {
-                    for polygon in cell.polygons() {
-                        self.send_elements_in_grid(&Element::Polygon(polygon.clone()), tx)?;
-                    }
-                    for path in cell.paths() {
-                        self.send_elements_in_grid(&Element::Path(path.clone()), tx)?;
-                    }
-                    for text in cell.texts() {
-                        self.send_elements_in_grid(&Element::Text(text.clone()), tx)?;
-                    }
-                    for reference in cell.references() {
-                        for grid_el in
-                            self.get_elements_in_grid(&Element::Reference(reference.clone()))
-                        {
-                            if let Element::Reference(grid_ref) = grid_el {
-                                grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
+                    for element in cell.iter_elements() {
+                        if let Element::Reference(reference) = element {
+                            for grid_el in
+                                self.get_elements_in_grid(&Element::Reference(reference.clone()))
+                            {
+                                if let Element::Reference(grid_ref) = grid_el {
+                                    grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
+                                }
                             }
+                        } else {
+                            self.send_elements_in_grid(element, tx)?;
                         }
                     }
                 }

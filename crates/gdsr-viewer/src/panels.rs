@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use egui::{Ui, Vec2};
 use gdsr::{CellStats, DataType, Layer};
 
-use crate::hierarchy::{CellTreeNode, ExpandState};
+use crate::hierarchy::{self, CellTreeNode, ExpandState};
 use crate::state::LayerState;
 
 /// Draws the side panel with cell hierarchy tree, statistics, and layer toggles.
@@ -16,25 +16,43 @@ pub fn draw_side_panel(
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
     cell_stats: Option<&CellStats>,
+    search_query: &mut String,
 ) {
     ui.heading("Cells");
 
+    ui.add(egui::TextEdit::singleline(search_query).hint_text("Search cells..."));
+
+    ui.add_space(4.0);
+
+    let is_filtering = !search_query.is_empty();
+    let filtered;
+    let display_tree = if is_filtering {
+        filtered = hierarchy::filter_tree(cell_tree, search_query);
+        &filtered
+    } else {
+        cell_tree
+    };
+
     ui.horizontal(|ui| {
         if ui.small_button("Expand All").clicked() {
-            expand_state.expand_all(cell_tree);
+            expand_state.expand_all(display_tree);
         }
         if ui.small_button("Collapse All").clicked() {
-            expand_state.collapse_all(cell_tree);
+            expand_state.collapse_all(display_tree);
         }
     });
 
     ui.add_space(4.0);
 
+    if is_filtering {
+        expand_state.expand_all(display_tree);
+    }
+
     egui::ScrollArea::vertical()
         .id_salt("cell_tree")
         .max_height(ui.available_height() * 0.5)
         .show(ui, |ui| {
-            for node in cell_tree {
+            for node in display_tree {
                 draw_tree_node(ui, node, selected_cell, cell_changed, expand_state);
             }
         });

@@ -33,6 +33,7 @@ pub struct CellState {
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
     pub cell_stats: Option<CellStats>,
+    pub search_query: String,
 }
 
 impl CellState {
@@ -55,6 +56,7 @@ impl CellState {
             spatial_grid: None,
             tessellation_cache: HashMap::new(),
             cell_stats: None,
+            search_query: String::new(),
         }
     }
 }

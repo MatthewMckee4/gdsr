@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::{DataType, Element, Layer, Library};
 
-use crate::drawable::{DrawContext, Drawable, WorldBBox};
+use crate::drawable::{DrawContext, Drawable, WorldBBox, draw_highlight};
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{LayerState, RenderCache};
@@ -102,6 +102,7 @@ impl Viewport {
         render_cache: &mut RenderCache,
         tessellation_cache: &mut HashMap<u32, Vec<usize>>,
         ruler: &mut RulerState,
+        hovered_element: Option<usize>,
     ) -> Option<(f64, f64)> {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
@@ -191,6 +192,11 @@ impl Viewport {
                 let mut s = s.clone();
                 s.transform(tsf);
                 painter.add(s);
+            }
+            if let Some(idx) = hovered_element {
+                if let Some(el) = elements.get(idx) {
+                    draw_highlight(el, self, &painter, rect);
+                }
             }
             let mouse_world = response
                 .hover_pos()
@@ -292,6 +298,12 @@ impl Viewport {
             hidden_layers,
             elements.len(),
         );
+
+        if let Some(idx) = hovered_element {
+            if let Some(el) = elements.get(idx) {
+                draw_highlight(el, self, &painter, rect);
+            }
+        }
 
         let mouse_world = response
             .hover_pos()

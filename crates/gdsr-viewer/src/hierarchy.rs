@@ -72,6 +72,37 @@ fn build_node<'a>(
     }
 }
 
+/// Returns a filtered copy of the tree containing only nodes whose name matches
+/// the query (case-insensitive substring) or that have a matching descendant.
+/// An empty query returns a clone of the full tree.
+pub fn filter_tree(tree: &[CellTreeNode], query: &str) -> Vec<CellTreeNode> {
+    if query.is_empty() {
+        return tree.to_vec();
+    }
+    let query_lower = query.to_lowercase();
+    tree.iter()
+        .filter_map(|node| filter_node(node, &query_lower))
+        .collect()
+}
+
+fn filter_node(node: &CellTreeNode, query_lower: &str) -> Option<CellTreeNode> {
+    let name_matches = node.name.to_lowercase().contains(query_lower);
+    let filtered_children: Vec<CellTreeNode> = node
+        .children
+        .iter()
+        .filter_map(|child| filter_node(child, query_lower))
+        .collect();
+
+    if name_matches || !filtered_children.is_empty() {
+        Some(CellTreeNode {
+            name: node.name.clone(),
+            children: filtered_children,
+        })
+    } else {
+        None
+    }
+}
+
 /// Tracks which nodes in the hierarchy tree are expanded.
 #[derive(Clone, Debug, Default)]
 pub struct ExpandState {
@@ -552,6 +583,88 @@ mod tests {
     fn node_depth_empty_tree() {
         let tree: Vec<CellTreeNode> = vec![];
         assert_eq!(node_depth(&tree, "anything"), None);
+    }
+
+    #[test]
+    fn filter_tree_empty_query_returns_full_tree() {
+        let library = make_library(vec![
+            ("top", vec!["mid"]),
+            ("mid", vec!["bot"]),
+            ("bot", vec![]),
+        ]);
+        let tree = build_cell_tree(&library);
+        let filtered = filter_tree(&tree, "");
+        assert_eq!(filtered, tree);
+    }
+
+    #[test]
+    fn filter_tree_partial_match() {
+        let library = make_library(vec![
+            ("top", vec!["mid"]),
+            ("mid", vec!["bot"]),
+            ("bot", vec![]),
+        ]);
+        let tree = build_cell_tree(&library);
+        let filtered = filter_tree(&tree, "mi");
+        insta::assert_debug_snapshot!(filtered, @r#"
+        [
+            CellTreeNode {
+                name: "top",
+                children: [
+                    CellTreeNode {
+                        name: "mid",
+                        children: [],
+                    },
+                ],
+            },
+        ]
+        "#);
+    }
+
+    #[test]
+    fn filter_tree_no_match_returns_empty() {
+        let library = make_library(vec![("top", vec!["child"]), ("child", vec![])]);
+        let tree = build_cell_tree(&library);
+        let filtered = filter_tree(&tree, "xyz");
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn filter_tree_deep_match_keeps_ancestors() {
+        let library = make_library(vec![
+            ("top", vec!["mid"]),
+            ("mid", vec!["deep_target"]),
+            ("deep_target", vec![]),
+        ]);
+        let tree = build_cell_tree(&library);
+        let filtered = filter_tree(&tree, "deep");
+        insta::assert_debug_snapshot!(filtered, @r#"
+        [
+            CellTreeNode {
+                name: "top",
+                children: [
+                    CellTreeNode {
+                        name: "mid",
+                        children: [
+                            CellTreeNode {
+                                name: "deep_target",
+                                children: [],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ]
+        "#);
+    }
+
+    #[test]
+    fn filter_tree_case_insensitive() {
+        let library = make_library(vec![("MyCell", vec![])]);
+        let tree = build_cell_tree(&library);
+        let filtered = filter_tree(&tree, "mycell");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "MyCell");
     }
 
     #[test]
