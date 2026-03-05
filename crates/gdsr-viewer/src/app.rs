@@ -249,9 +249,10 @@ impl eframe::App for ViewerApp {
                 if let Some(cell) = cell.as_mut() {
                     panels::draw_side_panel(
                         ui,
-                        &cell.cell_names,
+                        &cell.cell_tree,
                         &mut cell.selected_cell,
                         &mut cell_changed,
+                        &mut cell.expand_state,
                         &cell.layers,
                         layer_state,
                     );

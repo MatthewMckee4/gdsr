@@ -7,6 +7,7 @@ use emath::{TSTransform, Vec2};
 use gdsr::{DataType, Element, Layer, Library};
 
 use crate::colors::LayerColorMap;
+use crate::hierarchy::{self, CellTreeNode, ExpandState};
 use crate::spatial::SpatialGrid;
 
 /// Tracks an in-flight file-open operation.
@@ -22,6 +23,8 @@ pub struct FileLoadState {
 pub struct CellState {
     pub library: Library,
     pub cell_names: Vec<String>,
+    pub cell_tree: Vec<CellTreeNode>,
+    pub expand_state: ExpandState,
     pub selected_cell: Option<String>,
     pub elements: Vec<Element>,
     pub element_receiver: Option<mpsc::Receiver<Element>>,
@@ -35,9 +38,14 @@ impl CellState {
     pub fn new(library: Library) -> Self {
         let mut cell_names: Vec<String> = library.cells().keys().cloned().collect();
         cell_names.sort();
+        let cell_tree = hierarchy::build_cell_tree(&library);
+        let mut expand_state = ExpandState::default();
+        expand_state.expand_all(&cell_tree);
         Self {
             library,
             cell_names,
+            cell_tree,
+            expand_state,
             selected_cell: None,
             elements: Vec::new(),
             element_receiver: None,

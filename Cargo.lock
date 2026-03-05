@@ -1420,6 +1420,7 @@ dependencies = [
  "emath",
  "env_logger",
  "gdsr",
+ "insta",
  "log",
  "quickcheck",
  "quickcheck_macros",

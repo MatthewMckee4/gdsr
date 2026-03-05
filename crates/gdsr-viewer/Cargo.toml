@@ -20,6 +20,7 @@ log = { workspace = true }
 rfd = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 
