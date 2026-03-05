@@ -8,6 +8,7 @@ use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::{DataType, Element, Layer, Library};
 
 use crate::drawable::{DrawContext, Drawable, WorldBBox};
+use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{LayerState, RenderCache};
 
@@ -100,11 +101,20 @@ impl Viewport {
         library: Option<&Library>,
         render_cache: &mut RenderCache,
         tessellation_cache: &mut HashMap<u32, Vec<usize>>,
+        ruler: &mut RulerState,
     ) -> Option<(f64, f64)> {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
 
         painter.rect_filled(rect, 0.0, Color32::from_rgb(30, 30, 30));
+
+        // Handle ruler clicks before drag so ruler gets priority when active.
+        if ruler.active && response.clicked() {
+            if let Some(pos) = response.interact_pointer_pos() {
+                let (wx, wy) = self.screen_to_world(pos.x, pos.y, rect);
+                ruler.handle_click(wx, wy);
+            }
+        }
 
         if response.dragged() {
             let delta = response.drag_delta();
@@ -182,9 +192,11 @@ impl Viewport {
                 s.transform(tsf);
                 painter.add(s);
             }
-            return response
+            let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+            ruler.draw(&painter, self, rect, mouse_world);
+            return mouse_world;
         }
 
         // Full render: query a 3× expanded region so the cache has margin for panning.
@@ -281,9 +293,11 @@ impl Viewport {
             elements.len(),
         );
 
-        response
+        let mouse_world = response
             .hover_pos()
-            .map(|pos| self.screen_to_world(pos.x, pos.y, rect))
+            .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+        ruler.draw(&painter, self, rect, mouse_world);
+        mouse_world
     }
 }
 
