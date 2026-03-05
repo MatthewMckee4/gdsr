@@ -38,6 +38,11 @@ impl LayerColorMap {
             color
         })
     }
+
+    /// Sets the color for the given layer/datatype pair.
+    pub fn set(&mut self, layer: Layer, datatype: DataType, color: Color32) {
+        self.map.insert((layer, datatype), color);
+    }
 }
 
 #[cfg(test)]

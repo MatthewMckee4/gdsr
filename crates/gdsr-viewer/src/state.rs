@@ -174,6 +174,10 @@ impl RenderCache {
         self.populated = true;
     }
 
+    pub fn clear(&mut self) {
+        self.populated = false;
+    }
+
     pub fn layer_meshes(&self) -> &[((Layer, DataType), Mesh)] {
         &self.layer_meshes
     }

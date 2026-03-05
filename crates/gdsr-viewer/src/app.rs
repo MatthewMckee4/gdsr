@@ -310,6 +310,7 @@ impl eframe::App for ViewerApp {
         });
 
         let mut cell_changed = false;
+        let mut color_changed = false;
         let cell = &mut self.cell;
         let layer_state = &mut self.layer_state;
         egui::SidePanel::left("side_panel")
@@ -321,6 +322,7 @@ impl eframe::App for ViewerApp {
                         &cell.cell_tree,
                         &mut cell.selected_cell,
                         &mut cell_changed,
+                        &mut color_changed,
                         &mut cell.expand_state,
                         &cell.layers,
                         layer_state,
@@ -334,6 +336,11 @@ impl eframe::App for ViewerApp {
             if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
                 self.select_cell(&name);
             }
+        }
+
+        // Clearing render cache after changing color fixes the bug when color is not updated until user zooms out and back in.
+        if color_changed {
+            self.render_cache.clear();
         }
 
         let cell = &mut self.cell;

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use egui::{Ui, Vec2};
+use egui::Ui;
 use gdsr::{CellStats, DataType, Layer};
 
 use crate::hierarchy::{self, CellTreeNode, ExpandState};
@@ -12,6 +12,7 @@ pub fn draw_side_panel(
     cell_tree: &[CellTreeNode],
     selected_cell: &mut Option<String>,
     cell_changed: &mut bool,
+    color_changed: &mut bool,
     expand_state: &mut ExpandState,
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
@@ -137,13 +138,15 @@ pub fn draw_side_panel(
         .max_height(ui.available_height() - 40.0)
         .show(ui, |ui| {
             for &(layer, dt) in layers {
-                let color = layer_state.layer_colors.get(layer, dt);
+                let mut color = layer_state.layer_colors.get(layer, dt);
                 let visible = !layer_state.hidden_layers.contains(&(layer, dt));
 
                 ui.horizontal(|ui| {
-                    let (response, painter) =
-                        ui.allocate_painter(Vec2::new(14.0, 14.0), egui::Sense::hover());
-                    painter.rect_filled(response.rect, 2.0, color);
+                    let response = ui.color_edit_button_srgba(&mut color);
+                    if response.changed() {
+                        layer_state.layer_colors.set(layer, dt, color);
+                        *color_changed = true;
+                    }
 
                     let mut checked = visible;
                     if ui
