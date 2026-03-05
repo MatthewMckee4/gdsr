@@ -209,23 +209,8 @@ impl ToSvg for Element {
 
 impl ToSvg for Cell {
     fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
-        for polygon in self.polygons() {
-            polygon.to_svg_impl(ctx, out);
-        }
-        for path in self.paths() {
-            path.to_svg_impl(ctx, out);
-        }
-        for gds_box in self.boxes() {
-            gds_box.to_svg_impl(ctx, out);
-        }
-        for node in self.nodes() {
-            node.to_svg_impl(ctx, out);
-        }
-        for text in self.texts() {
-            text.to_svg_impl(ctx, out);
-        }
-        for reference in self.references() {
-            reference.to_svg_impl(ctx, out);
+        for element in self.elements() {
+            element.to_svg_impl(ctx, out);
         }
     }
 }

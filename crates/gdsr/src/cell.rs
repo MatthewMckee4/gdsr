@@ -79,6 +79,19 @@ impl Cell {
         &self.references
     }
 
+    /// Returns an iterator over all elements in this cell without flattening references.
+    pub fn elements(&self) -> impl Iterator<Item = Element> + '_ {
+        self.polygons
+            .iter()
+            .cloned()
+            .map(Element::Polygon)
+            .chain(self.paths.iter().cloned().map(Element::Path))
+            .chain(self.boxes.iter().cloned().map(Element::Box))
+            .chain(self.nodes.iter().cloned().map(Element::Node))
+            .chain(self.texts.iter().cloned().map(Element::Text))
+            .chain(self.references.iter().cloned().map(Element::Reference))
+    }
+
     /// Returns the names of all cells referenced by this cell, recursively resolving through
     /// inline element wrappers.
     pub fn referenced_cell_names(&self) -> Vec<&str> {
