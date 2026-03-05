@@ -177,7 +177,9 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
             self.open_file_dialog();
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::R)) {
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R)) {
+            self.ruler.clear_all();
+        } else if ctx.input(|i| i.key_pressed(egui::Key::R)) {
             self.ruler.toggle();
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -227,6 +229,13 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.ruler.toggle();
+                    }
+                    if ui
+                        .add(egui::Button::new("Clear Rulers").shortcut_text(shortcut_text("R")))
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.ruler.clear_all();
                     }
                     ui.separator();
                     ui.label("Pan: Arrow Keys");

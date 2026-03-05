@@ -13,8 +13,8 @@ pub struct RulerState {
     pub active: bool,
     /// First point in world coordinates, set on first click.
     pub start: Option<(f64, f64)>,
-    /// Completed measurement: start and end in world coordinates.
-    pub measurement: Option<Measurement>,
+    /// All completed measurements.
+    pub measurements: Vec<Measurement>,
 }
 
 /// A completed measurement between two world-space points.
@@ -37,13 +37,20 @@ impl RulerState {
     pub fn toggle(&mut self) {
         self.active = !self.active;
         if !self.active {
-            self.cancel();
+            self.start = None;
         }
     }
 
+    /// Cancels any in-progress measurement. Does not remove completed measurements.
     pub fn cancel(&mut self) {
         self.start = None;
-        self.measurement = None;
+        self.active = false;
+    }
+
+    /// Removes all completed measurements and cancels any in-progress one.
+    pub fn clear_all(&mut self) {
+        self.start = None;
+        self.measurements.clear();
         self.active = false;
     }
 
@@ -54,12 +61,11 @@ impl RulerState {
         }
 
         if let Some(start) = self.start {
-            self.measurement = Some(Measurement {
+            self.measurements.push(Measurement {
                 start,
                 end: (wx, wy),
             });
             self.start = None;
-            self.active = false;
             true
         } else {
             self.start = Some((wx, wy));
@@ -67,7 +73,7 @@ impl RulerState {
         }
     }
 
-    /// Draws the ruler overlay: in-progress line to cursor, or completed measurement.
+    /// Draws all ruler overlays: completed measurements and in-progress line to cursor.
     pub fn draw(
         &self,
         painter: &Painter,
@@ -76,6 +82,10 @@ impl RulerState {
         mouse_world: Option<(f64, f64)>,
     ) {
         let stroke = Stroke::new(RULER_WIDTH, RULER_COLOR);
+
+        for m in &self.measurements {
+            draw_measurement(painter, viewport, rect, m, stroke);
+        }
 
         if let Some(start) = self.start {
             let s_start = viewport.world_to_screen(start.0, start.1, rect);
@@ -98,26 +108,32 @@ impl RulerState {
                 draw_label(painter, midpoint, &label);
             }
         }
-
-        if let Some(m) = &self.measurement {
-            let s_start = viewport.world_to_screen(m.start.0, m.start.1, rect);
-            let s_end = viewport.world_to_screen(m.end.0, m.end.1, rect);
-
-            painter.add(Shape::LineSegment {
-                points: [s_start, s_end],
-                stroke,
-            });
-            draw_endpoint(painter, s_start);
-            draw_endpoint(painter, s_end);
-
-            let label = format_distance(m.distance());
-            let midpoint = Pos2::new(
-                f32::midpoint(s_start.x, s_end.x),
-                f32::midpoint(s_start.y, s_end.y),
-            );
-            draw_label(painter, midpoint, &label);
-        }
     }
+}
+
+fn draw_measurement(
+    painter: &Painter,
+    viewport: &Viewport,
+    rect: Rect,
+    m: &Measurement,
+    stroke: Stroke,
+) {
+    let s_start = viewport.world_to_screen(m.start.0, m.start.1, rect);
+    let s_end = viewport.world_to_screen(m.end.0, m.end.1, rect);
+
+    painter.add(Shape::LineSegment {
+        points: [s_start, s_end],
+        stroke,
+    });
+    draw_endpoint(painter, s_start);
+    draw_endpoint(painter, s_end);
+
+    let label = format_distance(m.distance());
+    let midpoint = Pos2::new(
+        f32::midpoint(s_start.x, s_end.x),
+        f32::midpoint(s_start.y, s_end.y),
+    );
+    draw_label(painter, midpoint, &label);
 }
 
 fn draw_endpoint(painter: &Painter, center: Pos2) {
@@ -224,43 +240,71 @@ mod tests {
     }
 
     #[test]
-    fn ruler_state_click_workflow() {
-        let mut ruler = RulerState::default();
+    fn multiple_measurements() {
+        let mut ruler = RulerState {
+            active: true,
+            ..Default::default()
+        };
 
-        assert!(!ruler.handle_click(0.0, 0.0));
+        ruler.handle_click(0.0, 0.0);
+        ruler.handle_click(3.0, 4.0);
+        assert_eq!(ruler.measurements.len(), 1);
+        assert!(
+            ruler.active,
+            "should stay active after completing a measurement"
+        );
 
-        ruler.active = true;
-
-        assert!(ruler.handle_click(1.0, 2.0));
-        assert_eq!(ruler.start, Some((1.0, 2.0)));
-        assert!(ruler.measurement.is_none());
-
-        assert!(ruler.handle_click(4.0, 6.0));
-        assert!(ruler.start.is_none());
-        assert!(ruler.measurement.is_some());
-        assert!(!ruler.active);
-
-        let m = ruler
-            .measurement
-            .as_ref()
-            .expect("measurement should exist");
-        assert!((m.distance() - 5.0).abs() < 1e-10);
+        ruler.handle_click(10.0, 10.0);
+        ruler.handle_click(13.0, 14.0);
+        assert_eq!(ruler.measurements.len(), 2);
+        assert!(ruler.active);
     }
 
     #[test]
-    fn ruler_cancel_clears_state() {
+    fn cancel_preserves_completed_measurements() {
         let mut ruler = RulerState {
             active: true,
-            start: Some((1.0, 2.0)),
-            measurement: Some(Measurement {
-                start: (0.0, 0.0),
-                end: (1.0, 1.0),
-            }),
+            ..Default::default()
         };
+
+        ruler.handle_click(0.0, 0.0);
+        ruler.handle_click(1.0, 0.0);
+        assert_eq!(ruler.measurements.len(), 1);
+
+        ruler.handle_click(5.0, 5.0);
+        assert!(ruler.start.is_some());
 
         ruler.cancel();
         assert!(!ruler.active);
         assert!(ruler.start.is_none());
-        assert!(ruler.measurement.is_none());
+        assert_eq!(
+            ruler.measurements.len(),
+            1,
+            "completed measurements should be preserved"
+        );
+    }
+
+    #[test]
+    fn clear_all_removes_everything() {
+        let mut ruler = RulerState {
+            active: true,
+            ..Default::default()
+        };
+
+        ruler.handle_click(0.0, 0.0);
+        ruler.handle_click(1.0, 0.0);
+        ruler.handle_click(2.0, 2.0);
+
+        ruler.clear_all();
+        assert!(!ruler.active);
+        assert!(ruler.start.is_none());
+        assert!(ruler.measurements.is_empty());
+    }
+
+    #[test]
+    fn click_ignored_when_inactive() {
+        let mut ruler = RulerState::default();
+        assert!(!ruler.handle_click(0.0, 0.0));
+        assert!(ruler.measurements.is_empty());
     }
 }
