@@ -83,7 +83,8 @@ impl ExpandState {
         self.expanded.get(name).copied().unwrap_or(false)
     }
 
-    pub fn toggle(&mut self, name: &str) {
+    #[cfg(test)]
+    fn toggle(&mut self, name: &str) {
         let entry = self.expanded.entry(name.to_string()).or_insert(false);
         *entry = !*entry;
     }
