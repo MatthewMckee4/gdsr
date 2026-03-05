@@ -1,7 +1,10 @@
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
 
+use quickcheck::Gen;
+use quickcheck_macros::quickcheck;
 use tempfile::tempdir;
 
+use super::arbitrary::arb_structure_name;
 use crate::*;
 
 fn assert_roundtrip(library: &Library) {
@@ -1317,4 +1320,48 @@ fn test_polygon_layer_and_data_type_at_boundary() {
     let temp_dir = tempdir().unwrap();
     let gds_path = temp_dir.path().join("valid.gds");
     assert!(library.write_file(&gds_path, 1e-9, 1e-9).is_ok());
+}
+
+#[quickcheck]
+fn dangling_references_detected_after_cell_removal(_seed: u8) -> bool {
+    let mut g = Gen::new(30);
+
+    let name_a = arb_structure_name(&mut g);
+    let mut name_b = arb_structure_name(&mut g);
+    while name_b == name_a {
+        name_b = arb_structure_name(&mut g);
+    }
+
+    let units = 1e-9;
+    let mut library = Library::new("lib");
+
+    let mut base = Cell::new(&name_a);
+    base.add(Polygon::new(
+        [
+            Point::integer(0, 0, units),
+            Point::integer(10, 0, units),
+            Point::integer(10, 10, units),
+        ],
+        1,
+        0,
+    ));
+    library.add_cell(base.clone());
+
+    let mut top = Cell::new(&name_b);
+    top.add(Reference::new(name_a.clone()));
+    library.add_cell(top);
+
+    assert!(
+        library.dangling_references().is_empty(),
+        "expected no dangling references before removal"
+    );
+
+    library.remove_cell(vec![base]);
+
+    let dangling = library.dangling_references();
+    assert_eq!(dangling.len(), 1);
+    assert_eq!(dangling[0].cell_name, name_b);
+    assert_eq!(dangling[0].target_name, name_a);
+
+    true
 }
