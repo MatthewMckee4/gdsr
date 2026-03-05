@@ -56,6 +56,17 @@ impl Viewport {
         WorldBBox::new(min_x, min_y, max_x, max_y)
     }
 
+    /// Pans the viewport by the given world-space deltas.
+    pub fn pan(&mut self, dx_world: f64, dy_world: f64) {
+        self.center_x += dx_world;
+        self.center_y += dy_world;
+    }
+
+    /// Zooms by `factor` anchored at the center of the viewport.
+    pub fn zoom_at_center(&mut self, factor: f64) {
+        self.zoom = (self.zoom * factor).clamp(1e-3, 1e15);
+    }
+
     /// Adjusts center and zoom to fit the given bounding box in the viewport rect.
     pub fn zoom_to_fit(&mut self, bounds: &WorldBBox, rect: Rect) {
         self.center_x = f64::midpoint(bounds.min_x, bounds.max_x);
@@ -116,6 +127,30 @@ impl Viewport {
                 self.zoom = new_zoom;
             }
         }
+
+        // Keyboard pan: arrow keys move by 10% of the visible viewport.
+        let pan_step_x = f64::from(rect.width()) * 0.1 / self.zoom;
+        let pan_step_y = f64::from(rect.height()) * 0.1 / self.zoom;
+        ui.input(|i| {
+            if i.key_pressed(egui::Key::ArrowLeft) {
+                self.pan(-pan_step_x, 0.0);
+            }
+            if i.key_pressed(egui::Key::ArrowRight) {
+                self.pan(pan_step_x, 0.0);
+            }
+            if i.key_pressed(egui::Key::ArrowUp) {
+                self.pan(0.0, pan_step_y);
+            }
+            if i.key_pressed(egui::Key::ArrowDown) {
+                self.pan(0.0, -pan_step_y);
+            }
+            if i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals) {
+                self.zoom_at_center(1.2);
+            }
+            if i.key_pressed(egui::Key::Minus) {
+                self.zoom_at_center(1.0 / 1.2);
+            }
+        });
 
         let mut hidden_layers: Vec<(Layer, DataType)> =
             layer_state.hidden_layers.iter().copied().collect();
@@ -384,6 +419,56 @@ mod tests {
 
         assert!((f64::from(after.x - cursor.x)).abs() < 0.01);
         assert!((f64::from(after.y - cursor.y)).abs() < 0.01);
+    }
+
+    #[test]
+    fn pan_shifts_center() {
+        let mut vp = Viewport::default();
+        vp.pan(10.0, -5.0);
+        assert!((vp.center_x - 10.0).abs() < EPSILON);
+        assert!((vp.center_y - (-5.0)).abs() < EPSILON);
+    }
+
+    #[test]
+    fn zoom_at_center_scales_zoom() {
+        let mut vp = Viewport {
+            center_x: 5.0,
+            center_y: 10.0,
+            zoom: 100.0,
+        };
+        let (orig_cx, orig_cy) = (vp.center_x, vp.center_y);
+        vp.zoom_at_center(2.0);
+        assert!((vp.zoom - 200.0).abs() < EPSILON);
+        assert!((vp.center_x - orig_cx).abs() < EPSILON);
+        assert!((vp.center_y - orig_cy).abs() < EPSILON);
+    }
+
+    #[test]
+    fn zoom_at_center_clamps() {
+        let mut vp = Viewport {
+            zoom: 1e-3,
+            ..Default::default()
+        };
+        vp.zoom_at_center(0.1);
+        assert!(vp.zoom >= 1e-3);
+
+        let mut vp = Viewport {
+            zoom: 1e15,
+            ..Default::default()
+        };
+        vp.zoom_at_center(10.0);
+        assert!(vp.zoom <= 1e15);
+    }
+
+    #[test]
+    fn zoom_at_center_in_then_out_returns_to_original() {
+        let mut vp = Viewport {
+            zoom: 100.0,
+            ..Default::default()
+        };
+        vp.zoom_at_center(1.2);
+        vp.zoom_at_center(1.0 / 1.2);
+        assert!((vp.zoom - 100.0).abs() < 1e-10);
     }
 
     #[test]

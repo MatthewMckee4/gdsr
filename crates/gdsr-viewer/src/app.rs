@@ -156,6 +156,14 @@ impl eframe::App for ViewerApp {
             self.zoom_to_fit();
         }
 
+        // Global keyboard shortcuts
+        if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+            self.zoom_to_fit();
+        }
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
+            self.open_file_dialog();
+        }
+
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
