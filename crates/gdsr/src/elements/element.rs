@@ -77,14 +77,14 @@ impl Element {
     }
 
     /// Remaps the layer and data type using the given mapping.
-    /// References are not affected since they don't have layer/data type.
+    /// For references, remaps the inline element if present.
     pub fn remap_layers(&mut self, mapping: &crate::LayerMapping) {
         match self {
             Self::Path(path) => path.remap_layers(mapping),
             Self::Polygon(polygon) => polygon.remap_layers(mapping),
             Self::Box(gds_box) => gds_box.remap_layers(mapping),
             Self::Text(text) => text.remap_layers(mapping),
-            Self::Reference(_) => {}
+            Self::Reference(reference) => reference.remap_layers(mapping),
         }
     }
 

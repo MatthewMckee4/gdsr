@@ -336,6 +336,52 @@ mod tests {
     }
 
     #[test]
+    fn test_remap_layers_inline_element() {
+        let units = 1e-9;
+        let mut library = Library::new("lib");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(10, 0, units),
+                Point::integer(10, 10, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut cell = Cell::new("cell");
+        cell.add(Reference::new(polygon));
+        library.add_cell(cell);
+
+        let mapping: crate::LayerMapping = [(
+            (Layer::new(1), DataType::new(0)),
+            (Layer::new(50), DataType::new(60)),
+        )]
+        .into_iter()
+        .collect();
+
+        library.remap_layers(&mapping);
+
+        let cell = library.get_cell("cell").unwrap();
+        let reference = &cell.references()[0];
+        let inner = reference.instance().as_element().unwrap();
+        let polygon = inner.as_polygon().unwrap();
+        insta::assert_debug_snapshot!(
+            (polygon.layer(), polygon.data_type()),
+            @r#"
+        (
+            Layer(
+                50,
+            ),
+            DataType(
+                60,
+            ),
+        )
+        "#
+        );
+    }
+
+    #[test]
     fn test_remap_layers_unmatched_unchanged() {
         let units = 1e-9;
         let mut library = Library::new("lib");

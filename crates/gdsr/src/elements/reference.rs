@@ -115,6 +115,15 @@ impl Reference {
         }
     }
 
+    /// Remaps layers on the inline element, if this reference holds one.
+    /// Cell references are unaffected.
+    pub fn remap_layers(&mut self, mapping: &crate::LayerMapping) {
+        if let Instance::Element(arc_elem) = &mut self.instance {
+            let elem = Arc::make_mut(arc_elem);
+            elem.remap_layers(mapping);
+        }
+    }
+
     /// Sets the grid layout and returns the modified reference.
     #[must_use]
     pub const fn with_grid(mut self, grid: Grid) -> Self {

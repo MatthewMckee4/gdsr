@@ -162,6 +162,9 @@ impl Cell {
         for text in &mut self.texts {
             text.remap_layers(mapping);
         }
+        for reference in &mut self.references {
+            reference.remap_layers(mapping);
+        }
     }
 
     /// Like [`get_elements`](Self::get_elements) but sends elements through a channel as they're
