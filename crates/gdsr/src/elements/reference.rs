@@ -100,6 +100,21 @@ impl Reference {
         &self.grid
     }
 
+    /// Returns the name of the referenced cell, recursively resolving through inline element
+    /// wrappers. Returns `None` if the reference chain ends at a non-reference element.
+    pub fn referenced_cell_name(&self) -> Option<&str> {
+        match &self.instance {
+            Instance::Cell(name) => Some(name),
+            Instance::Element(element) => {
+                if let Element::Reference(inner) = element.as_ref().as_ref() {
+                    inner.referenced_cell_name()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     /// Sets the grid layout and returns the modified reference.
     #[must_use]
     pub const fn with_grid(mut self, grid: Grid) -> Self {
@@ -562,6 +577,34 @@ mod tests {
         let reference = Reference::default();
         assert_eq!(reference.grid().columns(), 1);
         assert_eq!(reference.grid().rows(), 1);
+    }
+
+    #[test]
+    fn test_referenced_cell_name_direct() {
+        let reference = Reference::new("target_cell");
+        insta::assert_snapshot!(reference.referenced_cell_name().unwrap(), @"target_cell");
+    }
+
+    #[test]
+    fn test_referenced_cell_name_inline_polygon() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            1,
+            0,
+        );
+        let reference = Reference::new(polygon);
+        assert!(reference.referenced_cell_name().is_none());
+    }
+
+    #[test]
+    fn test_referenced_cell_name_nested() {
+        let inner = Reference::new("deep_cell");
+        let outer = Reference::new(inner);
+        insta::assert_snapshot!(outer.referenced_cell_name().unwrap(), @"deep_cell");
     }
 
     #[test]

@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use crate::cell::Cell;
-use crate::elements::reference::Instance;
 use crate::error::GdsError;
 use crate::utils::io::{from_gds, write_gds};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DanglingReference {
+pub struct DanglingCellReference {
     /// The cell containing the dangling reference.
     pub cell_name: String,
     /// The name of the missing target cell.
@@ -86,21 +85,20 @@ impl Library {
         write_gds(file_name, &self.name, user_units, database_units, &cells)
     }
 
-    /// Returns all dangling references in the library.
+    /// Returns all dangling cell references in the library.
     ///
-    /// A dangling reference is a `Reference` with an `Instance::Cell` target
-    /// whose name does not match any cell in the library.
-    pub fn dangling_references(&self) -> Vec<DanglingReference> {
+    /// A dangling cell reference is a `Reference` whose resolved cell name
+    /// (via [`Reference::referenced_cell_name`]) does not match any cell in the library.
+    /// This recursively resolves through inline element wrappers.
+    pub fn dangling_cell_references(&self) -> Vec<DanglingCellReference> {
         let mut dangling = Vec::new();
         for (cell_name, cell) in &self.cells {
-            for reference in cell.references() {
-                if let Instance::Cell(target) = reference.instance() {
-                    if !self.cells.contains_key(target) {
-                        dangling.push(DanglingReference {
-                            cell_name: cell_name.clone(),
-                            target_name: target.clone(),
-                        });
-                    }
+            for target in cell.referenced_cell_names() {
+                if !self.cells.contains_key(target) {
+                    dangling.push(DanglingCellReference {
+                        cell_name: cell_name.clone(),
+                        target_name: target.to_string(),
+                    });
                 }
             }
         }
@@ -260,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dangling_references_none() {
+    fn test_dangling_cell_references_none() {
         let units = 1e-9;
         let mut library = Library::new("lib");
 
@@ -280,25 +278,22 @@ mod tests {
         top.add(Reference::new("base".to_string()));
         library.add_cell(top);
 
-        assert!(library.dangling_references().is_empty());
+        assert!(library.dangling_cell_references().is_empty());
     }
 
     #[test]
-    fn test_dangling_references_detected() {
+    fn test_dangling_cell_references_detected() {
         let mut library = Library::new("lib");
 
         let mut cell = Cell::new("cell_a");
         cell.add(Reference::new("missing_cell".to_string()));
         library.add_cell(cell);
 
-        let dangling = library.dangling_references();
-        assert_eq!(dangling.len(), 1);
-        assert_eq!(dangling[0].cell_name, "cell_a");
-        assert_eq!(dangling[0].target_name, "missing_cell");
+        insta::assert_debug_snapshot!(library.dangling_cell_references());
     }
 
     #[test]
-    fn test_dangling_references_multiple() {
+    fn test_dangling_cell_references_multiple() {
         let mut library = Library::new("lib");
 
         let mut cell_a = Cell::new("cell_a");
@@ -310,18 +305,15 @@ mod tests {
         cell_b.add(Reference::new("ghost3".to_string()));
         library.add_cell(cell_b);
 
-        let mut dangling = library.dangling_references();
+        let mut dangling = library.dangling_cell_references();
         dangling
             .sort_by(|a, b| (&a.cell_name, &a.target_name).cmp(&(&b.cell_name, &b.target_name)));
 
-        assert_eq!(dangling.len(), 3);
-        assert_eq!(dangling[0].target_name, "ghost1");
-        assert_eq!(dangling[1].target_name, "ghost2");
-        assert_eq!(dangling[2].target_name, "ghost3");
+        insta::assert_debug_snapshot!(dangling);
     }
 
     #[test]
-    fn test_dangling_references_inline_element() {
+    fn test_dangling_cell_references_inline_element() {
         let units = 1e-9;
         let mut library = Library::new("lib");
 
@@ -337,6 +329,18 @@ mod tests {
         )));
         library.add_cell(cell);
 
-        assert!(library.dangling_references().is_empty());
+        assert!(library.dangling_cell_references().is_empty());
+    }
+
+    #[test]
+    fn test_dangling_cell_references_nested_inline_element() {
+        let mut library = Library::new("lib");
+
+        let mut cell = Cell::new("cell_a");
+        let inner_ref = Reference::new("missing_cell".to_string());
+        cell.add(Reference::new(inner_ref));
+        library.add_cell(cell);
+
+        insta::assert_debug_snapshot!(library.dangling_cell_references());
     }
 }

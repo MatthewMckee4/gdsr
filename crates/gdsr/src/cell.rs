@@ -65,6 +65,15 @@ impl Cell {
         &self.references
     }
 
+    /// Returns the names of all cells referenced by this cell, recursively resolving through
+    /// inline element wrappers.
+    pub fn referenced_cell_names(&self) -> Vec<&str> {
+        self.references
+            .iter()
+            .filter_map(Reference::referenced_cell_name)
+            .collect()
+    }
+
     /// Adds an element (polygon, path, text, or reference) to the cell.
     pub fn add(&mut self, element: impl Into<Element>) {
         match element.into() {

@@ -1323,7 +1323,7 @@ fn test_polygon_layer_and_data_type_at_boundary() {
 }
 
 #[quickcheck]
-fn dangling_references_detected_after_cell_removal(_seed: u8) -> bool {
+fn dangling_cell_references_detected_after_cell_removal(_seed: u8) -> bool {
     let mut g = Gen::new(30);
 
     let name_a = arb_structure_name(&mut g);
@@ -1352,13 +1352,13 @@ fn dangling_references_detected_after_cell_removal(_seed: u8) -> bool {
     library.add_cell(top);
 
     assert!(
-        library.dangling_references().is_empty(),
+        library.dangling_cell_references().is_empty(),
         "expected no dangling references before removal"
     );
 
     library.remove_cell(vec![base]);
 
-    let dangling = library.dangling_references();
+    let dangling = library.dangling_cell_references();
     assert_eq!(dangling.len(), 1);
     assert_eq!(dangling[0].cell_name, name_b);
     assert_eq!(dangling[0].target_name, name_a);

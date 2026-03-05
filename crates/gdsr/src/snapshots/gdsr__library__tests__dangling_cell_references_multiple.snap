@@ -1,0 +1,18 @@
+---
+source: crates/gdsr/src/library.rs
+expression: dangling
+---
+[
+    DanglingCellReference {
+        cell_name: "cell_a",
+        target_name: "ghost1",
+    },
+    DanglingCellReference {
+        cell_name: "cell_a",
+        target_name: "ghost2",
+    },
+    DanglingCellReference {
+        cell_name: "cell_b",
+        target_name: "ghost3",
+    },
+]

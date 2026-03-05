@@ -1,0 +1,10 @@
+---
+source: crates/gdsr/src/library.rs
+expression: library.dangling_cell_references()
+---
+[
+    DanglingCellReference {
+        cell_name: "cell_a",
+        target_name: "missing_cell",
+    },
+]
