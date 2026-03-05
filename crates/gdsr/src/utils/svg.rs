@@ -209,7 +209,7 @@ impl ToSvg for Element {
 
 impl ToSvg for Cell {
     fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
-        for element in self.elements() {
+        for element in self.iter_elements() {
             element.to_svg_impl(ctx, out);
         }
     }
