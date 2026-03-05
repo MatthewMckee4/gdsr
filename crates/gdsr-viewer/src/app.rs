@@ -19,7 +19,6 @@ fn shortcut_text(key: &str) -> String {
     format!("{modifier}{key}")
 }
 
-#[derive(Default)]
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -28,7 +27,24 @@ pub struct ViewerApp {
     mouse_world_pos: Option<(f64, f64)>,
     render_cache: RenderCache,
     ruler: RulerState,
+    show_grid: bool,
     hovered_element: Option<usize>,
+}
+
+impl Default for ViewerApp {
+    fn default() -> Self {
+        Self {
+            file_load: FileLoadState::default(),
+            cell: None,
+            layer_state: LayerState::default(),
+            viewport: Viewport::default(),
+            mouse_world_pos: None,
+            render_cache: RenderCache::default(),
+            ruler: RulerState::default(),
+            show_grid: true,
+            hovered_element: None,
+        }
+    }
 }
 
 impl ViewerApp {
@@ -174,6 +190,9 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F)) {
             self.zoom_to_fit();
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::G)) {
+            self.show_grid = !self.show_grid;
+        }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
             self.open_file_dialog();
         }
@@ -236,6 +255,20 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.ruler.clear_all();
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(if self.show_grid {
+                                "Hide Grid"
+                            } else {
+                                "Show Grid"
+                            })
+                            .shortcut_text("G"),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.show_grid = !self.show_grid;
                     }
                     ui.separator();
                     ui.label("Pan: Arrow Keys");
@@ -306,6 +339,7 @@ impl eframe::App for ViewerApp {
         let mouse_world_pos = &mut self.mouse_world_pos;
         let render_cache = &mut self.render_cache;
         let ruler = &mut self.ruler;
+        let show_grid = self.show_grid;
         let hovered_element = &mut self.hovered_element;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
@@ -330,6 +364,7 @@ impl eframe::App for ViewerApp {
                 render_cache,
                 tessellation_cache,
                 ruler,
+                show_grid,
                 *hovered_element,
             );
 
