@@ -1,6 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
-use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
@@ -23,11 +21,15 @@ pub struct ViewerApp {
 impl ViewerApp {
     pub fn with_path(path: &Path) -> Self {
         let (path, rx) = crate::loader::load_request(path);
-        Self {
+        let file_load = FileLoadState {
             file_path: Some(path.clone()),
             load_receiver: Some((path, rx)),
             loading: true,
             error_message: None,
+        };
+
+        Self {
+            file_load,
             ..Default::default()
         }
     }
