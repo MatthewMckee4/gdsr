@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::{Cell, DataType, Dimensions, Element, Layer, Library, Point};
+use crate::{
+    Cell, DataType, Dimensions, Element, GdsBox, Layer, Library, Node, Path, Point, Polygon,
+    Reference, Text,
+};
 
 const PALETTE: [(u8, u8, u8); 16] = [
     (230, 25, 75),
@@ -50,128 +53,180 @@ impl LayerColorMap {
     }
 }
 
-fn point_scaled(p: &Point, dbu: f64) -> (f64, f64) {
-    (p.x().absolute_value() / dbu, p.y().absolute_value() / dbu)
+/// Shared context passed to [`ToSvg::to_svg_impl`] implementations.
+pub struct SvgContext<'a> {
+    colors: LayerColorMap,
+    /// The larger of the bounding box width/height, used to scale text and markers.
+    pub extent: f64,
+    /// The database unit divisor applied to all coordinates.
+    pub dbu: f64,
+    /// The library used to resolve cell references.
+    pub library: &'a Library,
 }
 
-/// Formats a float for SVG output with limited precision, stripping trailing zeros.
-fn fmt(v: f64) -> String {
-    if v == 0.0 {
-        return "0".to_string();
-    }
-    // Round to 6 significant digits via scientific notation round-trip
-    let s = format!("{v:.6e}");
-    let parsed: f64 = s.parse().unwrap_or(v);
-    // Format with enough decimals to show all significant digits
-    let mag = parsed.abs().log10().floor() as i32;
-    let decimals = (6 - mag).max(0) as usize;
-    let mut fixed = format!("{parsed:.decimals$}");
-    // Strip trailing zeros after decimal point
-    if fixed.contains('.') {
-        fixed = fixed.trim_end_matches('0').to_string();
-        fixed = fixed.trim_end_matches('.').to_string();
-    }
-    fixed
-}
-
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-/// Renders a single flattened element to SVG, appending to `out`.
-/// `extent` is the larger of the bounding box width/height, used to scale text and markers.
-/// `dbu` is the database unit divisor applied to all coordinates.
-fn render_element(
-    element: &Element,
-    colors: &mut LayerColorMap,
-    extent: f64,
-    dbu: f64,
-    out: &mut String,
-) {
-    match element {
-        Element::Polygon(polygon) => {
-            let color = colors.hex(polygon.layer(), polygon.data_type());
-            let _ = write!(out, "    <polygon points=\"");
-            for (i, p) in polygon.points().iter().enumerate() {
-                let (x, y) = point_scaled(p, dbu);
-                if i > 0 {
-                    out.push(' ');
-                }
-                let _ = write!(out, "{},{}", fmt(x), fmt(y));
-            }
-            let _ = writeln!(
-                out,
-                "\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />"
-            );
+impl<'a> SvgContext<'a> {
+    fn new(extent: f64, dbu: f64, library: &'a Library) -> Self {
+        Self {
+            colors: LayerColorMap::new(),
+            extent,
+            dbu,
+            library,
         }
-        Element::Path(path) => {
-            let color = colors.hex(path.layer(), path.data_type());
-            let stroke_width = path
-                .width()
-                .map_or(extent * 0.005, |w| w.absolute_value() / dbu);
-            let _ = write!(out, "    <polyline points=\"");
-            for (i, p) in path.points().iter().enumerate() {
-                let (x, y) = point_scaled(p, dbu);
-                if i > 0 {
-                    out.push(' ');
-                }
-                let _ = write!(out, "{},{}", fmt(x), fmt(y));
+    }
+
+    fn hex(&mut self, layer: Layer, datatype: DataType) -> String {
+        self.colors.hex(layer, datatype)
+    }
+
+    fn scale(&self, p: &Point) -> (f64, f64) {
+        (
+            p.x().absolute_value() / self.dbu,
+            p.y().absolute_value() / self.dbu,
+        )
+    }
+}
+
+/// Trait for types that can be rendered to SVG elements.
+pub trait ToSvg {
+    /// Appends SVG element(s) for this value to `out`.
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String);
+}
+
+impl ToSvg for Polygon {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let color = ctx.hex(self.layer(), self.data_type());
+        let _ = write!(out, "    <polygon points=\"");
+        for (i, p) in self.points().iter().enumerate() {
+            let (x, y) = ctx.scale(p);
+            if i > 0 {
+                out.push(' ');
             }
-            let _ = writeln!(
-                out,
-                "\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{}\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />",
-                fmt(stroke_width)
-            );
+            let _ = write!(out, "{},{}", fmt(x), fmt(y));
         }
-        Element::Box(gds_box) => {
-            let color = colors.hex(gds_box.layer(), gds_box.box_type());
-            let (x, y) = point_scaled(&gds_box.bottom_left(), dbu);
-            let (x2, y2) = point_scaled(&gds_box.top_right(), dbu);
-            let w = x2 - x;
-            let h = y2 - y;
+        let _ = writeln!(
+            out,
+            "\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />"
+        );
+    }
+}
+
+impl ToSvg for Path {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let color = ctx.hex(self.layer(), self.data_type());
+        let stroke_width = self
+            .width()
+            .map_or(ctx.extent * 0.005, |w| w.absolute_value() / ctx.dbu);
+        let _ = write!(out, "    <polyline points=\"");
+        for (i, p) in self.points().iter().enumerate() {
+            let (x, y) = ctx.scale(p);
+            if i > 0 {
+                out.push(' ');
+            }
+            let _ = write!(out, "{},{}", fmt(x), fmt(y));
+        }
+        let _ = writeln!(
+            out,
+            "\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{}\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />",
+            fmt(stroke_width)
+        );
+    }
+}
+
+impl ToSvg for GdsBox {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let color = ctx.hex(self.layer(), self.box_type());
+        let (x, y) = ctx.scale(&self.bottom_left());
+        let (x2, y2) = ctx.scale(&self.top_right());
+        let w = x2 - x;
+        let h = y2 - y;
+        let _ = writeln!(
+            out,
+            "    <rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />",
+            fmt(x),
+            fmt(y),
+            fmt(w),
+            fmt(h)
+        );
+    }
+}
+
+impl ToSvg for Text {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let color = ctx.hex(self.layer(), self.data_type());
+        let (x, y) = ctx.scale(self.origin());
+        let escaped = escape_xml(self.text());
+        let font_size = ctx.extent * 0.03;
+        // Counter-flip text so it reads correctly despite the parent Y-flip
+        let _ = writeln!(
+            out,
+            "    <text x=\"{}\" y=\"{}\" fill=\"{color}\" font-size=\"{}\" font-family=\"monospace\" transform=\"scale(1,-1) translate(0,{})\">{escaped}</text>",
+            fmt(x),
+            fmt(y),
+            fmt(font_size),
+            fmt(-2.0 * y)
+        );
+    }
+}
+
+impl ToSvg for Node {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let color = ctx.hex(self.layer(), self.node_type());
+        let r = ctx.extent * 0.005;
+        for p in self.points() {
+            let (x, y) = ctx.scale(p);
             let _ = writeln!(
                 out,
-                "    <rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />",
+                "    <circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{color}\" />",
                 fmt(x),
                 fmt(y),
-                fmt(w),
-                fmt(h)
+                fmt(r)
             );
         }
-        Element::Text(text) => {
-            let color = colors.hex(text.layer(), text.data_type());
-            let (x, y) = point_scaled(text.origin(), dbu);
-            let escaped = escape_xml(text.text());
-            let font_size = extent * 0.03;
-            // Counter-flip text so it reads correctly despite the parent Y-flip
-            let _ = writeln!(
-                out,
-                "    <text x=\"{}\" y=\"{}\" fill=\"{color}\" font-size=\"{}\" font-family=\"monospace\" transform=\"scale(1,-1) translate(0,{})\">{escaped}</text>",
-                fmt(x),
-                fmt(y),
-                fmt(font_size),
-                fmt(-2.0 * y)
-            );
+    }
+}
+
+impl ToSvg for Reference {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        let flattened = self.clone().flatten(None, ctx.library);
+        for element in &flattened {
+            element.to_svg_impl(ctx, out);
         }
-        Element::Node(node) => {
-            let color = colors.hex(node.layer(), node.node_type());
-            let r = extent * 0.005;
-            for p in node.points() {
-                let (x, y) = point_scaled(p, dbu);
-                let _ = writeln!(
-                    out,
-                    "    <circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{color}\" />",
-                    fmt(x),
-                    fmt(y),
-                    fmt(r)
-                );
-            }
+    }
+}
+
+impl ToSvg for Element {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        match self {
+            Self::Polygon(v) => v.to_svg_impl(ctx, out),
+            Self::Path(v) => v.to_svg_impl(ctx, out),
+            Self::Box(v) => v.to_svg_impl(ctx, out),
+            Self::Text(v) => v.to_svg_impl(ctx, out),
+            Self::Node(v) => v.to_svg_impl(ctx, out),
+            Self::Reference(v) => v.to_svg_impl(ctx, out),
         }
-        Element::Reference(_) => {}
+    }
+}
+
+impl ToSvg for Cell {
+    fn to_svg_impl(&self, ctx: &mut SvgContext, out: &mut String) {
+        for polygon in self.polygons() {
+            polygon.to_svg_impl(ctx, out);
+        }
+        for path in self.paths() {
+            path.to_svg_impl(ctx, out);
+        }
+        for gds_box in self.boxes() {
+            gds_box.to_svg_impl(ctx, out);
+        }
+        for node in self.nodes() {
+            node.to_svg_impl(ctx, out);
+        }
+        for text in self.texts() {
+            text.to_svg_impl(ctx, out);
+        }
+        for reference in self.references() {
+            reference.to_svg_impl(ctx, out);
+        }
     }
 }
 
@@ -186,7 +241,7 @@ fn render_element(
 pub fn cell_to_svg(cell: &Cell, library: &Library, dbu: f64) -> String {
     let elements = cell.get_elements(None, library);
     let (min, max) = bounding_box_of_elements(&elements);
-    render_svg(&elements, min, max, dbu)
+    render_svg(cell, min, max, dbu, library)
 }
 
 fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
@@ -204,9 +259,15 @@ fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
     }
 }
 
-fn render_svg(elements: &[Element], min: Point, max: Point, dbu: f64) -> String {
-    let (min_x, min_y) = point_scaled(&min, dbu);
-    let (max_x, max_y) = point_scaled(&max, dbu);
+fn render_svg(cell: &Cell, min: Point, max: Point, dbu: f64, library: &Library) -> String {
+    let (min_x, min_y) = (
+        min.x().absolute_value() / dbu,
+        min.y().absolute_value() / dbu,
+    );
+    let (max_x, max_y) = (
+        max.x().absolute_value() / dbu,
+        max.y().absolute_value() / dbu,
+    );
 
     let width = max_x - min_x;
     let height = max_y - min_y;
@@ -237,20 +298,46 @@ fn render_svg(elements: &[Element], min: Point, max: Point, dbu: f64) -> String 
     );
 
     let extent = vb_w.max(vb_h);
-    let mut colors = LayerColorMap::new();
-    for element in elements {
-        render_element(element, &mut colors, extent, dbu, &mut out);
-    }
+    let mut ctx = SvgContext::new(extent, dbu, library);
+    cell.to_svg_impl(&mut ctx, &mut out);
 
     let _ = writeln!(out, "  </g>");
     let _ = writeln!(out, "</svg>");
     out
 }
 
+/// Formats a float for SVG output with limited precision, stripping trailing zeros.
+fn fmt(v: f64) -> String {
+    if v == 0.0 {
+        return "0".to_string();
+    }
+    // Round to 6 significant digits via scientific notation round-trip
+    let s = format!("{v:.6e}");
+    let parsed: f64 = s.parse().unwrap_or(v);
+    // Format with enough decimals to show all significant digits
+    let mag = parsed.abs().log10().floor() as i32;
+    let decimals = (6 - mag).max(0) as usize;
+    let mut fixed = format!("{parsed:.decimals$}");
+    // Strip trailing zeros after decimal point
+    if fixed.contains('.') {
+        fixed = fixed.trim_end_matches('0').to_string();
+        fixed = fixed.trim_end_matches('.').to_string();
+    }
+    fixed
+}
+
+fn escape_xml(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DataType, GdsBox, Layer, Node, Path, Point, Polygon, Reference, Text};
+    use crate::{DataType, Layer, Point};
 
     const UNITS: f64 = 1e-6;
 
