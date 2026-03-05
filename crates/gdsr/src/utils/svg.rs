@@ -54,6 +54,26 @@ fn point_abs(p: &Point) -> (f64, f64) {
     (p.x().absolute_value(), p.y().absolute_value())
 }
 
+/// Formats a float for SVG output with limited precision, stripping trailing zeros.
+fn fmt(v: f64) -> String {
+    if v == 0.0 {
+        return "0".to_string();
+    }
+    // Round to 6 significant digits via scientific notation round-trip
+    let s = format!("{v:.6e}");
+    let parsed: f64 = s.parse().unwrap_or(v);
+    // Format with enough decimals to show all significant digits
+    let mag = parsed.abs().log10().floor() as i32;
+    let decimals = (6 - mag).max(0) as usize;
+    let mut fixed = format!("{parsed:.decimals$}");
+    // Strip trailing zeros after decimal point
+    if fixed.contains('.') {
+        fixed = fixed.trim_end_matches('0').to_string();
+        fixed = fixed.trim_end_matches('.').to_string();
+    }
+    fixed
+}
+
 fn escape_xml(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -63,7 +83,8 @@ fn escape_xml(s: &str) -> String {
 }
 
 /// Renders a single flattened element to SVG, appending to `out`.
-fn render_element(element: &Element, colors: &mut LayerColorMap, out: &mut String) {
+/// `extent` is the larger of the bounding box width/height, used to scale text and markers.
+fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, out: &mut String) {
     match element {
         Element::Polygon(polygon) => {
             let color = colors.hex(polygon.layer(), polygon.data_type());
@@ -73,7 +94,7 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, out: &mut Strin
                 if i > 0 {
                     out.push(' ');
                 }
-                let _ = write!(out, "{x},{y}");
+                let _ = write!(out, "{},{}", fmt(x), fmt(y));
             }
             let _ = writeln!(
                 out,
@@ -82,18 +103,21 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, out: &mut Strin
         }
         Element::Path(path) => {
             let color = colors.hex(path.layer(), path.data_type());
-            let stroke_width = path.width().map_or(0.0, |w| w.absolute_value().abs());
+            let stroke_width = path
+                .width()
+                .map_or(extent * 0.005, |w| w.absolute_value().abs());
             let _ = write!(out, "    <polyline points=\"");
             for (i, p) in path.points().iter().enumerate() {
                 let (x, y) = point_abs(p);
                 if i > 0 {
                     out.push(' ');
                 }
-                let _ = write!(out, "{x},{y}");
+                let _ = write!(out, "{},{}", fmt(x), fmt(y));
             }
             let _ = writeln!(
                 out,
-                "\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{stroke_width}\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />"
+                "\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{}\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />",
+                fmt(stroke_width)
             );
         }
         Element::Box(gds_box) => {
@@ -104,25 +128,37 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, out: &mut Strin
             let h = y2 - y;
             let _ = writeln!(
                 out,
-                "    <rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />"
+                "    <rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{color}\" fill-opacity=\"0.6\" stroke=\"{color}\" stroke-width=\"0\" />",
+                fmt(x),
+                fmt(y),
+                fmt(w),
+                fmt(h)
             );
         }
         Element::Text(text) => {
             let color = colors.hex(text.layer(), text.data_type());
             let (x, y) = point_abs(text.origin());
             let escaped = escape_xml(text.text());
+            let font_size = extent * 0.03;
             let _ = writeln!(
                 out,
-                "    <text x=\"{x}\" y=\"{y}\" fill=\"{color}\" font-size=\"0.5\" font-family=\"monospace\">{escaped}</text>"
+                "    <text x=\"{}\" y=\"{}\" fill=\"{color}\" font-size=\"{}\" font-family=\"monospace\">{escaped}</text>",
+                fmt(x),
+                fmt(y),
+                fmt(font_size)
             );
         }
         Element::Node(node) => {
             let color = colors.hex(node.layer(), node.node_type());
+            let r = extent * 0.005;
             for p in node.points() {
                 let (x, y) = point_abs(p);
                 let _ = writeln!(
                     out,
-                    "    <circle cx=\"{x}\" cy=\"{y}\" r=\"0.2\" fill=\"{color}\" />"
+                    "    <circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{color}\" />",
+                    fmt(x),
+                    fmt(y),
+                    fmt(r)
                 );
             }
         }
@@ -196,18 +232,23 @@ fn render_svg(elements: &[Element], min: Point, max: Point) -> String {
     let _ = writeln!(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     let _ = writeln!(
         out,
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{vb_x} {vb_y} {vb_w} {vb_h}\">"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{} {} {} {}\">",
+        fmt(vb_x),
+        fmt(vb_y),
+        fmt(vb_w),
+        fmt(vb_h)
     );
     // Flip Y axis: GDS is Y-up, SVG is Y-down
     let _ = writeln!(
         out,
         "  <g transform=\"scale(1,-1) translate(0,{})\">",
-        -(vb_y * 2.0 + vb_h)
+        fmt(-(vb_y * 2.0 + vb_h))
     );
 
+    let extent = vb_w.max(vb_h);
     let mut colors = LayerColorMap::new();
     for element in elements {
-        render_element(element, &mut colors, &mut out);
+        render_element(element, &mut colors, extent, &mut out);
     }
 
     let _ = writeln!(out, "  </g>");
@@ -234,7 +275,7 @@ mod tests {
         insta::assert_snapshot!(svg, @r#"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
-          <g transform="scale(1,-1) translate(0,-0)">
+          <g transform="scale(1,-1) translate(0,0)">
           </g>
         </svg>
         "#);
@@ -253,8 +294,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.0000005 0.000011 0.000011">
-          <g transform="scale(1,-1) translate(0,-0.000009999999999999999)">
-            <polygon points="0,0 0.000009999999999999999,0 0.000009999999999999999,0.000009999999999999999 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+          <g transform="scale(1,-1) translate(0,-0.00001)">
+            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -277,8 +318,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.00000025 -0.00000025 0.0000055 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.0000049999999999999996)">
-            <polyline points="0,0 0.0000049999999999999996,0.0000049999999999999996" fill="none" stroke="#e6194b" stroke-width="0.000001" stroke-linecap="round" stroke-linejoin="round" />
+          <g transform="scale(1,-1) translate(0,-0.000005)">
+            <polyline points="0,0 0.000005,0.000005" fill="none" stroke="#e6194b" stroke-width="0.000001" stroke-linecap="round" stroke-linejoin="round" />
           </g>
         </svg>
         "##);
@@ -298,8 +339,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.00000025 0.000011 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.0000049999999999999996)">
-            <rect x="0" y="0" width="0.000009999999999999999" height="0.0000049999999999999996" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+          <g transform="scale(1,-1) translate(0,-0.000005)">
+            <rect x="0" y="0" width="0.00001" height="0.000005" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -318,8 +359,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.999999 -0.999998 2 2">
-          <g transform="scale(1,-1) translate(0,-0.000003999999999892978)">
-            <text x="0.000001" y="0.000002" fill="#e6194b" font-size="0.5" font-family="monospace">hello</text>
+          <g transform="scale(1,-1) translate(0,-0.000004)">
+            <text x="0.000001" y="0.000002" fill="#e6194b" font-size="0.06" font-family="monospace">hello</text>
           </g>
         </svg>
         "##);
@@ -338,8 +379,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.999997 -0.999996 2 2">
-          <g transform="scale(1,-1) translate(0,-0.000008000000000008)">
-            <circle cx="0.000003" cy="0.000004" r="0.2" fill="#e6194b" />
+          <g transform="scale(1,-1) translate(0,-0.000008)">
+            <circle cx="0.000003" cy="0.000004" r="0.01" fill="#e6194b" />
           </g>
         </svg>
         "##);
@@ -365,8 +406,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.00000025 -0.00000025 0.0000055 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.0000049999999999999996)">
-            <polygon points="0,0 0.0000049999999999999996,0 0.0000049999999999999996,0.0000049999999999999996 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+          <g transform="scale(1,-1) translate(0,-0.000005)">
+            <polygon points="0,0 0.000005,0 0.000005,0.000005 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -390,9 +431,9 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.0000005 0.000011 0.000011">
-          <g transform="scale(1,-1) translate(0,-0.000009999999999999999)">
-            <polygon points="0,0 0.000009999999999999999,0 0.000009999999999999999,0.000009999999999999999 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
-            <polygon points="0,0 0.000009999999999999999,0 0.000009999999999999999,0.000009999999999999999 0,0" fill="#3cb44b" fill-opacity="0.6" stroke="#3cb44b" stroke-width="0" />
+          <g transform="scale(1,-1) translate(0,-0.00001)">
+            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#3cb44b" fill-opacity="0.6" stroke="#3cb44b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -411,8 +452,8 @@ mod tests {
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
-          <g transform="scale(1,-1) translate(0,-0)">
-            <text x="0" y="0" fill="#e6194b" font-size="0.5" font-family="monospace">&lt;script&gt;&amp;&quot;test&quot;&lt;/script&gt;</text>
+          <g transform="scale(1,-1) translate(0,0)">
+            <text x="0" y="0" fill="#e6194b" font-size="0.06" font-family="monospace">&lt;script&gt;&amp;&quot;test&quot;&lt;/script&gt;</text>
           </g>
         </svg>
         "##);
