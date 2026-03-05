@@ -8,6 +8,7 @@ mod library;
 mod point;
 #[cfg(test)]
 mod property_tests;
+mod stats;
 mod traits;
 mod transformation;
 mod types;
@@ -21,6 +22,7 @@ pub use error::GdsError;
 pub use grid::Grid;
 pub use library::{DanglingCellReference, Library};
 pub use point::Point;
+pub use stats::{CellStats, LibraryStats};
 pub use traits::{Dimensions, Movable, ToGds, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer, LayerMapping};

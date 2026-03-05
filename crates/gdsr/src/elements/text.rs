@@ -242,6 +242,11 @@ impl Text {
         self.layer
     }
 
+    /// Returns the data type.
+    pub const fn data_type(&self) -> DataType {
+        self.datatype
+    }
+
     /// Sets the layer number and returns the modified value.
     #[must_use]
     pub fn set_layer(mut self, layer: Layer) -> Self {

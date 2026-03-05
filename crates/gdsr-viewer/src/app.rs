@@ -76,6 +76,7 @@ impl ViewerApp {
             cell.elements.clear();
             cell.layers.clear();
             cell.spatial_grid = None;
+            cell.cell_stats = cell.library.get_cell(name).map(gdsr::CellStats::from_cell);
 
             if let Some(cell_data) = cell.library.get_cell(name) {
                 let cell_data = cell_data.clone();
@@ -255,6 +256,7 @@ impl eframe::App for ViewerApp {
                         &mut cell.expand_state,
                         &cell.layers,
                         layer_state,
+                        cell.cell_stats.as_ref(),
                     );
                 }
             });

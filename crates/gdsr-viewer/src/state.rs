@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use egui::{Mesh, Pos2, Shape};
 use emath::{TSTransform, Vec2};
-use gdsr::{DataType, Element, Layer, Library};
+use gdsr::{CellStats, DataType, Element, Layer, Library};
 
 use crate::colors::LayerColorMap;
 use crate::hierarchy::{self, CellTreeNode, ExpandState};
@@ -32,6 +32,7 @@ pub struct CellState {
     pub layers: BTreeSet<(Layer, DataType)>,
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
+    pub cell_stats: Option<CellStats>,
 }
 
 impl CellState {
@@ -53,6 +54,7 @@ impl CellState {
             layers: BTreeSet::new(),
             spatial_grid: None,
             tessellation_cache: HashMap::new(),
+            cell_stats: None,
         }
     }
 }

@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 
 use egui::{Ui, Vec2};
-use gdsr::{DataType, Layer};
+use gdsr::{CellStats, DataType, Layer};
 
 use crate::hierarchy::{CellTreeNode, ExpandState};
 use crate::state::LayerState;
 
-/// Draws the side panel with cell hierarchy tree and layer toggles.
+/// Draws the side panel with cell hierarchy tree, statistics, and layer toggles.
 pub fn draw_side_panel(
     ui: &mut Ui,
     cell_tree: &[CellTreeNode],
@@ -15,6 +15,7 @@ pub fn draw_side_panel(
     expand_state: &mut ExpandState,
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
+    cell_stats: Option<&CellStats>,
 ) {
     ui.heading("Cells");
 
@@ -37,6 +38,76 @@ pub fn draw_side_panel(
                 draw_tree_node(ui, node, selected_cell, cell_changed, expand_state);
             }
         });
+
+    if let Some(stats) = cell_stats {
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        ui.collapsing("Statistics", |ui| {
+            ui.strong("Elements");
+            egui::Grid::new("stats_grid")
+                .num_columns(2)
+                .spacing([8.0, 2.0])
+                .show(ui, |ui| {
+                    let rows: &[(&str, usize)] = &[
+                        ("Polygons", stats.polygon_count),
+                        ("Paths", stats.path_count),
+                        ("Boxes", stats.box_count),
+                        ("Texts", stats.text_count),
+                        ("References", stats.reference_count),
+                    ];
+                    for &(label, count) in rows {
+                        if count > 0 {
+                            ui.label(label);
+                            ui.label(count.to_string());
+                            ui.end_row();
+                        }
+                    }
+
+                    ui.label("Total");
+                    ui.label(stats.total_elements().to_string());
+                    ui.end_row();
+                });
+
+            ui.separator();
+
+            if !stats.elements_per_layer.is_empty() {
+                ui.strong("Elements per layer");
+                egui::Grid::new("layer_stats_grid")
+                    .num_columns(2)
+                    .spacing([8.0, 2.0])
+                    .show(ui, |ui| {
+                        for (&(layer, dt), &count) in &stats.elements_per_layer {
+                            ui.label(format!("L{layer} D{dt}"));
+                            ui.label(count.to_string());
+                            ui.end_row();
+                        }
+                    });
+            }
+
+            if !stats.references_per_cell.is_empty() {
+                ui.add_space(4.0);
+                ui.strong("References per cell");
+                egui::Grid::new("ref_stats_grid")
+                    .num_columns(2)
+                    .spacing([8.0, 2.0])
+                    .show(ui, |ui| {
+                        for (name, &count) in &stats.references_per_cell {
+                            ui.label(name.as_str());
+                            ui.label(count.to_string());
+                            ui.end_row();
+                        }
+
+                        ui.label("Total");
+                        ui.label(stats.reference_count.to_string());
+                        ui.end_row();
+                    });
+
+                ui.separator();
+            }
+        });
+    }
 
     ui.add_space(12.0);
     ui.separator();
