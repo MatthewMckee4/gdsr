@@ -164,6 +164,25 @@ impl Arbitrary for Transformation {
     }
 }
 
+impl Arbitrary for GdsBox {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
+        let units = units_options[usize::arbitrary(g) % units_options.len()];
+        let x1 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let y1 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let x2 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let y2 = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
+        let layer = Layer::new(u16::arbitrary(g));
+        let box_type = DataType::new(u16::arbitrary(g));
+        Self::new(
+            Point::integer(x1, y1, units),
+            Point::integer(x2, y2, units),
+            layer,
+            box_type,
+        )
+    }
+}
+
 impl Arbitrary for Polygon {
     fn arbitrary(g: &mut Gen) -> Self {
         let units_options = [1e-9, 1e-8, 1e-7, 1e-6];
@@ -324,6 +343,15 @@ pub(super) fn arb_integer_point(g: &mut Gen) -> Point {
     let x = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
     let y = (i32::arbitrary(g) % MAX_VALUE).clamp(-MAX_VALUE, MAX_VALUE);
     Point::integer(x, y, 1e-9)
+}
+
+pub(super) fn arb_gds_box(g: &mut Gen) -> GdsBox {
+    GdsBox::new(
+        arb_integer_point(g),
+        arb_integer_point(g),
+        arb_layer(g),
+        arb_data_type(g),
+    )
 }
 
 pub(super) fn arb_gds_polygon(g: &mut Gen) -> Polygon {

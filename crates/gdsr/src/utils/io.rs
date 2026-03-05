@@ -9,7 +9,7 @@ use crate::config::gds_file_types::{
     GDSDataType, GDSRecord, GDSRecordData, combine_record_and_data_type,
 };
 use crate::elements::text::get_presentations_from_value;
-use crate::elements::{Path, PathType, Polygon, Reference, Text};
+use crate::elements::{GdsBox, Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
@@ -302,6 +302,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
     let mut cell: Option<Cell> = None;
     let mut path: Option<Path> = None;
     let mut polygon: Option<Polygon> = None;
+    let mut gds_box: Option<GdsBox> = None;
     let mut text: Option<Text> = None;
     let mut reference: Option<Reference> = None;
 
@@ -341,8 +342,11 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         library.cells.insert(cell.name().to_string(), cell);
                     }
                 }
-                GDSRecord::Boundary | GDSRecord::Box => {
+                GDSRecord::Boundary => {
                     polygon = Some(Polygon::default());
+                }
+                GDSRecord::Box => {
+                    gds_box = Some(GdsBox::default());
                 }
                 GDSRecord::Path => {
                     path = Some(Path::default());
@@ -358,6 +362,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         let layer_value = Layer::new(layer[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.layer = layer_value;
+                        } else if let Some(gds_box) = &mut gds_box {
+                            gds_box.layer = layer_value;
                         } else if let Some(path) = &mut path {
                             path.layer = layer_value;
                         } else if let Some(text) = &mut text {
@@ -365,13 +371,20 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         }
                     }
                 }
-                GDSRecord::DataType | GDSRecord::BoxType => {
+                GDSRecord::DataType => {
                     if let GDSRecordData::I16(data_type) = data {
                         let data_type_val = DataType::new(data_type[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.data_type = data_type_val;
                         } else if let Some(path) = &mut path {
                             path.data_type = data_type_val;
+                        }
+                    }
+                }
+                GDSRecord::BoxType => {
+                    if let GDSRecordData::I16(data_type) = data {
+                        if let Some(gds_box) = &mut gds_box {
+                            gds_box.box_type = DataType::new(data_type[0] as u16);
                         }
                     }
                 }
@@ -399,6 +412,10 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
 
                         if let Some(polygon) = &mut polygon {
                             polygon.points = points;
+                        } else if let Some(gds_box) = &mut gds_box {
+                            let (min, max) = crate::geometry::bounding_box(&points);
+                            gds_box.bottom_left = min;
+                            gds_box.top_right = max;
                         } else if let Some(path) = &mut path {
                             path.points = points;
                         } else if let Some(reference) = &mut reference {
@@ -448,6 +465,8 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                     if let Some(cell) = &mut cell {
                         if let Some(polygon) = polygon.take() {
                             cell.add(polygon);
+                        } else if let Some(gds_box) = gds_box.take() {
+                            cell.add(gds_box);
                         } else if let Some(path) = path.take() {
                             cell.add(path);
                         } else if let Some(reference) = reference.take() {
@@ -457,6 +476,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         }
                     }
                     polygon = None;
+                    gds_box = None;
                     path = None;
                     text = None;
                     reference = None;

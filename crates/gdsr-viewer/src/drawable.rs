@@ -397,6 +397,113 @@ impl Drawable for gdsr::Text {
     }
 }
 
+impl Drawable for gdsr::GdsBox {
+    fn layer_keys(&self) -> Vec<(Layer, DataType)> {
+        vec![(self.layer(), self.box_type())]
+    }
+
+    fn world_bbox(&self) -> Option<WorldBBox> {
+        let (min_pt, max_pt) = self.bounding_box();
+        Some(WorldBBox::new(
+            min_pt.x().absolute_value(),
+            min_pt.y().absolute_value(),
+            max_pt.x().absolute_value(),
+            max_pt.y().absolute_value(),
+        ))
+    }
+
+    fn draw(&self, ctx: &mut DrawContext) {
+        let key = (self.layer(), self.box_type());
+        if ctx.layer_state.hidden_layers.contains(&key) {
+            return;
+        }
+
+        let points = self.points();
+
+        let Some(bbox) = self.world_bbox() else {
+            return;
+        };
+        if !bbox.overlaps(ctx.visible) {
+            return;
+        }
+
+        let s_min = ctx
+            .viewport
+            .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+        let s_max = ctx
+            .viewport
+            .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
+        let sw = (s_max.x - s_min.x).abs();
+        let sh = (s_min.y - s_max.y).abs();
+
+        if sw < 2.0 && sh < 2.0 {
+            return;
+        }
+
+        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
+        let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+
+        if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
+            let bbox_rect = Rect::from_two_pos(s_min, s_max);
+            ctx.rect_filled(bbox_rect, 0.0, fill);
+            ctx.rect_stroke(bbox_rect, 0.0, Stroke::new(1.0, color), StrokeKind::Outside);
+            return;
+        }
+
+        ctx.screen_pts_buf.clear();
+        ctx.screen_pts_buf.extend(points.iter().map(|p| {
+            ctx.viewport
+                .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
+        }));
+
+        let open_len = if ctx.screen_pts_buf.len() >= 2
+            && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
+        {
+            ctx.screen_pts_buf.len() - 1
+        } else {
+            ctx.screen_pts_buf.len()
+        };
+
+        if open_len < 3 {
+            return;
+        }
+
+        let coords: Vec<f64> = ctx.screen_pts_buf[..open_len]
+            .iter()
+            .flat_map(|p| [f64::from(p.x), f64::from(p.y)])
+            .collect();
+
+        let indices = if let Some(idx) = ctx.current_element_idx {
+            ctx.tessellation_cache
+                .entry(idx)
+                .or_insert_with(|| earcutr::earcut(&coords, &[], 2).unwrap_or_default())
+                .clone()
+        } else {
+            earcutr::earcut(&coords, &[], 2).unwrap_or_default()
+        };
+
+        let mut mesh = Mesh::default();
+        for pt in &ctx.screen_pts_buf[..open_len] {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: *pt,
+                uv: egui::epaint::WHITE_UV,
+                color: fill,
+            });
+        }
+        for idx in indices {
+            mesh.indices.push(idx as u32);
+        }
+        ctx.merge_mesh(key, &mesh);
+
+        let outline = stroke_polyline_to_mesh(
+            &ctx.screen_pts_buf[..open_len],
+            Stroke::new(1.0, color),
+            true,
+        );
+        ctx.merge_mesh(key, &outline);
+    }
+}
+
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self.instance().as_element() {
@@ -437,6 +544,11 @@ impl Drawable for gdsr::Reference {
                             el.draw(ctx);
                         }
                     }
+                    for gds_box in cell.boxes() {
+                        for el in self.get_elements_in_grid(&Element::Box(gds_box.clone())) {
+                            el.draw(ctx);
+                        }
+                    }
                     for text in cell.texts() {
                         for el in self.get_elements_in_grid(&Element::Text(text.clone())) {
                             el.draw(ctx);
@@ -458,6 +570,7 @@ impl Drawable for Element {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self {
             Self::Polygon(p) => p.layer_keys(),
+            Self::Box(b) => b.layer_keys(),
             Self::Path(p) => p.layer_keys(),
             Self::Text(t) => t.layer_keys(),
             Self::Reference(r) => r.layer_keys(),
@@ -467,6 +580,7 @@ impl Drawable for Element {
     fn world_bbox(&self) -> Option<WorldBBox> {
         match self {
             Self::Polygon(p) => p.world_bbox(),
+            Self::Box(b) => b.world_bbox(),
             Self::Path(p) => p.world_bbox(),
             Self::Text(t) => t.world_bbox(),
             Self::Reference(r) => r.world_bbox(),
@@ -476,6 +590,7 @@ impl Drawable for Element {
     fn draw(&self, ctx: &mut DrawContext) {
         match self {
             Self::Polygon(p) => p.draw(ctx),
+            Self::Box(b) => b.draw(ctx),
             Self::Path(p) => p.draw(ctx),
             Self::Text(t) => t.draw(ctx),
             Self::Reference(r) => r.draw(ctx),

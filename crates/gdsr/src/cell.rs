@@ -10,16 +10,17 @@ use crate::utils::io::{
     validate_structure_name, write_string_with_record_to_file, write_u16_array_to_file,
 };
 use crate::{
-    Dimensions, Element, Library, Movable, Path, Point, Polygon, Reference, Text, Transformable,
-    Transformation,
+    Dimensions, Element, GdsBox, Library, Movable, Path, Point, Polygon, Reference, Text,
+    Transformable, Transformation,
 };
 
-/// A named cell containing polygons, paths, texts, and references to other cells or elements.
+/// A named cell containing polygons, paths, boxes, texts, and references to other cells or elements.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
     name: String,
     polygons: Vec<Polygon>,
     paths: Vec<Path>,
+    boxes: Vec<GdsBox>,
     texts: Vec<Text>,
     references: Vec<Reference>,
 }
@@ -31,6 +32,7 @@ impl Cell {
             name: name.to_string(),
             polygons: Vec::new(),
             paths: Vec::new(),
+            boxes: Vec::new(),
             texts: Vec::new(),
             references: Vec::new(),
         }
@@ -53,6 +55,11 @@ impl Cell {
     /// Returns the paths in this cell.
     pub const fn paths(&self) -> &Vec<Path> {
         &self.paths
+    }
+
+    /// Returns the boxes in this cell.
+    pub const fn boxes(&self) -> &Vec<GdsBox> {
+        &self.boxes
     }
 
     /// Returns the texts in this cell.
@@ -79,6 +86,7 @@ impl Cell {
         match element.into() {
             Element::Path(path) => self.paths.push(path),
             Element::Polygon(polygon) => self.polygons.push(polygon),
+            Element::Box(gds_box) => self.boxes.push(gds_box),
             Element::Reference(reference) => self.references.push(reference),
             Element::Text(text) => self.texts.push(text),
         }
@@ -94,6 +102,11 @@ impl Cell {
                 .map(Polygon::to_integer_unit)
                 .collect(),
             paths: self.paths.into_iter().map(Path::to_integer_unit).collect(),
+            boxes: self
+                .boxes
+                .into_iter()
+                .map(GdsBox::to_integer_unit)
+                .collect(),
             texts: self.texts.into_iter().map(Text::to_integer_unit).collect(),
             references: self
                 .references
@@ -114,6 +127,7 @@ impl Cell {
                 .map(Polygon::to_float_unit)
                 .collect(),
             paths: self.paths.into_iter().map(Path::to_float_unit).collect(),
+            boxes: self.boxes.into_iter().map(GdsBox::to_float_unit).collect(),
             texts: self.texts.into_iter().map(Text::to_float_unit).collect(),
             references: self
                 .references
@@ -142,6 +156,12 @@ impl Cell {
 
         for path in &self.paths {
             if tx.send(Element::Path(path.clone())).is_err() {
+                return;
+            }
+        }
+
+        for gds_box in &self.boxes {
+            if tx.send(Element::Box(gds_box.clone())).is_err() {
                 return;
             }
         }
@@ -176,6 +196,10 @@ impl Cell {
             elements.push(Element::Path(path.clone()));
         }
 
+        for gds_box in &self.boxes {
+            elements.push(Element::Box(gds_box.clone()));
+        }
+
         for text in &self.texts {
             elements.push(Element::Text(text.clone()));
         }
@@ -195,10 +219,11 @@ impl std::fmt::Display for Cell {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Cell '{}' with {} polygon(s), {} path(s), {} text(s)",
+            "Cell '{}' with {} polygon(s), {} path(s), {} box(es), {} text(s)",
             self.name,
             self.polygons.len(),
             self.paths.len(),
+            self.boxes.len(),
             self.texts.len(),
         )
     }
@@ -216,6 +241,12 @@ impl Transformable for Cell {
             .paths
             .into_iter()
             .map(|path| path.transform_impl(transformation))
+            .collect();
+
+        self.boxes = self
+            .boxes
+            .into_iter()
+            .map(|gds_box| gds_box.transform_impl(transformation))
             .collect();
 
         self.texts = self
@@ -247,6 +278,10 @@ impl Dimensions for Cell {
                 let (min, max) = p.bounding_box();
                 vec![min, max]
             }))
+            .chain(self.boxes.iter().flat_map(|b| {
+                let (min, max) = b.bounding_box();
+                vec![min, max]
+            }))
             .chain(self.texts.iter().flat_map(|t| {
                 let (min, max) = t.bounding_box();
                 vec![min, max]
@@ -269,6 +304,12 @@ impl Movable for Cell {
             .paths
             .into_iter()
             .map(|path| path.move_to(target))
+            .collect();
+
+        self.boxes = self
+            .boxes
+            .into_iter()
+            .map(|gds_box| gds_box.move_to(target))
             .collect();
 
         self.texts = self
@@ -335,6 +376,15 @@ impl ToGds for Cell {
             buffer.extend_from_slice(&b);
         }
 
+        let box_bufs: Result<Vec<_>, _> = self
+            .boxes
+            .par_iter()
+            .map(|b| b.to_gds_impl(database_units))
+            .collect();
+        for b in box_bufs? {
+            buffer.extend_from_slice(&b);
+        }
+
         let text_bufs: Result<Vec<_>, _> = self
             .texts
             .par_iter()
@@ -375,6 +425,7 @@ mod tests {
         assert_eq!(cell.name, "test_cell");
         assert!(cell.polygons().is_empty());
         assert!(cell.paths().is_empty());
+        assert!(cell.boxes().is_empty());
         assert!(cell.texts().is_empty());
         assert!(cell.references().is_empty());
     }
@@ -385,6 +436,7 @@ mod tests {
         assert_eq!(cell.name, "");
         assert!(cell.polygons.is_empty());
         assert!(cell.paths.is_empty());
+        assert!(cell.boxes.is_empty());
         assert!(cell.texts.is_empty());
         assert!(cell.references.is_empty());
     }
@@ -425,7 +477,7 @@ mod tests {
         let polygon = Polygon::default();
         cell.add(polygon);
 
-        insta::assert_snapshot!(cell.to_string(), @"Cell 'test_cell' with 1 polygon(s), 0 path(s), 0 text(s)");
+        insta::assert_snapshot!(cell.to_string(), @"Cell 'test_cell' with 1 polygon(s), 0 path(s), 0 box(es), 0 text(s)");
     }
 
     #[test]

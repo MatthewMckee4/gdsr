@@ -235,7 +235,7 @@ impl Reference {
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                Element::Path(_) | Element::Polygon(_) | Element::Box(_) | Element::Text(_) => {
                     self.send_elements_in_grid(element, tx)?;
                 }
                 Element::Reference(reference) => {
@@ -269,7 +269,7 @@ impl Reference {
                 }
             }
             Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_) | Element::Polygon(_) | Element::Text(_) => {
+                Element::Path(_) | Element::Polygon(_) | Element::Box(_) | Element::Text(_) => {
                     elements.extend(self.get_elements_in_grid(element));
                 }
 
