@@ -10,8 +10,8 @@ use crate::utils::io::{
     validate_structure_name, write_string_with_record_to_file, write_u16_array_to_file,
 };
 use crate::{
-    Dimensions, Element, GdsBox, Library, Movable, Node, Path, Point, Polygon, Reference, Text,
-    Transformable, Transformation,
+    Dimensions, Element, GdsBox, LayerMapping, Library, Movable, Node, Path, Point, Polygon,
+    Reference, Text, Transformable, Transformation,
 };
 
 /// A named cell containing polygons, paths, boxes, nodes, texts, and references to other cells or elements.
@@ -145,6 +145,22 @@ impl Cell {
                 .map(Reference::to_float_unit)
                 .collect(),
             ..self
+        }
+    }
+
+    /// Remaps layer/data type pairs on all elements in this cell using the given mapping.
+    pub fn remap_layers(&mut self, mapping: &LayerMapping) {
+        for polygon in &mut self.polygons {
+            polygon.remap_layers(mapping);
+        }
+        for path in &mut self.paths {
+            path.remap_layers(mapping);
+        }
+        for gds_box in &mut self.boxes {
+            gds_box.remap_layers(mapping);
+        }
+        for text in &mut self.texts {
+            text.remap_layers(mapping);
         }
     }
 

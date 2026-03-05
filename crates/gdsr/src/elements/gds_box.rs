@@ -5,7 +5,7 @@ use crate::utils::io::{
     validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
     write_u16_array_to_file,
 };
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable};
 
 /// A GDS II Box element defined by two diagonal corners on a specific layer.
 ///
@@ -82,6 +82,15 @@ impl GdsBox {
     /// Returns the box type.
     pub const fn box_type(&self) -> DataType {
         self.box_type
+    }
+
+    /// Remaps the layer and box type using the given mapping.
+    /// If the current (layer, `box_type`) pair is found in the mapping, it is replaced.
+    pub fn remap_layers(&mut self, mapping: &LayerMapping) {
+        if let Some(&(new_layer, new_box_type)) = mapping.get(&(self.layer, self.box_type)) {
+            self.layer = new_layer;
+            self.box_type = new_box_type;
+        }
     }
 
     /// Converts all points to integer units.

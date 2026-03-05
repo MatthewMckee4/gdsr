@@ -7,7 +7,7 @@ use crate::utils::io::{
     validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
     write_u16_array_to_file,
 };
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
+use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable, Unit};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum PathType {
@@ -82,6 +82,15 @@ impl Path {
     /// Returns the data type.
     pub const fn data_type(&self) -> DataType {
         self.data_type
+    }
+
+    /// Remaps the layer and data type using the given mapping.
+    /// If the current (layer, `data_type`) pair is found in the mapping, it is replaced.
+    pub fn remap_layers(&mut self, mapping: &LayerMapping) {
+        if let Some(&(new_layer, new_data_type)) = mapping.get(&(self.layer, self.data_type)) {
+            self.layer = new_layer;
+            self.data_type = new_data_type;
+        }
     }
 
     /// Returns the end cap type, if set.

@@ -249,6 +249,15 @@ impl Text {
         self
     }
 
+    /// Remaps the layer and data type using the given mapping.
+    /// If the current (layer, datatype) pair is found in the mapping, it is replaced.
+    pub fn remap_layers(&mut self, mapping: &crate::LayerMapping) {
+        if let Some(&(new_layer, new_datatype)) = mapping.get(&(self.layer, self.datatype)) {
+            self.layer = new_layer;
+            self.datatype = new_datatype;
+        }
+    }
+
     /// Returns the magnification factor.
     pub const fn magnification(&self) -> f64 {
         self.magnification

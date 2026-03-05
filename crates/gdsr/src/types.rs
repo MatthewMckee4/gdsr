@@ -39,3 +39,6 @@ impl std::fmt::Display for DataType {
 }
 
 pub type AngleInRadians = f64;
+
+/// A mapping from one (`Layer`, `DataType`) pair to another, used for bulk layer remapping.
+pub type LayerMapping = std::collections::HashMap<(Layer, DataType), (Layer, DataType)>;

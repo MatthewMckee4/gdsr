@@ -5,7 +5,7 @@ use crate::utils::io::{
     MAX_POINTS, MIN_POLYGON_POINTS, validate_data_type, validate_layer, write_element_tail_to_file,
     write_points_to_file, write_u16_array_to_file,
 };
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable, Unit};
+use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable, Unit};
 
 fn are_points_closed(points: &[Point]) -> bool {
     let points_vec: Vec<Point> = points.to_vec();
@@ -61,6 +61,15 @@ impl Polygon {
     /// Returns the data type.
     pub const fn data_type(&self) -> DataType {
         self.data_type
+    }
+
+    /// Remaps the layer and data type using the given mapping.
+    /// If the current (layer, `data_type`) pair is found in the mapping, it is replaced.
+    pub fn remap_layers(&mut self, mapping: &LayerMapping) {
+        if let Some(&(new_layer, new_data_type)) = mapping.get(&(self.layer, self.data_type)) {
+            self.layer = new_layer;
+            self.data_type = new_data_type;
+        }
     }
 
     /// Computes the area of the polygon using the shoelace formula.
