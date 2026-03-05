@@ -5,8 +5,7 @@ use gdsr::{DataType, Layer};
 
 use crate::state::LayerState;
 
-/// Draws the side panel with cell selector, layer toggles, and zoom-to-fit button.
-/// Returns `true` if zoom-to-fit was requested.
+/// Draws the side panel with cell selector and layer toggles.
 pub fn draw_side_panel(
     ui: &mut Ui,
     cell_names: &[String],
@@ -14,9 +13,7 @@ pub fn draw_side_panel(
     cell_changed: &mut bool,
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
-) -> bool {
-    let mut zoom_to_fit = false;
-
+) {
     ui.heading("Cells");
     let current_label = selected_cell.as_deref().unwrap_or("(none)");
 
@@ -65,11 +62,4 @@ pub fn draw_side_panel(
                 });
             }
         });
-
-    ui.add_space(8.0);
-    if ui.button("Zoom to Fit").clicked() {
-        zoom_to_fit = true;
-    }
-
-    zoom_to_fit
 }

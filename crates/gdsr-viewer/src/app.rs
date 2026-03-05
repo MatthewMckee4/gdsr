@@ -241,14 +241,13 @@ impl eframe::App for ViewerApp {
         });
 
         let mut cell_changed = false;
-        let mut zoom_to_fit = false;
         let cell = &mut self.cell;
         let layer_state = &mut self.layer_state;
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
             .show(ctx, |ui| {
                 if let Some(cell) = cell.as_mut() {
-                    zoom_to_fit = panels::draw_side_panel(
+                    panels::draw_side_panel(
                         ui,
                         &cell.cell_names,
                         &mut cell.selected_cell,
@@ -263,10 +262,6 @@ impl eframe::App for ViewerApp {
             if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
                 self.select_cell(&name);
             }
-        }
-
-        if zoom_to_fit {
-            self.zoom_to_fit();
         }
 
         let cell = &mut self.cell;
