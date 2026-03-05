@@ -307,8 +307,9 @@ mod tests {
         library.remap_layers(&mapping);
 
         let cell = library.get_cell("cell").unwrap();
+        let polygon = cell.polygons().next().unwrap();
         insta::assert_debug_snapshot!(
-            (cell.polygons()[0].layer(), cell.polygons()[0].data_type()),
+            (polygon.layer(), polygon.data_type()),
             @r#"
         (
             Layer(
@@ -320,8 +321,9 @@ mod tests {
         )
         "#
         );
+        let path = cell.paths().next().unwrap();
         insta::assert_debug_snapshot!(
-            (cell.paths()[0].layer(), cell.paths()[0].data_type()),
+            (path.layer(), path.data_type()),
             @r#"
         (
             Layer(
@@ -363,7 +365,7 @@ mod tests {
         library.remap_layers(&mapping);
 
         let cell = library.get_cell("cell").unwrap();
-        let reference = &cell.references()[0];
+        let reference = cell.references().next().unwrap();
         let inner = reference.instance().as_element().unwrap();
         let polygon = inner.as_polygon().unwrap();
         insta::assert_debug_snapshot!(
@@ -408,8 +410,9 @@ mod tests {
         library.remap_layers(&mapping);
 
         let cell = library.get_cell("cell").unwrap();
+        let polygon = cell.polygons().next().unwrap();
         insta::assert_debug_snapshot!(
-            (cell.polygons()[0].layer(), cell.polygons()[0].data_type()),
+            (polygon.layer(), polygon.data_type()),
             @r#"
         (
             Layer(

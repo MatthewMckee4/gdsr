@@ -26,11 +26,11 @@ pub struct CellStats {
 impl CellStats {
     /// Computes statistics for a cell.
     pub fn from_cell(cell: &Cell) -> Self {
-        let polygon_count = cell.polygons().len();
-        let path_count = cell.paths().len();
-        let box_count = cell.boxes().len();
-        let text_count = cell.texts().len();
-        let reference_count = cell.references().len();
+        let polygon_count = cell.polygons().count();
+        let path_count = cell.paths().count();
+        let box_count = cell.boxes().count();
+        let text_count = cell.texts().count();
+        let reference_count = cell.references().count();
 
         let mut elements_per_layer: BTreeMap<(Layer, DataType), usize> = BTreeMap::new();
 

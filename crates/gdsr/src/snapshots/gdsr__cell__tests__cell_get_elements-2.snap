@@ -14,6 +14,17 @@ expression: moved_elements
             ),
         },
     ),
+    Polygon(
+        Polygon {
+            points: [],
+            layer: Layer(
+                0,
+            ),
+            data_type: DataType(
+                0,
+            ),
+        },
+    ),
     Path(
         Path {
             points: [],
@@ -57,17 +68,6 @@ expression: moved_elements
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
-        },
-    ),
-    Polygon(
-        Polygon {
-            points: [],
-            layer: Layer(
-                0,
-            ),
-            data_type: DataType(
-                0,
-            ),
         },
     ),
 ]

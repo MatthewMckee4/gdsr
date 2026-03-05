@@ -94,6 +94,20 @@ impl SpatialGrid {
         }
     }
 
+    /// Returns the element indices in the grid cell containing the given world-space point.
+    pub fn query_point(&self, wx: f64, wy: f64) -> &[u32] {
+        let col = ((wx - self.world_min_x) / self.cell_width) as isize;
+        let row = ((wy - self.world_min_y) / self.cell_height) as isize;
+        if col < 0 || row < 0 || col >= GRID_SIZE as isize || row >= GRID_SIZE as isize {
+            return &[];
+        }
+        let idx = row as usize * GRID_SIZE + col as usize;
+        match &self.cells[idx] {
+            Some(cell) => &cell.indices,
+            None => &[],
+        }
+    }
+
     /// Returns an iterator over grid cells that overlap the given visible world-space rectangle.
     pub fn query_visible(&self, visible: &WorldBBox) -> impl Iterator<Item = &GridCell> {
         let col_min = ((visible.min_x - self.world_min_x) / self.cell_width).floor() as isize - 1;
@@ -285,6 +299,39 @@ mod tests {
         let visible = WorldBBox::new(0.0, 0.0, 100.0 * scale, 100.0 * scale);
         let indices = query_element_indices(&grid, &visible);
         assert!(indices.contains(&0));
+    }
+
+    #[test]
+    fn query_point_returns_element_in_cell() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+
+        let indices = grid.query_point(50.0 * scale, 50.0 * scale);
+        assert!(indices.contains(&0));
+    }
+
+    #[test]
+    fn query_point_misses_distant_element() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+
+        let indices = grid.query_point(900.0 * scale, 900.0 * scale);
+        assert!(!indices.contains(&0));
+    }
+
+    #[test]
+    fn query_point_outside_grid_returns_empty() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+
+        assert!(grid.query_point(-1.0, -1.0).is_empty());
+        assert!(grid.query_point(2.0, 2.0).is_empty());
     }
 
     #[test]
