@@ -147,12 +147,14 @@ fn render_element(
             let (x, y) = point_scaled(text.origin(), dbu);
             let escaped = escape_xml(text.text());
             let font_size = extent * 0.03;
+            // Counter-flip text so it reads correctly despite the parent Y-flip
             let _ = writeln!(
                 out,
-                "    <text x=\"{}\" y=\"{}\" fill=\"{color}\" font-size=\"{}\" font-family=\"monospace\">{escaped}</text>",
+                "    <text x=\"{}\" y=\"{}\" fill=\"{color}\" font-size=\"{}\" font-family=\"monospace\" transform=\"scale(1,-1) translate(0,{})\">{escaped}</text>",
                 fmt(x),
                 fmt(y),
-                fmt(font_size)
+                fmt(font_size),
+                fmt(-2.0 * y)
             );
         }
         Element::Node(node) => {
@@ -366,7 +368,7 @@ mod tests {
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 1 2 2">
           <g transform="scale(1,-1) translate(0,-4)">
-            <text x="1" y="2" fill="#e6194b" font-size="0.06" font-family="monospace">hello</text>
+            <text x="1" y="2" fill="#e6194b" font-size="0.06" font-family="monospace" transform="scale(1,-1) translate(0,-4)">hello</text>
           </g>
         </svg>
         "##);
@@ -459,7 +461,7 @@ mod tests {
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
           <g transform="scale(1,-1) translate(0,0)">
-            <text x="0" y="0" fill="#e6194b" font-size="0.06" font-family="monospace">&lt;script&gt;&amp;&quot;test&quot;&lt;/script&gt;</text>
+            <text x="0" y="0" fill="#e6194b" font-size="0.06" font-family="monospace" transform="scale(1,-1) translate(0,0)">&lt;script&gt;&amp;&quot;test&quot;&lt;/script&gt;</text>
           </g>
         </svg>
         "##);
