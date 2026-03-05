@@ -437,6 +437,8 @@ mod tests {
             DataType::new(0),
             None,
             None,
+            None,
+            None,
         ));
         cell.add(Text::default().set_origin(Point::float(5.0, 5.0, 1e-6)));
 
@@ -525,6 +527,8 @@ mod tests {
             DataType::new(0),
             None,
             None,
+            None,
+            None,
         ));
         cell.add(Text::default().set_origin(Point::integer(3, -2, 1e-9)));
 
@@ -585,6 +589,8 @@ mod tests {
             vec![Point::integer(0, 0, 1e-9), Point::integer(5, 5, 1e-9)],
             Layer::new(2),
             DataType::new(0),
+            None,
+            None,
             None,
             None,
         );

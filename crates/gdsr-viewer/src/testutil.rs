@@ -28,6 +28,8 @@ pub mod helpers {
             DataType::new(data_type),
             None,
             width.map(Unit::default_integer),
+            None,
+            None,
         ))
     }
 

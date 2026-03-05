@@ -58,6 +58,8 @@ fn build_library() -> Library {
                 DataType::new((i % 4) as u16),
                 Some(PATH_TYPES[i as usize % 3]),
                 Some(Unit::integer((i % 30 + 1) * 10, DB_UNITS)),
+                None,
+                None,
             ));
         }
 

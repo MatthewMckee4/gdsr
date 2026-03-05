@@ -57,6 +57,8 @@ fn get_elements(units: f64) -> Vec<Element> {
             DataType::new(0),
             Some(PathType::Round),
             Some(Unit::float(5.0, units)),
+            None,
+            None,
         )
         .into(),
         Path::new(
@@ -67,6 +69,8 @@ fn get_elements(units: f64) -> Vec<Element> {
             ],
             Layer::new(2),
             DataType::new(0),
+            None,
+            None,
             None,
             None,
         )
@@ -282,6 +286,8 @@ fn test_library_roundtrip_mixed_elements() {
         DataType::new(0),
         Some(PathType::Square),
         Some(Unit::float(2.0, units)),
+        None,
+        None,
     );
     cell.add(path);
 
@@ -430,6 +436,8 @@ fn test_complex_path_types_roundtrip() {
         DataType::new(0),
         Some(PathType::Square),
         Some(Unit::float(5.0, units)),
+        None,
+        None,
     ));
 
     cell.add(Path::new(
@@ -442,6 +450,8 @@ fn test_complex_path_types_roundtrip() {
         DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(3.0, units)),
+        None,
+        None,
     ));
 
     cell.add(Path::new(
@@ -450,6 +460,8 @@ fn test_complex_path_types_roundtrip() {
         DataType::new(0),
         Some(PathType::Overlap),
         Some(Unit::float(4.0, units)),
+        None,
+        None,
     ));
 
     library.add_cell(cell);
@@ -598,6 +610,8 @@ fn test_float_coordinates() {
         DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(1.5, units)),
+        None,
+        None,
     );
 
     cell.add(path);
@@ -672,6 +686,8 @@ fn test_single_cell_with_all_element_types() {
         DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(5.0, units)),
+        None,
+        None,
     ));
 
     cell.add(Text::new(
@@ -839,6 +855,8 @@ fn test_invalid_path() {
         DataType::new(0),
         Some(PathType::Round),
         Some(Unit::float(5.0, units)),
+        None,
+        None,
     );
 
     cell.add(path);
@@ -1102,6 +1120,8 @@ fn test_path_invalid_layer() {
         DataType::new(0),
         None,
         None,
+        None,
+        None,
     ));
     library.add_cell(cell);
     assert_write_validation_error(&library);
@@ -1116,6 +1136,8 @@ fn test_path_invalid_data_type() {
         vec![Point::integer(0, 0, units), Point::integer(10, 0, units)],
         Layer::new(0),
         DataType::new(256),
+        None,
+        None,
         None,
         None,
     ));

@@ -533,6 +533,22 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         }
                     }
                 }
+                GDSRecord::BgnExtn => {
+                    if let GDSRecordData::I32(extn) = data {
+                        if let Some(path) = &mut path {
+                            let value = round_to_decimals(f64::from(extn[0]) * scale, 10);
+                            path.begin_extension = Some(Unit::float(value, db_units));
+                        }
+                    }
+                }
+                GDSRecord::EndExtn => {
+                    if let GDSRecordData::I32(extn) = data {
+                        if let Some(path) = &mut path {
+                            let value = round_to_decimals(f64::from(extn[0]) * scale, 10);
+                            path.end_extension = Some(Unit::float(value, db_units));
+                        }
+                    }
+                }
                 _ => {}
             },
             Err(e) => return Err(e),

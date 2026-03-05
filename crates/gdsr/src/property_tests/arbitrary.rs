@@ -214,7 +214,27 @@ impl Arbitrary for Path {
         } else {
             None
         };
-        Self::new(points, layer, data_type, path_type, width)
+        let begin_extension = if bool::arbitrary(g) {
+            let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+            Some(Unit::integer(e, units))
+        } else {
+            None
+        };
+        let end_extension = if bool::arbitrary(g) {
+            let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+            Some(Unit::integer(e, units))
+        } else {
+            None
+        };
+        Self::new(
+            points,
+            layer,
+            data_type,
+            path_type,
+            width,
+            begin_extension,
+            end_extension,
+        )
     }
 }
 
@@ -326,7 +346,27 @@ pub(super) fn arb_gds_path(g: &mut Gen) -> Path {
     } else {
         None
     };
-    Path::new(points, arb_layer(g), arb_data_type(g), path_type, width)
+    let begin_extension = if bool::arbitrary(g) {
+        let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+        Some(Unit::integer(e, 1e-9))
+    } else {
+        None
+    };
+    let end_extension = if bool::arbitrary(g) {
+        let e = (i32::arbitrary(g) % MAX_VALUE).clamp(0, MAX_VALUE);
+        Some(Unit::integer(e, 1e-9))
+    } else {
+        None
+    };
+    Path::new(
+        points,
+        arb_layer(g),
+        arb_data_type(g),
+        path_type,
+        width,
+        begin_extension,
+        end_extension,
+    )
 }
 
 /// GDS `TextType` is always written as 0, so we use 0 here for roundtrip compatibility.

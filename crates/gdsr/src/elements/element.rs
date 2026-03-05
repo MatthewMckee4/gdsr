@@ -192,6 +192,8 @@ mod tests {
             DataType::new(0),
             None,
             None,
+            None,
+            None,
         )
     }
 
@@ -351,6 +353,8 @@ mod tests {
             vec![p(-5, 3), p(10, 7)],
             Layer::new(1),
             DataType::new(0),
+            None,
+            None,
             None,
             None,
         );

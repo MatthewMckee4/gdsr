@@ -50,6 +50,8 @@ fn main() -> Result<(), gdsr::GdsError> {
         DataType::new(0),
         Some(PathType::Square),
         Some(Unit::default_integer(50)),
+        None,
+        None,
     ));
     paths_cell.add(Path::new(
         vec![
@@ -61,6 +63,8 @@ fn main() -> Result<(), gdsr::GdsError> {
         DataType::new(0),
         Some(PathType::Round),
         Some(Unit::default_integer(100)),
+        None,
+        None,
     ));
     paths_cell.add(Path::new(
         vec![
@@ -71,6 +75,8 @@ fn main() -> Result<(), gdsr::GdsError> {
         DataType::new(0),
         Some(PathType::Overlap),
         Some(Unit::default_integer(75)),
+        None,
+        None,
     ));
 
     // Cell with text

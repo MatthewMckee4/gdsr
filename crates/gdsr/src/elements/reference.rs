@@ -483,6 +483,8 @@ mod tests {
                 DataType::new(0),
                 None,
                 None,
+                None,
+                None,
             );
 
             let instance = Instance::from(path);

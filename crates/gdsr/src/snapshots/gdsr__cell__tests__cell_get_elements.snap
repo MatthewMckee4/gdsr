@@ -25,6 +25,8 @@ expression: elements
             ),
             type: None,
             width: None,
+            begin_extension: None,
+            end_extension: None,
         },
     ),
     Text(
