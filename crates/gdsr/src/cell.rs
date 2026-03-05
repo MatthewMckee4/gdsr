@@ -367,6 +367,7 @@ impl ToGds for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{DataType, Layer};
 
     #[test]
     fn test_cell_new() {
@@ -436,13 +437,13 @@ mod tests {
                 Point::float(10.0, 0.0, 1e-6),
                 Point::float(10.0, 10.0, 1e-6),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
         cell.add(Path::new(
             vec![Point::float(0.0, 0.0, 1e-6)],
-            0,
-            0,
+            Layer::new(0),
+            DataType::new(0),
             None,
             None,
         ));
@@ -467,8 +468,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
 
         let converted = cell.to_float_unit();
@@ -524,13 +525,13 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
         cell.add(Path::new(
             vec![Point::integer(-5, 5, 1e-9), Point::integer(15, 20, 1e-9)],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
             None,
             None,
         ));
@@ -558,8 +559,8 @@ mod tests {
                 Point::integer(5, 0, 1e-9),
                 Point::integer(5, 5, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
         cell.add(Polygon::new(
             [
@@ -567,8 +568,8 @@ mod tests {
                 Point::integer(20, 10, 1e-9),
                 Point::integer(20, 20, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
 
         let (min, max) = cell.bounding_box();
@@ -586,13 +587,13 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let path = Path::new(
             vec![Point::integer(0, 0, 1e-9), Point::integer(5, 5, 1e-9)],
-            2,
-            0,
+            Layer::new(2),
+            DataType::new(0),
             None,
             None,
         );
@@ -630,8 +631,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
 
         let (tx, rx) = mpsc::channel();

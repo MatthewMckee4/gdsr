@@ -91,20 +91,26 @@ pub const MAX_COL_ROW: u32 = 32767;
 pub const MIN_POLYGON_POINTS: usize = 4;
 
 /// Returns an `InvalidInput` error if the layer is out of the GDS2 spec range (0-255).
-pub fn validate_layer(layer: u16) -> Result<(), GdsError> {
-    if layer > MAX_LAYER {
+pub fn validate_layer(layer: Layer) -> Result<(), GdsError> {
+    if layer.value() > MAX_LAYER {
         return Err(GdsError::ValidationError {
-            message: format!("Layer {layer} exceeds maximum value of {MAX_LAYER}"),
+            message: format!(
+                "Layer {} exceeds maximum value of {MAX_LAYER}",
+                layer.value()
+            ),
         });
     }
     Ok(())
 }
 
 /// Returns a validation error if the data type is out of the GDS2 spec range (0-255).
-pub fn validate_data_type(data_type: u16) -> Result<(), GdsError> {
-    if data_type > MAX_DATA_TYPE {
+pub fn validate_data_type(data_type: DataType) -> Result<(), GdsError> {
+    if data_type.value() > MAX_DATA_TYPE {
         return Err(GdsError::ValidationError {
-            message: format!("Data type {data_type} exceeds maximum value of {MAX_DATA_TYPE}"),
+            message: format!(
+                "Data type {} exceeds maximum value of {MAX_DATA_TYPE}",
+                data_type.value()
+            ),
         });
     }
     Ok(())
@@ -349,7 +355,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 }
                 GDSRecord::Layer => {
                     if let GDSRecordData::I16(layer) = data {
-                        let layer_value = layer[0] as Layer;
+                        let layer_value = Layer::new(layer[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.layer = layer_value;
                         } else if let Some(path) = &mut path {
@@ -361,7 +367,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 }
                 GDSRecord::DataType | GDSRecord::BoxType => {
                     if let GDSRecordData::I16(data_type) = data {
-                        let data_type_val = data_type[0] as DataType;
+                        let data_type_val = DataType::new(data_type[0] as u16);
                         if let Some(polygon) = &mut polygon {
                             polygon.data_type = data_type_val;
                         } else if let Some(path) = &mut path {

@@ -1,6 +1,6 @@
 use gdsr::{
-    Cell, Grid, HorizontalPresentation, Library, Path, PathType, Point, Polygon, Reference, Text,
-    Unit, VerticalPresentation,
+    Cell, DataType, Grid, HorizontalPresentation, Layer, Library, Path, PathType, Point, Polygon,
+    Reference, Text, Unit, VerticalPresentation,
 };
 
 fn main() -> Result<(), gdsr::GdsError> {
@@ -15,8 +15,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(1000, 1000),
             Point::default_integer(0, 1000),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
     polygons_cell.add(Polygon::new(
         vec![
@@ -25,8 +25,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(2000, 1000),
             Point::default_integer(1500, 1000),
         ],
-        2,
-        0,
+        Layer::new(2),
+        DataType::new(0),
     ));
     polygons_cell.add(Polygon::new(
         vec![
@@ -34,8 +34,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(4000, 0),
             Point::default_integer(3500, 1000),
         ],
-        3,
-        0,
+        Layer::new(3),
+        DataType::new(0),
     ));
 
     // Cell with paths
@@ -46,8 +46,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(1000, 0),
             Point::default_integer(1000, 1000),
         ],
-        4,
-        0,
+        Layer::new(4),
+        DataType::new(0),
         Some(PathType::Square),
         Some(Unit::default_integer(50)),
     ));
@@ -57,8 +57,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(2500, 500),
             Point::default_integer(2500, 1000),
         ],
-        5,
-        0,
+        Layer::new(5),
+        DataType::new(0),
         Some(PathType::Round),
         Some(Unit::default_integer(100)),
     ));
@@ -67,8 +67,8 @@ fn main() -> Result<(), gdsr::GdsError> {
             Point::default_integer(3000, 0),
             Point::default_integer(3000, 1000),
         ],
-        4,
-        0,
+        Layer::new(4),
+        DataType::new(0),
         Some(PathType::Overlap),
         Some(Unit::default_integer(75)),
     ));
@@ -78,8 +78,8 @@ fn main() -> Result<(), gdsr::GdsError> {
     text_cell.add(Text::new(
         "Hello",
         Point::default_integer(0, 0),
-        6,
-        0,
+        Layer::new(6),
+        DataType::new(0),
         1.0,
         0.0,
         false,
@@ -89,8 +89,8 @@ fn main() -> Result<(), gdsr::GdsError> {
     text_cell.add(Text::new(
         "World",
         Point::default_integer(0, 500),
-        7,
-        0,
+        Layer::new(7),
+        DataType::new(0),
         2.0,
         0.0,
         false,

@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use gdsr::{
-    Cell, Grid, HorizontalPresentation, Library, Path, PathType, Point, Polygon, Reference, Text,
-    Unit, VerticalPresentation,
+    Cell, DataType, Grid, HorizontalPresentation, Layer, Library, Path, PathType, Point, Polygon,
+    Reference, Text, Unit, VerticalPresentation,
 };
 
 const DB_UNITS: f64 = 1e-9;
@@ -38,8 +38,8 @@ fn medium_library() -> Library {
                 point(offset + 50, 70),
                 point(offset + 10, 40),
             ],
-            (i % 16) as u16,
-            (i % 4) as u16,
+            Layer::new((i % 16) as u16),
+            DataType::new((i % 4) as u16),
         ));
     }
 
@@ -53,8 +53,8 @@ fn medium_library() -> Library {
                 point(600, y + 50),
                 point(800, y),
             ],
-            (i % 16) as u16,
-            (i % 4) as u16,
+            Layer::new((i % 16) as u16),
+            DataType::new((i % 4) as u16),
             Some(PATH_TYPES[i as usize % 3]),
             Some(Unit::integer((i % 50 + 1) * 10, DB_UNITS)),
         ));
@@ -64,8 +64,8 @@ fn medium_library() -> Library {
         cell.add(Text::new(
             &format!("medium_label_{i:04}"),
             point(i * 200, -100),
-            (i % 16) as u16,
-            0,
+            Layer::new((i % 16) as u16),
+            DataType::new(0),
             1.0 + f64::from(i % 5) * 0.5,
             f64::from(i % 4) * 0.785,
             i % 2 == 0,
@@ -99,7 +99,11 @@ fn complex_library() -> Library {
                     )
                 })
                 .collect();
-            cell.add(Polygon::new(points, layer, (i % 8) as u16));
+            cell.add(Polygon::new(
+                points,
+                Layer::new(layer),
+                DataType::new((i % 8) as u16),
+            ));
         }
 
         for i in 0_i32..100 {
@@ -110,8 +114,8 @@ fn complex_library() -> Library {
                 .collect();
             cell.add(Path::new(
                 points,
-                ((c * 2 + i) % 64) as u16,
-                (i % 4) as u16,
+                Layer::new(((c * 2 + i) % 64) as u16),
+                DataType::new((i % 4) as u16),
                 Some(PATH_TYPES[i as usize % 3]),
                 Some(Unit::integer((i % 30 + 1) * 10, DB_UNITS)),
             ));
@@ -121,8 +125,8 @@ fn complex_library() -> Library {
             cell.add(Text::new(
                 &format!("L{c}_text_{i:03}"),
                 point(i * 400, c * 1000),
-                ((c + i) % 64) as u16,
-                (i % 4) as u16,
+                Layer::new(((c + i) % 64) as u16),
+                DataType::new((i % 4) as u16),
                 1.0 + f64::from(i % 3) * 0.5,
                 f64::from(i % 8) * std::f64::consts::FRAC_PI_4,
                 i % 3 == 0,
@@ -166,8 +170,8 @@ fn complex_library() -> Library {
                     point(i * 1000 + 500, 500),
                     point(i * 1000, 500),
                 ],
-                (i % 16) as u16,
-                0,
+                Layer::new((i % 16) as u16),
+                DataType::new(0),
             ));
         }
 

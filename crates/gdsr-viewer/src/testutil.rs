@@ -1,6 +1,7 @@
 pub mod helpers {
     use gdsr::{
-        Element, HorizontalPresentation, Path, Point, Polygon, Text, Unit, VerticalPresentation,
+        DataType, Element, HorizontalPresentation, Layer, Path, Point, Polygon, Text, Unit,
+        VerticalPresentation,
     };
 
     pub fn polygon(points: Vec<(i32, i32)>, layer: u16, data_type: u16) -> Element {
@@ -8,8 +9,8 @@ pub mod helpers {
             points
                 .into_iter()
                 .map(|(x, y)| Point::default_integer(x, y)),
-            layer,
-            data_type,
+            Layer::new(layer),
+            DataType::new(data_type),
         ))
     }
 
@@ -23,8 +24,8 @@ pub mod helpers {
             points
                 .into_iter()
                 .map(|(x, y)| Point::default_integer(x, y)),
-            layer,
-            data_type,
+            Layer::new(layer),
+            DataType::new(data_type),
             None,
             width.map(Unit::default_integer),
         ))
@@ -34,8 +35,8 @@ pub mod helpers {
         Element::Text(Text::new(
             value,
             Point::default_integer(x, y),
-            layer,
-            0,
+            Layer::new(layer),
+            DataType::new(0),
             1.0,
             0.0,
             false,
