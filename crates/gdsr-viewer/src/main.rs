@@ -3,11 +3,13 @@ use clap::Parser;
 mod app;
 mod colors;
 mod drawable;
+mod grid;
 mod hierarchy;
 mod loader;
 mod panels;
 #[cfg(test)]
 mod property_tests;
+mod ruler;
 mod spatial;
 mod state;
 #[cfg(test)]

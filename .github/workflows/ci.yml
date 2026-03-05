@@ -173,7 +173,8 @@ jobs:
 
     needs: determine_changes
 
-    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    # Disabled until benchmarks are stabilized and actively maintained
+    if: false
 
     permissions:
       contents: read

@@ -4,6 +4,7 @@ use std::thread;
 
 use crate::drawable::Drawable;
 use crate::panels;
+use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{CellState, FileLoadState, LayerState, RenderCache};
 use crate::viewport::{self, Viewport};
@@ -18,7 +19,6 @@ fn shortcut_text(key: &str) -> String {
     format!("{modifier}{key}")
 }
 
-#[derive(Default)]
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -26,6 +26,25 @@ pub struct ViewerApp {
     viewport: Viewport,
     mouse_world_pos: Option<(f64, f64)>,
     render_cache: RenderCache,
+    ruler: RulerState,
+    show_grid: bool,
+    hovered_element: Option<usize>,
+}
+
+impl Default for ViewerApp {
+    fn default() -> Self {
+        Self {
+            file_load: FileLoadState::default(),
+            cell: None,
+            layer_state: LayerState::default(),
+            viewport: Viewport::default(),
+            mouse_world_pos: None,
+            render_cache: RenderCache::default(),
+            ruler: RulerState::default(),
+            show_grid: true,
+            hovered_element: None,
+        }
+    }
 }
 
 impl ViewerApp {
@@ -171,8 +190,22 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F)) {
             self.zoom_to_fit();
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::G)) {
+            self.show_grid = !self.show_grid;
+        }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
             self.open_file_dialog();
+        }
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R)) {
+            self.ruler.clear_all();
+        } else if ctx.input(|i| i.key_pressed(egui::Key::R)) {
+            self.ruler.toggle();
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.ruler.cancel();
+        }
+        if self.ruler.start.is_some() {
+            ctx.request_repaint();
         }
 
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
@@ -209,6 +242,35 @@ impl eframe::App for ViewerApp {
                         self.viewport.zoom_at_center(1.0 / 1.2);
                     }
                     ui.separator();
+                    if ui
+                        .add(egui::Button::new("Ruler").shortcut_text("R"))
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.ruler.toggle();
+                    }
+                    if ui
+                        .add(egui::Button::new("Clear Rulers").shortcut_text(shortcut_text("R")))
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.ruler.clear_all();
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(if self.show_grid {
+                                "Hide Grid"
+                            } else {
+                                "Show Grid"
+                            })
+                            .shortcut_text("G"),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.show_grid = !self.show_grid;
+                    }
+                    ui.separator();
                     ui.label("Pan: Arrow Keys");
                 });
             });
@@ -237,6 +299,9 @@ impl eframe::App for ViewerApp {
                     if let Some((wx, wy)) = self.mouse_world_pos {
                         ui.label(format!("({wx:.6}, {wy:.6})"));
                     }
+                    if self.ruler.active {
+                        ui.label("Ruler: click to place point (Esc to cancel)");
+                    }
                 });
             });
         });
@@ -257,6 +322,7 @@ impl eframe::App for ViewerApp {
                         &cell.layers,
                         layer_state,
                         cell.cell_stats.as_ref(),
+                        &mut cell.search_query,
                     );
                 }
             });
@@ -272,6 +338,9 @@ impl eframe::App for ViewerApp {
         let layer_state = &mut self.layer_state;
         let mouse_world_pos = &mut self.mouse_world_pos;
         let render_cache = &mut self.render_cache;
+        let ruler = &mut self.ruler;
+        let show_grid = self.show_grid;
+        let hovered_element = &mut self.hovered_element;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -294,7 +363,29 @@ impl eframe::App for ViewerApp {
                 library,
                 render_cache,
                 tessellation_cache,
+                ruler,
+                show_grid,
+                *hovered_element,
             );
+
+            let prev_hovered = *hovered_element;
+            *hovered_element = None;
+            if let Some((wx, wy)) = *mouse_world_pos {
+                if let Some(grid) = spatial_grid {
+                    let candidates = grid.query_point(wx, wy);
+                    for &idx in candidates.iter().rev() {
+                        if let Some(el) = elements.get(idx as usize) {
+                            if el.hit_test(wx, wy, viewport.zoom) {
+                                *hovered_element = Some(idx as usize);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if *hovered_element != prev_hovered {
+                ctx.request_repaint();
+            }
         });
     }
 }

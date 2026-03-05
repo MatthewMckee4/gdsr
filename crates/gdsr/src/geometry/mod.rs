@@ -2,6 +2,7 @@ mod area;
 mod bounding_box;
 mod is_point_inside;
 mod is_point_on_edge;
+pub(crate) mod path_expansion;
 mod perimeter;
 mod round;
 
@@ -9,6 +10,7 @@ pub use area::area;
 pub use bounding_box::bounding_box;
 pub use is_point_inside::is_point_inside;
 pub use is_point_on_edge::is_point_on_edge;
+pub use path_expansion::expand_path_to_polygon;
 pub use perimeter::perimeter;
 pub use round::round_to_decimals;
 
