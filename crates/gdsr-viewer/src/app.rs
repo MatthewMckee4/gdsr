@@ -18,7 +18,6 @@ fn shortcut_text(key: &str) -> String {
     format!("{modifier}{key}")
 }
 
-#[derive(Default)]
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -28,6 +27,21 @@ pub struct ViewerApp {
     render_cache: RenderCache,
     show_grid: bool,
     hovered_element: Option<usize>,
+}
+
+impl Default for ViewerApp {
+    fn default() -> Self {
+        Self {
+            file_load: FileLoadState::default(),
+            cell: None,
+            layer_state: LayerState::default(),
+            viewport: Viewport::default(),
+            mouse_world_pos: None,
+            render_cache: RenderCache::default(),
+            show_grid: true,
+            hovered_element: None,
+        }
+    }
 }
 
 impl ViewerApp {

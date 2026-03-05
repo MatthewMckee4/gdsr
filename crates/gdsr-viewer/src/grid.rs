@@ -4,7 +4,7 @@ use crate::drawable::WorldBBox;
 use crate::viewport::Viewport;
 
 /// Grid line color — subtle against the dark background.
-const GRID_COLOR: Color32 = Color32::from_rgb(50, 50, 50);
+const GRID_COLOR: Color32 = Color32::from_rgb(60, 60, 60);
 
 /// Target screen-space distance between grid lines in pixels.
 const TARGET_SPACING_PX: f64 = 80.0;
@@ -69,7 +69,7 @@ fn draw_grid_lines(
 /// Draws the origin axes with slightly brighter lines.
 pub fn draw_origin_axes(painter: &Painter, viewport: &Viewport, rect: Rect) {
     let visible = viewport.visible_world_rect(rect);
-    let stroke = Stroke::new(1.0, Color32::from_rgb(80, 80, 80));
+    let stroke = Stroke::new(1.0, Color32::from_rgb(100, 100, 100));
 
     if visible.min_x <= 0.0 && visible.max_x >= 0.0 {
         let top = viewport.world_to_screen(0.0, visible.max_y, rect);
