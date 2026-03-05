@@ -1,7 +1,7 @@
 - ALWAYS read CONTRIBUTING.md for guidelines on how to run tools
 - ALWAYS attempt to add a test case for changed behavior. Get your tests to pass — if you didn't run the tests, your code does not work.
 - ALWAYS test UI changes by testing the underlying pure logic (coordinate transforms, state management, data processing) rather than rendering. Extract testable logic from UI code.
-- PREFER property tests, e.g., at `src/property_tests/...` over unit tests.
+- PREFER property tests, e.g., at `src/property_tests/...` over unit tests for non-trivial behavior. For trivial changes, normal unit tests are sufficient.
 - ALWAYS use snapshot tests when running a command in integration tests.
 - STRONGLY PREFER inline snapshot tests (`insta::assert_debug_snapshot!(value, @"...")`, `insta::assert_snapshot!(value, @"...")`) over chains of individual `assert_eq!` calls. Only use external snapshot files (without `@`) when the output is very large. Inline snapshots keep expected values visible in the test.
 - PREFER running specific tests over running the entire test suite

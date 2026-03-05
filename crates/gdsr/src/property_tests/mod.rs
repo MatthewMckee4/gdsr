@@ -2,7 +2,6 @@
 
 mod arbitrary;
 mod grid;
-mod layer_remap;
 mod path;
 mod point;
 mod polygon;
