@@ -12,6 +12,7 @@ license = { workspace = true }
 earcutr = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
+emath = { workspace = true }
 env_logger = { workspace = true }
 gdsr = { workspace = true }
 log = { workspace = true }

@@ -13,20 +13,21 @@ license = "MIT"
 gdsr = { path = "crates/gdsr" }
 
 approx = "0.5"
-bytemuck = "1.24.0"
-chrono = "0.4.42"
+bytemuck = "1.25.0"
+chrono = "0.4.44"
 earcutr = "0.4"
-eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
-egui = "0.31"
+eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui = "0.33.3"
+emath = "0.33.3"
 env_logger = "0.11"
-insta = "1.44.3"
+insta = "1.46.3"
 log = "0.4"
-quickcheck = "1.0.3"
+quickcheck = "1.1.0"
 quickcheck_macros = "1"
 rayon = "1"
 rfd = "0.15"
 rstest = "0.23.0"
-tempfile = "3.23"
+tempfile = "3.26"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }

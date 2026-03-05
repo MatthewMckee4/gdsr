@@ -1,7 +1,9 @@
-use egui::{Pos2, Rect};
+use std::collections::HashMap;
+
+use egui::{Mesh, Pos2, Rect, Stroke};
 use quickcheck_macros::quickcheck;
 
-use crate::drawable::{Drawable, WorldBBox};
+use crate::drawable::{Drawable, WorldBBox, stroke_polyline_to_mesh};
 use crate::spatial::SpatialGrid;
 use crate::testutil::helpers;
 use crate::viewport::Viewport;
@@ -244,4 +246,160 @@ fn spatial_grid_full_query_finds_all(x1: i8, y1: i8, x2: i8, y2: i8) -> bool {
     indices.dedup();
 
     indices.contains(&0) && indices.contains(&1)
+}
+
+/// Merging N meshes into a batch preserves total vertex count and produces
+/// correctly offset indices.
+#[quickcheck]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "quickcheck requires owned types"
+)]
+fn merge_mesh_preserves_totals(counts: Vec<u8>) -> bool {
+    let mut layer_meshes: HashMap<(u16, u16), Mesh> = HashMap::new();
+    let key = (1, 0);
+    let mut total_verts = 0usize;
+    let mut total_indices = 0usize;
+
+    for &n in &counts {
+        let n = (n % 20) as usize;
+        if n < 3 {
+            continue;
+        }
+        let mut src = Mesh::default();
+        for i in 0..n {
+            src.vertices.push(egui::epaint::Vertex {
+                pos: Pos2::new(i as f32, 0.0),
+                uv: egui::epaint::WHITE_UV,
+                color: egui::Color32::WHITE,
+            });
+        }
+        for i in 0..(n - 2) {
+            src.indices
+                .extend_from_slice(&[0, (i + 1) as u32, (i + 2) as u32]);
+        }
+        total_verts += src.vertices.len();
+        total_indices += src.indices.len();
+
+        let dst = layer_meshes.entry(key).or_default();
+        let base = dst.vertices.len() as u32;
+        dst.vertices.extend_from_slice(&src.vertices);
+        dst.indices.extend(src.indices.iter().map(|&i| i + base));
+    }
+
+    if let Some(merged) = layer_meshes.get(&key) {
+        if merged.vertices.len() != total_verts {
+            return false;
+        }
+        if merged.indices.len() != total_indices {
+            return false;
+        }
+        // All indices must reference valid vertices
+        let max_idx = merged.vertices.len() as u32;
+        merged.indices.iter().all(|&i| i < max_idx)
+    } else {
+        total_verts == 0
+    }
+}
+
+/// Elements at grid cell boundaries appear in multiple cells. The `seen` bitset
+/// ensures each element index is processed at most once.
+#[quickcheck]
+fn dedup_bitset_prevents_duplicates(x1: i8, y1: i8) -> bool {
+    let elems = vec![
+        helpers::polygon(
+            vec![
+                (i32::from(x1), i32::from(y1)),
+                (i32::from(x1) + 100, i32::from(y1)),
+                (i32::from(x1) + 100, i32::from(y1) + 100),
+            ],
+            1,
+            0,
+        ),
+        helpers::polygon(
+            vec![
+                (i32::from(x1) + 50, i32::from(y1) + 50),
+                (i32::from(x1) + 150, i32::from(y1) + 50),
+                (i32::from(x1) + 150, i32::from(y1) + 150),
+            ],
+            1,
+            0,
+        ),
+    ];
+
+    let Some(bounds) = compute_bounds(&elems) else {
+        return false;
+    };
+    let grid = SpatialGrid::build(&elems, &bounds);
+
+    let w = bounds.max_x - bounds.min_x;
+    let h = bounds.max_y - bounds.min_y;
+    let visible = WorldBBox::new(
+        bounds.min_x - w,
+        bounds.min_y - h,
+        bounds.max_x + w,
+        bounds.max_y + h,
+    );
+
+    let mut seen = vec![false; elems.len()];
+    let mut draw_counts = vec![0u32; elems.len()];
+
+    for cell in grid.query_visible(&visible) {
+        for &idx in &cell.indices {
+            let i = idx as usize;
+            if seen[i] {
+                continue;
+            }
+            seen[i] = true;
+            if i < draw_counts.len() {
+                draw_counts[i] += 1;
+            }
+        }
+    }
+
+    draw_counts.iter().all(|&c| c <= 1)
+}
+
+/// Counts edges that have non-zero length (matching the 1e-6 threshold in the function).
+fn count_nonzero_edges(points: &[Pos2], closed: bool) -> usize {
+    if points.len() < 2 {
+        return 0;
+    }
+    let edge_count = if closed {
+        points.len()
+    } else {
+        points.len() - 1
+    };
+    (0..edge_count)
+        .filter(|&i| {
+            let p0 = points[i];
+            let p1 = points[(i + 1) % points.len()];
+            (p1 - p0).length() >= 1e-6
+        })
+        .count()
+}
+
+#[quickcheck]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "quickcheck requires owned types"
+)]
+fn stroke_polyline_mesh_dimensions(xs: Vec<(i16, i16)>) -> bool {
+    let points: Vec<Pos2> = xs
+        .iter()
+        .map(|&(x, y)| Pos2::new(f32::from(x), f32::from(y)))
+        .collect();
+    let stroke = Stroke::new(2.0, egui::Color32::WHITE);
+
+    for closed in [false, true] {
+        let mesh = stroke_polyline_to_mesh(&points, stroke, closed);
+        let expected_edges = count_nonzero_edges(&points, closed);
+        if mesh.vertices.len() != 4 * expected_edges {
+            return false;
+        }
+        if mesh.indices.len() != 6 * expected_edges {
+            return false;
+        }
+    }
+    true
 }

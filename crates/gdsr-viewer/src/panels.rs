@@ -1,8 +1,8 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use egui::{ComboBox, Ui, Vec2};
 
-use crate::colors::LayerColorMap;
+use crate::state::LayerState;
 
 /// Draws the side panel with cell selector, layer toggles, and zoom-to-fit button.
 /// Returns `true` if zoom-to-fit was requested.
@@ -12,8 +12,7 @@ pub fn draw_side_panel(
     selected_cell: &mut Option<String>,
     cell_changed: &mut bool,
     layers: &BTreeSet<(u16, u16)>,
-    hidden_layers: &mut HashSet<(u16, u16)>,
-    layer_colors: &mut LayerColorMap,
+    layer_state: &mut LayerState,
 ) -> bool {
     let mut zoom_to_fit = false;
 
@@ -42,8 +41,8 @@ pub fn draw_side_panel(
         .max_height(ui.available_height() - 40.0)
         .show(ui, |ui| {
             for &(layer, dt) in layers {
-                let color = layer_colors.get(layer, dt);
-                let visible = !hidden_layers.contains(&(layer, dt));
+                let color = layer_state.layer_colors.get(layer, dt);
+                let visible = !layer_state.hidden_layers.contains(&(layer, dt));
 
                 ui.horizontal(|ui| {
                     // Color swatch
@@ -57,9 +56,9 @@ pub fn draw_side_panel(
                         .changed()
                     {
                         if checked {
-                            hidden_layers.remove(&(layer, dt));
+                            layer_state.hidden_layers.remove(&(layer, dt));
                         } else {
-                            hidden_layers.insert((layer, dt));
+                            layer_state.hidden_layers.insert((layer, dt));
                         }
                     }
                 });

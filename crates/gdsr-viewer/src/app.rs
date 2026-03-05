@@ -1,46 +1,21 @@
-use std::collections::{BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 
-use gdsr::{Element, Library};
-
-use crate::colors::LayerColorMap;
 use crate::drawable::Drawable;
 use crate::panels;
 use crate::spatial::SpatialGrid;
+use crate::state::{CellState, FileLoadState, LayerState, RenderCache};
 use crate::viewport::{self, Viewport};
-
-/// Tracks an in-flight file-open operation.
-#[derive(Default)]
-struct FileLoadState {
-    file_path: Option<PathBuf>,
-    load_receiver: Option<(PathBuf, mpsc::Receiver<Result<Library, String>>)>,
-    loading: bool,
-    error_message: Option<String>,
-}
-
-/// Holds the loaded library, selected cell, and its streamed elements.
-#[derive(Default)]
-struct CellState {
-    library: Option<Library>,
-    cell_names: Vec<String>,
-    selected_cell: Option<String>,
-    elements: Vec<Element>,
-    element_receiver: Option<mpsc::Receiver<Element>>,
-    elements_loading: bool,
-    layers: BTreeSet<(u16, u16)>,
-    spatial_grid: Option<SpatialGrid>,
-}
 
 #[derive(Default)]
 pub struct ViewerApp {
     file_load: FileLoadState,
-    cell: CellState,
+    cell: Option<CellState>,
+    layer_state: LayerState,
     viewport: Viewport,
-    layer_colors: LayerColorMap,
-    hidden_layers: HashSet<(u16, u16)>,
     mouse_world_pos: Option<(f64, f64)>,
+    render_cache: RenderCache,
 }
 
 impl ViewerApp {
@@ -55,15 +30,10 @@ impl ViewerApp {
 
     /// Called when the background file loader completes successfully. Populates cell
     /// names and auto-selects the first cell.
-    fn on_library_loaded(&mut self, library: Library, path: PathBuf) {
-        self.cell.cell_names = {
-            let mut names: Vec<String> = library.cells().keys().cloned().collect();
-            names.sort();
-            names
-        };
-
-        let first_cell = self.cell.cell_names.first().cloned();
-        self.cell.library = Some(library);
+    fn on_library_loaded(&mut self, library: gdsr::Library, path: PathBuf) {
+        let cell_state = CellState::new(library);
+        let first_cell = cell_state.cell_names.first().cloned();
+        self.cell = Some(cell_state);
         self.file_load.file_path = Some(path);
         self.file_load.loading = false;
 
@@ -75,35 +45,36 @@ impl ViewerApp {
     /// Switches to a new cell, cancelling any in-flight element streaming and starting
     /// a new streaming thread for the selected cell's elements.
     fn select_cell(&mut self, name: &str) {
-        self.cell.selected_cell = Some(name.to_string());
+        if let Some(cell) = self.cell.as_mut() {
+            cell.selected_cell = Some(name.to_string());
+            cell.element_receiver = None;
+            cell.elements.clear();
+            cell.layers.clear();
+            cell.spatial_grid = None;
 
-        // Drop old receiver to cancel any in-flight streaming thread
-        self.cell.element_receiver = None;
-        self.cell.elements.clear();
-        self.cell.layers.clear();
-        self.cell.spatial_grid = None;
-
-        if let Some(library) = &self.cell.library {
-            if let Some(cell) = library.get_cell(name) {
-                let cell = cell.clone();
-                let library = library.clone();
+            if let Some(cell_data) = cell.library.get_cell(name) {
+                let cell_data = cell_data.clone();
+                let library = cell.library.clone();
                 let (tx, rx) = mpsc::channel();
 
                 thread::spawn(move || {
-                    cell.stream_elements(None, &library, &tx);
+                    cell_data.stream_elements(None, &library, &tx);
                 });
 
-                self.cell.element_receiver = Some(rx);
-                self.cell.elements_loading = true;
+                cell.element_receiver = Some(rx);
+                cell.elements_loading = true;
             }
         }
     }
 
     /// Adjusts the viewport to fit all currently loaded elements.
     fn zoom_to_fit(&mut self) {
-        if let Some(bounds) = viewport::compute_bounds(&self.cell.elements) {
-            let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
-            self.viewport.zoom_to_fit(&bounds, rect);
+        if let Some(cell) = self.cell.as_ref() {
+            if let Some(bounds) = viewport::compute_bounds(&cell.elements) {
+                let rect =
+                    egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
+                self.viewport.zoom_to_fit(&bounds, rect);
+            }
         }
     }
 }
@@ -133,41 +104,48 @@ impl eframe::App for ViewerApp {
         }
 
         // Drain element streaming channel
-        if let Some(rx) = &self.cell.element_receiver {
-            loop {
-                match rx.try_recv() {
-                    Ok(element) => {
-                        for key in element.layer_keys() {
-                            if self.cell.layers.insert(key) {
-                                self.layer_colors.get(key.0, key.1);
+        let mut streaming_finished = false;
+        if let Some(cell) = self.cell.as_mut() {
+            if let Some(rx) = &cell.element_receiver {
+                loop {
+                    match rx.try_recv() {
+                        Ok(element) => {
+                            for key in element.layer_keys() {
+                                if cell.layers.insert(key) {
+                                    self.layer_state.layer_colors.get(key.0, key.1);
+                                }
                             }
+                            cell.elements.push(element);
                         }
-                        self.cell.elements.push(element);
-                    }
-                    Err(mpsc::TryRecvError::Empty) => break,
-                    Err(mpsc::TryRecvError::Disconnected) => {
-                        self.cell.elements_loading = false;
-                        self.cell.element_receiver = None;
-                        if let Some(bounds) = viewport::compute_bounds(&self.cell.elements) {
-                            self.cell.spatial_grid =
-                                Some(SpatialGrid::build(&self.cell.elements, &bounds));
+                        Err(mpsc::TryRecvError::Empty) => break,
+                        Err(mpsc::TryRecvError::Disconnected) => {
+                            cell.elements_loading = false;
+                            cell.element_receiver = None;
+                            if let Some(bounds) = viewport::compute_bounds(&cell.elements) {
+                                cell.spatial_grid =
+                                    Some(SpatialGrid::build(&cell.elements, &bounds));
+                            }
+                            streaming_finished = true;
+                            break;
                         }
-                        self.zoom_to_fit();
-                        break;
                     }
                 }
             }
+
+            if cell.elements_loading {
+                ctx.request_repaint();
+            }
         }
 
-        if self.cell.elements_loading {
-            ctx.request_repaint();
+        if streaming_finished {
+            self.zoom_to_fit();
         }
 
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Open...").clicked() {
-                        ui.close_menu();
+                        ui.close_kind(egui::UiKind::Menu);
                         self.open_file_dialog();
                     }
                 });
@@ -178,10 +156,10 @@ impl eframe::App for ViewerApp {
             ui.horizontal(|ui| {
                 if self.file_load.loading {
                     ui.label("Loading...");
-                } else if self.cell.elements_loading {
+                } else if self.cell.as_ref().is_some_and(|c| c.elements_loading) {
                     ui.label(format!(
                         "Expanding elements... ({})",
-                        self.cell.elements.len()
+                        self.cell.as_ref().map_or(0, |c| c.elements.len())
                     ));
                 } else if let Some(err) = &self.file_load.error_message {
                     ui.colored_label(egui::Color32::RED, format!("Error: {err}"));
@@ -203,22 +181,25 @@ impl eframe::App for ViewerApp {
 
         let mut cell_changed = false;
         let mut zoom_to_fit = false;
+        let cell = &mut self.cell;
+        let layer_state = &mut self.layer_state;
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
             .show(ctx, |ui| {
-                zoom_to_fit = panels::draw_side_panel(
-                    ui,
-                    &self.cell.cell_names,
-                    &mut self.cell.selected_cell,
-                    &mut cell_changed,
-                    &self.cell.layers,
-                    &mut self.hidden_layers,
-                    &mut self.layer_colors,
-                );
+                if let Some(cell) = cell.as_mut() {
+                    zoom_to_fit = panels::draw_side_panel(
+                        ui,
+                        &cell.cell_names,
+                        &mut cell.selected_cell,
+                        &mut cell_changed,
+                        &cell.layers,
+                        layer_state,
+                    );
+                }
             });
 
         if cell_changed {
-            if let Some(name) = self.cell.selected_cell.clone() {
+            if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
                 self.select_cell(&name);
             }
         }
@@ -227,14 +208,33 @@ impl eframe::App for ViewerApp {
             self.zoom_to_fit();
         }
 
+        let cell = &mut self.cell;
+        let viewport = &mut self.viewport;
+        let layer_state = &mut self.layer_state;
+        let mouse_world_pos = &mut self.mouse_world_pos;
+        let render_cache = &mut self.render_cache;
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.mouse_world_pos = viewport::draw_viewport(
+            let mut empty_cache = std::collections::HashMap::new();
+            let (elements, spatial_grid, library, tessellation_cache) =
+                if let Some(cell) = cell.as_mut() {
+                    (
+                        cell.elements.as_slice(),
+                        cell.spatial_grid.as_ref(),
+                        Some(&cell.library),
+                        &mut cell.tessellation_cache,
+                    )
+                } else {
+                    (&[] as &[gdsr::Element], None, None, &mut empty_cache)
+                };
+
+            *mouse_world_pos = viewport.draw(
                 ui,
-                &mut self.viewport,
-                &self.cell.elements,
-                &self.hidden_layers,
-                &mut self.layer_colors,
-                self.cell.spatial_grid.as_ref(),
+                elements,
+                layer_state,
+                spatial_grid,
+                library,
+                render_cache,
+                tessellation_cache,
             );
         });
     }

@@ -2,14 +2,14 @@ pub(crate) mod bounds;
 
 pub use bounds::compute_bounds;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Rect, Sense};
-use gdsr::Element;
+use gdsr::{Element, Library};
 
-use crate::colors::LayerColorMap;
-use crate::drawable::{Drawable, WorldBBox};
+use crate::drawable::{DrawContext, Drawable, WorldBBox};
 use crate::spatial::SpatialGrid;
+use crate::state::{LayerState, RenderCache};
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
 pub struct Viewport {
@@ -76,96 +76,179 @@ impl Viewport {
 /// instead of rendering individual elements.
 const CELL_LOAD_THRESHOLD_PX: f32 = 24.0;
 
-/// Draws the viewport and handles pan/zoom interaction.
-///
-/// Returns the mouse position in world coordinates if the pointer is inside the viewport.
-pub fn draw_viewport(
-    ui: &mut egui::Ui,
-    viewport: &mut Viewport,
-    elements: &[Element],
-    hidden_layers: &HashSet<(u16, u16)>,
-    layer_colors: &mut LayerColorMap,
-    spatial_grid: Option<&SpatialGrid>,
-) -> Option<(f64, f64)> {
-    let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
-    let rect = response.rect;
+impl Viewport {
+    /// Draws the viewport and handles pan/zoom interaction.
+    ///
+    /// Returns the mouse position in world coordinates if the pointer is inside the viewport.
+    pub fn draw(
+        &mut self,
+        ui: &mut egui::Ui,
+        elements: &[Element],
+        layer_state: &mut LayerState,
+        spatial_grid: Option<&SpatialGrid>,
+        library: Option<&Library>,
+        render_cache: &mut RenderCache,
+        tessellation_cache: &mut HashMap<u32, Vec<usize>>,
+    ) -> Option<(f64, f64)> {
+        let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
+        let rect = response.rect;
 
-    painter.rect_filled(rect, 0.0, Color32::from_rgb(30, 30, 30));
+        painter.rect_filled(rect, 0.0, Color32::from_rgb(30, 30, 30));
 
-    if response.dragged() {
-        let delta = response.drag_delta();
-        viewport.center_x -= f64::from(delta.x) / viewport.zoom;
-        viewport.center_y += f64::from(delta.y) / viewport.zoom;
-    }
-
-    if let Some(hover_pos) = response.hover_pos() {
-        let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-        if scroll != 0.0 {
-            let (wx, wy) = viewport.screen_to_world(hover_pos.x, hover_pos.y, rect);
-            let factor = 1.0 + f64::from(scroll) * 0.002;
-            let new_zoom = (viewport.zoom * factor).clamp(1e-3, 1e15);
-            let cx = f64::from(rect.center().x);
-            let cy = f64::from(rect.center().y);
-            let sx = f64::from(hover_pos.x);
-            let sy = f64::from(hover_pos.y);
-            viewport.center_x = wx - (sx - cx) / new_zoom;
-            viewport.center_y = wy + (sy - cy) / new_zoom;
-            viewport.zoom = new_zoom;
+        if response.dragged() {
+            let delta = response.drag_delta();
+            self.center_x -= f64::from(delta.x) / self.zoom;
+            self.center_y += f64::from(delta.y) / self.zoom;
         }
-    }
 
-    let visible = viewport.visible_world_rect(rect);
-
-    if let Some(grid) = spatial_grid {
-        for cell in grid.query_visible(&visible) {
-            let s_min = viewport.world_to_screen(cell.bbox.min_x, cell.bbox.min_y, rect);
-            let s_max = viewport.world_to_screen(cell.bbox.max_x, cell.bbox.max_y, rect);
-            let sw = (s_max.x - s_min.x).abs();
-            let sh = (s_min.y - s_max.y).abs();
-
-            if sw < 1.0 && sh < 1.0 {
-                continue;
-            }
-
-            if sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
-                if !hidden_layers.contains(&cell.dominant_layer) {
-                    let color = layer_colors.get(cell.dominant_layer.0, cell.dominant_layer.1);
-                    let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
-                    let cell_rect = Rect::from_two_pos(s_min, s_max);
-                    painter.rect_filled(cell_rect, 0.0, fill);
-                }
-                continue;
-            }
-
-            for &idx in &cell.indices {
-                if let Some(element) = elements.get(idx as usize) {
-                    element.draw(
-                        &painter,
-                        viewport,
-                        rect,
-                        &visible,
-                        hidden_layers,
-                        layer_colors,
-                    );
-                }
+        if let Some(hover_pos) = response.hover_pos() {
+            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+            if scroll != 0.0 {
+                let (wx, wy) = self.screen_to_world(hover_pos.x, hover_pos.y, rect);
+                let factor = 1.0 + f64::from(scroll) * 0.002;
+                let new_zoom = (self.zoom * factor).clamp(1e-3, 1e15);
+                let cx = f64::from(rect.center().x);
+                let cy = f64::from(rect.center().y);
+                let sx = f64::from(hover_pos.x);
+                let sy = f64::from(hover_pos.y);
+                self.center_x = wx - (sx - cx) / new_zoom;
+                self.center_y = wy + (sy - cy) / new_zoom;
+                self.zoom = new_zoom;
             }
         }
-    } else {
-        for element in elements {
-            element.draw(
-                &painter,
-                viewport,
-                rect,
-                &visible,
-                hidden_layers,
-                layer_colors,
+
+        let mut hidden_layers: Vec<(u16, u16)> =
+            layer_state.hidden_layers.iter().copied().collect();
+        hidden_layers.sort_unstable();
+
+        if !render_cache.needs_full_render(
+            &hidden_layers,
+            elements.len(),
+            self.center_x,
+            self.center_y,
+            self.zoom,
+            rect,
+        ) {
+            let tsf = render_cache.delta_transform(
+                self.center_x,
+                self.center_y,
+                self.zoom,
+                rect.center(),
             );
+            for (_, mesh) in render_cache.layer_meshes() {
+                let mut m = mesh.clone();
+                for v in &mut m.vertices {
+                    v.pos = tsf * v.pos;
+                }
+                painter.add(egui::Shape::mesh(m));
+            }
+            for s in render_cache.extra_shapes() {
+                let mut s = s.clone();
+                s.transform(tsf);
+                painter.add(s);
+            }
+            return response
+                .hover_pos()
+                .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
         }
-    }
 
-    response
-        .hover_pos()
-        .map(|pos| viewport.screen_to_world(pos.x, pos.y, rect))
+        // Full render: query a 3× expanded region so the cache has margin for panning.
+        let visible = self.visible_world_rect(rect);
+        let w = visible.max_x - visible.min_x;
+        let h = visible.max_y - visible.min_y;
+        let render_visible = WorldBBox::new(
+            visible.min_x - w,
+            visible.min_y - h,
+            visible.max_x + w,
+            visible.max_y + h,
+        );
+
+        let mut layer_meshes = HashMap::new();
+        let mut extra_shapes = Vec::new();
+        let mut screen_pts_buf = Vec::new();
+        let mut ctx = DrawContext {
+            painter: &painter,
+            layer_meshes: &mut layer_meshes,
+            extra_shapes: &mut extra_shapes,
+            viewport: self,
+            rect,
+            visible: &render_visible,
+            layer_state,
+            library,
+            current_element_idx: None,
+            tessellation_cache,
+            screen_pts_buf: &mut screen_pts_buf,
+        };
+
+        if let Some(grid) = spatial_grid {
+            let mut seen = vec![false; elements.len()];
+            for cell in grid.query_visible(&render_visible) {
+                let s_min = ctx
+                    .viewport
+                    .world_to_screen(cell.bbox.min_x, cell.bbox.min_y, rect);
+                let s_max = ctx
+                    .viewport
+                    .world_to_screen(cell.bbox.max_x, cell.bbox.max_y, rect);
+                let sw = (s_max.x - s_min.x).abs();
+                let sh = (s_min.y - s_max.y).abs();
+
+                if sw < 1.0 && sh < 1.0 {
+                    continue;
+                }
+
+                if sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
+                    if !ctx.layer_state.hidden_layers.contains(&cell.dominant_layer) {
+                        let color = ctx
+                            .layer_state
+                            .layer_colors
+                            .get(cell.dominant_layer.0, cell.dominant_layer.1);
+                        let fill =
+                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+                        let cell_rect = Rect::from_two_pos(s_min, s_max);
+                        ctx.rect_filled(cell_rect, 0.0, fill);
+                    }
+                    continue;
+                }
+
+                for &idx in &cell.indices {
+                    let i = idx as usize;
+                    if seen[i] {
+                        continue;
+                    }
+                    seen[i] = true;
+                    if let Some(element) = elements.get(i) {
+                        ctx.current_element_idx = Some(idx);
+                        element.draw(&mut ctx);
+                    }
+                }
+            }
+        } else {
+            for (i, element) in elements.iter().enumerate() {
+                ctx.current_element_idx = Some(i as u32);
+                element.draw(&mut ctx);
+            }
+        }
+
+        let batched: Vec<((u16, u16), egui::epaint::Mesh)> = layer_meshes.into_iter().collect();
+        for (_, mesh) in &batched {
+            painter.add(egui::Shape::mesh(mesh.clone()));
+        }
+        painter.extend(extra_shapes.iter().cloned());
+        render_cache.update(
+            batched,
+            extra_shapes,
+            self.center_x,
+            self.center_y,
+            self.zoom,
+            rect.center(),
+            hidden_layers,
+            elements.len(),
+        );
+
+        response
+            .hover_pos()
+            .map(|pos| self.screen_to_world(pos.x, pos.y, rect))
+    }
 }
 
 #[cfg(test)]

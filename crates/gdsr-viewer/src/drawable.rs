@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
-use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke};
-use gdsr::{Dimensions, Element};
+use egui::epaint;
+use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
+use gdsr::{Dimensions, Element, Library};
 
-use crate::colors::LayerColorMap;
+use crate::state::LayerState;
 use crate::viewport::Viewport;
 
 /// World-space axis-aligned bounding box with named fields.
@@ -42,6 +43,117 @@ impl WorldBBox {
     }
 }
 
+/// Bundles the rendering context passed to every `Drawable::draw` call.
+///
+/// Geometry is batched by layer into large meshes (`layer_meshes`) to minimize
+/// per-frame clones on cache hits. Non-mesh shapes (text, rect fallbacks) go
+/// into `extra_shapes`. The `screen_pts_buf` is a reusable scratch buffer to
+/// avoid per-element allocations.
+pub struct DrawContext<'a> {
+    pub painter: &'a egui::Painter,
+    pub layer_meshes: &'a mut HashMap<(u16, u16), Mesh>,
+    pub extra_shapes: &'a mut Vec<Shape>,
+    pub viewport: &'a Viewport,
+    pub rect: Rect,
+    pub visible: &'a WorldBBox,
+    pub layer_state: &'a mut LayerState,
+    pub library: Option<&'a Library>,
+    pub current_element_idx: Option<u32>,
+    pub tessellation_cache: &'a mut HashMap<u32, Vec<usize>>,
+    pub screen_pts_buf: &'a mut Vec<Pos2>,
+}
+
+impl DrawContext<'_> {
+    /// Merges a mesh's geometry into the batched mesh for the given layer.
+    pub fn merge_mesh(&mut self, key: (u16, u16), src: &Mesh) {
+        let dst = self.layer_meshes.entry(key).or_default();
+        let base = dst.vertices.len() as u32;
+        dst.vertices.extend_from_slice(&src.vertices);
+        dst.indices.extend(src.indices.iter().map(|&i| i + base));
+    }
+
+    pub fn rect_filled(&mut self, rect: Rect, corner_radius: f32, fill: Color32) {
+        self.extra_shapes
+            .push(Shape::from(epaint::RectShape::filled(
+                rect,
+                corner_radius,
+                fill,
+            )));
+    }
+
+    pub fn rect_stroke(
+        &mut self,
+        rect: Rect,
+        corner_radius: f32,
+        stroke: Stroke,
+        kind: StrokeKind,
+    ) {
+        self.extra_shapes
+            .push(Shape::from(epaint::RectShape::stroke(
+                rect,
+                corner_radius,
+                stroke,
+                kind,
+            )));
+    }
+
+    pub fn line_segment(&mut self, points: [Pos2; 2], stroke: Stroke) {
+        self.extra_shapes
+            .push(Shape::LineSegment { points, stroke });
+    }
+
+    pub fn text(
+        &mut self,
+        pos: Pos2,
+        anchor: egui::Align2,
+        text: &str,
+        font_id: FontId,
+        color: Color32,
+    ) {
+        let galley = self.painter.layout_no_wrap(text.to_owned(), font_id, color);
+        let rect = anchor.anchor_size(pos, galley.size());
+        self.extra_shapes
+            .push(Shape::galley(rect.min, galley, color));
+    }
+}
+
+/// Pre-tessellates a polyline stroke into a [`Mesh`] of quads (2 triangles per edge).
+/// For `closed` polylines, the last point connects back to the first.
+pub(crate) fn stroke_polyline_to_mesh(points: &[Pos2], stroke: Stroke, closed: bool) -> Mesh {
+    let mut mesh = Mesh::default();
+    if points.len() < 2 {
+        return mesh;
+    }
+    let half_w = stroke.width / 2.0;
+    let edge_count = if closed {
+        points.len()
+    } else {
+        points.len() - 1
+    };
+
+    for i in 0..edge_count {
+        let p0 = points[i];
+        let p1 = points[(i + 1) % points.len()];
+        let dir = p1 - p0;
+        let len = dir.length();
+        if len < 1e-6 {
+            continue;
+        }
+        let normal = egui::Vec2::new(-dir.y, dir.x) / len * half_w;
+        let base = mesh.vertices.len() as u32;
+        for pos in [p0 + normal, p0 - normal, p1 + normal, p1 - normal] {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos,
+                uv: egui::epaint::WHITE_UV,
+                color: stroke.color,
+            });
+        }
+        mesh.indices
+            .extend_from_slice(&[base, base + 1, base + 2, base + 1, base + 3, base + 2]);
+    }
+    mesh
+}
+
 /// Trait for viewer-drawable elements. Provides layer info, bounding box, and drawing.
 pub trait Drawable {
     /// Returns all `(layer, data_type)` pairs this element contributes to.
@@ -51,15 +163,7 @@ pub trait Drawable {
     fn world_bbox(&self) -> Option<WorldBBox>;
 
     /// Draws this element onto the painter, resolving its own color and visibility.
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    );
+    fn draw(&self, ctx: &mut DrawContext);
 }
 
 /// Screen-pixel threshold below which polygons render as a filled bounding box.
@@ -80,17 +184,9 @@ impl Drawable for gdsr::Polygon {
         ))
     }
 
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    ) {
+    fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), self.data_type());
-        if hidden_layers.contains(&key) {
+        if ctx.layer_state.hidden_layers.contains(&key) {
             return;
         }
 
@@ -102,12 +198,16 @@ impl Drawable for gdsr::Polygon {
         let Some(bbox) = self.world_bbox() else {
             return;
         };
-        if !bbox.overlaps(visible) {
+        if !bbox.overlaps(ctx.visible) {
             return;
         }
 
-        let s_min = viewport.world_to_screen(bbox.min_x, bbox.min_y, rect);
-        let s_max = viewport.world_to_screen(bbox.max_x, bbox.max_y, rect);
+        let s_min = ctx
+            .viewport
+            .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+        let s_max = ctx
+            .viewport
+            .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs();
 
@@ -115,61 +215,67 @@ impl Drawable for gdsr::Polygon {
             return;
         }
 
-        let color = layer_colors.get(key.0, key.1);
+        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
         let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
             let bbox_rect = Rect::from_two_pos(s_min, s_max);
-            painter.rect_filled(bbox_rect, 0.0, fill);
-            painter.rect_stroke(
-                bbox_rect,
-                0.0,
-                Stroke::new(1.0, color),
-                egui::StrokeKind::Outside,
-            );
+            ctx.rect_filled(bbox_rect, 0.0, fill);
+            ctx.rect_stroke(bbox_rect, 0.0, Stroke::new(1.0, color), StrokeKind::Outside);
             return;
         }
 
-        let screen_pts: Vec<Pos2> = points
-            .iter()
-            .map(|p| viewport.world_to_screen(p.x().absolute_value(), p.y().absolute_value(), rect))
-            .collect();
+        ctx.screen_pts_buf.clear();
+        ctx.screen_pts_buf.extend(points.iter().map(|p| {
+            ctx.viewport
+                .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
+        }));
 
-        let open_pts = if screen_pts.len() >= 2 && screen_pts.first() == screen_pts.last() {
-            &screen_pts[..screen_pts.len() - 1]
+        let open_len = if ctx.screen_pts_buf.len() >= 2
+            && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
+        {
+            ctx.screen_pts_buf.len() - 1
         } else {
-            &screen_pts
+            ctx.screen_pts_buf.len()
         };
 
-        if open_pts.len() < 3 {
+        if open_len < 3 {
             return;
         }
 
-        let coords: Vec<f64> = open_pts
+        let coords: Vec<f64> = ctx.screen_pts_buf[..open_len]
             .iter()
             .flat_map(|p| [f64::from(p.x), f64::from(p.y)])
             .collect();
 
-        if let Ok(indices) = earcutr::earcut(&coords, &[], 2) {
-            let mut mesh = Mesh::default();
-            for pt in open_pts {
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: *pt,
-                    uv: egui::epaint::WHITE_UV,
-                    color: fill,
-                });
-            }
-            for idx in indices {
-                mesh.indices.push(idx as u32);
-            }
-            painter.add(Shape::mesh(mesh));
-        }
+        let indices = if let Some(idx) = ctx.current_element_idx {
+            ctx.tessellation_cache
+                .entry(idx)
+                .or_insert_with(|| earcutr::earcut(&coords, &[], 2).unwrap_or_default())
+                .clone()
+        } else {
+            earcutr::earcut(&coords, &[], 2).unwrap_or_default()
+        };
 
-        let stroke = Stroke::new(1.0, color);
-        for i in 0..open_pts.len() {
-            let next = (i + 1) % open_pts.len();
-            painter.line_segment([open_pts[i], open_pts[next]], stroke);
+        let mut mesh = Mesh::default();
+        for pt in &ctx.screen_pts_buf[..open_len] {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: *pt,
+                uv: egui::epaint::WHITE_UV,
+                color: fill,
+            });
         }
+        for idx in indices {
+            mesh.indices.push(idx as u32);
+        }
+        ctx.merge_mesh(key, &mesh);
+
+        let outline = stroke_polyline_to_mesh(
+            &ctx.screen_pts_buf[..open_len],
+            Stroke::new(1.0, color),
+            true,
+        );
+        ctx.merge_mesh(key, &outline);
     }
 }
 
@@ -188,17 +294,9 @@ impl Drawable for gdsr::Path {
         ))
     }
 
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    ) {
+    fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), self.data_type());
-        if hidden_layers.contains(&key) {
+        if ctx.layer_state.hidden_layers.contains(&key) {
             return;
         }
 
@@ -210,12 +308,16 @@ impl Drawable for gdsr::Path {
         let Some(bbox) = self.world_bbox() else {
             return;
         };
-        if !bbox.overlaps(visible) {
+        if !bbox.overlaps(ctx.visible) {
             return;
         }
 
-        let s_min = viewport.world_to_screen(bbox.min_x, bbox.min_y, rect);
-        let s_max = viewport.world_to_screen(bbox.max_x, bbox.max_y, rect);
+        let s_min = ctx
+            .viewport
+            .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+        let s_max = ctx
+            .viewport
+            .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs();
 
@@ -223,29 +325,29 @@ impl Drawable for gdsr::Path {
             return;
         }
 
-        let color = layer_colors.get(key.0, key.1);
+        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
             let stroke = Stroke::new(1.0, color);
-            painter.line_segment([s_min, s_max], stroke);
+            ctx.line_segment([s_min, s_max], stroke);
             return;
         }
 
-        let screen_pts: Vec<Pos2> = points
-            .iter()
-            .map(|p| viewport.world_to_screen(p.x().absolute_value(), p.y().absolute_value(), rect))
-            .collect();
+        ctx.screen_pts_buf.clear();
+        ctx.screen_pts_buf.extend(points.iter().map(|p| {
+            ctx.viewport
+                .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
+        }));
 
         let width_px = self
             .width()
-            .map(|w| (w.absolute_value() * viewport.zoom) as f32)
+            .map(|w| (w.absolute_value() * ctx.viewport.zoom) as f32)
             .unwrap_or(1.0)
             .clamp(1.0, 20.0);
 
-        let stroke = Stroke::new(width_px, color);
-        for pair in screen_pts.windows(2) {
-            painter.line_segment([pair[0], pair[1]], stroke);
-        }
+        let stroke_mesh =
+            stroke_polyline_to_mesh(ctx.screen_pts_buf, Stroke::new(width_px, color), false);
+        ctx.merge_mesh(key, &stroke_mesh);
     }
 }
 
@@ -261,39 +363,31 @@ impl Drawable for gdsr::Text {
         Some(WorldBBox::new(x, y, x, y))
     }
 
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        _visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    ) {
+    fn draw(&self, ctx: &mut DrawContext) {
         let key = (self.layer(), 0);
-        if hidden_layers.contains(&key) {
+        if ctx.layer_state.hidden_layers.contains(&key) {
             return;
         }
 
         let origin = self.origin();
-        let screen_pos = viewport.world_to_screen(
+        let screen_pos = ctx.viewport.world_to_screen(
             origin.x().absolute_value(),
             origin.y().absolute_value(),
-            rect,
+            ctx.rect,
         );
 
-        if !rect.contains(screen_pos) {
+        if !ctx.rect.contains(screen_pos) {
             return;
         }
 
-        let font_size = (12.0 * viewport.zoom.log10().max(1.0)) as f32;
+        let font_size = (12.0 * ctx.viewport.zoom.log10().max(1.0)) as f32;
         if font_size < 4.0 {
             return;
         }
         let font_size = font_size.min(48.0);
 
-        let color = layer_colors.get(key.0, key.1);
-        painter.text(
+        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
+        ctx.text(
             screen_pos,
             egui::Align2::LEFT_BOTTOM,
             self.text(),
@@ -325,25 +419,36 @@ impl Drawable for gdsr::Reference {
         result
     }
 
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    ) {
+    fn draw(&self, ctx: &mut DrawContext) {
         if let Some(element) = self.instance().as_element() {
             for el in self.get_elements_in_grid(element) {
-                el.draw(
-                    painter,
-                    viewport,
-                    rect,
-                    visible,
-                    hidden_layers,
-                    layer_colors,
-                );
+                el.draw(ctx);
+            }
+        } else if let Some(cell_name) = self.instance().as_cell() {
+            if let Some(lib) = ctx.library {
+                if let Some(cell) = lib.get_cell(cell_name) {
+                    for polygon in cell.polygons() {
+                        for el in self.get_elements_in_grid(&Element::Polygon(polygon.clone())) {
+                            el.draw(ctx);
+                        }
+                    }
+                    for path in cell.paths() {
+                        for el in self.get_elements_in_grid(&Element::Path(path.clone())) {
+                            el.draw(ctx);
+                        }
+                    }
+                    for text in cell.texts() {
+                        for el in self.get_elements_in_grid(&Element::Text(text.clone())) {
+                            el.draw(ctx);
+                        }
+                    }
+                    for reference in cell.references() {
+                        for el in self.get_elements_in_grid(&Element::Reference(reference.clone()))
+                        {
+                            el.draw(ctx);
+                        }
+                    }
+                }
             }
         }
     }
@@ -368,50 +473,12 @@ impl Drawable for Element {
         }
     }
 
-    fn draw(
-        &self,
-        painter: &egui::Painter,
-        viewport: &Viewport,
-        rect: Rect,
-        visible: &WorldBBox,
-        hidden_layers: &HashSet<(u16, u16)>,
-        layer_colors: &mut LayerColorMap,
-    ) {
+    fn draw(&self, ctx: &mut DrawContext) {
         match self {
-            Self::Polygon(p) => p.draw(
-                painter,
-                viewport,
-                rect,
-                visible,
-                hidden_layers,
-                layer_colors,
-            ),
-            Self::Path(p) => p.draw(
-                painter,
-                viewport,
-                rect,
-                visible,
-                hidden_layers,
-                layer_colors,
-            ),
-            Self::Text(t) => t.draw(
-                painter,
-                viewport,
-                rect,
-                visible,
-                hidden_layers,
-                layer_colors,
-            ),
-            Self::Reference(r) => {
-                r.draw(
-                    painter,
-                    viewport,
-                    rect,
-                    visible,
-                    hidden_layers,
-                    layer_colors,
-                );
-            }
+            Self::Polygon(p) => p.draw(ctx),
+            Self::Path(p) => p.draw(ctx),
+            Self::Text(t) => t.draw(ctx),
+            Self::Reference(r) => r.draw(ctx),
         }
     }
 }

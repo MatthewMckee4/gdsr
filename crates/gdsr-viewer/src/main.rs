@@ -6,6 +6,7 @@ mod panels;
 #[cfg(test)]
 mod property_tests;
 mod spatial;
+mod state;
 #[cfg(test)]
 mod testutil;
 mod viewport;
