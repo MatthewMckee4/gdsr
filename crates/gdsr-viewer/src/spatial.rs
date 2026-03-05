@@ -94,18 +94,29 @@ impl SpatialGrid {
         }
     }
 
-    /// Returns the element indices in the grid cell containing the given world-space point.
-    pub fn query_point(&self, wx: f64, wy: f64) -> &[u32] {
+    /// Returns deduplicated element indices from the 3×3 neighbourhood of grid
+    /// cells around the given world-space point, eliminating boundary misses.
+    pub fn query_point<'a>(&self, wx: f64, wy: f64, buf: &'a mut Vec<u32>) -> &'a [u32] {
+        buf.clear();
         let col = ((wx - self.world_min_x) / self.cell_width) as isize;
         let row = ((wy - self.world_min_y) / self.cell_height) as isize;
-        if col < 0 || row < 0 || col >= GRID_SIZE as isize || row >= GRID_SIZE as isize {
-            return &[];
+        let gs = GRID_SIZE as isize;
+        for dr in -1..=1 {
+            for dc in -1..=1 {
+                let r = row + dr;
+                let c = col + dc;
+                if r < 0 || c < 0 || r >= gs || c >= gs {
+                    continue;
+                }
+                let idx = r as usize * GRID_SIZE + c as usize;
+                if let Some(cell) = &self.cells[idx] {
+                    buf.extend_from_slice(&cell.indices);
+                }
+            }
         }
-        let idx = row as usize * GRID_SIZE + col as usize;
-        match &self.cells[idx] {
-            Some(cell) => &cell.indices,
-            None => &[],
-        }
+        buf.sort_unstable();
+        buf.dedup();
+        buf
     }
 
     /// Returns an iterator over grid cells that overlap the given visible world-space rectangle.
@@ -308,7 +319,8 @@ mod tests {
         let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[poly], &bounds);
 
-        let indices = grid.query_point(50.0 * scale, 50.0 * scale);
+        let mut buf = Vec::new();
+        let indices = grid.query_point(50.0 * scale, 50.0 * scale, &mut buf);
         assert!(indices.contains(&0));
     }
 
@@ -319,7 +331,8 @@ mod tests {
         let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[poly], &bounds);
 
-        let indices = grid.query_point(900.0 * scale, 900.0 * scale);
+        let mut buf = Vec::new();
+        let indices = grid.query_point(900.0 * scale, 900.0 * scale, &mut buf);
         assert!(!indices.contains(&0));
     }
 
@@ -330,8 +343,9 @@ mod tests {
         let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
         let grid = SpatialGrid::build(&[poly], &bounds);
 
-        assert!(grid.query_point(-1.0, -1.0).is_empty());
-        assert!(grid.query_point(2.0, 2.0).is_empty());
+        let mut buf = Vec::new();
+        assert!(grid.query_point(-1.0, -1.0, &mut buf).is_empty());
+        assert!(grid.query_point(2.0, 2.0, &mut buf).is_empty());
     }
 
     #[test]

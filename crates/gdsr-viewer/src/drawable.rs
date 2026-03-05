@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use egui::epaint;
-use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2};
+use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
 use gdsr::{DataType, Dimensions, Element, Layer, Library};
 
 use crate::state::LayerState;
@@ -61,9 +61,41 @@ pub struct DrawContext<'a> {
     pub current_element_idx: Option<u32>,
     pub tessellation_cache: &'a mut HashMap<u32, Vec<usize>>,
     pub screen_pts_buf: &'a mut Vec<Pos2>,
+    /// When true, the element is drawn with a brighter fill and bolder outline.
+    pub highlight: bool,
 }
 
+/// Fill alpha for normal and highlighted elements.
+const FILL_ALPHA: u8 = 80;
+const HIGHLIGHT_FILL_ALPHA: u8 = 160;
+/// Stroke width for normal and highlighted outlines.
+const STROKE_WIDTH: f32 = 1.0;
+const HIGHLIGHT_STROKE_WIDTH: f32 = 3.0;
+
 impl DrawContext<'_> {
+    /// Returns the fill and stroke colors for the given layer, brightened when highlighted.
+    pub fn element_style(&mut self, layer: Layer, dt: DataType) -> (Color32, Color32, f32) {
+        let color = self.layer_state.layer_colors.get(layer, dt);
+        if self.highlight {
+            let brighten = |c: u8| c.saturating_add((255 - c) / 3);
+            let bright = Color32::from_rgb(
+                brighten(color.r()),
+                brighten(color.g()),
+                brighten(color.b()),
+            );
+            let fill = Color32::from_rgba_unmultiplied(
+                bright.r(),
+                bright.g(),
+                bright.b(),
+                HIGHLIGHT_FILL_ALPHA,
+            );
+            (fill, bright, HIGHLIGHT_STROKE_WIDTH)
+        } else {
+            let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), FILL_ALPHA);
+            (fill, color, STROKE_WIDTH)
+        }
+    }
+
     /// Merges a mesh's geometry into the batched mesh for the given layer.
     pub fn merge_mesh(&mut self, key: (Layer, DataType), src: &Mesh) {
         let dst = self.layer_meshes.entry(key).or_default();
@@ -225,9 +257,15 @@ impl Drawable for gdsr::Polygon {
         ))
     }
 
-    fn hit_test(&self, wx: f64, wy: f64, _zoom: f64) -> bool {
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        let tolerance = 3.0 / zoom;
+        let tol_sq = tolerance * tolerance;
         if let Some(bbox) = self.world_bbox() {
-            if wx < bbox.min_x || wx > bbox.max_x || wy < bbox.min_y || wy > bbox.max_y {
+            if wx < bbox.min_x - tolerance
+                || wx > bbox.max_x + tolerance
+                || wy < bbox.min_y - tolerance
+                || wy > bbox.max_y + tolerance
+            {
                 return false;
             }
         }
@@ -239,7 +277,19 @@ impl Drawable for gdsr::Polygon {
         if verts.len() >= 2 && verts.first() == verts.last() {
             verts.pop();
         }
-        point_in_polygon(wx, wy, &verts)
+        if point_in_polygon(wx, wy, &verts) {
+            return true;
+        }
+        // Check proximity to edges so points near the boundary still hit.
+        let n = verts.len();
+        for i in 0..n {
+            let (ax, ay) = verts[i];
+            let (bx, by) = verts[(i + 1) % n];
+            if point_to_segment_dist_sq(wx, wy, ax, ay, bx, by) <= tol_sq {
+                return true;
+            }
+        }
+        false
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
@@ -273,13 +323,17 @@ impl Drawable for gdsr::Polygon {
             return;
         }
 
-        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
-        let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+        let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
             let bbox_rect = Rect::from_two_pos(s_min, s_max);
             ctx.rect_filled(bbox_rect, 0.0, fill);
-            ctx.rect_stroke(bbox_rect, 0.0, Stroke::new(1.0, color), StrokeKind::Outside);
+            ctx.rect_stroke(
+                bbox_rect,
+                0.0,
+                Stroke::new(stroke_width, stroke_color),
+                StrokeKind::Outside,
+            );
             return;
         }
 
@@ -330,7 +384,7 @@ impl Drawable for gdsr::Polygon {
 
         let outline = stroke_polyline_to_mesh(
             &ctx.screen_pts_buf[..open_len],
-            Stroke::new(1.0, color),
+            Stroke::new(stroke_width, stroke_color),
             true,
         );
         ctx.merge_mesh(key, &outline);
@@ -405,10 +459,10 @@ impl Drawable for gdsr::Path {
             return;
         }
 
-        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
+        let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
-            let stroke = Stroke::new(1.0, color);
+            let stroke = Stroke::new(stroke_width, stroke_color);
             ctx.line_segment([s_min, s_max], stroke);
             return;
         }
@@ -432,8 +486,6 @@ impl Drawable for gdsr::Path {
             };
 
             if open_len >= 3 {
-                let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
-
                 let coords: Vec<f64> = ctx.screen_pts_buf[..open_len]
                     .iter()
                     .flat_map(|p| [f64::from(p.x), f64::from(p.y)])
@@ -456,7 +508,7 @@ impl Drawable for gdsr::Path {
 
                 let outline = stroke_polyline_to_mesh(
                     &ctx.screen_pts_buf[..open_len],
-                    Stroke::new(1.0, color),
+                    Stroke::new(stroke_width, stroke_color),
                     true,
                 );
                 ctx.merge_mesh(key, &outline);
@@ -471,8 +523,11 @@ impl Drawable for gdsr::Path {
                 .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
         }));
 
-        let stroke_mesh =
-            stroke_polyline_to_mesh(ctx.screen_pts_buf, Stroke::new(1.0, color), false);
+        let stroke_mesh = stroke_polyline_to_mesh(
+            ctx.screen_pts_buf,
+            Stroke::new(stroke_width, stroke_color),
+            false,
+        );
         ctx.merge_mesh(key, &stroke_mesh);
     }
 }
@@ -522,13 +577,13 @@ impl Drawable for gdsr::Text {
         }
         let font_size = font_size.min(48.0);
 
-        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
+        let (_fill, stroke_color, _stroke_width) = ctx.element_style(key.0, key.1);
         ctx.text(
             screen_pos,
             egui::Align2::LEFT_BOTTOM,
             self.text(),
             FontId::monospace(font_size),
-            color,
+            stroke_color,
         );
     }
 }
@@ -548,9 +603,13 @@ impl Drawable for gdsr::GdsBox {
         ))
     }
 
-    fn hit_test(&self, wx: f64, wy: f64, _zoom: f64) -> bool {
+    fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
+        let tolerance = 3.0 / zoom;
         if let Some(bbox) = self.world_bbox() {
-            wx >= bbox.min_x && wx <= bbox.max_x && wy >= bbox.min_y && wy <= bbox.max_y
+            wx >= bbox.min_x - tolerance
+                && wx <= bbox.max_x + tolerance
+                && wy >= bbox.min_y - tolerance
+                && wy <= bbox.max_y + tolerance
         } else {
             false
         }
@@ -584,13 +643,17 @@ impl Drawable for gdsr::GdsBox {
             return;
         }
 
-        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
-        let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
+        let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
 
         if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
             let bbox_rect = Rect::from_two_pos(s_min, s_max);
             ctx.rect_filled(bbox_rect, 0.0, fill);
-            ctx.rect_stroke(bbox_rect, 0.0, Stroke::new(1.0, color), StrokeKind::Outside);
+            ctx.rect_stroke(
+                bbox_rect,
+                0.0,
+                Stroke::new(stroke_width, stroke_color),
+                StrokeKind::Outside,
+            );
             return;
         }
 
@@ -641,7 +704,7 @@ impl Drawable for gdsr::GdsBox {
 
         let outline = stroke_polyline_to_mesh(
             &ctx.screen_pts_buf[..open_len],
-            Stroke::new(1.0, color),
+            Stroke::new(stroke_width, stroke_color),
             true,
         );
         ctx.merge_mesh(key, &outline);
@@ -694,8 +757,8 @@ impl Drawable for gdsr::Node {
             return;
         }
 
-        let color = ctx.layer_state.layer_colors.get(key.0, key.1);
-        let marker_size = 3.0_f32;
+        let (_fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
+        let marker_size = if ctx.highlight { 5.0_f32 } else { 3.0_f32 };
 
         for point in points {
             let screen = ctx.viewport.world_to_screen(
@@ -705,7 +768,15 @@ impl Drawable for gdsr::Node {
             );
             if ctx.rect.contains(screen) {
                 let rect = Rect::from_center_size(screen, egui::Vec2::splat(marker_size * 2.0));
-                ctx.rect_filled(rect, 0.0, color);
+                ctx.rect_filled(rect, 0.0, stroke_color);
+                if ctx.highlight {
+                    ctx.rect_stroke(
+                        rect,
+                        0.0,
+                        Stroke::new(stroke_width, stroke_color),
+                        StrokeKind::Outside,
+                    );
+                }
             }
         }
     }
@@ -809,119 +880,40 @@ impl Drawable for Element {
     }
 }
 
-const HIGHLIGHT_COLOR: Color32 = Color32::from_rgb(255, 255, 100);
-const HIGHLIGHT_WIDTH: f32 = 2.0;
-
-/// Draws a highlight overlay for the given element using the painter directly (not cached).
+/// Re-renders a single element with highlight styling (brighter fill, bolder stroke)
+/// directly onto the painter, bypassing the render cache.
 pub fn draw_highlight(
     element: &Element,
     viewport: &crate::viewport::Viewport,
     painter: &egui::Painter,
     rect: Rect,
+    layer_state: &mut LayerState,
+    library: Option<&Library>,
+    tessellation_cache: &mut HashMap<u32, Vec<usize>>,
 ) {
-    let stroke = Stroke::new(HIGHLIGHT_WIDTH, HIGHLIGHT_COLOR);
-    match element {
-        Element::Polygon(p) => {
-            let pts = p.points();
-            if pts.len() < 3 {
-                return;
-            }
-            let screen: Vec<Pos2> = pts
-                .iter()
-                .map(|pt| {
-                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
-                })
-                .collect();
-            let mut open = screen;
-            if open.len() >= 2 && open.first() == open.last() {
-                open.pop();
-            }
-            let mesh = stroke_polyline_to_mesh(&open, stroke, true);
-            painter.add(Shape::mesh(mesh));
-        }
-        Element::Box(b) => {
-            let pts = b.points();
-            let screen: Vec<Pos2> = pts
-                .iter()
-                .map(|pt| {
-                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
-                })
-                .collect();
-            let mut open = screen;
-            if open.len() >= 2 && open.first() == open.last() {
-                open.pop();
-            }
-            let mesh = stroke_polyline_to_mesh(&open, stroke, true);
-            painter.add(Shape::mesh(mesh));
-        }
-        Element::Path(p) => {
-            let pts = p.points();
-            if pts.len() < 2 {
-                return;
-            }
-            let screen: Vec<Pos2> = pts
-                .iter()
-                .map(|pt| {
-                    viewport.world_to_screen(pt.x().absolute_value(), pt.y().absolute_value(), rect)
-                })
-                .collect();
-            let width_px = p
-                .width()
-                .map(|w| (w.absolute_value() * viewport.zoom) as f32)
-                .unwrap_or(1.0)
-                .clamp(1.0, 20.0);
-            let mesh = stroke_polyline_to_mesh(
-                &screen,
-                Stroke::new(width_px + 2.0, HIGHLIGHT_COLOR),
-                false,
-            );
-            painter.add(Shape::mesh(mesh));
-        }
-        Element::Text(t) => {
-            let origin = t.origin();
-            let screen = viewport.world_to_screen(
-                origin.x().absolute_value(),
-                origin.y().absolute_value(),
-                rect,
-            );
-            let marker_rect = Rect::from_center_size(screen, Vec2::splat(10.0));
-            painter.add(Shape::from(epaint::RectShape::stroke(
-                marker_rect,
-                2.0,
-                stroke,
-                StrokeKind::Outside,
-            )));
-        }
-        Element::Node(n) => {
-            for pt in n.points() {
-                let screen = viewport.world_to_screen(
-                    pt.x().absolute_value(),
-                    pt.y().absolute_value(),
-                    rect,
-                );
-                let marker_rect = Rect::from_center_size(screen, Vec2::splat(10.0));
-                painter.add(Shape::from(epaint::RectShape::stroke(
-                    marker_rect,
-                    2.0,
-                    stroke,
-                    StrokeKind::Outside,
-                )));
-            }
-        }
-        Element::Reference(r) => {
-            if let Some(bbox) = r.world_bbox() {
-                let s_min = viewport.world_to_screen(bbox.min_x, bbox.min_y, rect);
-                let s_max = viewport.world_to_screen(bbox.max_x, bbox.max_y, rect);
-                let highlight_rect = Rect::from_two_pos(s_min, s_max);
-                painter.add(Shape::from(epaint::RectShape::stroke(
-                    highlight_rect,
-                    0.0,
-                    stroke,
-                    StrokeKind::Outside,
-                )));
-            }
-        }
+    let visible = viewport.visible_world_rect(rect);
+    let mut layer_meshes = HashMap::new();
+    let mut extra_shapes = Vec::new();
+    let mut screen_pts_buf = Vec::new();
+    let mut ctx = DrawContext {
+        painter,
+        layer_meshes: &mut layer_meshes,
+        extra_shapes: &mut extra_shapes,
+        viewport,
+        rect,
+        visible: &visible,
+        layer_state,
+        library,
+        current_element_idx: None,
+        tessellation_cache,
+        screen_pts_buf: &mut screen_pts_buf,
+        highlight: true,
+    };
+    element.draw(&mut ctx);
+    for (_, mesh) in layer_meshes {
+        painter.add(Shape::mesh(mesh));
     }
+    painter.extend(extra_shapes);
 }
 
 #[cfg(test)]

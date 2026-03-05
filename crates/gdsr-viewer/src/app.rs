@@ -29,6 +29,8 @@ pub struct ViewerApp {
     ruler: RulerState,
     show_grid: bool,
     hovered_element: Option<usize>,
+    /// Reusable scratch buffer for spatial grid point queries.
+    query_buf: Vec<u32>,
 }
 
 impl Default for ViewerApp {
@@ -43,6 +45,7 @@ impl Default for ViewerApp {
             ruler: RulerState::default(),
             show_grid: true,
             hovered_element: None,
+            query_buf: Vec::new(),
         }
     }
 }
@@ -341,6 +344,7 @@ impl eframe::App for ViewerApp {
         let ruler = &mut self.ruler;
         let show_grid = self.show_grid;
         let hovered_element = &mut self.hovered_element;
+        let query_buf = &mut self.query_buf;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -372,7 +376,7 @@ impl eframe::App for ViewerApp {
             *hovered_element = None;
             if let Some((wx, wy)) = *mouse_world_pos {
                 if let Some(grid) = spatial_grid {
-                    let candidates = grid.query_point(wx, wy);
+                    let candidates = grid.query_point(wx, wy, query_buf);
                     for &idx in candidates.iter().rev() {
                         if let Some(el) = elements.get(idx as usize) {
                             if el.hit_test(wx, wy, viewport.zoom) {

@@ -202,7 +202,15 @@ impl Viewport {
             }
             if let Some(idx) = hovered_element {
                 if let Some(el) = elements.get(idx) {
-                    draw_highlight(el, self, &painter, rect);
+                    draw_highlight(
+                        el,
+                        self,
+                        &painter,
+                        rect,
+                        layer_state,
+                        library,
+                        tessellation_cache,
+                    );
                 }
             }
             let mouse_world = response
@@ -238,6 +246,7 @@ impl Viewport {
             current_element_idx: None,
             tessellation_cache,
             screen_pts_buf: &mut screen_pts_buf,
+            highlight: false,
         };
 
         if let Some(grid) = spatial_grid {
@@ -252,11 +261,14 @@ impl Viewport {
                 let sw = (s_max.x - s_min.x).abs();
                 let sh = (s_min.y - s_max.y).abs();
 
-                if sw < 1.0 && sh < 1.0 {
+                let has_area =
+                    cell.bbox.min_x < cell.bbox.max_x || cell.bbox.min_y < cell.bbox.max_y;
+
+                if has_area && sw < 1.0 && sh < 1.0 {
                     continue;
                 }
 
-                if sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
+                if has_area && sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
                     if !ctx.layer_state.hidden_layers.contains(&cell.dominant_layer) {
                         let color = ctx
                             .layer_state
@@ -308,7 +320,15 @@ impl Viewport {
 
         if let Some(idx) = hovered_element {
             if let Some(el) = elements.get(idx) {
-                draw_highlight(el, self, &painter, rect);
+                draw_highlight(
+                    el,
+                    self,
+                    &painter,
+                    rect,
+                    layer_state,
+                    library,
+                    tessellation_cache,
+                );
             }
         }
 
