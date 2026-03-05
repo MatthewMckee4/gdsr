@@ -1,6 +1,6 @@
 use gdsr::{
     Cell, DataType, Grid, HorizontalPresentation, Layer, Library, Path, PathType, Point, Polygon,
-    Reference, Text, Unit, VerticalPresentation,
+    Reference, Text, Unit, VerticalPresentation, cell_to_svg,
 };
 
 fn main() -> Result<(), gdsr::GdsError> {
@@ -154,6 +154,9 @@ fn main() -> Result<(), gdsr::GdsError> {
     library.add_cell(top);
 
     library.write_file("sample.gds", 1e-6, 1e-9)?;
+
+    let svg = cell_to_svg(library.get_cell("top").expect("top cell exists"), &library);
+    std::fs::write("sample.svg", &svg).expect("failed to write SVG");
 
     Ok(())
 }

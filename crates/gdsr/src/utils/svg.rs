@@ -136,7 +136,8 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, out: &mut Strin
 /// to the cell's bounding box with a small margin.
 pub fn cell_to_svg(cell: &Cell, library: &Library) -> String {
     let elements = cell.get_elements(None, library);
-    elements_to_svg(&elements, cell)
+    let (min, max) = bounding_box_of_elements(&elements);
+    render_svg(&elements, min, max)
 }
 
 /// Exports a library to SVG by rendering all cells into a single document.
@@ -157,18 +158,23 @@ pub fn library_to_svg(library: &Library) -> String {
         all_elements.extend(elements);
     }
 
-    let (min, max) = if all_points.is_empty() {
-        (Point::default(), Point::default())
-    } else {
-        crate::geometry::bounding_box(&all_points)
-    };
-
+    let (min, max) = bounding_box_of_elements(&all_elements);
     render_svg(&all_elements, min, max)
 }
 
-fn elements_to_svg(elements: &[Element], cell: &Cell) -> String {
-    let (min, max) = cell.bounding_box();
-    render_svg(elements, min, max)
+fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
+    let points: Vec<Point> = elements
+        .iter()
+        .flat_map(|e| {
+            let (min, max) = e.bounding_box();
+            [min, max]
+        })
+        .collect();
+    if points.is_empty() {
+        (Point::default(), Point::default())
+    } else {
+        crate::geometry::bounding_box(&points)
+    }
 }
 
 fn render_svg(elements: &[Element], min: Point, max: Point) -> String {
@@ -358,8 +364,8 @@ mod tests {
         let svg = cell_to_svg(library.get_cell("top").unwrap(), &library);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
-          <g transform="scale(1,-1) translate(0,-0)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.00000025 -0.00000025 0.0000055 0.0000055">
+          <g transform="scale(1,-1) translate(0,-0.0000049999999999999996)">
             <polygon points="0,0 0.0000049999999999999996,0 0.0000049999999999999996,0.0000049999999999999996 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
