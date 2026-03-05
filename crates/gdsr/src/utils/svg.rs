@@ -50,8 +50,8 @@ impl LayerColorMap {
     }
 }
 
-fn point_abs(p: &Point) -> (f64, f64) {
-    (p.x().absolute_value(), p.y().absolute_value())
+fn point_scaled(p: &Point, dbu: f64) -> (f64, f64) {
+    (p.x().absolute_value() / dbu, p.y().absolute_value() / dbu)
 }
 
 /// Formats a float for SVG output with limited precision, stripping trailing zeros.
@@ -84,13 +84,20 @@ fn escape_xml(s: &str) -> String {
 
 /// Renders a single flattened element to SVG, appending to `out`.
 /// `extent` is the larger of the bounding box width/height, used to scale text and markers.
-fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, out: &mut String) {
+/// `dbu` is the database unit divisor applied to all coordinates.
+fn render_element(
+    element: &Element,
+    colors: &mut LayerColorMap,
+    extent: f64,
+    dbu: f64,
+    out: &mut String,
+) {
     match element {
         Element::Polygon(polygon) => {
             let color = colors.hex(polygon.layer(), polygon.data_type());
             let _ = write!(out, "    <polygon points=\"");
             for (i, p) in polygon.points().iter().enumerate() {
-                let (x, y) = point_abs(p);
+                let (x, y) = point_scaled(p, dbu);
                 if i > 0 {
                     out.push(' ');
                 }
@@ -105,10 +112,10 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, ou
             let color = colors.hex(path.layer(), path.data_type());
             let stroke_width = path
                 .width()
-                .map_or(extent * 0.005, |w| w.absolute_value().abs());
+                .map_or(extent * 0.005, |w| w.absolute_value() / dbu);
             let _ = write!(out, "    <polyline points=\"");
             for (i, p) in path.points().iter().enumerate() {
-                let (x, y) = point_abs(p);
+                let (x, y) = point_scaled(p, dbu);
                 if i > 0 {
                     out.push(' ');
                 }
@@ -122,8 +129,8 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, ou
         }
         Element::Box(gds_box) => {
             let color = colors.hex(gds_box.layer(), gds_box.box_type());
-            let (x, y) = point_abs(&gds_box.bottom_left());
-            let (x2, y2) = point_abs(&gds_box.top_right());
+            let (x, y) = point_scaled(&gds_box.bottom_left(), dbu);
+            let (x2, y2) = point_scaled(&gds_box.top_right(), dbu);
             let w = x2 - x;
             let h = y2 - y;
             let _ = writeln!(
@@ -137,7 +144,7 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, ou
         }
         Element::Text(text) => {
             let color = colors.hex(text.layer(), text.data_type());
-            let (x, y) = point_abs(text.origin());
+            let (x, y) = point_scaled(text.origin(), dbu);
             let escaped = escape_xml(text.text());
             let font_size = extent * 0.03;
             let _ = writeln!(
@@ -152,7 +159,7 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, ou
             let color = colors.hex(node.layer(), node.node_type());
             let r = extent * 0.005;
             for p in node.points() {
-                let (x, y) = point_abs(p);
+                let (x, y) = point_scaled(p, dbu);
                 let _ = writeln!(
                     out,
                     "    <circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{color}\" />",
@@ -168,34 +175,33 @@ fn render_element(element: &Element, colors: &mut LayerColorMap, extent: f64, ou
 
 /// Exports a cell to SVG, flattening all references using the library.
 ///
+/// `dbu` is the database unit (e.g. `1e-9` for nanometers) used to scale coordinates
+/// so the SVG contains human-readable numbers. For example, a point at 1000 nm
+/// with `dbu = 1e-9` produces an SVG coordinate of `1000`.
+///
 /// Returns the SVG document as a string. The viewport is automatically sized
 /// to the cell's bounding box with a small margin.
-pub fn cell_to_svg(cell: &Cell, library: &Library) -> String {
+pub fn cell_to_svg(cell: &Cell, library: &Library, dbu: f64) -> String {
     let elements = cell.get_elements(None, library);
     let (min, max) = bounding_box_of_elements(&elements);
-    render_svg(&elements, min, max)
+    render_svg(&elements, min, max, dbu)
 }
 
 /// Exports a library to SVG by rendering all cells into a single document.
 ///
+/// `dbu` is the database unit (e.g. `1e-9` for nanometers) used to scale coordinates.
 /// Each cell's elements are flattened and rendered. The viewport encompasses
 /// all cells' bounding boxes.
-pub fn library_to_svg(library: &Library) -> String {
+pub fn library_to_svg(library: &Library, dbu: f64) -> String {
     let mut all_elements = Vec::new();
-    let mut all_points = Vec::new();
 
     for cell in library.cells().values() {
         let elements = cell.get_elements(None, library);
-        for elem in &elements {
-            let (min, max) = elem.bounding_box();
-            all_points.push(min);
-            all_points.push(max);
-        }
         all_elements.extend(elements);
     }
 
     let (min, max) = bounding_box_of_elements(&all_elements);
-    render_svg(&all_elements, min, max)
+    render_svg(&all_elements, min, max, dbu)
 }
 
 fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
@@ -213,9 +219,9 @@ fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
     }
 }
 
-fn render_svg(elements: &[Element], min: Point, max: Point) -> String {
-    let (min_x, min_y) = point_abs(&min);
-    let (max_x, max_y) = point_abs(&max);
+fn render_svg(elements: &[Element], min: Point, max: Point, dbu: f64) -> String {
+    let (min_x, min_y) = point_scaled(&min, dbu);
+    let (max_x, max_y) = point_scaled(&max, dbu);
 
     let width = max_x - min_x;
     let height = max_y - min_y;
@@ -248,7 +254,7 @@ fn render_svg(elements: &[Element], min: Point, max: Point) -> String {
     let extent = vb_w.max(vb_h);
     let mut colors = LayerColorMap::new();
     for element in elements {
-        render_element(element, &mut colors, extent, &mut out);
+        render_element(element, &mut colors, extent, dbu, &mut out);
     }
 
     let _ = writeln!(out, "  </g>");
@@ -271,7 +277,7 @@ mod tests {
     fn empty_cell_produces_valid_svg() {
         let cell = Cell::new("empty");
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r#"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
@@ -290,12 +296,12 @@ mod tests {
             DataType::new(0),
         ));
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.0000005 0.000011 0.000011">
-          <g transform="scale(1,-1) translate(0,-0.00001)">
-            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 11 11">
+          <g transform="scale(1,-1) translate(0,-10)">
+            <polygon points="0,0 10,0 10,10 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -314,12 +320,12 @@ mod tests {
             None,
         ));
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.00000025 -0.00000025 0.0000055 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.000005)">
-            <polyline points="0,0 0.000005,0.000005" fill="none" stroke="#e6194b" stroke-width="0.000001" stroke-linecap="round" stroke-linejoin="round" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.25 -0.25 5.5 5.5">
+          <g transform="scale(1,-1) translate(0,-5)">
+            <polyline points="0,0 5,5" fill="none" stroke="#e6194b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
           </g>
         </svg>
         "##);
@@ -335,12 +341,12 @@ mod tests {
             DataType::new(0),
         ));
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.00000025 0.000011 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.000005)">
-            <rect x="0" y="0" width="0.00001" height="0.000005" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.25 11 5.5">
+          <g transform="scale(1,-1) translate(0,-5)">
+            <rect x="0" y="0" width="10" height="5" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -355,12 +361,12 @@ mod tests {
                 .set_origin(p(1.0, 2.0)),
         );
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.999999 -0.999998 2 2">
-          <g transform="scale(1,-1) translate(0,-0.000004)">
-            <text x="0.000001" y="0.000002" fill="#e6194b" font-size="0.06" font-family="monospace">hello</text>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 1 2 2">
+          <g transform="scale(1,-1) translate(0,-4)">
+            <text x="1" y="2" fill="#e6194b" font-size="0.06" font-family="monospace">hello</text>
           </g>
         </svg>
         "##);
@@ -375,12 +381,12 @@ mod tests {
             DataType::new(0),
         ));
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.999997 -0.999996 2 2">
-          <g transform="scale(1,-1) translate(0,-0.000008)">
-            <circle cx="0.000003" cy="0.000004" r="0.01" fill="#e6194b" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="2 3 2 2">
+          <g transform="scale(1,-1) translate(0,-8)">
+            <circle cx="3" cy="4" r="0.01" fill="#e6194b" />
           </g>
         </svg>
         "##);
@@ -402,12 +408,12 @@ mod tests {
         top.add(Reference::new("inner".to_string()));
         library.add_cell(top);
 
-        let svg = cell_to_svg(library.get_cell("top").unwrap(), &library);
+        let svg = cell_to_svg(library.get_cell("top").unwrap(), &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.00000025 -0.00000025 0.0000055 0.0000055">
-          <g transform="scale(1,-1) translate(0,-0.000005)">
-            <polygon points="0,0 0.000005,0 0.000005,0.000005 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.25 -0.25 5.5 5.5">
+          <g transform="scale(1,-1) translate(0,-5)">
+            <polygon points="0,0 5,0 5,5 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -427,13 +433,13 @@ mod tests {
             DataType::new(0),
         ));
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.0000005 -0.0000005 0.000011 0.000011">
-          <g transform="scale(1,-1) translate(0,-0.00001)">
-            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
-            <polygon points="0,0 0.00001,0 0.00001,0.00001 0,0" fill="#3cb44b" fill-opacity="0.6" stroke="#3cb44b" stroke-width="0" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-0.5 -0.5 11 11">
+          <g transform="scale(1,-1) translate(0,-10)">
+            <polygon points="0,0 10,0 10,10 0,0" fill="#e6194b" fill-opacity="0.6" stroke="#e6194b" stroke-width="0" />
+            <polygon points="0,0 10,0 10,10 0,0" fill="#3cb44b" fill-opacity="0.6" stroke="#3cb44b" stroke-width="0" />
           </g>
         </svg>
         "##);
@@ -448,7 +454,7 @@ mod tests {
                 .set_origin(p(0.0, 0.0)),
         );
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         insta::assert_snapshot!(svg, @r##"
         <?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2">
@@ -479,7 +485,7 @@ mod tests {
         ));
         library.add_cell(cell2);
 
-        let svg = library_to_svg(&library);
+        let svg = library_to_svg(&library, UNITS);
         let polygon_count = svg.matches("<polygon").count();
         assert!(polygon_count >= 2);
     }
@@ -488,7 +494,7 @@ mod tests {
     fn svg_has_y_flip_transform() {
         let cell = Cell::new("empty");
         let library = Library::new("lib");
-        let svg = cell_to_svg(&cell, &library);
+        let svg = cell_to_svg(&cell, &library, UNITS);
         assert!(svg.contains("scale(1,-1)"));
     }
 }

@@ -155,7 +155,11 @@ fn main() -> Result<(), gdsr::GdsError> {
 
     library.write_file("sample.gds", 1e-6, 1e-9)?;
 
-    let svg = cell_to_svg(library.get_cell("top").expect("top cell exists"), &library);
+    let svg = cell_to_svg(
+        library.get_cell("top").expect("top cell exists"),
+        &library,
+        1e-9,
+    );
     std::fs::write("sample.svg", &svg).expect("failed to write SVG");
 
     Ok(())
