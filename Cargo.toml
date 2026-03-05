@@ -15,7 +15,7 @@ gdsr = { path = "crates/gdsr" }
 approx = "0.5"
 bytemuck = "1.25.0"
 chrono = "0.4.44"
-clap = { version = "4.5.55", features = ["derive"] }
+clap = "4.5.55"
 earcutr = "0.4"
 eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 egui = "0.33.3"
