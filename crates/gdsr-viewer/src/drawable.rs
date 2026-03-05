@@ -584,34 +584,8 @@ impl Drawable for gdsr::Reference {
         } else if let Some(cell_name) = self.instance().as_cell() {
             if let Some(lib) = ctx.library {
                 if let Some(cell) = lib.get_cell(cell_name) {
-                    for polygon in cell.polygons() {
-                        for el in self.get_elements_in_grid(&Element::Polygon(polygon.clone())) {
-                            el.draw(ctx);
-                        }
-                    }
-                    for path in cell.paths() {
-                        for el in self.get_elements_in_grid(&Element::Path(path.clone())) {
-                            el.draw(ctx);
-                        }
-                    }
-                    for gds_box in cell.boxes() {
-                        for el in self.get_elements_in_grid(&Element::Box(gds_box.clone())) {
-                            el.draw(ctx);
-                        }
-                    }
-                    for node in cell.nodes() {
-                        for el in self.get_elements_in_grid(&Element::Node(node.clone())) {
-                            el.draw(ctx);
-                        }
-                    }
-                    for text in cell.texts() {
-                        for el in self.get_elements_in_grid(&Element::Text(text.clone())) {
-                            el.draw(ctx);
-                        }
-                    }
-                    for reference in cell.references() {
-                        for el in self.get_elements_in_grid(&Element::Reference(reference.clone()))
-                        {
+                    for element in cell.iter_elements() {
+                        for el in self.get_elements_in_grid(element) {
                             el.draw(ctx);
                         }
                     }

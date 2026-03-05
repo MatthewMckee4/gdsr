@@ -18,12 +18,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Cell {
     name: String,
-    polygons: Vec<Polygon>,
-    paths: Vec<Path>,
-    boxes: Vec<GdsBox>,
-    nodes: Vec<Node>,
-    texts: Vec<Text>,
-    references: Vec<Reference>,
+    elements: Vec<Element>,
 }
 
 impl Cell {
@@ -31,12 +26,7 @@ impl Cell {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            polygons: Vec::new(),
-            paths: Vec::new(),
-            boxes: Vec::new(),
-            nodes: Vec::new(),
-            texts: Vec::new(),
-            references: Vec::new(),
+            elements: Vec::new(),
         }
     }
 
@@ -49,80 +39,69 @@ impl Cell {
         self.name = name.to_string();
     }
 
-    /// Returns the polygons in this cell.
-    pub const fn polygons(&self) -> &Vec<Polygon> {
-        &self.polygons
+    /// Returns an iterator over all elements in this cell.
+    pub fn iter_elements(&self) -> impl Iterator<Item = &Element> {
+        self.elements.iter()
     }
 
-    /// Returns the paths in this cell.
-    pub const fn paths(&self) -> &Vec<Path> {
-        &self.paths
+    /// Returns a mutable iterator over all elements in this cell.
+    pub fn iter_elements_mut(&mut self) -> impl Iterator<Item = &mut Element> {
+        self.elements.iter_mut()
     }
 
-    /// Returns the boxes in this cell.
-    pub const fn boxes(&self) -> &Vec<GdsBox> {
-        &self.boxes
+    /// Returns an iterator over the polygons in this cell.
+    pub fn polygons(&self) -> impl Iterator<Item = &Polygon> {
+        self.elements.iter().filter_map(Element::as_polygon)
     }
 
-    /// Returns the nodes in this cell.
-    pub const fn nodes(&self) -> &Vec<Node> {
-        &self.nodes
+    /// Returns an iterator over the paths in this cell.
+    pub fn paths(&self) -> impl Iterator<Item = &Path> {
+        self.elements.iter().filter_map(Element::as_path)
     }
 
-    /// Returns the texts in this cell.
-    pub const fn texts(&self) -> &Vec<Text> {
-        &self.texts
+    /// Returns an iterator over the boxes in this cell.
+    pub fn boxes(&self) -> impl Iterator<Item = &GdsBox> {
+        self.elements.iter().filter_map(Element::as_box)
     }
 
-    /// Returns the references in this cell.
-    pub const fn references(&self) -> &Vec<Reference> {
-        &self.references
+    /// Returns an iterator over the nodes in this cell.
+    pub fn nodes(&self) -> impl Iterator<Item = &Node> {
+        self.elements.iter().filter_map(Element::as_node)
+    }
+
+    /// Returns an iterator over the texts in this cell.
+    pub fn texts(&self) -> impl Iterator<Item = &Text> {
+        self.elements.iter().filter_map(Element::as_text)
+    }
+
+    /// Returns an iterator over the references in this cell.
+    pub fn references(&self) -> impl Iterator<Item = &Reference> {
+        self.elements.iter().filter_map(Element::as_reference)
     }
 
     /// Returns the names of all cells referenced by this cell, recursively resolving through
     /// inline element wrappers.
     pub fn referenced_cell_names(&self) -> Vec<&str> {
-        self.references
-            .iter()
+        self.references()
             .filter_map(Reference::referenced_cell_name)
             .collect()
     }
 
     /// Adds an element (polygon, path, text, or reference) to the cell.
     pub fn add(&mut self, element: impl Into<Element>) {
-        match element.into() {
-            Element::Path(path) => self.paths.push(path),
-            Element::Polygon(polygon) => self.polygons.push(polygon),
-            Element::Box(gds_box) => self.boxes.push(gds_box),
-            Element::Node(node) => self.nodes.push(node),
-            Element::Reference(reference) => self.references.push(reference),
-            Element::Text(text) => self.texts.push(text),
-        }
+        self.elements.push(element.into());
     }
 
     /// Converts all elements to integer units.
     #[must_use]
     pub fn to_integer_unit(self) -> Self {
         Self {
-            polygons: self
-                .polygons
+            name: self.name,
+            elements: self
+                .elements
                 .into_iter()
-                .map(Polygon::to_integer_unit)
+                .map(Element::to_integer_unit)
                 .collect(),
-            paths: self.paths.into_iter().map(Path::to_integer_unit).collect(),
-            boxes: self
-                .boxes
-                .into_iter()
-                .map(GdsBox::to_integer_unit)
-                .collect(),
-            nodes: self.nodes.into_iter().map(Node::to_integer_unit).collect(),
-            texts: self.texts.into_iter().map(Text::to_integer_unit).collect(),
-            references: self
-                .references
-                .into_iter()
-                .map(Reference::to_integer_unit)
-                .collect(),
-            ..self
         }
     }
 
@@ -130,43 +109,19 @@ impl Cell {
     #[must_use]
     pub fn to_float_unit(self) -> Self {
         Self {
-            polygons: self
-                .polygons
+            name: self.name,
+            elements: self
+                .elements
                 .into_iter()
-                .map(Polygon::to_float_unit)
+                .map(Element::to_float_unit)
                 .collect(),
-            paths: self.paths.into_iter().map(Path::to_float_unit).collect(),
-            boxes: self.boxes.into_iter().map(GdsBox::to_float_unit).collect(),
-            nodes: self.nodes.into_iter().map(Node::to_float_unit).collect(),
-            texts: self.texts.into_iter().map(Text::to_float_unit).collect(),
-            references: self
-                .references
-                .into_iter()
-                .map(Reference::to_float_unit)
-                .collect(),
-            ..self
         }
     }
 
     /// Remaps layer/data type pairs on all elements in this cell using the given mapping.
     pub fn remap_layers(&mut self, mapping: &LayerMapping) {
-        for polygon in &mut self.polygons {
-            polygon.remap_layers(mapping);
-        }
-        for path in &mut self.paths {
-            path.remap_layers(mapping);
-        }
-        for gds_box in &mut self.boxes {
-            gds_box.remap_layers(mapping);
-        }
-        for node in &mut self.nodes {
-            node.remap_layers(mapping);
-        }
-        for text in &mut self.texts {
-            text.remap_layers(mapping);
-        }
-        for reference in &mut self.references {
-            reference.remap_layers(mapping);
+        for element in &mut self.elements {
+            element.remap_layers(mapping);
         }
     }
 
@@ -180,42 +135,16 @@ impl Cell {
     ) {
         let depth = depth.unwrap_or(usize::MAX);
 
-        for polygon in &self.polygons {
-            if tx.send(Element::Polygon(polygon.clone())).is_err() {
-                return;
-            }
-        }
-
-        for path in &self.paths {
-            if tx.send(Element::Path(path.clone())).is_err() {
-                return;
-            }
-        }
-
-        for gds_box in &self.boxes {
-            if tx.send(Element::Box(gds_box.clone())).is_err() {
-                return;
-            }
-        }
-
-        for node in &self.nodes {
-            if tx.send(Element::Node(node.clone())).is_err() {
-                return;
-            }
-        }
-
-        for text in &self.texts {
-            if tx.send(Element::Text(text.clone())).is_err() {
-                return;
-            }
-        }
-
-        for reference in &self.references {
-            if reference
-                .clone()
-                .stream_flatten(Some(depth), library, tx)
-                .is_err()
-            {
+        for element in &self.elements {
+            if let Element::Reference(reference) = element {
+                if reference
+                    .clone()
+                    .stream_flatten(Some(depth), library, tx)
+                    .is_err()
+                {
+                    return;
+                }
+            } else if tx.send(element.clone()).is_err() {
                 return;
             }
         }
@@ -224,36 +153,17 @@ impl Cell {
     /// Returns all elements in this cell, recursively flattening references up to the given depth.
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
         let depth = depth.unwrap_or(usize::MAX);
-        let mut elements: Vec<Element> = Vec::new();
+        let mut result: Vec<Element> = Vec::new();
 
-        for polygon in &self.polygons {
-            elements.push(Element::Polygon(polygon.clone()));
-        }
-
-        for path in &self.paths {
-            elements.push(Element::Path(path.clone()));
-        }
-
-        for gds_box in &self.boxes {
-            elements.push(Element::Box(gds_box.clone()));
-        }
-
-        for node in &self.nodes {
-            elements.push(Element::Node(node.clone()));
-        }
-
-        for text in &self.texts {
-            elements.push(Element::Text(text.clone()));
-        }
-
-        for reference in &self.references {
-            let reference_elements = reference.clone().flatten(Some(depth), library);
-            for referenced_element in reference_elements {
-                elements.push(referenced_element);
+        for element in &self.elements {
+            if let Element::Reference(reference) = element {
+                result.extend(reference.clone().flatten(Some(depth), library));
+            } else {
+                result.push(element.clone());
             }
         }
 
-        elements
+        result
     }
 }
 
@@ -263,82 +173,38 @@ impl std::fmt::Display for Cell {
             f,
             "Cell '{}' with {} polygon(s), {} path(s), {} box(es), {} node(s), {} text(s)",
             self.name,
-            self.polygons.len(),
-            self.paths.len(),
-            self.boxes.len(),
-            self.nodes.len(),
-            self.texts.len(),
+            self.polygons().count(),
+            self.paths().count(),
+            self.boxes().count(),
+            self.nodes().count(),
+            self.texts().count(),
         )
     }
 }
 
 impl Transformable for Cell {
-    fn transform_impl(mut self, transformation: &Transformation) -> Self {
-        self.polygons = self
-            .polygons
-            .into_iter()
-            .map(|polygon| polygon.transform_impl(transformation))
-            .collect();
-
-        self.paths = self
-            .paths
-            .into_iter()
-            .map(|path| path.transform_impl(transformation))
-            .collect();
-
-        self.boxes = self
-            .boxes
-            .into_iter()
-            .map(|gds_box| gds_box.transform_impl(transformation))
-            .collect();
-
-        self.nodes = self
-            .nodes
-            .into_iter()
-            .map(|node| node.transform_impl(transformation))
-            .collect();
-
-        self.texts = self
-            .texts
-            .into_iter()
-            .map(|text| text.transform_impl(transformation))
-            .collect();
-
-        self.references = self
-            .references
-            .into_iter()
-            .map(|reference| reference.transform_impl(transformation))
-            .collect();
-
-        self
+    fn transform_impl(self, transformation: &Transformation) -> Self {
+        Self {
+            name: self.name,
+            elements: self
+                .elements
+                .into_iter()
+                .map(|e| e.transform_impl(transformation))
+                .collect(),
+        }
     }
 }
 
 impl Dimensions for Cell {
     fn bounding_box(&self) -> (Point, Point) {
         let all_points: Vec<Point> = self
-            .polygons
+            .elements
             .iter()
-            .flat_map(|p| {
-                let (min, max) = p.bounding_box();
+            .filter(|e| !matches!(e, Element::Reference(_)))
+            .flat_map(|e| {
+                let (min, max) = e.bounding_box();
                 vec![min, max]
             })
-            .chain(self.paths.iter().flat_map(|p| {
-                let (min, max) = p.bounding_box();
-                vec![min, max]
-            }))
-            .chain(self.boxes.iter().flat_map(|b| {
-                let (min, max) = b.bounding_box();
-                vec![min, max]
-            }))
-            .chain(self.nodes.iter().flat_map(|n| {
-                let (min, max) = n.bounding_box();
-                vec![min, max]
-            }))
-            .chain(self.texts.iter().flat_map(|t| {
-                let (min, max) = t.bounding_box();
-                vec![min, max]
-            }))
             .collect();
 
         crate::geometry::bounding_box(&all_points)
@@ -346,44 +212,15 @@ impl Dimensions for Cell {
 }
 
 impl Movable for Cell {
-    fn move_to(mut self, target: crate::Point) -> Self {
-        self.polygons = self
-            .polygons
-            .into_iter()
-            .map(|polygon| polygon.move_to(target))
-            .collect();
-
-        self.paths = self
-            .paths
-            .into_iter()
-            .map(|path| path.move_to(target))
-            .collect();
-
-        self.boxes = self
-            .boxes
-            .into_iter()
-            .map(|gds_box| gds_box.move_to(target))
-            .collect();
-
-        self.nodes = self
-            .nodes
-            .into_iter()
-            .map(|node| node.move_to(target))
-            .collect();
-
-        self.texts = self
-            .texts
-            .into_iter()
-            .map(|text| text.move_to(target))
-            .collect();
-
-        self.references = self
-            .references
-            .into_iter()
-            .map(|reference| reference.move_to(target))
-            .collect();
-
-        self
+    fn move_to(self, target: crate::Point) -> Self {
+        Self {
+            name: self.name,
+            elements: self
+                .elements
+                .into_iter()
+                .map(|e| e.move_to(target))
+                .collect(),
+        }
     }
 }
 
@@ -417,57 +254,12 @@ impl ToGds for Cell {
 
         write_string_with_record_to_file(&mut buffer, GDSRecord::StrName, &self.name)?;
 
-        let path_bufs: Result<Vec<_>, _> = self
-            .paths
+        let element_bufs: Result<Vec<_>, _> = self
+            .elements
             .par_iter()
-            .map(|p| p.to_gds_impl(database_units))
+            .map(|e| e.to_gds_impl(database_units))
             .collect();
-        for b in path_bufs? {
-            buffer.extend_from_slice(&b);
-        }
-
-        let polygon_bufs: Result<Vec<_>, _> = self
-            .polygons
-            .par_iter()
-            .map(|p| p.to_gds_impl(database_units))
-            .collect();
-        for b in polygon_bufs? {
-            buffer.extend_from_slice(&b);
-        }
-
-        let box_bufs: Result<Vec<_>, _> = self
-            .boxes
-            .par_iter()
-            .map(|b| b.to_gds_impl(database_units))
-            .collect();
-        for b in box_bufs? {
-            buffer.extend_from_slice(&b);
-        }
-
-        let node_bufs: Result<Vec<_>, _> = self
-            .nodes
-            .par_iter()
-            .map(|n| n.to_gds_impl(database_units))
-            .collect();
-        for b in node_bufs? {
-            buffer.extend_from_slice(&b);
-        }
-
-        let text_bufs: Result<Vec<_>, _> = self
-            .texts
-            .par_iter()
-            .map(|t| t.to_gds_impl(database_units))
-            .collect();
-        for b in text_bufs? {
-            buffer.extend_from_slice(&b);
-        }
-
-        let ref_bufs: Result<Vec<_>, _> = self
-            .references
-            .par_iter()
-            .map(|r| r.to_gds_impl(database_units))
-            .collect();
-        for b in ref_bufs? {
+        for b in element_bufs? {
             buffer.extend_from_slice(&b);
         }
 
@@ -491,24 +283,19 @@ mod tests {
     fn test_cell_new() {
         let cell = Cell::new("test_cell");
         assert_eq!(cell.name, "test_cell");
-        assert!(cell.polygons().is_empty());
-        assert!(cell.paths().is_empty());
-        assert!(cell.boxes().is_empty());
-        assert!(cell.nodes().is_empty());
-        assert!(cell.texts().is_empty());
-        assert!(cell.references().is_empty());
+        assert_eq!(cell.polygons().next(), None);
+        assert_eq!(cell.paths().next(), None);
+        assert_eq!(cell.boxes().next(), None);
+        assert_eq!(cell.nodes().next(), None);
+        assert_eq!(cell.texts().next(), None);
+        assert_eq!(cell.references().next(), None);
     }
 
     #[test]
     fn test_cell_default() {
         let cell = Cell::default();
         assert_eq!(cell.name, "");
-        assert!(cell.polygons.is_empty());
-        assert!(cell.paths.is_empty());
-        assert!(cell.boxes.is_empty());
-        assert!(cell.nodes.is_empty());
-        assert!(cell.texts.is_empty());
-        assert!(cell.references.is_empty());
+        assert_eq!(cell.elements.len(), 0);
     }
 
     #[test]
@@ -517,8 +304,8 @@ mod tests {
         let polygon = Polygon::default();
 
         cell.add(polygon.clone());
-        assert_eq!(cell.polygons.len(), 1);
-        assert_eq!(cell.polygons[0], polygon);
+        assert_eq!(cell.polygons().count(), 1);
+        assert_eq!(cell.polygons().next().unwrap(), &polygon);
     }
 
     #[test]
@@ -527,8 +314,8 @@ mod tests {
         let path = Path::default();
 
         cell.add(path.clone());
-        assert_eq!(cell.paths.len(), 1);
-        assert_eq!(cell.paths[0], path);
+        assert_eq!(cell.paths().count(), 1);
+        assert_eq!(cell.paths().next().unwrap(), &path);
     }
 
     #[test]
@@ -537,8 +324,8 @@ mod tests {
         let text = Text::default();
 
         cell.add(text.clone());
-        assert_eq!(cell.texts.len(), 1);
-        assert_eq!(cell.texts[0], text);
+        assert_eq!(cell.texts().count(), 1);
+        assert_eq!(cell.texts().next().unwrap(), &text);
     }
 
     #[test]
@@ -575,10 +362,10 @@ mod tests {
 
         let converted = cell.to_integer_unit();
 
-        assert_eq!(converted.polygons().len(), 1);
-        assert_eq!(converted.paths().len(), 1);
-        assert_eq!(converted.texts().len(), 1);
-        for point in converted.polygons()[0].points() {
+        assert_eq!(converted.polygons().count(), 1);
+        assert_eq!(converted.paths().count(), 1);
+        assert_eq!(converted.texts().count(), 1);
+        for point in converted.polygons().next().unwrap().points() {
             assert_eq!(*point, point.to_integer_unit());
         }
     }
@@ -598,8 +385,8 @@ mod tests {
 
         let converted = cell.to_float_unit();
 
-        assert_eq!(converted.polygons().len(), 1);
-        for point in converted.polygons()[0].points() {
+        assert_eq!(converted.polygons().count(), 1);
+        for point in converted.polygons().next().unwrap().points() {
             assert_eq!(*point, point.to_float_unit());
         }
     }
