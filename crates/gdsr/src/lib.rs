@@ -27,4 +27,4 @@ pub use traits::{Dimensions, Movable, ToGds, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer, LayerMapping};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};
-pub use utils::svg::{cell_to_svg, library_to_svg};
+pub use utils::svg::cell_to_svg;

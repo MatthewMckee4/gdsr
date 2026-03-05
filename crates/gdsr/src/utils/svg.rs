@@ -189,23 +189,6 @@ pub fn cell_to_svg(cell: &Cell, library: &Library, dbu: f64) -> String {
     render_svg(&elements, min, max, dbu)
 }
 
-/// Exports a library to SVG by rendering all cells into a single document.
-///
-/// `dbu` is the database unit (e.g. `1e-9` for nanometers) used to scale coordinates.
-/// Each cell's elements are flattened and rendered. The viewport encompasses
-/// all cells' bounding boxes.
-pub fn library_to_svg(library: &Library, dbu: f64) -> String {
-    let mut all_elements = Vec::new();
-
-    for cell in library.cells().values() {
-        let elements = cell.get_elements(None, library);
-        all_elements.extend(elements);
-    }
-
-    let (min, max) = bounding_box_of_elements(&all_elements);
-    render_svg(&all_elements, min, max, dbu)
-}
-
 fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
     let points: Vec<Point> = elements
         .iter()
@@ -465,31 +448,6 @@ mod tests {
           </g>
         </svg>
         "##);
-    }
-
-    #[test]
-    fn library_to_svg_includes_all_cells() {
-        let mut library = Library::new("lib");
-
-        let mut cell1 = Cell::new("cell1");
-        cell1.add(Polygon::new(
-            [p(0.0, 0.0), p(5.0, 0.0), p(5.0, 5.0)],
-            Layer::new(1),
-            DataType::new(0),
-        ));
-        library.add_cell(cell1);
-
-        let mut cell2 = Cell::new("cell2");
-        cell2.add(Polygon::new(
-            [p(10.0, 10.0), p(15.0, 10.0), p(15.0, 15.0)],
-            Layer::new(2),
-            DataType::new(0),
-        ));
-        library.add_cell(cell2);
-
-        let svg = library_to_svg(&library, UNITS);
-        let polygon_count = svg.matches("<polygon").count();
-        assert!(polygon_count >= 2);
     }
 
     #[test]
