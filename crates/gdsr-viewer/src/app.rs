@@ -26,6 +26,7 @@ pub struct ViewerApp {
     viewport: Viewport,
     mouse_world_pos: Option<(f64, f64)>,
     render_cache: RenderCache,
+    show_grid: bool,
 }
 
 impl ViewerApp {
@@ -171,6 +172,9 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F)) {
             self.zoom_to_fit();
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::G)) {
+            self.show_grid = !self.show_grid;
+        }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
             self.open_file_dialog();
         }
@@ -207,6 +211,21 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.viewport.zoom_at_center(1.0 / 1.2);
+                    }
+                    ui.separator();
+                    if ui
+                        .add(
+                            egui::Button::new(if self.show_grid {
+                                "Hide Grid"
+                            } else {
+                                "Show Grid"
+                            })
+                            .shortcut_text("G"),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.show_grid = !self.show_grid;
                     }
                     ui.separator();
                     ui.label("Pan: Arrow Keys");
@@ -272,6 +291,7 @@ impl eframe::App for ViewerApp {
         let layer_state = &mut self.layer_state;
         let mouse_world_pos = &mut self.mouse_world_pos;
         let render_cache = &mut self.render_cache;
+        let show_grid = self.show_grid;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -294,6 +314,7 @@ impl eframe::App for ViewerApp {
                 library,
                 render_cache,
                 tessellation_cache,
+                show_grid,
             );
         });
     }
