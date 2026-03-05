@@ -1342,8 +1342,8 @@ fn dangling_cell_references_detected_after_cell_removal(_seed: u8) -> bool {
             Point::integer(10, 0, units),
             Point::integer(10, 10, units),
         ],
-        1,
-        0,
+        Layer::new(1),
+        DataType::new(0),
     ));
     library.add_cell(base.clone());
 

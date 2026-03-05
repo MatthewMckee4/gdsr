@@ -127,8 +127,8 @@ impl std::fmt::Display for Library {
 
 #[cfg(test)]
 mod tests {
-    use crate::Point;
     use crate::elements::{Polygon, Reference};
+    use crate::{DataType, Layer, Point};
 
     use super::*;
 
@@ -269,8 +269,8 @@ mod tests {
                 Point::integer(10, 0, units),
                 Point::integer(10, 10, units),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         ));
         library.add_cell(base);
 
@@ -346,8 +346,8 @@ mod tests {
                 Point::integer(10, 0, units),
                 Point::integer(10, 10, units),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         )));
         library.add_cell(cell);
 

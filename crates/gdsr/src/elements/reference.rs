@@ -594,8 +594,8 @@ mod tests {
                 Point::integer(10, 0, 1e-9),
                 Point::integer(10, 10, 1e-9),
             ],
-            1,
-            0,
+            Layer::new(1),
+            DataType::new(0),
         );
         let reference = Reference::new(polygon);
         assert!(reference.referenced_cell_name().is_none());
