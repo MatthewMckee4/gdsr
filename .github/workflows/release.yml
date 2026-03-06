@@ -120,9 +120,9 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  build-viewer:
-    name: Build viewer binaries (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
+  build-viewer-local:
+    name: Build viewer (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
     needs: [generate-release, create-release]
     if: github.event_name == 'workflow_dispatch'
     env:
@@ -131,14 +131,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-          - os: macos-latest
+            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+          - runner: macos-14
             target: aarch64-apple-darwin
-          - os: macos-13
+            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+          - runner: macos-15-intel
             target: x86_64-apple-darwin
-          - os: windows-latest
+            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+          - runner: windows-2022
             target: x86_64-pc-windows-msvc
+            install_dist: irm https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.ps1 | iex
 
     steps:
       - name: Checkout repository
@@ -152,13 +156,47 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install cargo-dist
-        run: cargo install cargo-dist
+        run: ${{ matrix.install_dist }}
 
       - name: Build binaries
-        run: cargo dist build --artifacts=local --target=${{ matrix.target }}
+        env:
+          TAG: ${{ needs.generate-release.outputs.tag }}
+        run: dist build --tag="v${TAG}" --artifacts=local --target=${{ matrix.target }}
 
       - name: Upload to GitHub Release
         shell: bash
+        env:
+          TAG: ${{ needs.generate-release.outputs.tag }}
+        run: |
+          for file in target/distrib/*; do
+            if [ -f "$file" ]; then
+              gh release upload "$TAG" "$file" --clobber
+            fi
+          done
+
+  build-viewer-global:
+    name: Build viewer installers
+    runs-on: ubuntu-22.04
+    needs: [generate-release, create-release]
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install cargo-dist
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+
+      - name: Build global artifacts
+        env:
+          TAG: ${{ needs.generate-release.outputs.tag }}
+        run: dist build --tag="v${TAG}" --artifacts=global
+
+      - name: Upload to GitHub Release
         env:
           TAG: ${{ needs.generate-release.outputs.tag }}
         run: |
