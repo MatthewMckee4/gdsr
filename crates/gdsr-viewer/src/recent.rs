@@ -95,7 +95,10 @@ impl QuickPickItem for RecentProjectItem {
 
 /// Replaces the home directory prefix with `~` for shorter display.
 fn abbreviate_home(path: &Path) -> String {
-    if let Ok(home) = std::env::var("HOME") {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok();
+    if let Some(home) = home {
         if let Some(rest) = path.to_str().and_then(|p| p.strip_prefix(&home)) {
             return format!("~{rest}");
         }
@@ -163,11 +166,17 @@ mod tests {
         assert!(config_path().is_some());
     }
 
+    fn home_dir() -> String {
+        std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap()
+    }
+
     #[test]
     fn abbreviate_home_replaces_prefix() {
-        let home = std::env::var("HOME").unwrap();
+        let home = home_dir();
         let path = PathBuf::from(&home).join("Documents/test.gds");
-        insta::assert_snapshot!(abbreviate_home(&path), @"~/Documents/test.gds");
+        assert_eq!(abbreviate_home(&path), "~/Documents/test.gds");
     }
 
     #[test]
@@ -184,10 +193,10 @@ mod tests {
 
     #[test]
     fn recent_project_item_from_home_path() {
-        let home = std::env::var("HOME").unwrap();
+        let home = home_dir();
         let path = PathBuf::from(&home).join("projects/chip.gds");
         let item = RecentProjectItem::from_path(&path);
         insta::assert_snapshot!(item.name, @"chip.gds");
-        insta::assert_snapshot!(item.display_path, @"~/projects/chip.gds");
+        assert_eq!(item.display_path, "~/projects/chip.gds");
     }
 }
