@@ -175,8 +175,9 @@ mod tests {
     #[test]
     fn abbreviate_home_replaces_prefix() {
         let home = home_dir();
-        let path = PathBuf::from(&home).join("Documents/test.gds");
-        assert_eq!(abbreviate_home(&path), "~/Documents/test.gds");
+        let path_str = format!("{home}/Documents/test.gds");
+        let path = Path::new(&path_str);
+        assert_eq!(abbreviate_home(path), "~/Documents/test.gds");
     }
 
     #[test]
@@ -194,8 +195,8 @@ mod tests {
     #[test]
     fn recent_project_item_from_home_path() {
         let home = home_dir();
-        let path = PathBuf::from(&home).join("projects/chip.gds");
-        let item = RecentProjectItem::from_path(&path);
+        let path_str = format!("{home}/projects/chip.gds");
+        let item = RecentProjectItem::from_path(Path::new(&path_str));
         insta::assert_snapshot!(item.name, @"chip.gds");
         assert_eq!(item.display_path, "~/projects/chip.gds");
     }
