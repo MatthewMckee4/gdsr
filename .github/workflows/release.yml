@@ -131,18 +131,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
           - runner: macos-14
             target: aarch64-apple-darwin
-            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            install_dist: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-musl
+            packages_install: sudo apt-get update && sudo apt-get install -y musl-tools
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-musl
+            packages_install: sudo apt-get update && sudo apt-get install -y musl-tools
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
-            install_dist: irm https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.ps1 | iex
 
     steps:
       - name: Checkout repository
@@ -156,7 +160,13 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install cargo-dist
-        run: ${{ matrix.install_dist }}
+        uses: taiki-e/install-action@385db9cc6bf65d19775b02084a4b698eaca9a4f2 # v2
+        with:
+          tool: cargo-dist@0.31.0
+
+      - name: Install dependencies
+        if: matrix.packages_install
+        run: ${{ matrix.packages_install }}
 
       - name: Build binaries
         env:
@@ -189,7 +199,9 @@ jobs:
           persist-credentials: false
 
       - name: Install cargo-dist
-        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh
+        uses: taiki-e/install-action@385db9cc6bf65d19775b02084a4b698eaca9a4f2 # v2
+        with:
+          tool: cargo-dist@0.31.0
 
       - name: Build global artifacts
         env:
