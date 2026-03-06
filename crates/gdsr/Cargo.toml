@@ -11,6 +11,9 @@ homepage = { workspace = true }
 authors = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.dist]
+dist = false
+
 [dependencies]
 bytemuck = { workspace = true }
 chrono = { workspace = true }
