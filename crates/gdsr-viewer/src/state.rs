@@ -366,6 +366,133 @@ mod tests {
         assert_eq!(first, second);
         assert!(!first.is_empty());
     }
+
+    #[test]
+    fn display_unit_auto_nanometers() {
+        insta::assert_snapshot!(
+            DisplayUnit::Auto.format_pair(5e-8, -3e-8),
+            @"(50.00, -30.00) nm"
+        );
+    }
+
+    #[test]
+    fn display_unit_auto_micrometers() {
+        insta::assert_snapshot!(
+            DisplayUnit::Auto.format_pair(1.5e-6, 2.0e-5),
+            @"(1.500, 20.000) µm"
+        );
+    }
+
+    #[test]
+    fn display_unit_auto_millimeters() {
+        insta::assert_snapshot!(
+            DisplayUnit::Auto.format_pair(2.5e-3, 1.0e-3),
+            @"(2.5000, 1.0000) mm"
+        );
+    }
+
+    #[test]
+    fn display_unit_fixed_nanometers() {
+        insta::assert_snapshot!(
+            DisplayUnit::Nanometers.format_pair(1.5e-6, 2.0e-6),
+            @"(1500.00, 2000.00) nm"
+        );
+    }
+
+    #[test]
+    fn display_unit_fixed_micrometers() {
+        insta::assert_snapshot!(
+            DisplayUnit::Micrometers.format_pair(5e-8, 1e-7),
+            @"(0.050, 0.100) µm"
+        );
+    }
+
+    #[test]
+    fn display_unit_fixed_millimeters() {
+        insta::assert_snapshot!(
+            DisplayUnit::Millimeters.format_pair(5e-8, 1e-7),
+            @"(0.0000, 0.0001) mm"
+        );
+    }
+
+    #[test]
+    fn display_unit_auto_zero() {
+        insta::assert_snapshot!(
+            DisplayUnit::Auto.format_pair(0.0, 0.0),
+            @"(0.00, 0.00) nm"
+        );
+    }
+
+    #[test]
+    fn display_unit_auto_uses_larger_axis_for_scale() {
+        // x is in nm range but y is in µm range, so both should display as µm
+        insta::assert_snapshot!(
+            DisplayUnit::Auto.format_pair(5e-8, 2.0e-6),
+            @"(0.050, 2.000) µm"
+        );
+    }
+
+    #[test]
+    fn display_unit_label() {
+        insta::assert_snapshot!(DisplayUnit::Auto.label(), @"Auto");
+        insta::assert_snapshot!(DisplayUnit::Nanometers.label(), @"nm");
+        insta::assert_snapshot!(DisplayUnit::Micrometers.label(), @"µm");
+        insta::assert_snapshot!(DisplayUnit::Millimeters.label(), @"mm");
+    }
+
+    #[test]
+    fn display_unit_default_is_auto() {
+        assert_eq!(DisplayUnit::default(), DisplayUnit::Auto);
+    }
+}
+
+/// Controls how world coordinates (meters) are displayed to the user.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisplayUnit {
+    /// Automatically choose nm/µm/mm based on magnitude.
+    #[default]
+    Auto,
+    Nanometers,
+    Micrometers,
+    Millimeters,
+}
+
+impl DisplayUnit {
+    pub const ALL: [Self; 4] = [
+        Self::Auto,
+        Self::Nanometers,
+        Self::Micrometers,
+        Self::Millimeters,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto",
+            Self::Nanometers => "nm",
+            Self::Micrometers => "µm",
+            Self::Millimeters => "mm",
+        }
+    }
+
+    /// Formats an (x, y) coordinate pair in the selected unit, using a
+    /// consistent unit suffix for both axes.
+    pub fn format_pair(self, x: f64, y: f64) -> String {
+        match self {
+            Self::Auto => {
+                let abs = x.abs().max(y.abs());
+                if abs < 1e-6 {
+                    format!("({:.2}, {:.2}) nm", x * 1e9, y * 1e9)
+                } else if abs < 1e-3 {
+                    format!("({:.3}, {:.3}) µm", x * 1e6, y * 1e6)
+                } else {
+                    format!("({:.4}, {:.4}) mm", x * 1e3, y * 1e3)
+                }
+            }
+            Self::Nanometers => format!("({:.2}, {:.2}) nm", x * 1e9, y * 1e9),
+            Self::Micrometers => format!("({:.3}, {:.3}) µm", x * 1e6, y * 1e6),
+            Self::Millimeters => format!("({:.4}, {:.4}) mm", x * 1e3, y * 1e3),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

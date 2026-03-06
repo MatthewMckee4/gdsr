@@ -8,7 +8,9 @@ use crate::quick_pick::{QuickPick, QuickPickResult};
 use crate::recent::RecentProjects;
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
-use crate::state::{CellState, CellViewMode, FileLoadState, LayerState, RenderCache, SidePanelTab};
+use crate::state::{
+    CellState, CellViewMode, DisplayUnit, FileLoadState, LayerState, RenderCache, SidePanelTab,
+};
 use crate::viewport::{self, Viewport};
 
 /// Returns shortcut text with the platform-appropriate modifier (⌘ on macOS, Ctrl on others).
@@ -37,6 +39,7 @@ pub struct ViewerApp {
     cell_view_mode: CellViewMode,
     scroll_to_selected: bool,
     recent_projects: RecentProjects,
+    display_unit: DisplayUnit,
     cell_picker: QuickPick,
     recent_picker: QuickPick,
 }
@@ -57,6 +60,7 @@ impl Default for ViewerApp {
             side_panel_tab: SidePanelTab::default(),
             cell_view_mode: CellViewMode::default(),
             scroll_to_selected: false,
+            display_unit: DisplayUnit::default(),
             recent_projects: RecentProjects::load(),
             cell_picker: QuickPick::new("Search cells…"),
             recent_picker: QuickPick::new("Recent projects…"),
@@ -362,6 +366,12 @@ impl eframe::App for ViewerApp {
 
                 ui.separator();
 
+                if let Some((wx, wy)) = self.mouse_world_pos {
+                    ui.label(self.display_unit.format_pair(wx, wy));
+                }
+
+                ui.separator();
+
                 if self.file_load.loading {
                     ui.label("Loading...");
                 } else if self.cell.as_ref().is_some_and(|c| c.elements_loading) {
@@ -380,9 +390,14 @@ impl eframe::App for ViewerApp {
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if let Some((wx, wy)) = self.mouse_world_pos {
-                        ui.label(format!("({wx:.6}, {wy:.6})"));
-                    }
+                    egui::ComboBox::from_id_salt("display_unit")
+                        .selected_text(self.display_unit.label())
+                        .width(60.0)
+                        .show_ui(ui, |ui| {
+                            for unit in DisplayUnit::ALL {
+                                ui.selectable_value(&mut self.display_unit, unit, unit.label());
+                            }
+                        });
                     if self.ruler.active {
                         ui.label("Ruler: click to place point (Esc to cancel)");
                     }
