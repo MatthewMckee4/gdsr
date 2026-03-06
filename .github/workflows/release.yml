@@ -169,6 +169,7 @@ jobs:
         run: ${{ matrix.packages_install }}
 
       - name: Build binaries
+        shell: bash
         env:
           TAG: ${{ needs.generate-release.outputs.tag }}
         run: dist build --tag="v${TAG}" --artifacts=local --target=${{ matrix.target }}
