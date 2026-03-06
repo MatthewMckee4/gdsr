@@ -351,4 +351,153 @@ mod tests {
             .is_empty()
         );
     }
+
+    #[test]
+    fn overlap_zero_extension_matches_no_extension() {
+        let with_zero = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Overlap,
+            0.0,
+            0.0,
+            8,
+        );
+        let without = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Square,
+            0.0,
+            0.0,
+            8,
+        );
+        insta::assert_debug_snapshot!(with_zero, @r"
+        [
+            (
+                0.0,
+                1.0,
+            ),
+            (
+                10.0,
+                1.0,
+            ),
+            (
+                10.0,
+                -1.0,
+            ),
+            (
+                0.0,
+                -1.0,
+            ),
+        ]
+        ");
+        assert_eq!(with_zero, without);
+    }
+
+    #[test]
+    fn overlap_extension_polygon_is_contiguous() {
+        let pts = expand_path_to_polygon(
+            &[(0.0, 0.0), (5.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Overlap,
+            2.0,
+            3.0,
+            8,
+        );
+        // Extended polygon should span from x=-2 to x=13, with no gaps at segment joins
+        insta::assert_debug_snapshot!(pts, @r"
+        [
+            (
+                -2.0,
+                1.0,
+            ),
+            (
+                5.0,
+                1.0,
+            ),
+            (
+                13.0,
+                1.0,
+            ),
+            (
+                13.0,
+                -1.0,
+            ),
+            (
+                5.0,
+                -1.0,
+            ),
+            (
+                -2.0,
+                -1.0,
+            ),
+        ]
+        ");
+    }
+
+    #[test]
+    fn overlap_diagonal_extensions() {
+        let pts = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 10.0)],
+            1.0,
+            PathType::Overlap,
+            2.0,
+            3.0,
+            8,
+        );
+        assert_eq!(pts.len(), 4);
+        // Begin extends backward along (−1/√2, −1/√2) by 2
+        // End extends forward along (1/√2, 1/√2) by 3
+        // Normal is (−1/√2, 1/√2), so left offset adds normal, right subtracts
+        let s = 1.0 / 2.0_f64.sqrt();
+        let begin = (-2.0 * s, -2.0 * s);
+        let end = (10.0 + 3.0 * s, 10.0 + 3.0 * s);
+        // left[0] = begin + normal * hw
+        assert!((pts[0].0 - (begin.0 - s)).abs() < 1e-10);
+        assert!((pts[0].1 - (begin.1 + s)).abs() < 1e-10);
+        // left[1] = end + normal * hw
+        assert!((pts[1].0 - (end.0 - s)).abs() < 1e-10);
+        assert!((pts[1].1 - (end.1 + s)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn square_ignores_extensions() {
+        let with_ext = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Square,
+            5.0,
+            5.0,
+            8,
+        );
+        let without_ext = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Square,
+            0.0,
+            0.0,
+            8,
+        );
+        assert_eq!(with_ext, without_ext);
+    }
+
+    #[test]
+    fn round_ignores_extensions() {
+        let with_ext = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Round,
+            5.0,
+            5.0,
+            8,
+        );
+        let without_ext = expand_path_to_polygon(
+            &[(0.0, 0.0), (10.0, 0.0)],
+            1.0,
+            PathType::Round,
+            0.0,
+            0.0,
+            8,
+        );
+        assert_eq!(with_ext, without_ext);
+    }
 }

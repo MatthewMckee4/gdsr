@@ -100,6 +100,73 @@ fn straight_path_area_matches_length_times_width(x_end: i16, width: u8) -> bool 
     rel_err < 1e-6
 }
 
+/// For a straight Overlap path, area ≈ (length + `begin_ext` + `end_ext`) × width.
+#[quickcheck]
+fn overlap_extension_area_matches_extended_length_times_width(
+    x_end: i16,
+    width: u8,
+    begin_ext: u8,
+    end_ext: u8,
+) -> bool {
+    let x_end = i32::from(x_end).max(1);
+    let width = i32::from(width).max(1);
+    let begin_ext = i32::from(begin_ext);
+    let end_ext = i32::from(end_ext);
+    let units = 1e-6;
+
+    let path = Path::new(
+        vec![Point::integer(0, 0, units), Point::integer(x_end, 0, units)],
+        Layer::new(0),
+        DataType::new(0),
+        Some(PathType::Overlap),
+        Some(Unit::integer(width, units)),
+        Some(Unit::integer(begin_ext, units)),
+        Some(Unit::integer(end_ext, units)),
+    );
+
+    let Some(poly_pts) = path.to_polygon_points(8) else {
+        return false;
+    };
+
+    let computed_area = geometry::area(&poly_pts).float_value();
+    let expected =
+        (f64::from(x_end) + f64::from(begin_ext) + f64::from(end_ext)) * f64::from(width);
+    let rel_err = (computed_area - expected).abs() / expected.max(1e-10);
+    rel_err < 1e-6
+}
+
+/// Overlap with zero extensions produces the same polygon as Square with no extensions.
+#[quickcheck]
+fn overlap_zero_extension_matches_square(x_end: i16, width: u8) -> bool {
+    let x_end = i32::from(x_end).max(1);
+    let width = i32::from(width).max(1);
+    let units = 1e-6;
+
+    let overlap_path = Path::new(
+        vec![Point::integer(0, 0, units), Point::integer(x_end, 0, units)],
+        Layer::new(0),
+        DataType::new(0),
+        Some(PathType::Overlap),
+        Some(Unit::integer(width, units)),
+        Some(Unit::integer(0, units)),
+        Some(Unit::integer(0, units)),
+    );
+
+    let square_path = Path::new(
+        vec![Point::integer(0, 0, units), Point::integer(x_end, 0, units)],
+        Layer::new(0),
+        DataType::new(0),
+        Some(PathType::Square),
+        Some(Unit::integer(width, units)),
+        None,
+        None,
+    );
+
+    let overlap_pts = overlap_path.to_polygon_points(8);
+    let square_pts = square_path.to_polygon_points(8);
+    overlap_pts == square_pts
+}
+
 /// All centerline points of a straight horizontal path should be inside the expanded polygon.
 #[quickcheck]
 fn centerline_points_inside_expanded_straight_path(x_end: i16, width: u8) -> bool {

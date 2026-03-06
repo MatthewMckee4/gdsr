@@ -412,10 +412,11 @@ mod tests {
             .world_bbox()
             .expect("should have bbox");
         let scale = 1e-9;
-        assert!((bbox.min_x - 10.0 * scale).abs() < 1e-15);
-        assert!((bbox.min_y - 20.0 * scale).abs() < 1e-15);
-        assert!((bbox.max_x - 30.0 * scale).abs() < 1e-15);
-        assert!((bbox.max_y - 40.0 * scale).abs() < 1e-15);
+        let half_width = 2.5 * scale;
+        assert!((bbox.min_x - (10.0 * scale - half_width)).abs() < 1e-15);
+        assert!((bbox.min_y - (20.0 * scale - half_width)).abs() < 1e-15);
+        assert!((bbox.max_x - (30.0 * scale + half_width)).abs() < 1e-15);
+        assert!((bbox.max_y - (40.0 * scale + half_width)).abs() < 1e-15);
     }
 
     #[test]

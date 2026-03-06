@@ -398,11 +398,18 @@ impl Drawable for gdsr::Path {
 
     fn world_bbox(&self) -> Option<WorldBBox> {
         let (min_pt, max_pt) = self.bounding_box();
+        let half_width = self
+            .width()
+            .map(|w| w.absolute_value() / 2.0)
+            .unwrap_or(0.0);
+        let begin_ext = self.begin_extension().map_or(0.0, |u| u.absolute_value());
+        let end_ext = self.end_extension().map_or(0.0, |u| u.absolute_value());
+        let pad = half_width + begin_ext.max(end_ext);
         Some(WorldBBox::new(
-            min_pt.x().absolute_value(),
-            min_pt.y().absolute_value(),
-            max_pt.x().absolute_value(),
-            max_pt.y().absolute_value(),
+            min_pt.x().absolute_value() - pad,
+            min_pt.y().absolute_value() - pad,
+            max_pt.x().absolute_value() + pad,
+            max_pt.y().absolute_value() + pad,
         ))
     }
 
@@ -418,14 +425,47 @@ impl Drawable for gdsr::Path {
         let min_tolerance = 3.0 / zoom;
         let tolerance = half_width.max(min_tolerance);
         let tol_sq = tolerance * tolerance;
-        for pair in pts.windows(2) {
-            let (ax, ay) = (pair[0].x().absolute_value(), pair[0].y().absolute_value());
-            let (bx, by) = (pair[1].x().absolute_value(), pair[1].y().absolute_value());
-            if point_to_segment_dist_sq(wx, wy, ax, ay, bx, by) <= tol_sq {
-                return true;
+
+        let path_type = self.path_type().unwrap_or_default();
+        let begin_ext = self.begin_extension().map_or(0.0, |u| u.absolute_value());
+        let end_ext = self.end_extension().map_or(0.0, |u| u.absolute_value());
+
+        let mut segments: Vec<(f64, f64, f64, f64)> = pts
+            .windows(2)
+            .map(|pair| {
+                (
+                    pair[0].x().absolute_value(),
+                    pair[0].y().absolute_value(),
+                    pair[1].x().absolute_value(),
+                    pair[1].y().absolute_value(),
+                )
+            })
+            .collect();
+
+        if path_type == gdsr::PathType::Overlap && !segments.is_empty() {
+            if let Some(first) = segments.first_mut() {
+                let dx = first.2 - first.0;
+                let dy = first.3 - first.1;
+                let len = (dx * dx + dy * dy).sqrt();
+                if len > f64::EPSILON {
+                    first.0 -= dx / len * begin_ext;
+                    first.1 -= dy / len * begin_ext;
+                }
+            }
+            if let Some(last) = segments.last_mut() {
+                let dx = last.2 - last.0;
+                let dy = last.3 - last.1;
+                let len = (dx * dx + dy * dy).sqrt();
+                if len > f64::EPSILON {
+                    last.2 += dx / len * end_ext;
+                    last.3 += dy / len * end_ext;
+                }
             }
         }
-        false
+
+        segments
+            .iter()
+            .any(|&(ax, ay, bx, by)| point_to_segment_dist_sq(wx, wy, ax, ay, bx, by) <= tol_sq)
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
