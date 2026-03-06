@@ -349,6 +349,77 @@ mod tests {
     }
 
     #[test]
+    fn no_rerender_at_zoom_ratio_boundary_low() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 0.5, rect));
+    }
+
+    #[test]
+    fn rerender_just_below_zoom_ratio_boundary() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 0.49, rect));
+    }
+
+    #[test]
+    fn no_rerender_at_zoom_ratio_boundary_high() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 2.0, rect));
+    }
+
+    #[test]
+    fn rerender_just_above_zoom_ratio_boundary() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 2.01, rect));
+    }
+
+    #[test]
+    fn no_rerender_at_exact_margin() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        // margin_x = 800 * 0.8 = 640, dx_screen = |0 - 640| = 640, NOT > 640
+        assert!(!cache.needs_full_render(&[], 42, 640.0, 0.0, 1.0, rect));
+    }
+
+    #[test]
+    fn rerender_just_beyond_margin() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        assert!(cache.needs_full_render(&[], 42, 641.0, 0.0, 1.0, rect));
+    }
+
+    #[test]
+    fn delta_transform_extreme_zoom_ratio() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        let tsf = cache.delta_transform(0.0, 0.0, 2.0, rect.center());
+        assert!(tsf.scaling.is_finite());
+        assert!(tsf.translation.x.is_finite());
+        assert!(tsf.translation.y.is_finite());
+    }
+
+    #[test]
+    fn delta_transform_large_pan() {
+        let cache = populated_cache();
+        let rect = test_rect();
+        let tsf = cache.delta_transform(1e6, 1e6, 1.0, rect.center());
+        assert!(tsf.translation.x.is_finite());
+        assert!(tsf.translation.y.is_finite());
+    }
+
+    #[test]
+    fn clear_forces_rerender() {
+        let mut cache = populated_cache();
+        let rect = test_rect();
+        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, rect));
+        cache.clear();
+        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, rect));
+    }
+
+    #[test]
     fn tessellation_cache_returns_same_indices() {
         let coords: Vec<f64> = vec![0.0, 0.0, 100.0, 0.0, 100.0, 100.0, 0.0, 100.0];
         let mut cache: HashMap<u32, Vec<usize>> = HashMap::new();

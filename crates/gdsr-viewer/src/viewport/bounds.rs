@@ -97,6 +97,67 @@ mod tests {
     }
 
     #[test]
+    fn compute_bounds_single_element_with_extreme_coords() {
+        let max = i32::MAX / 2;
+        let elem = polygon(vec![(0, 0), (max, 0), (max, max)], 1, 0);
+        let bounds = compute_bounds(&[elem]).expect("should have bounds");
+        assert!(bounds.min_x.is_finite());
+        assert!(bounds.max_x.is_finite());
+        assert!(bounds.max_x > bounds.min_x);
+    }
+
+    #[test]
+    fn compute_bounds_many_elements() {
+        let elems: Vec<gdsr::Element> = (0..100)
+            .map(|i| {
+                polygon(
+                    vec![
+                        (i * 10, i * 10),
+                        (i * 10 + 5, i * 10),
+                        (i * 10 + 5, i * 10 + 5),
+                    ],
+                    1,
+                    0,
+                )
+            })
+            .collect();
+        let bounds = compute_bounds(&elems).expect("should have bounds");
+        assert!(bounds.min_x.is_finite());
+        assert!(bounds.max_x > bounds.min_x);
+        assert!(bounds.max_y > bounds.min_y);
+    }
+
+    #[test]
+    fn compute_bounds_with_node() {
+        let n = gdsr::Node::new(
+            vec![
+                gdsr::Point::default_integer(100, 200),
+                gdsr::Point::default_integer(300, 400),
+            ],
+            gdsr::Layer::new(1),
+            gdsr::DataType::new(0),
+        );
+        let bounds = compute_bounds(&[gdsr::Element::Node(n)]).expect("should have bounds");
+        let scale = 1e-9;
+        assert!((bounds.min_x - 100.0 * scale).abs() < EPSILON);
+        assert!((bounds.min_y - 200.0 * scale).abs() < EPSILON);
+    }
+
+    #[test]
+    fn compute_bounds_with_gds_box() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(10, 20),
+            gdsr::Point::default_integer(30, 40),
+            gdsr::Layer::new(1),
+            gdsr::DataType::new(0),
+        );
+        let bounds = compute_bounds(&[gdsr::Element::Box(b)]).expect("should have bounds");
+        let scale = 1e-9;
+        assert!((bounds.min_x - 10.0 * scale).abs() < EPSILON);
+        assert!((bounds.max_x - 30.0 * scale).abs() < EPSILON);
+    }
+
+    #[test]
     fn bbox_overlaps_is_symmetric() {
         let a = WorldBBox::new(0.0, 0.0, 2.0, 2.0);
         let b = WorldBBox::new(1.0, 1.0, 3.0, 3.0);

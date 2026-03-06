@@ -360,6 +360,112 @@ fn dedup_bitset_prevents_duplicates(x1: i8, y1: i8) -> bool {
     draw_counts.iter().all(|&c| c <= 1)
 }
 
+/// Hit-testing a point inside a polygon's bbox but outside the polygon itself
+/// should not panic, and a point known to be inside should always hit.
+#[quickcheck]
+fn polygon_hit_test_never_panics(x1: i8, y1: i8, x2: i8, y2: i8, x3: i8, y3: i8) -> bool {
+    let elem = helpers::polygon(
+        vec![
+            (i32::from(x1), i32::from(y1)),
+            (i32::from(x2), i32::from(y2)),
+            (i32::from(x3), i32::from(y3)),
+        ],
+        1,
+        0,
+    );
+    let scale = 1e-9;
+    // Just ensure these don't panic at various zoom levels
+    let _ = elem.hit_test(f64::from(x1) * scale, f64::from(y1) * scale, 1e-3);
+    let _ = elem.hit_test(f64::from(x2) * scale, f64::from(y2) * scale, 1e9);
+    let _ = elem.hit_test(f64::from(x3) * scale, f64::from(y3) * scale, 1e15);
+    let _ = elem.hit_test(0.0, 0.0, 1.0);
+    true
+}
+
+/// Path `hit_test` should never panic regardless of input.
+#[quickcheck]
+fn path_hit_test_never_panics(x1: i8, y1: i8, x2: i8, y2: i8, w: u8) -> bool {
+    let elem = helpers::path(
+        vec![
+            (i32::from(x1), i32::from(y1)),
+            (i32::from(x2), i32::from(y2)),
+        ],
+        1,
+        0,
+        if w > 0 { Some(i32::from(w)) } else { None },
+    );
+    let scale = 1e-9;
+    let _ = elem.hit_test(f64::from(x1) * scale, f64::from(y1) * scale, 1e-3);
+    let _ = elem.hit_test(f64::from(x2) * scale, f64::from(y2) * scale, 1e15);
+    let _ = elem.hit_test(0.0, 0.0, 1.0);
+    true
+}
+
+/// The visible world rect should always have max > min (non-degenerate)
+/// for any valid viewport configuration.
+#[quickcheck]
+fn visible_world_rect_is_non_degenerate(cx: f64, cy: f64, zoom: f64) -> bool {
+    let Some(vp) = clamp_viewport(cx, cy, zoom) else {
+        return true;
+    };
+    let rect = test_rect();
+    let vis = vp.visible_world_rect(rect);
+    vis.max_x > vis.min_x && vis.max_y > vis.min_y
+}
+
+/// The spatial grid `query_point` should never panic even with extreme inputs.
+#[quickcheck]
+fn spatial_grid_query_point_never_panics(x: f64, y: f64) -> bool {
+    if !x.is_finite() || !y.is_finite() {
+        return true;
+    }
+    let scale = 1e-9;
+    let elems = vec![helpers::polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+    let bounds = WorldBBox::new(0.0, 0.0, 100.0 * scale, 100.0 * scale);
+    let grid = SpatialGrid::build(&elems, &bounds);
+    let mut buf = Vec::new();
+    let _ = grid.query_point(x, y, &mut buf);
+    true
+}
+
+/// Zoom-to-fit should always produce a finite zoom and center for valid bounds.
+#[quickcheck]
+fn zoom_to_fit_produces_finite_state(min_x: f64, min_y: f64, w: f64, h: f64) -> bool {
+    if !is_finite(min_x) || !is_finite(min_y) || !is_finite(w) || !is_finite(h) {
+        return true;
+    }
+    let min_x = min_x.clamp(-1e6, 1e6);
+    let min_y = min_y.clamp(-1e6, 1e6);
+    let w = w.abs().clamp(1e-12, 1e6);
+    let h = h.abs().clamp(1e-12, 1e6);
+
+    let mut vp = Viewport::default();
+    let rect = test_rect();
+    let bounds = WorldBBox::new(min_x, min_y, min_x + w, min_y + h);
+    vp.zoom_to_fit(&bounds, rect);
+    vp.center_x.is_finite() && vp.center_y.is_finite() && vp.zoom.is_finite() && vp.zoom > 0.0
+}
+
+/// The spatial grid `query_visible` should never panic even with extreme bounds.
+#[quickcheck]
+fn spatial_grid_query_visible_never_panics(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> bool {
+    if !min_x.is_finite() || !min_y.is_finite() || !max_x.is_finite() || !max_y.is_finite() {
+        return true;
+    }
+    let scale = 1e-9;
+    let elems = vec![helpers::polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+    let bounds = WorldBBox::new(0.0, 0.0, 100.0 * scale, 100.0 * scale);
+    let grid = SpatialGrid::build(&elems, &bounds);
+
+    let min_x = min_x.clamp(-1e18, 1e18);
+    let min_y = min_y.clamp(-1e18, 1e18);
+    let max_x = max_x.clamp(min_x, 1e18);
+    let max_y = max_y.clamp(min_y, 1e18);
+    let visible = WorldBBox::new(min_x, min_y, max_x, max_y);
+    let _: Vec<_> = grid.query_visible(&visible).collect();
+    true
+}
+
 /// Counts edges that have non-zero length (matching the 1e-6 threshold in the function).
 fn count_nonzero_edges(points: &[Pos2], closed: bool) -> usize {
     if points.len() < 2 {

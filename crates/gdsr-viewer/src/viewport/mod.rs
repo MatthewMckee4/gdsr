@@ -525,6 +525,150 @@ mod tests {
     }
 
     #[test]
+    fn world_to_screen_extreme_zoom_min() {
+        let vp = Viewport {
+            center_x: 0.0,
+            center_y: 0.0,
+            zoom: 1e-3,
+        };
+        let rect = test_rect();
+        let screen = vp.world_to_screen(1e6, 1e6, rect);
+        assert!(screen.x.is_finite());
+        assert!(screen.y.is_finite());
+    }
+
+    #[test]
+    fn world_to_screen_extreme_zoom_max() {
+        let vp = Viewport {
+            center_x: 0.0,
+            center_y: 0.0,
+            zoom: 1e15,
+        };
+        let rect = test_rect();
+        let screen = vp.world_to_screen(1e-15, 1e-15, rect);
+        assert!(screen.x.is_finite());
+        assert!(screen.y.is_finite());
+    }
+
+    #[test]
+    fn world_to_screen_large_world_coordinates() {
+        let vp = Viewport {
+            center_x: 2.0,
+            center_y: 2.0,
+            zoom: 1.0,
+        };
+        let rect = test_rect();
+        let screen = vp.world_to_screen(2.147e9 * 1e-9, 2.147e9 * 1e-9, rect);
+        assert!(screen.x.is_finite());
+        assert!(screen.y.is_finite());
+    }
+
+    #[test]
+    fn zoom_to_fit_zero_area_bounds() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        let bounds = WorldBBox::new(5.0, 5.0, 5.0, 5.0);
+        vp.zoom_to_fit(&bounds, rect);
+        assert!((vp.center_x - 5.0).abs() < EPSILON);
+        assert!((vp.center_y - 5.0).abs() < EPSILON);
+        assert!(
+            (vp.zoom - 1.0).abs() < EPSILON,
+            "zoom should stay at default for zero-area bounds"
+        );
+    }
+
+    #[test]
+    fn zoom_to_fit_zero_width() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        let bounds = WorldBBox::new(5.0, 0.0, 5.0, 10.0);
+        vp.zoom_to_fit(&bounds, rect);
+        assert!((vp.center_x - 5.0).abs() < EPSILON);
+        assert!(
+            (vp.zoom - 1.0).abs() < EPSILON,
+            "zoom should stay at default for zero-width bounds"
+        );
+    }
+
+    #[test]
+    fn zoom_to_fit_huge_bounds() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        let bounds = WorldBBox::new(-1e6, -1e6, 1e6, 1e6);
+        vp.zoom_to_fit(&bounds, rect);
+        assert!(vp.zoom > 0.0);
+        assert!(vp.zoom.is_finite());
+    }
+
+    #[test]
+    fn zoom_to_fit_tiny_bounds() {
+        let mut vp = Viewport::default();
+        let rect = test_rect();
+        let bounds = WorldBBox::new(0.0, 0.0, 1e-12, 1e-12);
+        vp.zoom_to_fit(&bounds, rect);
+        assert!(vp.zoom > 0.0);
+        assert!(vp.zoom.is_finite());
+    }
+
+    #[test]
+    fn visible_world_rect_extreme_zoom_min() {
+        let vp = Viewport {
+            center_x: 0.0,
+            center_y: 0.0,
+            zoom: 1e-3,
+        };
+        let rect = test_rect();
+        let vis = vp.visible_world_rect(rect);
+        assert!(vis.min_x.is_finite());
+        assert!(vis.max_x.is_finite());
+        assert!(vis.min_y.is_finite());
+        assert!(vis.max_y.is_finite());
+        assert!(vis.max_x > vis.min_x);
+        assert!(vis.max_y > vis.min_y);
+    }
+
+    #[test]
+    fn visible_world_rect_extreme_zoom_max() {
+        let vp = Viewport {
+            center_x: 0.0,
+            center_y: 0.0,
+            zoom: 1e15,
+        };
+        let rect = test_rect();
+        let vis = vp.visible_world_rect(rect);
+        assert!(vis.min_x.is_finite());
+        assert!(vis.max_x.is_finite());
+        assert!(vis.max_x > vis.min_x);
+    }
+
+    #[test]
+    fn pan_extreme_values() {
+        let mut vp = Viewport::default();
+        vp.pan(1e15, -1e15);
+        assert!(vp.center_x.is_finite());
+        assert!(vp.center_y.is_finite());
+    }
+
+    #[test]
+    fn repeated_zoom_stays_finite() {
+        let mut vp = Viewport {
+            zoom: 100.0,
+            ..Default::default()
+        };
+        for _ in 0..1000 {
+            vp.zoom_at_center(1.2);
+        }
+        assert!(vp.zoom.is_finite());
+        assert!(vp.zoom <= 1e15);
+
+        for _ in 0..2000 {
+            vp.zoom_at_center(1.0 / 1.2);
+        }
+        assert!(vp.zoom.is_finite());
+        assert!(vp.zoom >= 1e-3);
+    }
+
+    #[test]
     fn zoom_in_then_out_returns_to_original() {
         let rect = test_rect();
         let cursor = Pos2::new(600.0, 400.0);

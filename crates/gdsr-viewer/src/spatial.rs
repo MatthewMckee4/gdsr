@@ -103,8 +103,8 @@ impl SpatialGrid {
         let gs = GRID_SIZE as isize;
         for dr in -1..=1 {
             for dc in -1..=1 {
-                let r = row + dr;
-                let c = col + dc;
+                let r = row.saturating_add(dr);
+                let c = col.saturating_add(dc);
                 if r < 0 || c < 0 || r >= gs || c >= gs {
                     continue;
                 }
@@ -121,10 +121,14 @@ impl SpatialGrid {
 
     /// Returns an iterator over grid cells that overlap the given visible world-space rectangle.
     pub fn query_visible(&self, visible: &WorldBBox) -> impl Iterator<Item = &GridCell> {
-        let col_min = ((visible.min_x - self.world_min_x) / self.cell_width).floor() as isize - 1;
-        let col_max = ((visible.max_x - self.world_min_x) / self.cell_width).ceil() as isize + 1;
-        let row_min = ((visible.min_y - self.world_min_y) / self.cell_height).floor() as isize - 1;
-        let row_max = ((visible.max_y - self.world_min_y) / self.cell_height).ceil() as isize + 1;
+        let col_min = ((visible.min_x - self.world_min_x) / self.cell_width).floor() as isize;
+        let col_max = ((visible.max_x - self.world_min_x) / self.cell_width).ceil() as isize;
+        let row_min = ((visible.min_y - self.world_min_y) / self.cell_height).floor() as isize;
+        let row_max = ((visible.max_y - self.world_min_y) / self.cell_height).ceil() as isize;
+        let col_min = col_min.saturating_sub(1);
+        let col_max = col_max.saturating_add(1);
+        let row_min = row_min.saturating_sub(1);
+        let row_max = row_max.saturating_add(1);
 
         let col_min = col_min.clamp(0, GRID_SIZE as isize - 1) as usize;
         let col_max = col_max.clamp(0, GRID_SIZE as isize - 1) as usize;
@@ -449,6 +453,107 @@ mod tests {
         assert!((bbox.min_y - 0.0).abs() < 1e-15);
         assert!((bbox.max_x - 100.0 * scale).abs() < 1e-15);
         assert!((bbox.max_y - 200.0 * scale).abs() < 1e-15);
+    }
+
+    #[test]
+    fn build_degenerate_zero_area_bounds() {
+        let poly = polygon(vec![(500, 500), (500, 500), (500, 500)], 1, 0);
+        let bounds = WorldBBox::new(500e-9, 500e-9, 500e-9, 500e-9);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+        let all = query_element_indices(&grid, &bounds);
+        assert!(all.contains(&0));
+    }
+
+    #[test]
+    fn build_many_elements_same_location() {
+        let scale = 1e-9;
+        let elems: Vec<Element> = (0..1000)
+            .map(|_| polygon(vec![(0, 0), (10, 0), (10, 10)], 1, 0))
+            .collect();
+        let bounds = WorldBBox::new(0.0, 0.0, 10.0 * scale, 10.0 * scale);
+        let grid = SpatialGrid::build(&elems, &bounds);
+        let all = query_element_indices(&grid, &bounds);
+        assert_eq!(all.len(), 1000);
+    }
+
+    #[test]
+    fn build_element_spanning_entire_grid() {
+        let scale = 1e-9;
+        let large = polygon(vec![(0, 0), (10000, 0), (10000, 10000), (0, 10000)], 1, 0);
+        let small = polygon(vec![(100, 100), (200, 100), (200, 200)], 2, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
+        let grid = SpatialGrid::build(&[large, small], &bounds);
+        let visible = WorldBBox::new(50.0 * scale, 50.0 * scale, 250.0 * scale, 250.0 * scale);
+        let indices = query_element_indices(&grid, &visible);
+        assert!(indices.contains(&0), "large spanning element must be found");
+        assert!(
+            indices.contains(&1),
+            "small element in visible area must be found"
+        );
+    }
+
+    #[test]
+    fn query_point_at_grid_boundary() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (1000, 0), (1000, 1000), (0, 1000)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+        let mut buf = Vec::new();
+        let indices = grid.query_point(0.0, 0.0, &mut buf);
+        assert!(indices.contains(&0), "element at grid origin must be found");
+    }
+
+    #[test]
+    fn query_visible_beyond_grid_extent() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 100.0 * scale, 100.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+        let huge_visible = WorldBBox::new(-1.0, -1.0, 1.0, 1.0);
+        let indices = query_element_indices(&grid, &huge_visible);
+        assert!(indices.contains(&0));
+    }
+
+    #[test]
+    fn build_with_extreme_coordinates() {
+        let max = i32::MAX / 2;
+        let min = i32::MIN / 2;
+        let scale = 1e-9;
+        let p1 = polygon(
+            vec![(min, min), (min + 100, min), (min + 100, min + 100)],
+            1,
+            0,
+        );
+        let p2 = polygon(
+            vec![(max - 100, max - 100), (max, max - 100), (max, max)],
+            2,
+            0,
+        );
+        let bounds = WorldBBox::new(
+            f64::from(min) * scale,
+            f64::from(min) * scale,
+            f64::from(max) * scale,
+            f64::from(max) * scale,
+        );
+        let grid = SpatialGrid::build(&[p1, p2], &bounds);
+        let all = query_element_indices(&grid, &bounds);
+        assert_eq!(all, vec![0, 1]);
+    }
+
+    #[test]
+    fn query_point_reuses_buffer() {
+        let scale = 1e-9;
+        let poly = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let grid = SpatialGrid::build(&[poly], &bounds);
+        let mut buf = Vec::new();
+        let _ = grid.query_point(50.0 * scale, 50.0 * scale, &mut buf);
+        let first_len = buf.len();
+        let _ = grid.query_point(900.0 * scale, 900.0 * scale, &mut buf);
+        assert!(
+            buf.len() != first_len || first_len == 0,
+            "buffer should be reused and cleared between queries"
+        );
     }
 
     #[test]

@@ -302,6 +302,62 @@ mod tests {
     }
 
     #[test]
+    fn format_distance_very_large() {
+        let s = format_distance(1.0);
+        assert!(s.contains("mm"));
+    }
+
+    #[test]
+    fn format_distance_negative() {
+        let s = format_distance(-5e-8);
+        assert!(s.contains("nm"));
+    }
+
+    #[test]
+    fn measurement_distance_zero() {
+        let m = Measurement {
+            start: (0.0, 0.0),
+            end: (0.0, 0.0),
+        };
+        assert!((m.distance() - 0.0).abs() < 1e-20);
+    }
+
+    #[test]
+    fn measurement_distance_extreme_coords() {
+        let m = Measurement {
+            start: (-1e6, -1e6),
+            end: (1e6, 1e6),
+        };
+        let d = m.distance();
+        assert!(d.is_finite());
+        assert!(d > 0.0);
+    }
+
+    #[test]
+    fn ruler_many_measurements() {
+        let mut ruler = RulerState {
+            active: true,
+            ..Default::default()
+        };
+        for i in 0..100 {
+            ruler.handle_click(f64::from(i), 0.0);
+            ruler.handle_click(f64::from(i) + 0.5, 0.0);
+        }
+        assert_eq!(ruler.measurements.len(), 100);
+        ruler.clear_all();
+        assert!(ruler.measurements.is_empty());
+    }
+
+    #[test]
+    fn toggle_twice_returns_to_original_state() {
+        let mut ruler = RulerState::default();
+        ruler.toggle();
+        ruler.toggle();
+        assert!(!ruler.active);
+        assert!(ruler.start.is_none());
+    }
+
+    #[test]
     fn click_ignored_when_inactive() {
         let mut ruler = RulerState::default();
         assert!(!ruler.handle_click(0.0, 0.0));

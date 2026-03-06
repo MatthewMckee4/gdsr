@@ -137,6 +137,58 @@ mod tests {
     }
 
     #[test]
+    fn grid_spacing_at_min_zoom() {
+        let spacing = grid_spacing(1e-3);
+        assert!(spacing > 0.0);
+        assert!(spacing.is_finite());
+        let screen_px = spacing * 1e-3;
+        assert!((40.0..=200.0).contains(&screen_px));
+    }
+
+    #[test]
+    fn grid_spacing_at_max_zoom() {
+        let spacing = grid_spacing(1e15);
+        assert!(spacing > 0.0);
+        assert!(spacing.is_finite());
+        let screen_px = spacing * 1e15;
+        assert!((40.0..=200.0).contains(&screen_px));
+    }
+
+    #[test]
+    fn grid_spacing_very_small_zoom() {
+        let spacing = grid_spacing(1e-10);
+        assert!(spacing > 0.0);
+        assert!(spacing.is_finite());
+    }
+
+    #[test]
+    fn grid_spacing_very_large_zoom() {
+        let spacing = grid_spacing(1e12);
+        assert!(spacing > 0.0);
+        assert!(spacing.is_finite());
+    }
+
+    #[test]
+    fn first_line_large_negative() {
+        let result = first_line(-1e15, 100.0);
+        assert!(result.is_finite());
+        assert!(result <= -1e15);
+    }
+
+    #[test]
+    fn first_line_large_positive() {
+        let result = first_line(1e15, 100.0);
+        assert!(result.is_finite());
+        assert!(result <= 1e15);
+    }
+
+    #[test]
+    fn first_line_tiny_spacing() {
+        let result = first_line(1.0, 1e-12);
+        assert!(result.is_finite());
+    }
+
+    #[test]
     fn first_line_exact_multiple() {
         assert!((first_line(20.0, 10.0) - 20.0).abs() < 1e-10);
         assert!((first_line(-20.0, 10.0) - (-20.0)).abs() < 1e-10);

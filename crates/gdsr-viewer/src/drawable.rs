@@ -1007,6 +1007,233 @@ mod tests {
     }
 
     #[test]
+    fn gds_box_layer_keys() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(100, 100),
+            Layer::new(3),
+            DataType::new(5),
+        );
+        assert_eq!(b.layer_keys(), vec![(Layer::new(3), DataType::new(5))]);
+    }
+
+    #[test]
+    fn gds_box_world_bbox() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(10, 20),
+            gdsr::Point::default_integer(30, 40),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let bbox = b.world_bbox().expect("should have bbox");
+        assert!((bbox.min_x - 10.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.min_y - 20.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_x - 30.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_y - 40.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn node_layer_keys() {
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(0, 0)],
+            Layer::new(7),
+            DataType::new(2),
+        );
+        assert_eq!(n.layer_keys(), vec![(Layer::new(7), DataType::new(2))]);
+    }
+
+    #[test]
+    fn node_world_bbox() {
+        let n = gdsr::Node::new(
+            vec![
+                gdsr::Point::default_integer(10, 20),
+                gdsr::Point::default_integer(30, 40),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let bbox = n.world_bbox().expect("should have bbox");
+        assert!((bbox.min_x - 10.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.min_y - 20.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_x - 30.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_y - 40.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn gds_box_hit_near_edge() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(100, 100),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Box(b);
+        assert!(el.hit_test(0.0, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn node_hit_multiple_points() {
+        let n = gdsr::Node::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 100),
+                gdsr::Point::default_integer(200, 0),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let el = Element::Node(n);
+        assert!(el.hit_test(0.0, 0.0, ZOOM));
+        assert!(el.hit_test(100.0 * SCALE, 100.0 * SCALE, ZOOM));
+        assert!(el.hit_test(200.0 * SCALE, 0.0, ZOOM));
+        assert!(!el.hit_test(500.0 * SCALE, 500.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn reference_with_element_layer_keys() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(10, 0),
+                gdsr::Point::default_integer(10, 10),
+            ],
+            Layer::new(3),
+            DataType::new(1),
+        );
+        let r = gdsr::Reference::new(poly);
+        assert_eq!(r.layer_keys(), vec![(Layer::new(3), DataType::new(1))]);
+    }
+
+    #[test]
+    fn reference_empty_layer_keys() {
+        let r = gdsr::Reference::default();
+        assert!(r.layer_keys().is_empty());
+    }
+
+    #[test]
+    fn reference_empty_world_bbox() {
+        let r = gdsr::Reference::default();
+        assert!(r.world_bbox().is_none());
+    }
+
+    #[test]
+    fn reference_with_element_world_bbox() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 0),
+                gdsr::Point::default_integer(100, 100),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let r = gdsr::Reference::new(poly);
+        let bbox = r.world_bbox().expect("should have bbox");
+        assert!((bbox.min_x - 0.0).abs() < 1e-15);
+        assert!((bbox.max_x - 100.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn reference_with_element_hit_test() {
+        let poly = gdsr::Polygon::new(
+            vec![
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 0),
+                gdsr::Point::default_integer(100, 100),
+                gdsr::Point::default_integer(0, 100),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let r = gdsr::Reference::new(poly);
+        assert!(r.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+        assert!(!r.hit_test(500.0 * SCALE, 500.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn element_dispatch_layer_keys() {
+        let el = polygon(vec![(0, 0), (10, 0), (10, 10)], 5, 3);
+        assert_eq!(el.layer_keys(), vec![(Layer::new(5), DataType::new(3))]);
+
+        let el = path(vec![(0, 0), (10, 0)], 7, 2, None);
+        assert_eq!(el.layer_keys(), vec![(Layer::new(7), DataType::new(2))]);
+
+        let el = text("t", 0, 0, 4);
+        assert_eq!(el.layer_keys(), vec![(Layer::new(4), DataType::new(0))]);
+
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(10, 10),
+            Layer::new(8),
+            DataType::new(1),
+        );
+        assert_eq!(
+            Element::Box(b).layer_keys(),
+            vec![(Layer::new(8), DataType::new(1))]
+        );
+
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(0, 0)],
+            Layer::new(9),
+            DataType::new(4),
+        );
+        assert_eq!(
+            Element::Node(n).layer_keys(),
+            vec![(Layer::new(9), DataType::new(4))]
+        );
+    }
+
+    #[test]
+    fn element_dispatch_world_bbox() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        assert!(el.world_bbox().is_some());
+
+        let el = path(vec![(0, 0), (100, 100)], 1, 0, None);
+        assert!(el.world_bbox().is_some());
+
+        let el = text("hi", 50, 50, 1);
+        assert!(el.world_bbox().is_some());
+
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(10, 10),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        assert!(Element::Box(b).world_bbox().is_some());
+
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(0, 0)],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        assert!(Element::Node(n).world_bbox().is_some());
+
+        let el = reference();
+        assert!(el.world_bbox().is_none());
+    }
+
+    #[test]
+    fn element_dispatch_hit_test() {
+        let b = gdsr::GdsBox::new(
+            gdsr::Point::default_integer(0, 0),
+            gdsr::Point::default_integer(100, 100),
+            Layer::new(1),
+            DataType::new(0),
+        );
+        assert!(Element::Box(b).hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+
+        let n = gdsr::Node::new(
+            vec![gdsr::Point::default_integer(50, 50)],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        assert!(Element::Node(n).hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+
+        assert!(!reference().hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
     fn point_in_polygon_triangle() {
         let tri = [(0.0, 0.0), (10.0, 0.0), (5.0, 10.0)];
         assert!(point_in_polygon(5.0, 3.0, &tri));
@@ -1017,6 +1244,239 @@ mod tests {
     fn point_to_segment_dist_on_segment() {
         let d = point_to_segment_dist_sq(5.0, 0.0, 0.0, 0.0, 10.0, 0.0);
         assert!(d < 1e-20);
+    }
+
+    #[test]
+    fn polygon_hit_degenerate_single_point() {
+        let el = polygon(vec![(50, 50), (50, 50), (50, 50)], 1, 0);
+        // Exactly at the vertex — edge proximity returns true
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+        // Far away should miss
+        assert!(!el.hit_test(500.0 * SCALE, 500.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn polygon_hit_collinear_points() {
+        let el = polygon(vec![(0, 0), (50, 0), (100, 0)], 1, 0);
+        assert!(el.hit_test(50.0 * SCALE, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn polygon_hit_extreme_zoom_far() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, 1e-3));
+    }
+
+    #[test]
+    fn polygon_hit_extreme_zoom_close() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(el.hit_test(50.0 * SCALE, 50.0 * SCALE, 1e15));
+    }
+
+    #[test]
+    fn polygon_hit_at_edge() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(el.hit_test(0.0, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn polygon_hit_at_vertex() {
+        let el = polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0);
+        assert!(el.hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn polygon_with_two_points_no_panic() {
+        let el = polygon(vec![(0, 0), (100, 0)], 1, 0);
+        // Near the line segment — edge proximity hits
+        assert!(el.hit_test(50.0 * SCALE, 0.0, ZOOM));
+        // Far away should miss
+        assert!(!el.hit_test(50.0 * SCALE, 500.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn path_hit_zero_width() {
+        let el = path(vec![(0, 0), (100, 0)], 1, 0, None);
+        assert!(el.hit_test(50.0 * SCALE, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn path_hit_single_point_no_panic() {
+        let el = path(vec![(50, 50)], 1, 0, Some(10));
+        assert!(!el.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn path_hit_empty_no_panic() {
+        let el = path(vec![], 1, 0, Some(10));
+        assert!(!el.hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn node_hit_empty_points_no_panic() {
+        let n = gdsr::Node::new(vec![], Layer::new(1), DataType::new(0));
+        let el = Element::Node(n);
+        assert!(!el.hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn text_hit_extreme_zoom() {
+        let el = text("hello", 500, 600, 1);
+        assert!(el.hit_test(500.0 * SCALE, 600.0 * SCALE, 1e-3));
+    }
+
+    #[test]
+    fn reference_empty_hit_test() {
+        let el = reference();
+        assert!(!el.hit_test(0.0, 0.0, ZOOM));
+    }
+
+    #[test]
+    fn bbox_overlaps_identical() {
+        let a = WorldBBox::new(1.0, 2.0, 3.0, 4.0);
+        assert!(a.overlaps(&a));
+    }
+
+    #[test]
+    fn bbox_merge_with_itself() {
+        let a = WorldBBox::new(1.0, 2.0, 3.0, 4.0);
+        let merged = a.merge(&a);
+        assert!((merged.min_x - a.min_x).abs() < 1e-15);
+        assert!((merged.max_x - a.max_x).abs() < 1e-15);
+    }
+
+    #[test]
+    fn bbox_merge_disjoint() {
+        let a = WorldBBox::new(0.0, 0.0, 1.0, 1.0);
+        let b = WorldBBox::new(10.0, 10.0, 11.0, 11.0);
+        let merged = a.merge(&b);
+        assert!((merged.min_x - 0.0).abs() < 1e-15);
+        assert!((merged.min_y - 0.0).abs() < 1e-15);
+        assert!((merged.max_x - 11.0).abs() < 1e-15);
+        assert!((merged.max_y - 11.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn point_in_polygon_degenerate_less_than_3() {
+        assert!(!point_in_polygon(0.0, 0.0, &[]));
+        assert!(!point_in_polygon(0.0, 0.0, &[(0.0, 0.0)]));
+        assert!(!point_in_polygon(0.0, 0.0, &[(0.0, 0.0), (1.0, 0.0)]));
+    }
+
+    #[test]
+    fn point_in_polygon_concave() {
+        let concave = [
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 10.0),
+            (5.0, 5.0),
+            (0.0, 10.0),
+        ];
+        assert!(point_in_polygon(2.0, 2.0, &concave));
+        assert!(!point_in_polygon(5.0, 8.0, &concave));
+    }
+
+    #[test]
+    fn point_to_segment_dist_zero_length_segment() {
+        let d = point_to_segment_dist_sq(3.0, 4.0, 0.0, 0.0, 0.0, 0.0);
+        assert!((d - 25.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn point_to_segment_dist_at_endpoint() {
+        let d = point_to_segment_dist_sq(0.0, 0.0, 0.0, 0.0, 10.0, 0.0);
+        assert!(d < 1e-20);
+    }
+
+    #[test]
+    fn point_to_segment_dist_beyond_endpoint() {
+        let d = point_to_segment_dist_sq(15.0, 0.0, 0.0, 0.0, 10.0, 0.0);
+        assert!((d - 25.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn stroke_polyline_empty() {
+        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let mesh = stroke_polyline_to_mesh(&[], stroke, false);
+        assert!(mesh.vertices.is_empty());
+        assert!(mesh.indices.is_empty());
+    }
+
+    #[test]
+    fn stroke_polyline_single_point() {
+        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let mesh = stroke_polyline_to_mesh(&[Pos2::new(5.0, 5.0)], stroke, false);
+        assert!(mesh.vertices.is_empty());
+        assert!(mesh.indices.is_empty());
+    }
+
+    #[test]
+    fn stroke_polyline_coincident_points() {
+        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let pts = vec![
+            Pos2::new(5.0, 5.0),
+            Pos2::new(5.0, 5.0),
+            Pos2::new(5.0, 5.0),
+        ];
+        let mesh = stroke_polyline_to_mesh(&pts, stroke, false);
+        assert!(
+            mesh.vertices.is_empty(),
+            "coincident points should produce no edges"
+        );
+    }
+
+    #[test]
+    fn stroke_polyline_closed_vs_open() {
+        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let pts = vec![
+            Pos2::new(0.0, 0.0),
+            Pos2::new(10.0, 0.0),
+            Pos2::new(10.0, 10.0),
+        ];
+        let open = stroke_polyline_to_mesh(&pts, stroke, false);
+        let closed = stroke_polyline_to_mesh(&pts, stroke, true);
+        assert!(
+            closed.vertices.len() > open.vertices.len(),
+            "closed should have more vertices from closing edge"
+        );
+    }
+
+    #[test]
+    fn polygon_bbox_with_extreme_coords() {
+        let max = i32::MAX / 2;
+        let el = polygon(vec![(0, 0), (max, 0), (max, max), (0, max)], 1, 0);
+        let bbox = el.world_bbox().expect("should have bbox");
+        assert!(bbox.min_x.is_finite());
+        assert!(bbox.max_x.is_finite());
+        assert!(bbox.min_y.is_finite());
+        assert!(bbox.max_y.is_finite());
+        assert!(bbox.max_x > bbox.min_x);
+        assert!(bbox.max_y > bbox.min_y);
+    }
+
+    #[test]
+    fn path_bbox_with_extreme_coords() {
+        let max = i32::MAX / 2;
+        let el = path(vec![(0, 0), (max, max)], 1, 0, Some(100));
+        let bbox = el.world_bbox().expect("should have bbox");
+        assert!(bbox.min_x.is_finite());
+        assert!(bbox.max_x.is_finite());
+    }
+
+    #[test]
+    fn polygon_many_vertices_no_panic() {
+        let pts: Vec<(i32, i32)> = (0..1000)
+            .map(|i| {
+                let angle = f64::from(i) * 2.0 * std::f64::consts::PI / 1000.0;
+                let x = (angle.cos() * 1000.0) as i32;
+                let y = (angle.sin() * 1000.0) as i32;
+                (x, y)
+            })
+            .collect();
+        let el = polygon(pts, 1, 0);
+        let bbox = el.world_bbox().expect("should have bbox");
+        assert!(bbox.max_x > bbox.min_x);
+        assert!(el.hit_test(0.0, 0.0, ZOOM));
     }
 
     #[test]
