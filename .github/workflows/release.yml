@@ -154,6 +154,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install Linux dependencies
+        uses: ./.github/actions/setup-linux-deps
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
