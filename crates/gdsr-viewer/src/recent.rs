@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use crate::quick_pick::QuickPickItem;
+
 const MAX_ENTRIES: usize = 10;
 
 /// Persists a list of recently opened file paths.
@@ -49,6 +51,56 @@ impl RecentProjects {
     pub fn paths(&self) -> &[PathBuf] {
         &self.paths
     }
+}
+
+/// An item in the recent-projects picker, showing the file name prominently
+/// and the abbreviated path below it.
+pub struct RecentProjectItem {
+    pub name: String,
+    pub display_path: String,
+    pub path: PathBuf,
+}
+
+impl RecentProjectItem {
+    pub fn from_path(path: &Path) -> Self {
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let display_path = abbreviate_home(path);
+
+        Self {
+            name,
+            display_path,
+            path: path.to_path_buf(),
+        }
+    }
+}
+
+impl QuickPickItem for RecentProjectItem {
+    fn filter_text(&self) -> &str {
+        &self.name
+    }
+
+    fn ui(&self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 1.0;
+            ui.label(&self.name);
+            ui.label(egui::RichText::new(&self.display_path).small().weak());
+        });
+    }
+}
+
+/// Replaces the home directory prefix with `~` for shorter display.
+fn abbreviate_home(path: &Path) -> String {
+    if let Ok(home) = std::env::var("HOME") {
+        if let Some(rest) = path.to_str().and_then(|p| p.strip_prefix(&home)) {
+            return format!("~{rest}");
+        }
+    }
+    path.display().to_string()
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -109,5 +161,33 @@ mod tests {
     #[test]
     fn config_path_returns_some() {
         assert!(config_path().is_some());
+    }
+
+    #[test]
+    fn abbreviate_home_replaces_prefix() {
+        let home = std::env::var("HOME").unwrap();
+        let path = PathBuf::from(&home).join("Documents/test.gds");
+        insta::assert_snapshot!(abbreviate_home(&path), @"~/Documents/test.gds");
+    }
+
+    #[test]
+    fn abbreviate_home_leaves_non_home_paths() {
+        insta::assert_snapshot!(abbreviate_home(Path::new("/tmp/test.gds")), @"/tmp/test.gds");
+    }
+
+    #[test]
+    fn recent_project_item_from_path() {
+        let item = RecentProjectItem::from_path(Path::new("/some/dir/chip.gds"));
+        insta::assert_snapshot!(item.name, @"chip.gds");
+        insta::assert_snapshot!(item.display_path, @"/some/dir/chip.gds");
+    }
+
+    #[test]
+    fn recent_project_item_from_home_path() {
+        let home = std::env::var("HOME").unwrap();
+        let path = PathBuf::from(&home).join("projects/chip.gds");
+        let item = RecentProjectItem::from_path(&path);
+        insta::assert_snapshot!(item.name, @"chip.gds");
+        insta::assert_snapshot!(item.display_path, @"~/projects/chip.gds");
     }
 }

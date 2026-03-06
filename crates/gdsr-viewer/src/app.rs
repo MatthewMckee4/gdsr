@@ -5,7 +5,7 @@ use std::thread;
 use crate::drawable::Drawable;
 use crate::panels;
 use crate::quick_pick::{QuickPick, QuickPickResult};
-use crate::recent::RecentProjects;
+use crate::recent::{RecentProjectItem, RecentProjects};
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{
@@ -40,8 +40,8 @@ pub struct ViewerApp {
     scroll_to_selected: bool,
     recent_projects: RecentProjects,
     display_unit: DisplayUnit,
-    cell_picker: QuickPick,
-    recent_picker: QuickPick,
+    cell_picker: QuickPick<String>,
+    recent_picker: QuickPick<RecentProjectItem>,
 }
 
 impl Default for ViewerApp {
@@ -62,8 +62,8 @@ impl Default for ViewerApp {
             scroll_to_selected: false,
             display_unit: DisplayUnit::default(),
             recent_projects: RecentProjects::load(),
-            cell_picker: QuickPick::new("Search cells…"),
-            recent_picker: QuickPick::new("Recent projects…"),
+            cell_picker: QuickPick::new("Search cells…", true),
+            recent_picker: QuickPick::new("Recent projects…", false),
         }
     }
 }
@@ -409,25 +409,27 @@ impl eframe::App for ViewerApp {
         });
 
         // Cell picker (⌘P)
-        let cell_names: Vec<String> = self
-            .cell
-            .as_ref()
-            .map(|c| c.cell_names.clone())
-            .unwrap_or_default();
-        if let QuickPickResult::Selected(idx) = self.cell_picker.show(ctx, &cell_names, true) {
-            self.select_cell(&cell_names[idx]);
+        self.cell_picker.set_items(
+            self.cell
+                .as_ref()
+                .map(|c| c.cell_names.clone())
+                .unwrap_or_default(),
+        );
+        if let QuickPickResult::Selected(idx) = self.cell_picker.show(ctx) {
+            let name = self.cell_picker.items()[idx].clone();
+            self.select_cell(&name);
         }
 
         // Recent projects picker (⌘⌥O)
-        let recent_labels: Vec<String> = self
-            .recent_projects
-            .paths()
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect();
-        if let QuickPickResult::Selected(idx) = self.recent_picker.show(ctx, &recent_labels, false)
-        {
-            let path = self.recent_projects.paths()[idx].clone();
+        self.recent_picker.set_items(
+            self.recent_projects
+                .paths()
+                .iter()
+                .map(|p| RecentProjectItem::from_path(p))
+                .collect(),
+        );
+        if let QuickPickResult::Selected(idx) = self.recent_picker.show(ctx) {
+            let path = self.recent_picker.items()[idx].path.clone();
             self.load_path(&path);
         }
 

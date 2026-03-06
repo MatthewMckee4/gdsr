@@ -1,11 +1,32 @@
+/// An item that can be displayed in a [`QuickPick`].
+pub trait QuickPickItem {
+    /// Text used for case-insensitive substring filtering.
+    fn filter_text(&self) -> &str;
+
+    /// Render the item content. The picker handles selection highlighting.
+    fn ui(&self, ui: &mut egui::Ui);
+}
+
+impl QuickPickItem for String {
+    fn filter_text(&self) -> &str {
+        self
+    }
+
+    fn ui(&self, ui: &mut egui::Ui) {
+        ui.label(self.as_str());
+    }
+}
+
 /// A filterable floating picker dialog, similar to VS Code's Quick Pick or Zed's command palette.
-pub struct QuickPick {
+pub struct QuickPick<T> {
     open: bool,
     query: String,
     hint: String,
     /// Index into the filtered list (not the original items).
     cursor: usize,
     scroll_to_cursor: bool,
+    items: Vec<T>,
+    filterable: bool,
 }
 
 /// The result of showing a `QuickPick` for a single frame.
@@ -19,19 +40,29 @@ pub enum QuickPickResult {
     Dismissed,
 }
 
-impl QuickPick {
-    pub fn new(hint: impl Into<String>) -> Self {
+impl<T: QuickPickItem> QuickPick<T> {
+    pub fn new(hint: impl Into<String>, filterable: bool) -> Self {
         Self {
             open: false,
             query: String::new(),
             hint: hint.into(),
             cursor: 0,
             scroll_to_cursor: false,
+            items: Vec::new(),
+            filterable,
         }
     }
 
     pub fn is_open(&self) -> bool {
         self.open
+    }
+
+    pub fn items(&self) -> &[T] {
+        &self.items
+    }
+
+    pub fn set_items(&mut self, items: Vec<T>) {
+        self.items = items;
     }
 
     pub fn open(&mut self) {
@@ -58,16 +89,9 @@ impl QuickPick {
 
     /// Shows the picker and returns the outcome for this frame.
     ///
-    /// `items` is the full list of display labels. The picker filters them by the query
-    /// (case-insensitive substring match). When `filterable` is false, all items are
-    /// shown regardless of the query (useful for recent projects where the search box
-    /// still provides focus but items aren't filtered).
-    pub fn show(
-        &mut self,
-        ctx: &egui::Context,
-        items: &[String],
-        filterable: bool,
-    ) -> QuickPickResult {
+    /// When `filterable` is true, items are filtered by case-insensitive substring match
+    /// on their `filter_text`. When false, all items are always shown.
+    pub fn show(&mut self, ctx: &egui::Context) -> QuickPickResult {
         if !self.open {
             return QuickPickResult::None;
         }
@@ -75,11 +99,14 @@ impl QuickPick {
         let mut result = QuickPickResult::None;
         let query_lower = self.query.to_lowercase();
 
-        let filtered_indices: Vec<usize> = items
+        let filtered_indices: Vec<usize> = self
+            .items
             .iter()
             .enumerate()
-            .filter(|(_, label)| {
-                !filterable || query_lower.is_empty() || label.to_lowercase().contains(&query_lower)
+            .filter(|(_, item)| {
+                !self.filterable
+                    || query_lower.is_empty()
+                    || item.filter_text().to_lowercase().contains(&query_lower)
             })
             .map(|(i, _)| i)
             .collect();
@@ -134,7 +161,32 @@ impl QuickPick {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for (pos, &idx) in filtered_indices.iter().enumerate() {
                         let highlighted = pos == self.cursor;
-                        let response = ui.selectable_label(highlighted, &items[idx]);
+                        let item = &self.items[idx];
+
+                        let bg_idx = ui.painter().add(egui::Shape::Noop);
+
+                        let inner = ui.horizontal(|ui| {
+                            ui.set_min_width(ui.available_width());
+                            item.ui(ui);
+                        });
+                        let response = inner.response.interact(egui::Sense::click());
+
+                        let visuals = ui.style().interact_selectable(&response, highlighted);
+                        if highlighted
+                            || response.hovered()
+                            || response.highlighted()
+                            || response.has_focus()
+                        {
+                            ui.painter().set(
+                                bg_idx,
+                                egui::Shape::from(egui::epaint::RectShape::filled(
+                                    response.rect.expand(visuals.expansion),
+                                    visuals.corner_radius,
+                                    visuals.bg_fill,
+                                )),
+                            );
+                        }
+
                         if highlighted && self.scroll_to_cursor {
                             response.scroll_to_me(Some(egui::Align::Center));
                             self.scroll_to_cursor = false;
