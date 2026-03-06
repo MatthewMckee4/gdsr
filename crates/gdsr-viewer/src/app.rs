@@ -4,9 +4,11 @@ use std::thread;
 
 use crate::drawable::Drawable;
 use crate::panels;
+use crate::quick_pick::{QuickPick, QuickPickResult};
+use crate::recent::RecentProjects;
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
-use crate::state::{CellState, FileLoadState, LayerState, RenderCache};
+use crate::state::{CellState, CellViewMode, FileLoadState, LayerState, RenderCache, SidePanelTab};
 use crate::viewport::{self, Viewport};
 
 /// Returns shortcut text with the platform-appropriate modifier (⌘ on macOS, Ctrl on others).
@@ -31,6 +33,12 @@ pub struct ViewerApp {
     hovered_element: Option<usize>,
     /// Reusable scratch buffer for spatial grid point queries.
     query_buf: Vec<u32>,
+    side_panel_tab: SidePanelTab,
+    cell_view_mode: CellViewMode,
+    scroll_to_selected: bool,
+    recent_projects: RecentProjects,
+    cell_picker: QuickPick,
+    recent_picker: QuickPick,
 }
 
 impl Default for ViewerApp {
@@ -46,6 +54,12 @@ impl Default for ViewerApp {
             show_grid: true,
             hovered_element: None,
             query_buf: Vec::new(),
+            side_panel_tab: SidePanelTab::default(),
+            cell_view_mode: CellViewMode::default(),
+            scroll_to_selected: false,
+            recent_projects: RecentProjects::load(),
+            cell_picker: QuickPick::new("Search cells…"),
+            recent_picker: QuickPick::new("Recent projects…"),
         }
     }
 }
@@ -78,15 +92,13 @@ impl ViewerApp {
     /// Called when the background file loader completes successfully. Populates cell
     /// names and auto-selects the first cell.
     fn on_library_loaded(&mut self, library: gdsr::Library, path: PathBuf) {
+        self.recent_projects.add(&path);
+        self.recent_projects.save();
+
         let cell_state = CellState::new(library);
-        let first_cell = cell_state.cell_names.first().cloned();
         self.cell = Some(cell_state);
         self.file_load.file_path = Some(path);
         self.file_load.loading = false;
-
-        if let Some(name) = first_cell {
-            self.select_cell(&name);
-        }
     }
 
     /// Switches to a new cell, cancelling any in-flight element streaming and starting
@@ -94,6 +106,8 @@ impl ViewerApp {
     fn select_cell(&mut self, name: &str) {
         if let Some(cell) = self.cell.as_mut() {
             cell.selected_cell = Some(name.to_string());
+            cell.expand_state.set_expanded(name, true);
+            self.scroll_to_selected = true;
             cell.element_receiver = None;
             cell.elements.clear();
             cell.layers.clear();
@@ -124,6 +138,14 @@ impl ViewerApp {
                 self.viewport.zoom_to_fit(&bounds, rect);
             }
         }
+    }
+
+    /// Loads a file from a path (used by recent projects).
+    fn load_path(&mut self, path: &Path) {
+        let (path, rx) = crate::loader::load_request(path);
+        self.file_load.load_receiver = Some((path, rx));
+        self.file_load.loading = true;
+        self.file_load.error_message = None;
     }
 }
 
@@ -196,15 +218,24 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.key_pressed(egui::Key::G)) {
             self.show_grid = !self.show_grid;
         }
-        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O)) {
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O) && !i.modifiers.alt) {
             self.open_file_dialog();
+        }
+        if ctx.input(|i| i.modifiers.command && i.modifiers.alt && i.key_pressed(egui::Key::O)) {
+            self.recent_picker.toggle();
+        }
+        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::P)) {
+            self.cell_picker.toggle();
         }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R)) {
             self.ruler.clear_all();
         } else if ctx.input(|i| i.key_pressed(egui::Key::R)) {
             self.ruler.toggle();
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape))
+            && !self.cell_picker.is_open()
+            && !self.recent_picker.is_open()
+        {
             self.ruler.cancel();
         }
         if self.ruler.start.is_some() {
@@ -220,6 +251,16 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.open_file_dialog();
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new("Recent Projects...")
+                                .shortcut_text(shortcut_text("⌥O")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.recent_picker.open();
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -279,8 +320,48 @@ impl eframe::App for ViewerApp {
             });
         });
 
+        // Bottom activity bar
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
+                let is_tree = self.side_panel_tab == SidePanelTab::Cells
+                    && self.cell_view_mode == CellViewMode::Tree;
+                if ui
+                    .selectable_label(is_tree, "Tree")
+                    .on_hover_text("Cell hierarchy")
+                    .clicked()
+                {
+                    self.side_panel_tab = SidePanelTab::Cells;
+                    self.cell_view_mode = CellViewMode::Tree;
+                }
+
+                let is_flat = self.side_panel_tab == SidePanelTab::Cells
+                    && self.cell_view_mode == CellViewMode::Flat;
+                if ui
+                    .selectable_label(is_flat, "Cells")
+                    .on_hover_text("All cells")
+                    .clicked()
+                {
+                    self.side_panel_tab = SidePanelTab::Cells;
+                    self.cell_view_mode = CellViewMode::Flat;
+                    if self
+                        .cell
+                        .as_ref()
+                        .and_then(|c| c.selected_cell.as_ref())
+                        .is_some()
+                    {
+                        self.scroll_to_selected = true;
+                    }
+                }
+
+                if ui
+                    .selectable_label(self.side_panel_tab == SidePanelTab::Layers, "Layers")
+                    .clicked()
+                {
+                    self.side_panel_tab = SidePanelTab::Layers;
+                }
+
+                ui.separator();
+
                 if self.file_load.loading {
                     ui.label("Loading...");
                 } else if self.cell.as_ref().is_some_and(|c| c.elements_loading) {
@@ -305,29 +386,63 @@ impl eframe::App for ViewerApp {
                     if self.ruler.active {
                         ui.label("Ruler: click to place point (Esc to cancel)");
                     }
+                    if let Some(stats) = self.cell.as_ref().and_then(|c| c.cell_stats.as_ref()) {
+                        panels::draw_stats_bar(ui, stats);
+                    }
                 });
             });
         });
+
+        // Cell picker (⌘P)
+        let cell_names: Vec<String> = self
+            .cell
+            .as_ref()
+            .map(|c| c.cell_names.clone())
+            .unwrap_or_default();
+        if let QuickPickResult::Selected(idx) = self.cell_picker.show(ctx, &cell_names, true) {
+            self.select_cell(&cell_names[idx]);
+        }
+
+        // Recent projects picker (⌘⌥O)
+        let recent_labels: Vec<String> = self
+            .recent_projects
+            .paths()
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect();
+        if let QuickPickResult::Selected(idx) = self.recent_picker.show(ctx, &recent_labels, false)
+        {
+            let path = self.recent_projects.paths()[idx].clone();
+            self.load_path(&path);
+        }
 
         let mut cell_changed = false;
         let mut color_changed = false;
         let cell = &mut self.cell;
         let layer_state = &mut self.layer_state;
+        let active_tab = self.side_panel_tab;
+        let view_mode = self.cell_view_mode;
+        let scroll_to_selected = &mut self.scroll_to_selected;
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
+            .width_range(40.0..=800.0)
+            .resizable(true)
             .show(ctx, |ui| {
+                ui.allocate_at_least(egui::vec2(ui.available_width(), 0.0), egui::Sense::hover());
                 if let Some(cell) = cell.as_mut() {
                     panels::draw_side_panel(
                         ui,
+                        active_tab,
                         &cell.cell_tree,
+                        &cell.flat_tree,
+                        view_mode,
                         &mut cell.selected_cell,
                         &mut cell_changed,
                         &mut color_changed,
                         &mut cell.expand_state,
+                        scroll_to_selected,
                         &cell.layers,
                         layer_state,
-                        cell.cell_stats.as_ref(),
-                        &mut cell.search_query,
                     );
                 }
             });

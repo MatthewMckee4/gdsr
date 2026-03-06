@@ -72,9 +72,34 @@ fn build_node<'a>(
     }
 }
 
+/// Builds a flat cell list where every cell in the library is a top-level node,
+/// each with its direct children (references) as subtree entries.
+pub fn build_flat_cell_tree(library: &Library) -> Vec<CellTreeNode> {
+    let cells = library.cells();
+
+    let mut children_of: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for (name, cell) in cells {
+        let entry = children_of.entry(name.as_str()).or_default();
+        for ref_name in cell.referenced_cell_names() {
+            if cells.contains_key(ref_name) {
+                entry.insert(ref_name);
+            }
+        }
+    }
+
+    let mut names: Vec<&str> = cells.keys().map(String::as_str).collect();
+    names.sort_unstable();
+
+    names
+        .into_iter()
+        .map(|name| build_node(name, &children_of, &mut HashSet::new()))
+        .collect()
+}
+
 /// Returns a filtered copy of the tree containing only nodes whose name matches
 /// the query (case-insensitive substring) or that have a matching descendant.
 /// An empty query returns a clone of the full tree.
+#[cfg(test)]
 pub fn filter_tree(tree: &[CellTreeNode], query: &str) -> Vec<CellTreeNode> {
     if query.is_empty() {
         return tree.to_vec();
@@ -85,6 +110,7 @@ pub fn filter_tree(tree: &[CellTreeNode], query: &str) -> Vec<CellTreeNode> {
         .collect()
 }
 
+#[cfg(test)]
 fn filter_node(node: &CellTreeNode, query_lower: &str) -> Option<CellTreeNode> {
     let name_matches = node.name.to_lowercase().contains(query_lower);
     let filtered_children: Vec<CellTreeNode> = node
@@ -124,6 +150,7 @@ impl ExpandState {
         self.expanded.insert(name.to_string(), expanded);
     }
 
+    #[cfg(test)]
     pub fn expand_all(&mut self, tree: &[CellTreeNode]) {
         for node in tree {
             self.set_expanded(&node.name, true);
@@ -131,6 +158,7 @@ impl ExpandState {
         }
     }
 
+    #[cfg(test)]
     pub fn collapse_all(&mut self, tree: &[CellTreeNode]) {
         for node in tree {
             self.set_expanded(&node.name, false);
@@ -678,5 +706,26 @@ mod tests {
 
         let tree = build_cell_tree(&library);
         assert_eq!(tree[0].children.len(), 1);
+    }
+
+    #[test]
+    fn flat_tree_lists_all_cells_as_roots() {
+        let library = make_library(vec![
+            ("top", vec!["mid"]),
+            ("mid", vec!["bot"]),
+            ("bot", vec![]),
+        ]);
+        let flat = build_flat_cell_tree(&library);
+        let root_names: Vec<&str> = flat.iter().map(|n| n.name.as_str()).collect();
+        insta::assert_debug_snapshot!(root_names, @r#"
+        [
+            "bot",
+            "mid",
+            "top",
+        ]
+        "#);
+        assert!(flat[0].children.is_empty());
+        assert_eq!(flat[1].children.len(), 1);
+        assert_eq!(flat[2].children.len(), 1);
     }
 }

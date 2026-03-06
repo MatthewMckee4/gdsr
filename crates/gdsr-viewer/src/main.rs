@@ -9,6 +9,8 @@ mod loader;
 mod panels;
 #[cfg(test)]
 mod property_tests;
+mod quick_pick;
+mod recent;
 mod ruler;
 mod spatial;
 mod state;

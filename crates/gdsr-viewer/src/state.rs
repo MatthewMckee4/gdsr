@@ -24,6 +24,7 @@ pub struct CellState {
     pub library: Library,
     pub cell_names: Vec<String>,
     pub cell_tree: Vec<CellTreeNode>,
+    pub flat_tree: Vec<CellTreeNode>,
     pub expand_state: ExpandState,
     pub selected_cell: Option<String>,
     pub elements: Vec<Element>,
@@ -33,7 +34,6 @@ pub struct CellState {
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
     pub cell_stats: Option<CellStats>,
-    pub search_query: String,
 }
 
 impl CellState {
@@ -41,12 +41,13 @@ impl CellState {
         let mut cell_names: Vec<String> = library.cells().keys().cloned().collect();
         cell_names.sort();
         let cell_tree = hierarchy::build_cell_tree(&library);
-        let mut expand_state = ExpandState::default();
-        expand_state.expand_all(&cell_tree);
+        let flat_tree = hierarchy::build_flat_cell_tree(&library);
+        let expand_state = ExpandState::default();
         Self {
             library,
             cell_names,
             cell_tree,
+            flat_tree,
             expand_state,
             selected_cell: None,
             elements: Vec::new(),
@@ -56,7 +57,6 @@ impl CellState {
             spatial_grid: None,
             tessellation_cache: HashMap::new(),
             cell_stats: None,
-            search_query: String::new(),
         }
     }
 }
@@ -366,6 +366,20 @@ mod tests {
         assert_eq!(first, second);
         assert!(!first.is_empty());
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SidePanelTab {
+    #[default]
+    Cells,
+    Layers,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CellViewMode {
+    #[default]
+    Tree,
+    Flat,
 }
 
 /// Groups layer visibility and color state.

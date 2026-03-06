@@ -1,141 +1,84 @@
 use std::collections::BTreeSet;
 
-use egui::Ui;
+use egui::{Color32, Pos2, Stroke, Ui};
 use gdsr::{CellStats, DataType, Layer};
 
-use crate::hierarchy::{self, CellTreeNode, ExpandState};
-use crate::state::LayerState;
+use crate::hierarchy::{CellTreeNode, ExpandState};
+use crate::state::{CellViewMode, LayerState, SidePanelTab};
 
-/// Draws the side panel with cell hierarchy tree, statistics, and layer toggles.
+const INDENT_PX: f32 = 16.0;
+const GUIDE_COLOR: Color32 = Color32::from_gray(60);
+const EXPANDED_COLOR: Color32 = Color32::from_gray(140);
+
+/// Draws the side panel content, dispatching to cell or layer panel based on active tab.
 pub fn draw_side_panel(
     ui: &mut Ui,
+    active_tab: SidePanelTab,
     cell_tree: &[CellTreeNode],
+    flat_tree: &[CellTreeNode],
+    view_mode: CellViewMode,
     selected_cell: &mut Option<String>,
     cell_changed: &mut bool,
     color_changed: &mut bool,
     expand_state: &mut ExpandState,
+    scroll_to_selected: &mut bool,
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
-    cell_stats: Option<&CellStats>,
-    search_query: &mut String,
 ) {
-    ui.heading("Cells");
-
-    ui.add(egui::TextEdit::singleline(search_query).hint_text("Search cells..."));
-
-    ui.add_space(4.0);
-
-    let is_filtering = !search_query.is_empty();
-    let filtered;
-    let display_tree = if is_filtering {
-        filtered = hierarchy::filter_tree(cell_tree, search_query);
-        &filtered
-    } else {
-        cell_tree
-    };
-
-    ui.horizontal(|ui| {
-        if ui.small_button("Expand All").clicked() {
-            expand_state.expand_all(display_tree);
+    match active_tab {
+        SidePanelTab::Cells => {
+            let tree = match view_mode {
+                CellViewMode::Tree => cell_tree,
+                CellViewMode::Flat => flat_tree,
+            };
+            draw_cell_panel(
+                ui,
+                tree,
+                selected_cell,
+                cell_changed,
+                expand_state,
+                scroll_to_selected,
+            );
         }
-        if ui.small_button("Collapse All").clicked() {
-            expand_state.collapse_all(display_tree);
+        SidePanelTab::Layers => {
+            draw_layer_panel(ui, layers, layer_state, color_changed);
         }
-    });
-
-    ui.add_space(4.0);
-
-    if is_filtering {
-        expand_state.expand_all(display_tree);
     }
+}
 
+fn draw_cell_panel(
+    ui: &mut Ui,
+    cell_tree: &[CellTreeNode],
+    selected_cell: &mut Option<String>,
+    cell_changed: &mut bool,
+    expand_state: &mut ExpandState,
+    scroll_to_selected: &mut bool,
+) {
     egui::ScrollArea::vertical()
         .id_salt("cell_tree")
-        .max_height(ui.available_height() * 0.5)
         .show(ui, |ui| {
-            for node in display_tree {
-                draw_tree_node(ui, node, selected_cell, cell_changed, expand_state);
+            for node in cell_tree {
+                draw_tree_node(
+                    ui,
+                    node,
+                    selected_cell,
+                    cell_changed,
+                    expand_state,
+                    0,
+                    scroll_to_selected,
+                );
             }
         });
+}
 
-    if let Some(stats) = cell_stats {
-        ui.add_space(12.0);
-        ui.separator();
-        ui.add_space(4.0);
-
-        ui.collapsing("Statistics", |ui| {
-            ui.strong("Elements");
-            egui::Grid::new("stats_grid")
-                .num_columns(2)
-                .spacing([8.0, 2.0])
-                .show(ui, |ui| {
-                    let rows: &[(&str, usize)] = &[
-                        ("Polygons", stats.polygon_count),
-                        ("Paths", stats.path_count),
-                        ("Boxes", stats.box_count),
-                        ("Texts", stats.text_count),
-                        ("References", stats.reference_count),
-                    ];
-                    for &(label, count) in rows {
-                        if count > 0 {
-                            ui.label(label);
-                            ui.label(count.to_string());
-                            ui.end_row();
-                        }
-                    }
-
-                    ui.label("Total");
-                    ui.label(stats.total_elements().to_string());
-                    ui.end_row();
-                });
-
-            ui.separator();
-
-            if !stats.elements_per_layer.is_empty() {
-                ui.strong("Elements per layer");
-                egui::Grid::new("layer_stats_grid")
-                    .num_columns(2)
-                    .spacing([8.0, 2.0])
-                    .show(ui, |ui| {
-                        for (&(layer, dt), &count) in &stats.elements_per_layer {
-                            ui.label(format!("L{layer} D{dt}"));
-                            ui.label(count.to_string());
-                            ui.end_row();
-                        }
-                    });
-            }
-
-            if !stats.references_per_cell.is_empty() {
-                ui.add_space(4.0);
-                ui.strong("References per cell");
-                egui::Grid::new("ref_stats_grid")
-                    .num_columns(2)
-                    .spacing([8.0, 2.0])
-                    .show(ui, |ui| {
-                        for (name, &count) in &stats.references_per_cell {
-                            ui.label(name.as_str());
-                            ui.label(count.to_string());
-                            ui.end_row();
-                        }
-
-                        ui.label("Total");
-                        ui.label(stats.reference_count.to_string());
-                        ui.end_row();
-                    });
-
-                ui.separator();
-            }
-        });
-    }
-
-    ui.add_space(12.0);
-    ui.separator();
-    ui.add_space(4.0);
-
-    ui.heading("Layers");
+fn draw_layer_panel(
+    ui: &mut Ui,
+    layers: &BTreeSet<(Layer, DataType)>,
+    layer_state: &mut LayerState,
+    color_changed: &mut bool,
+) {
     egui::ScrollArea::vertical()
         .id_salt("layers")
-        .max_height(ui.available_height() - 40.0)
         .show(ui, |ui| {
             for &(layer, dt) in layers {
                 let mut color = layer_state.layer_colors.get(layer, dt);
@@ -164,53 +107,99 @@ pub fn draw_side_panel(
         });
 }
 
+/// Draws the statistics detail panel in the bottom bar.
+pub fn draw_stats_bar(ui: &mut Ui, stats: &CellStats) {
+    ui.separator();
+
+    let parts: Vec<String> = [
+        ("P", stats.polygon_count),
+        ("Pa", stats.path_count),
+        ("B", stats.box_count),
+        ("T", stats.text_count),
+        ("R", stats.reference_count),
+    ]
+    .iter()
+    .filter(|(_, c)| *c > 0)
+    .map(|(label, count)| format!("{label}:{count}"))
+    .collect();
+
+    let summary = format!("{} el  {}", stats.total_elements(), parts.join(" "));
+    ui.label(summary);
+}
+
 fn draw_tree_node(
     ui: &mut Ui,
     node: &CellTreeNode,
     selected_cell: &mut Option<String>,
     cell_changed: &mut bool,
     expand_state: &mut ExpandState,
+    depth: usize,
+    scroll_to_selected: &mut bool,
 ) {
     let has_children = !node.children.is_empty();
     let is_selected = selected_cell.as_deref() == Some(&node.name);
+    let is_expanded = has_children && expand_state.is_expanded(&node.name);
+    let indent = depth as f32 * INDENT_PX;
 
-    if has_children {
-        let open = expand_state.is_expanded(&node.name);
-        let id = ui.make_persistent_id(&node.name);
-        let mut state =
-            egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, open);
+    let max_width = ui.available_width();
+    ui.horizontal(|ui| {
+        ui.set_max_width(max_width);
 
-        if state.is_open() != open {
-            state.set_open(open);
+        let base_x = ui.cursor().left();
+        let top_y = ui.cursor().top();
+        let row_height = ui.spacing().interact_size.y;
+        let painter = ui.painter();
+
+        for level in 0..depth {
+            let x = base_x + level as f32 * INDENT_PX + INDENT_PX * 0.5;
+            painter.line_segment(
+                [Pos2::new(x, top_y), Pos2::new(x, top_y + row_height)],
+                Stroke::new(1.0, GUIDE_COLOR),
+            );
         }
 
-        ui.spacing_mut().indent = 10.0;
-        state
-            .show_header(ui, |ui| {
-                if ui.selectable_label(is_selected, &node.name).clicked() && !is_selected {
-                    *selected_cell = Some(node.name.clone());
-                    *cell_changed = true;
-                }
-            })
-            .body(|ui| {
-                for child in &node.children {
-                    draw_tree_node(ui, child, selected_cell, cell_changed, expand_state);
-                }
-            });
+        ui.add_space(indent);
 
-        if let Some(persisted) = egui::collapsing_header::CollapsingState::load(ui.ctx(), id) {
-            let new_open = persisted.is_open();
-            if new_open != open {
-                expand_state.set_expanded(&node.name, new_open);
+        let label = if is_expanded {
+            egui::RichText::new(&node.name).color(EXPANDED_COLOR)
+        } else {
+            egui::RichText::new(&node.name)
+        };
+
+        let response = ui.add(
+            egui::Button::selectable(is_selected, label)
+                .truncate()
+                .frame(false),
+        );
+        if is_selected && *scroll_to_selected {
+            response.scroll_to_me(Some(egui::Align::Center));
+            *scroll_to_selected = false;
+        }
+        if response.clicked() {
+            if has_children && is_expanded {
+                expand_state.set_expanded(&node.name, false);
             }
-        }
-    } else {
-        ui.horizontal(|ui| {
-            ui.add_space(14.0);
-            if ui.selectable_label(is_selected, &node.name).clicked() && !is_selected {
+            if !is_selected {
                 *selected_cell = Some(node.name.clone());
                 *cell_changed = true;
+                if has_children {
+                    expand_state.set_expanded(&node.name, true);
+                }
             }
-        });
+        }
+    });
+
+    if is_expanded {
+        for child in &node.children {
+            draw_tree_node(
+                ui,
+                child,
+                selected_cell,
+                cell_changed,
+                expand_state,
+                depth + 1,
+                scroll_to_selected,
+            );
+        }
     }
 }
