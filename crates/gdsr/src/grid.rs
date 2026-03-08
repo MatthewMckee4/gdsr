@@ -1,6 +1,8 @@
 use std::f64::consts::PI;
 
-use crate::{AngleInRadians, Movable, Point, Transformable, Transformation};
+use crate::{
+    AngleInRadians, Movable, Point, Reflection, Rotation, Scale, Transformable, Transformation,
+};
 
 /// A grid layout that repeats elements in rows and columns with optional transformations.
 #[derive(Clone, Debug, PartialEq)]
@@ -240,8 +242,28 @@ impl std::fmt::Display for Grid {
 impl Transformable for Grid {
     fn transform_impl(mut self, transformation: &Transformation) -> Self {
         self.origin = transformation.apply_to_point(&self.origin);
-        self.spacing_x = self.spacing_x.map(|p| transformation.apply_to_point(&p));
-        self.spacing_y = self.spacing_y.map(|p| transformation.apply_to_point(&p));
+
+        // Spacing vectors are relative displacements, not absolute positions.
+        // Only the linear part of each transform (rotation angle, scale factor,
+        // reflection axis) should apply — not translation or center offsets.
+        let origin = Point::default();
+        let linear_only = Transformation {
+            reflection: transformation
+                .reflection
+                .as_ref()
+                .map(|r| Reflection::new(r.angle(), origin)),
+            rotation: transformation
+                .rotation
+                .as_ref()
+                .map(|r| Rotation::new(r.angle(), origin)),
+            scale: transformation
+                .scale
+                .as_ref()
+                .map(|s| Scale::new(s.factor(), origin)),
+            translation: None,
+        };
+        self.spacing_x = self.spacing_x.map(|p| linear_only.apply_to_point(&p));
+        self.spacing_y = self.spacing_y.map(|p| linear_only.apply_to_point(&p));
 
         // Apply scale and rotation to grid properties
         if let Some(scale) = &transformation.scale {
@@ -403,6 +425,8 @@ mod tests {
     fn test_grid_transform_with_scale() {
         let transformed = test_grid().scale(2.0, origin());
         assert_eq!(transformed.magnification, 2.0);
+        assert_eq!(transformed.spacing_x, Some(p(10, 0)));
+        assert_eq!(transformed.spacing_y, Some(p(0, 10)));
     }
 
     #[test]
@@ -415,6 +439,58 @@ mod tests {
     fn test_grid_transform_with_reflection() {
         let transformed = test_grid().reflect(0.0, origin());
         assert!(transformed.x_reflection);
+    }
+
+    #[test]
+    fn test_grid_translation_preserves_spacing() {
+        let grid = test_grid();
+        let translated = grid.translate(p(100, 200));
+        assert_eq!(translated.spacing_x, Some(p(5, 0)));
+        assert_eq!(translated.spacing_y, Some(p(0, 5)));
+        assert_eq!(translated.origin, p(110, 220));
+    }
+
+    #[test]
+    fn test_grid_scale_transforms_spacing() {
+        let grid = Grid::new(
+            origin(),
+            2,
+            2,
+            Some(p(10, 0)),
+            Some(p(0, 10)),
+            1.0,
+            0.0,
+            false,
+        );
+        let scaled = grid.scale(3.0, origin());
+        assert_eq!(scaled.spacing_x, Some(p(30, 0)));
+        assert_eq!(scaled.spacing_y, Some(p(0, 30)));
+    }
+
+    #[test]
+    fn test_grid_scale_around_nonorigin_preserves_spacing() {
+        let grid = Grid::new(
+            p(50, 50),
+            2,
+            2,
+            Some(p(10, 0)),
+            Some(p(0, 10)),
+            1.0,
+            0.0,
+            false,
+        );
+        let scaled = grid.scale(2.0, p(50, 50));
+        assert_eq!(scaled.spacing_x, Some(p(20, 0)));
+        assert_eq!(scaled.spacing_y, Some(p(0, 20)));
+    }
+
+    #[test]
+    fn test_grid_move_by_preserves_spacing() {
+        let grid = test_grid();
+        let moved = grid.move_by(p(30, 40));
+        assert_eq!(moved.spacing_x, Some(p(5, 0)));
+        assert_eq!(moved.spacing_y, Some(p(0, 5)));
+        assert_eq!(moved.origin, p(40, 60));
     }
 
     #[test]

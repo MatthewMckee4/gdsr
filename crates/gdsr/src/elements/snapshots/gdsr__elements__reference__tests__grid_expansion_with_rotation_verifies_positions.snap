@@ -1,0 +1,142 @@
+---
+source: crates/gdsr/src/elements/reference.rs
+expression: elements
+---
+[
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 10,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: -10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+            ],
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
+        },
+    ),
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 30,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: -10,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 0,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 20,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+            ],
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
+        },
+    ),
+]

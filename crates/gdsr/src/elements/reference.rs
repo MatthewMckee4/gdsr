@@ -172,16 +172,16 @@ impl Reference {
 
                 let mut new_element = element.clone();
 
-                // Apply transformations around grid origin
+                // Apply transformations around cell-local origin (0,0)
                 if grid.x_reflection() {
-                    new_element = new_element.reflect(0.0, grid.origin());
+                    new_element = new_element.reflect(0.0, Point::default());
                 }
 
-                new_element = new_element.rotate(grid.angle(), grid.origin());
-                new_element = new_element.scale(grid.magnification(), grid.origin());
+                new_element = new_element.rotate(grid.angle(), Point::default());
+                new_element = new_element.scale(grid.magnification(), Point::default());
 
-                // Move element to final position
-                new_element = new_element.move_by(final_position - grid.origin());
+                // Translate to final world position
+                new_element = new_element.move_by(final_position);
 
                 elements.push(new_element);
             }
@@ -351,11 +351,11 @@ impl Reference {
 
                 let mut new_element = element.clone();
                 if grid.x_reflection() {
-                    new_element = new_element.reflect(0.0, grid.origin());
+                    new_element = new_element.reflect(0.0, crate::Point::default());
                 }
-                new_element = new_element.rotate(grid.angle(), grid.origin());
-                new_element = new_element.scale(grid.magnification(), grid.origin());
-                new_element = new_element.move_by(final_position - grid.origin());
+                new_element = new_element.rotate(grid.angle(), crate::Point::default());
+                new_element = new_element.scale(grid.magnification(), crate::Point::default());
+                new_element = new_element.move_by(final_position);
 
                 buf.extend_from_slice(&new_element.to_gds_impl(database_units)?);
             }
@@ -386,11 +386,11 @@ impl Reference {
 
         write_string_with_record_to_file(&mut buffer, GDSRecord::SName, cell_name)?;
 
-        let angle = self.grid().angle();
+        let angle_degrees = self.grid().angle().to_degrees();
         let magnification = self.grid().magnification();
         let x_reflection = self.grid().x_reflection();
 
-        write_transformation_to_file(&mut buffer, angle, magnification, x_reflection)?;
+        write_transformation_to_file(&mut buffer, angle_degrees, magnification, x_reflection)?;
 
         if is_single_instance {
             let origin = self.grid().origin();
@@ -413,23 +413,23 @@ impl Reference {
 
             match (self.grid.spacing_x(), self.grid.spacing_y()) {
                 (Some(spacing_x), Some(spacing_y)) => {
-                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                    let point2 = (origin + spacing_x * self.grid().columns())
                         .rotate_around_point(self.grid().angle(), &origin);
 
-                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                    let point3 = (origin + spacing_y * self.grid().rows())
                         .rotate_around_point(self.grid().angle(), &origin);
 
                     let reference_points = [origin, point2, point3];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
                 }
                 (Some(spacing_x), None) => {
-                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                    let point2 = (origin + spacing_x * self.grid().columns())
                         .rotate_around_point(self.grid().angle(), &origin);
                     let reference_points = [origin, point2, origin];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
                 }
                 (None, Some(spacing_y)) => {
-                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                    let point3 = (origin + spacing_y * self.grid().rows())
                         .rotate_around_point(self.grid().angle(), &origin);
                     let reference_points = [origin, origin, point3];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
@@ -1439,5 +1439,147 @@ mod tests {
         drop(rx);
         let result = reference.stream_flatten(None, &library, &tx);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_grid_expansion_with_nonzero_origin() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let grid = Grid::default()
+            .with_origin(Point::integer(100, 200, 1e-9))
+            .with_columns(2)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)));
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+        let elements = reference.get_elements_in_grid(&Element::Polygon(polygon));
+
+        assert_eq!(elements.len(), 2);
+        let p0 = elements[0].as_polygon().unwrap();
+        let p1 = elements[1].as_polygon().unwrap();
+        assert_eq!(p0.points()[0], Point::integer(100, 200, 1e-9));
+        assert_eq!(p1.points()[0], Point::integer(120, 200, 1e-9));
+    }
+
+    #[test]
+    fn test_grid_expansion_with_rotation_verifies_positions() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(0, 10, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let grid = Grid::default()
+            .with_columns(2)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+            .with_angle(std::f64::consts::FRAC_PI_2);
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+        let elements = reference.get_elements_in_grid(&Element::Polygon(polygon));
+
+        assert_eq!(elements.len(), 2);
+        insta::assert_debug_snapshot!(elements);
+    }
+
+    #[test]
+    fn test_grid_expansion_with_magnification_verifies_positions() {
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let grid = Grid::default()
+            .with_columns(1)
+            .with_rows(1)
+            .with_magnification(2.0);
+
+        let reference = Reference::new(polygon.clone()).with_grid(grid);
+        let elements = reference.get_elements_in_grid(&Element::Polygon(polygon));
+
+        assert_eq!(elements.len(), 1);
+        let p = elements[0].as_polygon().unwrap();
+        assert_eq!(p.points()[0], Point::integer(0, 0, 1e-9));
+        assert_eq!(p.points()[1], Point::integer(20, 0, 1e-9));
+        assert_eq!(p.points()[2], Point::integer(20, 20, 1e-9));
+    }
+
+    #[test]
+    fn test_cell_ref_grid_expansion_with_origin() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut cell = crate::Cell::new("base");
+        cell.add(polygon);
+        library.add_cell(cell);
+
+        let grid = Grid::default()
+            .with_origin(Point::integer(100, 200, 1e-9))
+            .with_columns(2)
+            .with_rows(1)
+            .with_spacing_x(Some(Point::integer(30, 0, 1e-9)));
+
+        let reference = Reference::new("base").with_grid(grid);
+        let flattened = reference.flatten(None, &library);
+
+        assert_eq!(flattened.len(), 2);
+        let p0 = flattened[0].as_polygon().unwrap();
+        let p1 = flattened[1].as_polygon().unwrap();
+        assert_eq!(p0.points()[0], Point::integer(100, 200, 1e-9));
+        assert_eq!(p0.points()[1], Point::integer(110, 200, 1e-9));
+        assert_eq!(p1.points()[0], Point::integer(130, 200, 1e-9));
+        assert_eq!(p1.points()[1], Point::integer(140, 200, 1e-9));
+    }
+
+    #[test]
+    fn test_cell_ref_grid_expansion_with_origin_and_rotation() {
+        let mut library = Library::new("main");
+
+        let polygon = Polygon::new(
+            [
+                Point::integer(5, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 5, 1e-9),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut cell = crate::Cell::new("base");
+        cell.add(polygon);
+        library.add_cell(cell);
+
+        let grid = Grid::default()
+            .with_origin(Point::integer(100, 200, 1e-9))
+            .with_columns(1)
+            .with_rows(1)
+            .with_angle(std::f64::consts::FRAC_PI_2);
+
+        let reference = Reference::new("base").with_grid(grid);
+        let flattened = reference.flatten(None, &library);
+
+        assert_eq!(flattened.len(), 1);
+        insta::assert_debug_snapshot!(flattened);
     }
 }

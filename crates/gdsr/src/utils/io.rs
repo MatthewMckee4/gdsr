@@ -452,16 +452,16 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                                         .grid
                                         .set_spacing_x(if reference.grid.columns() > 1 {
                                             Some(
-                                                (unrotated_points[1] / reference.grid.columns())
-                                                    - unrotated_points[0],
+                                                (unrotated_points[1] - unrotated_points[0])
+                                                    / reference.grid.columns(),
                                             )
                                         } else {
                                             None
                                         });
                                     reference.grid.set_spacing_y(if reference.grid.rows() > 1 {
                                         Some(
-                                            (unrotated_points[2] / reference.grid.rows())
-                                                - unrotated_points[0],
+                                            (unrotated_points[2] - unrotated_points[0])
+                                                / reference.grid.rows(),
                                         )
                                     } else {
                                         None
@@ -560,7 +560,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         if let Some(text) = &mut text {
                             text.angle = angle[0];
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.set_angle(angle[0]);
+                            reference.grid.set_angle(angle[0].to_radians());
                         }
                     }
                 }
