@@ -73,6 +73,8 @@ jobs:
 
       - uses: ./.github/actions/setup-linux-deps
 
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+
       - uses: j178/prek-action@91fd7d7cf70ae1dee9f4f44e7dfa5d1073fe6623 # v1.0.11
 
   build-docs:
