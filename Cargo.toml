@@ -30,6 +30,21 @@ rfd = "0.15"
 rstest = "0.23.0"
 tempfile = "3.26"
 
+[workspace.metadata.dist]
+allow-dirty = ["ci"]
+cargo-dist-version = "0.31.0"
+ci = "github"
+installers = ["shell", "powershell"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+]
+
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
@@ -66,3 +81,7 @@ cast_possible_truncation = "allow"
 cast_sign_loss = "allow"
 float_cmp = "allow"
 cast_possible_wrap = "allow"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
