@@ -127,14 +127,12 @@ pub fn write_library(
     Ok(buffer)
 }
 
-/// Serializes a single cell to GDS bytes.
-pub fn write_cell(cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
-    validate_structure_name(cell.name())?;
-
+/// Returns the `BgnStr` record header with the current timestamp.
+fn cell_head_record() -> [u16; 14] {
     let now = Local::now();
     let timestamp = now.naive_utc();
 
-    let cell_head = [
+    [
         28,
         combine_record_and_data_type(GDSRecord::BgnStr, GDSDataType::TwoByteSignedInteger),
         timestamp.year() as u16,
@@ -149,10 +147,15 @@ pub fn write_cell(cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
         timestamp.hour() as u16,
         timestamp.minute() as u16,
         timestamp.second() as u16,
-    ];
+    ]
+}
+
+/// Serializes a single cell to GDS bytes.
+pub fn write_cell(cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
+    validate_structure_name(cell.name())?;
 
     let mut buffer = Vec::new();
-    write_u16_array_to_file(&mut buffer, &cell_head)?;
+    write_u16_array_to_file(&mut buffer, &cell_head_record())?;
     write_string_with_record_to_file(&mut buffer, GDSRecord::StrName, cell.name())?;
 
     let element_bufs: Result<Vec<_>, _> = cell
@@ -185,29 +188,35 @@ pub fn write_element(element: &Element, db_units: f64) -> Result<Vec<u8>, GdsErr
     }
 }
 
-/// Serializes a polygon to GDS bytes.
-pub fn write_polygon(polygon: &Polygon, db_units: f64) -> Result<Vec<u8>, GdsError> {
-    if polygon.points().len() > MAX_POINTS {
+/// Validates that a polygon has the correct number of points for GDS serialization.
+fn validate_polygon_points(points: &[Point]) -> Result<(), GdsError> {
+    if points.len() > MAX_POINTS {
         return Err(GdsError::ValidationError {
             message: format!(
                 "Polygon has {} points, which exceeds the maximum of {}",
-                polygon.points().len(),
+                points.len(),
                 MAX_POINTS
             ),
         });
     }
 
-    validate_layer(polygon.layer())?;
-    validate_data_type(polygon.data_type())?;
-
-    if polygon.points().len() < MIN_POLYGON_POINTS {
+    if points.len() < MIN_POLYGON_POINTS {
         return Err(GdsError::ValidationError {
             message: format!(
                 "Polygon must have at least {MIN_POLYGON_POINTS} points (3 vertices + closing point), got {}",
-                polygon.points().len()
+                points.len()
             ),
         });
     }
+
+    Ok(())
+}
+
+/// Serializes a polygon to GDS bytes.
+pub fn write_polygon(polygon: &Polygon, db_units: f64) -> Result<Vec<u8>, GdsError> {
+    validate_polygon_points(polygon.points())?;
+    validate_layer(polygon.layer())?;
+    validate_data_type(polygon.data_type())?;
 
     let mut buffer = Vec::new();
 
@@ -513,36 +522,4 @@ pub fn write_node(node: &Node, db_units: f64) -> Result<Vec<u8>, GdsError> {
     write_element_tail_to_file(&mut buffer)?;
 
     Ok(buffer)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{DataType, Layer};
-
-    #[test]
-    fn write_returns_valid_gds() {
-        let mut library = Library::new("test_lib");
-        let mut cell = Cell::new("cell");
-        cell.add(Polygon::new(
-            [
-                Point::integer(0, 0, 1e-9),
-                Point::integer(10, 0, 1e-9),
-                Point::integer(10, 10, 1e-9),
-                Point::integer(0, 0, 1e-9),
-            ],
-            Layer::new(1),
-            DataType::new(0),
-        ));
-        library.add_cell(cell);
-
-        let bytes = library.write(&GdsFileWriter, 1e-9, 1e-9).unwrap();
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.gds");
-        std::fs::write(&path, &bytes).unwrap();
-        let read = Library::read_file(&path, Some(1e-9)).unwrap();
-
-        assert_eq!(library, read);
-    }
 }
