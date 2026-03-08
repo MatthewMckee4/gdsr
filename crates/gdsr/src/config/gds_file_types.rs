@@ -147,7 +147,7 @@ pub enum GDSDataType {
 
 const GDS_RECORD_HEADER_SIZE: u16 = 4;
 
-/// Bit 0 (MSB) of the STrans record: set when X-axis reflection is applied.
+/// Bit 0 (MSB) of the `STrans` record: set when X-axis reflection is applied.
 pub const STRANS_X_REFLECTION: u16 = 0x8000;
 
 impl GDSDataType {
