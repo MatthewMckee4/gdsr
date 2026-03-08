@@ -2,7 +2,9 @@ use std::fs::File;
 use std::io::{self, BufReader, Read};
 
 use crate::cell::Cell;
-use crate::config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData};
+use crate::config::gds_file_types::{
+    GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION,
+};
 use crate::elements::text::get_presentations_from_value;
 use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
@@ -258,7 +260,7 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 }
                 GDSRecord::STrans => {
                     if let GDSRecordData::I16(flags) = data {
-                        let x_reflection = flags[0] & 0x8000u16 as i16 != 0;
+                        let x_reflection = flags[0] & STRANS_X_REFLECTION as i16 != 0;
                         if let Some(text) = &mut text {
                             text.x_reflection = x_reflection;
                         }

@@ -1,27 +1,26 @@
 mod gds_format;
 pub mod svg;
+pub mod validation;
 
 use std::io::Write;
 
 use chrono::{Datelike, Local, Timelike};
 use rayon::prelude::*;
 
-use crate::config::gds_file_types::{GDSDataType, GDSRecord, record_head, record_header};
+use crate::config::gds_file_types::{
+    GDSDataType, GDSRecord, STRANS_X_REFLECTION, record_head, record_header,
+};
 use crate::elements::text::get_presentation_value;
 use crate::error::GdsError;
 use crate::{
-    Cell, DataType, Element, GdsBox, Instance, Layer, Library, Movable, Node, Path, Point, Polygon,
-    Reference, Text, Transformable,
+    Cell, Element, GdsBox, Instance, Library, Movable, Node, Path, Point, Polygon, Reference, Text,
+    Transformable,
 };
 use gds_format::{eight_byte_real, write_u16_array_as_big_endian};
-
-pub const MAX_POINTS: usize = 8191;
-pub const MAX_LAYER: u16 = 255;
-pub const MAX_DATA_TYPE: u16 = 255;
-pub const MAX_STRING_LENGTH: usize = 512;
-pub const MAX_STRUCTURE_NAME_LENGTH: usize = 32;
-pub const MAX_COL_ROW: u32 = 32767;
-pub const MIN_POLYGON_POINTS: usize = 4;
+use validation::{
+    MAX_POINTS, validate_col_row, validate_data_type, validate_layer, validate_path_points,
+    validate_polygon_points, validate_string_length, validate_structure_name,
+};
 
 /// Trait for customizing GDS file serialization.
 ///
@@ -38,17 +37,24 @@ pub trait GdsWriter: Sync {
         user_units: f64,
         db_units: f64,
     ) -> Result<Vec<u8>, GdsError> {
-        write_library(library, user_units, db_units)
+        write_library(self, library, user_units, db_units)
     }
 
     /// Serializes a single cell to GDS bytes.
     fn write_cell(&self, cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
-        write_cell(cell, db_units)
+        write_cell(self, cell, db_units)
     }
 
     /// Serializes a single element to GDS bytes.
     fn write_element(&self, element: &Element, db_units: f64) -> Result<Vec<u8>, GdsError> {
-        write_element(element, db_units)
+        match element {
+            Element::Polygon(polygon) => self.write_polygon(polygon, db_units),
+            Element::Path(path) => self.write_path(path, db_units),
+            Element::Text(text) => self.write_text(text, db_units),
+            Element::Reference(reference) => self.write_reference(reference, db_units),
+            Element::Box(gds_box) => self.write_box(gds_box, db_units),
+            Element::Node(node) => self.write_node(node, db_units),
+        }
     }
 
     /// Serializes a polygon to GDS bytes.
@@ -133,113 +139,13 @@ fn cell_head_record() -> [u16; 14] {
 fn write_i32_record(
     buffer: &mut impl Write,
     record: GDSRecord,
-    value: u32,
+    value: i32,
 ) -> Result<(), GdsError> {
     write_u16_array(
         buffer,
         &record_header(record, GDSDataType::FourByteSignedInteger, 1),
     )?;
     buffer.write_all(&value.to_be_bytes())?;
-    Ok(())
-}
-
-/// Returns an `InvalidInput` error if the layer is out of the GDS2 spec range (0-255).
-pub fn validate_layer(layer: Layer) -> Result<(), GdsError> {
-    if layer.value() > MAX_LAYER {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Layer {} exceeds maximum value of {MAX_LAYER}",
-                layer.value()
-            ),
-        });
-    }
-    Ok(())
-}
-
-/// Returns a validation error if the data type is out of the GDS2 spec range (0-255).
-pub fn validate_data_type(data_type: DataType) -> Result<(), GdsError> {
-    if data_type.value() > MAX_DATA_TYPE {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Data type {} exceeds maximum value of {MAX_DATA_TYPE}",
-                data_type.value()
-            ),
-        });
-    }
-    Ok(())
-}
-
-/// Returns a validation error if the string exceeds 512 characters.
-fn validate_string_length(s: &str) -> Result<(), GdsError> {
-    if s.len() > MAX_STRING_LENGTH {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "String length {} exceeds maximum of {MAX_STRING_LENGTH} characters",
-                s.len()
-            ),
-        });
-    }
-    Ok(())
-}
-
-/// Returns a validation error if the structure name exceeds 32 characters or contains
-/// invalid characters (only alphanumeric, `_`, `?`, `$` are allowed).
-fn validate_structure_name(name: &str) -> Result<(), GdsError> {
-    if name.len() > MAX_STRUCTURE_NAME_LENGTH {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Structure name length {} exceeds maximum of {MAX_STRUCTURE_NAME_LENGTH} characters",
-                name.len()
-            ),
-        });
-    }
-    if let Some(c) = name
-        .chars()
-        .find(|c| !c.is_ascii_alphanumeric() && *c != '_' && *c != '?' && *c != '$')
-    {
-        return Err(GdsError::ValidationError {
-            message: format!("Structure name contains invalid character: '{c}'"),
-        });
-    }
-    Ok(())
-}
-
-/// Returns a validation error if columns or rows exceed 32767.
-fn validate_col_row(columns: u32, rows: u32) -> Result<(), GdsError> {
-    if columns > MAX_COL_ROW {
-        return Err(GdsError::ValidationError {
-            message: format!("Column count {columns} exceeds maximum value of {MAX_COL_ROW}"),
-        });
-    }
-    if rows > MAX_COL_ROW {
-        return Err(GdsError::ValidationError {
-            message: format!("Row count {rows} exceeds maximum value of {MAX_COL_ROW}"),
-        });
-    }
-    Ok(())
-}
-
-/// Validates that a polygon has the correct number of points for GDS serialization.
-fn validate_polygon_points(points: &[Point]) -> Result<(), GdsError> {
-    if points.len() > MAX_POINTS {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Polygon has {} points, which exceeds the maximum of {}",
-                points.len(),
-                MAX_POINTS
-            ),
-        });
-    }
-
-    if points.len() < MIN_POLYGON_POINTS {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Polygon must have at least {MIN_POLYGON_POINTS} points (3 vertices + closing point), got {}",
-                points.len()
-            ),
-        });
-    }
-
     Ok(())
 }
 
@@ -346,7 +252,7 @@ fn write_transformation_to_file(
         let buffer_flags = [
             GDSDataType::BitArray.record_size(1),
             record_head(GDSRecord::STrans, GDSDataType::BitArray),
-            if x_reflection { 0x8000 } else { 0x0000 },
+            if x_reflection { STRANS_X_REFLECTION } else { 0 },
         ];
 
         write_u16_array(buffer, &buffer_flags)?;
@@ -388,42 +294,48 @@ fn element_head(
 
 /// Serializes an entire library to GDS bytes.
 pub fn write_library(
+    writer: &(impl GdsWriter + ?Sized),
     library: &Library,
     user_units: f64,
     db_units: f64,
 ) -> Result<Vec<u8>, GdsError> {
-    let cells: Vec<&Cell> = library.cells().values().collect();
-    let cell_buffers: Result<Vec<Vec<u8>>, GdsError> = cells
-        .par_iter()
-        .map(|cell| write_cell(cell, db_units))
-        .collect();
-    let cell_buffers = cell_buffers?;
-
     let mut buffer = Vec::new();
     write_gds_head_to_file(library.name(), user_units, db_units, &mut buffer)?;
-    for buf in &cell_buffers {
-        buffer.extend_from_slice(buf);
+
+    let cells: Vec<&Cell> = library.cells().values().collect();
+
+    for buf in cells
+        .par_iter()
+        .map(|cell| writer.write_cell(cell, db_units))
+        .collect::<Result<Vec<_>, GdsError>>()?
+    {
+        buffer.extend_from_slice(&buf);
     }
+
     write_gds_tail_to_file(&mut buffer)?;
 
     Ok(buffer)
 }
 
 /// Serializes a single cell to GDS bytes.
-pub fn write_cell(cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
+pub fn write_cell(
+    writer: &(impl GdsWriter + ?Sized),
+    cell: &Cell,
+    db_units: f64,
+) -> Result<Vec<u8>, GdsError> {
     validate_structure_name(cell.name())?;
 
     let mut buffer = Vec::new();
     write_u16_array(&mut buffer, &cell_head_record())?;
     write_string_with_record_to_file(&mut buffer, GDSRecord::StrName, cell.name())?;
 
-    let element_bufs: Result<Vec<_>, _> = cell
+    for buf in cell
         .elements()
         .par_iter()
-        .map(|e| write_element(e, db_units))
-        .collect();
-    for b in element_bufs? {
-        buffer.extend_from_slice(&b);
+        .map(|element| writer.write_element(element, db_units))
+        .collect::<Result<Vec<_>, GdsError>>()?
+    {
+        buffer.extend_from_slice(&buf);
     }
 
     write_u16_array(
@@ -432,18 +344,6 @@ pub fn write_cell(cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
     )?;
 
     Ok(buffer)
-}
-
-/// Serializes a single element to GDS bytes, dispatching to the appropriate function.
-pub fn write_element(element: &Element, db_units: f64) -> Result<Vec<u8>, GdsError> {
-    match element {
-        Element::Polygon(polygon) => write_polygon(polygon, db_units),
-        Element::Path(path) => write_path(path, db_units),
-        Element::Text(text) => write_text(text, db_units),
-        Element::Reference(reference) => write_reference(reference, db_units),
-        Element::Box(gds_box) => write_box(gds_box, db_units),
-        Element::Node(node) => write_node(node, db_units),
-    }
 }
 
 /// Serializes a polygon to GDS bytes.
@@ -469,14 +369,9 @@ pub fn write_polygon(polygon: &Polygon, db_units: f64) -> Result<Vec<u8>, GdsErr
 
 /// Serializes a path to GDS bytes.
 pub fn write_path(path: &Path, db_units: f64) -> Result<Vec<u8>, GdsError> {
+    validate_path_points(path.points())?;
     validate_layer(path.layer())?;
     validate_data_type(path.data_type())?;
-
-    if path.points().len() < 2 {
-        return Err(GdsError::ValidationError {
-            message: "Path must have at least 2 points".to_string(),
-        });
-    }
 
     let mut buffer = Vec::new();
 
@@ -495,19 +390,19 @@ pub fn write_path(path: &Path, db_units: f64) -> Result<Vec<u8>, GdsError> {
 
     if let Some(width) = path.width() {
         let scaled_width = width.scale_to(db_units);
-        let width_value = scaled_width.as_integer_unit().value as u32;
+        let width_value = scaled_width.as_integer_unit().value;
         write_i32_record(&mut buffer, GDSRecord::Width, width_value)?;
     }
 
     if let Some(begin_ext) = path.begin_extension() {
         let scaled = begin_ext.scale_to(db_units);
-        let value = scaled.as_integer_unit().value as u32;
+        let value = scaled.as_integer_unit().value;
         write_i32_record(&mut buffer, GDSRecord::BgnExtn, value)?;
     }
 
     if let Some(end_ext) = path.end_extension() {
         let scaled = end_ext.scale_to(db_units);
-        let value = scaled.as_integer_unit().value as u32;
+        let value = scaled.as_integer_unit().value;
         write_i32_record(&mut buffer, GDSRecord::EndExtn, value)?;
     }
 
@@ -524,28 +419,28 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
 
     let mut buffer = Vec::new();
 
-    let [s1, h1] = record_header(GDSRecord::Text, GDSDataType::NoData, 1);
-    let [s2, h2] = record_header(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger, 1);
-    let [s3, h3] = record_header(GDSRecord::TextType, GDSDataType::TwoByteSignedInteger, 1);
-    let [s4, h4] = record_header(GDSRecord::Presentation, GDSDataType::BitArray, 1);
-    let buffer_start = [
-        s1,
-        h1,
-        s2,
-        h2,
-        text.layer().value(),
-        s3,
-        h3,
-        0,
-        s4,
-        h4,
-        get_presentation_value(
+    write_u16_array(&mut buffer, &record_header(GDSRecord::Text, GDSDataType::NoData, 1))?;
+    write_u16_array(
+        &mut buffer,
+        &record_header(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger, 1),
+    )?;
+    write_u16_array(&mut buffer, &[text.layer().value()])?;
+    write_u16_array(
+        &mut buffer,
+        &record_header(GDSRecord::TextType, GDSDataType::TwoByteSignedInteger, 1),
+    )?;
+    write_u16_array(&mut buffer, &[0])?;
+    write_u16_array(
+        &mut buffer,
+        &record_header(GDSRecord::Presentation, GDSDataType::BitArray, 1),
+    )?;
+    write_u16_array(
+        &mut buffer,
+        &[get_presentation_value(
             *text.vertical_presentation(),
             *text.horizontal_presentation(),
-        ),
-    ];
-
-    write_u16_array(&mut buffer, &buffer_start)?;
+        )],
+    )?;
     write_transformation_to_file(
         &mut buffer,
         text.angle(),
@@ -593,7 +488,7 @@ fn write_reference_element(
             new_element = new_element.scale(grid.magnification(), Point::default());
             new_element = new_element.move_by(final_position);
 
-            buf.extend_from_slice(&write_element(&new_element, db_units)?);
+            buf.extend_from_slice(&GdsFileWriter.write_element(&new_element, db_units)?);
         }
     }
     Ok(buf)
