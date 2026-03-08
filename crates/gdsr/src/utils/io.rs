@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::fs::File;
-use std::io::{self, BufReader, Read, Write};
+use std::io::{self, BufReader, Read};
 
 use chrono::{Datelike, Local, Timelike};
 
@@ -14,7 +14,7 @@ use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
 use crate::utils::gds_format::{eight_byte_real, write_u16_array_as_big_endian};
-use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, ToGds, Unit};
+use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, Unit};
 
 pub fn write_gds_head_to_file(
     library_name: &str,
@@ -225,30 +225,6 @@ pub fn write_string_with_record_to_file(
     }
 
     Ok(())
-}
-
-pub fn write_gds<P: AsRef<std::path::Path>>(
-    file_name: P,
-    library_name: &str,
-    user_units: f64,
-    database_units: f64,
-    cells: &[&Cell],
-) -> Result<(), GdsError> {
-    use rayon::prelude::*;
-
-    let cell_buffers: Result<Vec<Vec<u8>>, GdsError> = cells
-        .par_iter()
-        .map(|cell| cell.to_gds_impl(database_units))
-        .collect();
-    let cell_buffers = cell_buffers?;
-
-    let mut file = File::create(file_name)?;
-    write_gds_head_to_file(library_name, user_units, database_units, &mut file)?;
-    for buf in &cell_buffers {
-        file.write_all(buf)?;
-    }
-    write_gds_tail_to_file(&mut file)?;
-    Ok(file.flush()?)
 }
 
 pub fn write_transformation_to_file(

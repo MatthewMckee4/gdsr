@@ -14,6 +14,7 @@ mod transformation;
 mod types;
 mod units;
 mod utils;
+mod writer;
 
 pub use cell::Cell;
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
@@ -28,3 +29,4 @@ pub use transformation::{Reflection, Rotation, Scale, Transformation, Translatio
 pub use types::{AngleInRadians, DataType, Layer, LayerMapping};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};
 pub use utils::svg::cell_to_svg;
+pub use writer::{GdsFileWriter, GdsWriter};

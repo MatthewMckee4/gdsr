@@ -218,14 +218,7 @@ impl From<Element> for Instance {
 
 impl ToGds for Element {
     fn to_gds_impl(&self, scale: f64) -> Result<Vec<u8>, crate::error::GdsError> {
-        match self {
-            Self::Path(path) => path.to_gds_impl(scale),
-            Self::Polygon(polygon) => polygon.to_gds_impl(scale),
-            Self::Box(gds_box) => gds_box.to_gds_impl(scale),
-            Self::Node(node) => node.to_gds_impl(scale),
-            Self::Reference(reference) => reference.to_gds_impl(scale),
-            Self::Text(text) => text.to_gds_impl(scale),
-        }
+        crate::writer::GdsWriter::write_element(&crate::writer::GdsFileWriter, self, scale)
     }
 }
 
