@@ -1,0 +1,592 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A GDSII editor, written in Rust">
+      
+      
+        <meta name="author" content="Matthew McKee">
+      
+      
+        <link rel="canonical" href="https://matthewmckee4.github.io/gdsr/units/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.12">
+    
+    
+      
+        <title>Units - gdsr</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.09f707be.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+  
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
+  
+  <style>:root{}</style>
+
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="cyan" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#important" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="gdsr" class="md-header__button md-logo" aria-label="gdsr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gdsr
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Units
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="cyan" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/MatthewMckee4/gdsr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Github
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="gdsr" class="md-nav__button md-logo" aria-label="gdsr" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    gdsr
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MatthewMckee4/gdsr" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Github
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Units
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#important" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#important" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+  <h1>Units</h1>
+
+<p>Units are used in every data structure, a <code>Unit</code> represents a value with a unit of measurement.</p>
+<p>For integer units, the default unit is <code>nm</code> (nanometer).</p>
+<p>For floating-point units, the default unit is <code>um</code> (micrometer).</p>
+<p>When using units, you can construct them in the following way:</p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">Rust</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">gdsr</span><span class="p">::</span><span class="n">Unit</span><span class="p">;</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">nm_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unit</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-9</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">um_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unit</span><span class="p">::</span><span class="n">float</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+</code></pre></div></td></tr></table></div>
+<p>Or if you want to use the default units, you can simply write:</p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">Rust</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">gdsr</span><span class="p">::</span><span class="n">Unit</span><span class="p">;</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">nm_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unit</span><span class="p">::</span><span class="n">default_integer</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">um_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unit</span><span class="p">::</span><span class="n">default_float</span><span class="p">(</span><span class="mf">10.0</span><span class="p">);</span>
+</code></pre></div></td></tr></table></div>
+<p>You may not be using <code>Unit</code> directly in your code, but you will be using <code>Point</code>.</p>
+<p>We can similarly construct points in the following way:</p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">Rust</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">gdsr</span><span class="p">::</span><span class="n">Point</span><span class="p">;</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">nm_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Point</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-9</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">um_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Point</span><span class="p">::</span><span class="n">float</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="mf">20.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+</code></pre></div></td></tr></table></div>
+<p>Or if you want to use the default units, you can simply write:</p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">Rust</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">gdsr</span><span class="p">::</span><span class="n">Point</span><span class="p">;</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">nm_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Point</span><span class="p">::</span><span class="n">default_integer</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">);</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">um_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Point</span><span class="p">::</span><span class="n">default_float</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span><span class="w"> </span><span class="mf">20.0</span><span class="p">);</span>
+</code></pre></div></td></tr></table></div>
+<p>We model units this way so that there is no confusion about what unit is being used.</p>
+<p>When writing a <code>Library</code>, with <code>Library::write_file</code>, you must specify two units, the user units, and the database units.
+This may be slightly confusing, but there is a good reason for it.</p>
+<p>The user units are used simply for your GDSII editor, these let you see values in a more human-readable format.
+For most users I would imagine that they would want to use micrometers (<code>um</code>) for their user units and nanometers (<code>nm</code>) for their database units.</p>
+<p>When reading a GDSII file into a <code>Library</code>, with <code>Library::read_file</code>, you can only specify the "user" units.
+These units are what is used when creating <code>Point</code>s and <code>Unit</code>s. This allows you to work with these values in a consistent way. If you do not provide this, then values will be with units of 1e-9, which is not recommended, though it is fine to work with these values.</p>
+<h2 id="important">Important</h2>
+<p>I'd like to first show a scenario, and explain why it may result in unexpected behavior.</p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">Rust</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">gdsr</span><span class="p">::{</span><span class="n">Cell</span><span class="p">,</span><span class="w"> </span><span class="n">Grid</span><span class="p">,</span><span class="w"> </span><span class="n">Library</span><span class="p">,</span><span class="w"> </span><span class="n">Point</span><span class="p">,</span><span class="w"> </span><span class="n">Polygon</span><span class="p">,</span><span class="w"> </span><span class="n">Reference</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">units</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1e-9</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">library</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Library</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="s">&quot;main&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">cell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cell</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="s">&quot;main_cell&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">polygon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Polygon</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="n">Point</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">units</span><span class="p">),</span>
+<span class="w">            </span><span class="n">Point</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">units</span><span class="p">),</span>
+<span class="w">            </span><span class="n">Point</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">units</span><span class="p">),</span>
+<span class="w">            </span><span class="n">Point</span><span class="p">::</span><span class="n">integer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">units</span><span class="p">),</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">cell</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">polygon</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">library</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">cell</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">library</span><span class="p">.</span><span class="n">write_file</span><span class="p">(</span><span class="s">&quot;main.gds&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">).</span><span class="n">unwrap</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+<p>Note here we are writing with user units <code>1e-3</code> and database units <code>1e-6</code>.</p>
+<p>But <code>1e-6</code> is greater than <code>1e-9</code>, which is the units we are using for our <code>Point</code>s and <code>Unit</code>s.</p>
+<p>When we set database units, this is setting the minimal value that we can see in our GDSII,
+since all values are less than that, all values in the polygon will be scaled to 0.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.instant","search.highlight","navigation.sections"],"search":"../assets/javascripts/workers/search.5df7522c.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.21aa498e.min.js"></script>
+      
+    
+  </body>
+</html>
