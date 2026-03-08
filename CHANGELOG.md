@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.0.1-alpha.2
+
+### Bug Fixes
+
+- Fix integer overflow panics in spatial grid and add viewer stress tests ([#205](https://github.com/MatthewMckee4/gdsr/pull/205))
+- Fix viewer crash on overflow and improve rendering performance ([#164](https://github.com/MatthewMckee4/gdsr/pull/164))
+
+### CLI
+
+- Add command line argument parser & open viewer with .gds file preloaded. ([#166](https://github.com/MatthewMckee4/gdsr/pull/166))
+
+### GDS Spec
+
+- Add first-class Node element type ([#182](https://github.com/MatthewMckee4/gdsr/pull/182))
+- Add first-class GdsBox element type ([#178](https://github.com/MatthewMckee4/gdsr/pull/178))
+- Add path extension support (BgnExtn/EndExtn) ([#177](https://github.com/MatthewMckee4/gdsr/pull/177))
+
+### IO
+
+- Change ToGds to return Vec<u8> and parallelize within cells ([#109](https://github.com/MatthewMckee4/gdsr/pull/109))
+
+### Library
+
+- Add SVG export for cells and libraries ([#192](https://github.com/MatthewMckee4/gdsr/pull/192))
+- Expand paths to true width for rendering ([#188](https://github.com/MatthewMckee4/gdsr/pull/188))
+- Add iter_elements / iter_elements_mut to Cell ([#185](https://github.com/MatthewMckee4/gdsr/pull/185))
+- Add library and cell statistics ([#183](https://github.com/MatthewMckee4/gdsr/pull/183))
+- Add layer remapping support ([#179](https://github.com/MatthewMckee4/gdsr/pull/179))
+- Add dangling reference detection to Library ([#175](https://github.com/MatthewMckee4/gdsr/pull/175))
+
+### Performance
+
+- Refactor viewer: split viewport module, group app fields, add property tests ([#171](https://github.com/MatthewMckee4/gdsr/pull/171))
+
+### Viewer
+
+- Fix path extension rendering in viewer ([#209](https://github.com/MatthewMckee4/gdsr/pull/209))
+- Make QuickPick generic and improve recent projects display ([#208](https://github.com/MatthewMckee4/gdsr/pull/208))
+- Add selectable display units with coordinate display in viewer ([#207](https://github.com/MatthewMckee4/gdsr/pull/207))
+- Redesign viewer UI with Zed-like panels and command palette ([#203](https://github.com/MatthewMckee4/gdsr/pull/203))
+- Add color picker & fix render cache bug. ([#201](https://github.com/MatthewMckee4/gdsr/pull/201))
+- Improve viewer hover highlighting and fix text rendering ([#199](https://github.com/MatthewMckee4/gdsr/pull/199))
+- Add adaptive grid overlay to viewer ([#190](https://github.com/MatthewMckee4/gdsr/pull/190))
+- Add ruler/measurement tool to viewer ([#189](https://github.com/MatthewMckee4/gdsr/pull/189))
+- Highlight element on hover in viewer ([#187](https://github.com/MatthewMckee4/gdsr/pull/187))
+- Add cell search/filter to viewer side panel ([#186](https://github.com/MatthewMckee4/gdsr/pull/186))
+- Add keyboard shortcuts for pan/zoom in viewer ([#181](https://github.com/MatthewMckee4/gdsr/pull/181))
+- Show cell hierarchy as a tree in viewer side panel ([#180](https://github.com/MatthewMckee4/gdsr/pull/180))
+- Add spatial grid with cell-level LOAD for large element counts ([#169](https://github.com/MatthewMckee4/gdsr/pull/169))
+- Fix zoom to anchor on cursor position ([#168](https://github.com/MatthewMckee4/gdsr/pull/168))
+- Add streaming element expansion for progressive rendering ([#167](https://github.com/MatthewMckee4/gdsr/pull/167))
+- Add interactive GDS viewer and sample example ([#142](https://github.com/MatthewMckee4/gdsr/pull/142))
+
+### Contributors
+
+- [@MatthewMckee4](https://github.com/MatthewMckee4)
+- [@limonfort](https://github.com/limonfort)
+
 ## 0.0.1-alpha.1
 
 ### Bug Fixes
