@@ -24,7 +24,7 @@ pub use grid::Grid;
 pub use library::{DanglingCellReference, Library};
 pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
-pub use traits::{Dimensions, Movable, ToGds, Transformable};
+pub use traits::{Dimensions, Movable, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer, LayerMapping};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};

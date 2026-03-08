@@ -1,8 +1,5 @@
 use std::sync::mpsc;
 
-use crate::error::GdsError;
-use crate::traits::ToGds;
-use crate::writer::{GdsFileWriter, GdsWriter};
 use crate::{
     Dimensions, Element, GdsBox, LayerMapping, Library, Movable, Node, Path, Point, Polygon,
     Reference, Text, Transformable, Transformation,
@@ -220,12 +217,6 @@ impl Movable for Cell {
                 .map(|e| e.move_to(target))
                 .collect(),
         }
-    }
-}
-
-impl ToGds for Cell {
-    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
-        GdsFileWriter.write_cell(self, database_units)
     }
 }
 

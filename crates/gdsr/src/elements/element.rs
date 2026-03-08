@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::elements::{GdsBox, Node, Path, Polygon, Reference, Text};
-use crate::traits::ToGds;
 use crate::{Dimensions, Instance, Movable, Point, Transformable, Transformation};
 
 /// A GDSII element: one of [`Path`], [`Polygon`], [`GdsBox`], [`Node`], [`Text`], or [`Reference`].
@@ -213,12 +212,6 @@ impl_from_element_reference!(Path, Polygon, GdsBox => Box, Node, Text, Reference
 impl From<Element> for Instance {
     fn from(v: Element) -> Self {
         Self::Element(Arc::new(Box::new(v)))
-    }
-}
-
-impl ToGds for Element {
-    fn to_gds_impl(&self, scale: f64) -> Result<Vec<u8>, crate::error::GdsError> {
-        crate::writer::GdsWriter::write_element(&crate::writer::GdsFileWriter, self, scale)
     }
 }
 
