@@ -193,16 +193,7 @@ jobs:
       - name: Upload artifacts to release
         env:
           TAG: ${{ needs.generate-release.outputs.tag }}
-        run: |
-          find artifacts -type f \( \
-            -name '*.tar.xz' -o \
-            -name '*.tar.gz' -o \
-            -name '*.zip' -o \
-            -name '*.sha256' -o \
-            -name '*.sh' -o \
-            -name '*.ps1' -o \
-            -name 'sha256.sum' \
-          \) -exec gh release upload "$TAG" {} --clobber \;
+        run: gh release upload "$TAG" artifacts/* --clobber
 
   publish-crate:
     name: Publish to crates.io
