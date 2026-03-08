@@ -2,8 +2,8 @@ use quickcheck_macros::quickcheck;
 
 use crate::config::gds_file_types::GDSRecord;
 use crate::geometry;
-use crate::utils::io::RecordReader;
-use crate::writer::write_path;
+use crate::io::read::RecordReader;
+use crate::io::write::write_path;
 use crate::*;
 use std::io::{BufReader, Cursor};
 
