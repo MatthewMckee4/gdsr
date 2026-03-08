@@ -19,7 +19,7 @@ Install uv with our standalone installers:
 
 ```shell
 # On macOS and Linux.
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/MatthewMckee4/gdsr/releases/download/0.0.1-alpha.3/gdsr-viewer-installer.sh  | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/MatthewMckee4/gdsr/releases/download/0.0.1-alpha.3/gdsr-viewer-installer.sh | sh
 ```
 
 ```shell
