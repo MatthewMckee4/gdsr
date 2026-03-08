@@ -419,7 +419,10 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
 
     let mut buffer = Vec::new();
 
-    write_u16_array(&mut buffer, &record_header(GDSRecord::Text, GDSDataType::NoData, 1))?;
+    write_u16_array(
+        &mut buffer,
+        &record_header(GDSRecord::Text, GDSDataType::NoData, 1),
+    )?;
     write_u16_array(
         &mut buffer,
         &record_header(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger, 1),

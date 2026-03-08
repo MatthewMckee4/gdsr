@@ -2,9 +2,7 @@ use std::fs::File;
 use std::io::{self, BufReader, Read};
 
 use crate::cell::Cell;
-use crate::config::gds_file_types::{
-    GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION,
-};
+use crate::config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION};
 use crate::elements::text::get_presentations_from_value;
 use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
