@@ -1,3 +1,5 @@
+use std::f64::consts::FRAC_PI_2;
+
 use quickcheck::{Arbitrary, Gen};
 use quickcheck_macros::quickcheck;
 use tempfile::tempdir;
@@ -156,6 +158,35 @@ fn nested_reference_roundtrip(_seed: u8) -> bool {
             .with_grid(Grid::default().with_origin(arb_integer_point(&mut g))),
     );
     library.add_cell(cell_c);
+
+    assert_roundtrip(&library);
+    true
+}
+
+#[quickcheck]
+fn rotated_aref_roundtrip(_seed: u8) -> bool {
+    let mut g = Gen::new(30);
+    let mut library = Library::new("roundtrip_lib");
+
+    let mut base_cell = Cell::new("base");
+    base_cell.add(arb_gds_polygon(&mut g));
+    library.add_cell(base_cell);
+
+    let cols = 2 + (u32::arbitrary(&mut g) % 4);
+    let rows = 2 + (u32::arbitrary(&mut g) % 4);
+    let mut cell = Cell::new("top");
+    cell.add(
+        Reference::new("base".to_string()).with_grid(
+            Grid::default()
+                .with_origin(arb_integer_point(&mut g))
+                .with_columns(cols)
+                .with_rows(rows)
+                .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
+                .with_spacing_y(Some(Point::integer(0, 20, 1e-9)))
+                .with_angle(FRAC_PI_2),
+        ),
+    );
+    library.add_cell(cell);
 
     assert_roundtrip(&library);
     true

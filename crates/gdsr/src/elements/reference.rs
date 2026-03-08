@@ -386,11 +386,11 @@ impl Reference {
 
         write_string_with_record_to_file(&mut buffer, GDSRecord::SName, cell_name)?;
 
-        let angle = self.grid().angle();
+        let angle_degrees = self.grid().angle().to_degrees();
         let magnification = self.grid().magnification();
         let x_reflection = self.grid().x_reflection();
 
-        write_transformation_to_file(&mut buffer, angle, magnification, x_reflection)?;
+        write_transformation_to_file(&mut buffer, angle_degrees, magnification, x_reflection)?;
 
         if is_single_instance {
             let origin = self.grid().origin();
@@ -413,23 +413,23 @@ impl Reference {
 
             match (self.grid.spacing_x(), self.grid.spacing_y()) {
                 (Some(spacing_x), Some(spacing_y)) => {
-                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                    let point2 = (origin + spacing_x * self.grid().columns())
                         .rotate_around_point(self.grid().angle(), &origin);
 
-                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                    let point3 = (origin + spacing_y * self.grid().rows())
                         .rotate_around_point(self.grid().angle(), &origin);
 
                     let reference_points = [origin, point2, point3];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
                 }
                 (Some(spacing_x), None) => {
-                    let point2 = ((origin + spacing_x) * self.grid().columns())
+                    let point2 = (origin + spacing_x * self.grid().columns())
                         .rotate_around_point(self.grid().angle(), &origin);
                     let reference_points = [origin, point2, origin];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
                 }
                 (None, Some(spacing_y)) => {
-                    let point3 = ((origin + spacing_y) * self.grid().rows())
+                    let point3 = (origin + spacing_y * self.grid().rows())
                         .rotate_around_point(self.grid().angle(), &origin);
                     let reference_points = [origin, origin, point3];
                     write_points_to_file(&mut buffer, &reference_points, database_units)?;
