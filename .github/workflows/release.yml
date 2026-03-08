@@ -99,7 +99,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ needs.generate-release.outputs.tag }}
-        run: dist build --tag="v${TAG}" --artifacts=local --target=${{ matrix.target }}
+        run: dist build --tag="${TAG}" --artifacts=local --target=${{ matrix.target }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -127,7 +127,7 @@ jobs:
       - name: Build global artifacts
         env:
           TAG: ${{ needs.generate-release.outputs.tag }}
-        run: dist build --tag="v${TAG}" --artifacts=global
+        run: dist build --tag="${TAG}" --artifacts=global
 
       - name: Upload global artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
