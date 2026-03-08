@@ -13,12 +13,19 @@ GDSII manipulation, written in Rust.
 > [!WARNING]
 > This is a work in progress and is not yet ready for production use.
 
-## Crates
+## Installation
 
-| Crate | Description |
-| ---------------------------------- | -------------------------- |
-| [gdsr](crates/gdsr/) | GDSII manipulation library |
-| [gdsr-viewer](crates/gdsr-viewer/) | Interactive GDS file viewer |
+Install uv with our standalone installers:
+
+```shell
+# On macOS and Linux.
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/MatthewMckee4/gdsr/releases/download/0.0.1-alpha.2/gdsr-viewer-installer.sh  | sh
+```
+
+```shell
+# On Windows.
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/MatthewMckee4/gdsr/releases/download/0.0.1-alpha.2/gdsr-viewer-installer.ps1 | iex"
+```
 
 ## Getting Started
 
