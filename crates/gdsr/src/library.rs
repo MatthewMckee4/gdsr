@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 
 use crate::cell::Cell;
 use crate::error::GdsError;
 use crate::types::LayerMapping;
-use crate::utils::io::{from_gds, write_gds};
+use crate::utils::io::from_gds;
+use crate::writer::{GdsFileWriter, GdsWriter};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq)]
@@ -67,6 +70,16 @@ impl Library {
         self.cells.contains_key(cell.name())
     }
 
+    /// Serialize the library using a custom writer, returning the GDS bytes.
+    pub fn write(
+        &self,
+        writer: &impl GdsWriter,
+        user_units: f64,
+        database_units: f64,
+    ) -> Result<Vec<u8>, GdsError> {
+        writer.write_library(self, user_units, database_units)
+    }
+
     /// Write the library to a GDS file.
     ///
     /// The given user units are only used when writing the GDSII header.
@@ -82,8 +95,10 @@ impl Library {
         user_units: f64,
         database_units: f64,
     ) -> Result<(), GdsError> {
-        let cells: Vec<&Cell> = self.cells.values().collect();
-        write_gds(file_name, &self.name, user_units, database_units, &cells)
+        let bytes = self.write(&GdsFileWriter, user_units, database_units)?;
+        let mut file = File::create(file_name)?;
+        file.write_all(&bytes)?;
+        Ok(file.flush()?)
     }
 
     /// Remaps layer/data type pairs on all elements in all cells using the given mapping.

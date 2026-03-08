@@ -14,6 +14,7 @@ mod transformation;
 mod types;
 mod units;
 mod utils;
+mod writer;
 
 pub use cell::Cell;
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
@@ -23,8 +24,9 @@ pub use grid::Grid;
 pub use library::{DanglingCellReference, Library};
 pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
-pub use traits::{Dimensions, Movable, ToGds, Transformable};
+pub use traits::{Dimensions, Movable, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{AngleInRadians, DataType, Layer, LayerMapping};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};
 pub use utils::svg::cell_to_svg;
+pub use writer::{GdsFileWriter, GdsWriter};

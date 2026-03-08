@@ -1,12 +1,5 @@
-use crate::error::GdsError;
 use crate::transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 use crate::{AngleInRadians, Point};
-
-/// Trait for types that can be serialized to the GDSII binary format.
-pub trait ToGds {
-    /// Returns the GDSII binary representation as a byte vector.
-    fn to_gds_impl(&self, scale: f64) -> Result<Vec<u8>, GdsError>;
-}
 
 /// Trait for types that can be geometrically transformed (rotated, scaled, reflected, translated).
 pub trait Transformable: Sized {

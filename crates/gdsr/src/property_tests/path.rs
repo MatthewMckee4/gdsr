@@ -2,8 +2,8 @@ use quickcheck_macros::quickcheck;
 
 use crate::config::gds_file_types::GDSRecord;
 use crate::geometry;
-use crate::traits::ToGds;
 use crate::utils::io::RecordReader;
+use crate::writer::write_path;
 use crate::*;
 use std::io::{BufReader, Cursor};
 
@@ -37,7 +37,7 @@ fn serialized_path_contains_extension_records(path: Path) -> bool {
     if path.points().len() < 2 {
         return true;
     }
-    let Ok(bytes) = path.to_gds_impl(1e-9) else {
+    let Ok(bytes) = write_path(&path, 1e-9) else {
         return true;
     };
 

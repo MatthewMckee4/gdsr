@@ -1,10 +1,3 @@
-use crate::config::gds_file_types::{GDSDataType, GDSRecord, combine_record_and_data_type};
-use crate::error::GdsError;
-use crate::traits::ToGds;
-use crate::utils::io::{
-    validate_data_type, validate_layer, write_element_tail_to_file, write_points_to_file,
-    write_u16_array_to_file,
-};
 use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable};
 
 /// Maximum number of points allowed in a GDS II Node element.
@@ -120,32 +113,6 @@ impl Movable for Node {
 impl Dimensions for Node {
     fn bounding_box(&self) -> (Point, Point) {
         crate::geometry::bounding_box(&self.points)
-    }
-}
-
-impl ToGds for Node {
-    fn to_gds_impl(&self, database_units: f64) -> Result<Vec<u8>, GdsError> {
-        validate_layer(self.layer())?;
-        validate_data_type(self.node_type())?;
-
-        let mut buffer = Vec::new();
-
-        let node_head = [
-            4,
-            combine_record_and_data_type(GDSRecord::Node, GDSDataType::NoData),
-            6,
-            combine_record_and_data_type(GDSRecord::Layer, GDSDataType::TwoByteSignedInteger),
-            self.layer().value(),
-            6,
-            combine_record_and_data_type(GDSRecord::NodeType, GDSDataType::TwoByteSignedInteger),
-            self.node_type().value(),
-        ];
-
-        write_u16_array_to_file(&mut buffer, &node_head)?;
-        write_points_to_file(&mut buffer, &self.points, database_units)?;
-        write_element_tail_to_file(&mut buffer)?;
-
-        Ok(buffer)
     }
 }
 
