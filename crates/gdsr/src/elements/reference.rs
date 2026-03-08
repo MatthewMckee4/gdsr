@@ -172,16 +172,16 @@ impl Reference {
 
                 let mut new_element = element.clone();
 
-                // Apply transformations around grid origin
+                // Apply transformations around cell-local origin (0,0)
                 if grid.x_reflection() {
-                    new_element = new_element.reflect(0.0, grid.origin());
+                    new_element = new_element.reflect(0.0, Point::default());
                 }
 
-                new_element = new_element.rotate(grid.angle(), grid.origin());
-                new_element = new_element.scale(grid.magnification(), grid.origin());
+                new_element = new_element.rotate(grid.angle(), Point::default());
+                new_element = new_element.scale(grid.magnification(), Point::default());
 
-                // Move element to final position
-                new_element = new_element.move_by(final_position - grid.origin());
+                // Translate to final world position
+                new_element = new_element.move_by(final_position);
 
                 elements.push(new_element);
             }
@@ -351,11 +351,11 @@ impl Reference {
 
                 let mut new_element = element.clone();
                 if grid.x_reflection() {
-                    new_element = new_element.reflect(0.0, grid.origin());
+                    new_element = new_element.reflect(0.0, crate::Point::default());
                 }
-                new_element = new_element.rotate(grid.angle(), grid.origin());
-                new_element = new_element.scale(grid.magnification(), grid.origin());
-                new_element = new_element.move_by(final_position - grid.origin());
+                new_element = new_element.rotate(grid.angle(), crate::Point::default());
+                new_element = new_element.scale(grid.magnification(), crate::Point::default());
+                new_element = new_element.move_by(final_position);
 
                 buf.extend_from_slice(&new_element.to_gds_impl(database_units)?);
             }

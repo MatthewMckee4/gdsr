@@ -240,8 +240,19 @@ impl std::fmt::Display for Grid {
 impl Transformable for Grid {
     fn transform_impl(mut self, transformation: &Transformation) -> Self {
         self.origin = transformation.apply_to_point(&self.origin);
-        self.spacing_x = self.spacing_x.map(|p| transformation.apply_to_point(&p));
-        self.spacing_y = self.spacing_y.map(|p| transformation.apply_to_point(&p));
+
+        // Spacing vectors are relative displacements, not absolute positions,
+        // so translation must not be applied to them.
+        let without_translation = Transformation {
+            translation: None,
+            ..transformation.clone()
+        };
+        self.spacing_x = self
+            .spacing_x
+            .map(|p| without_translation.apply_to_point(&p));
+        self.spacing_y = self
+            .spacing_y
+            .map(|p| without_translation.apply_to_point(&p));
 
         // Apply scale and rotation to grid properties
         if let Some(scale) = &transformation.scale {
