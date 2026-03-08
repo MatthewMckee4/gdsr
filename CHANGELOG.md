@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.1-alpha.3
+
+### Documentation
+
+- Add installation methods to README.md ([#218](https://github.com/MatthewMckee4/gdsr/pull/218))
+
+### Contributors
+
+- [@MatthewMckee4](https://github.com/MatthewMckee4)
+
 ## 0.0.1-alpha.2
 
 ### Bug Fixes

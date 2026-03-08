@@ -10,7 +10,7 @@ authors = ["Matthew McKee <matthewmckee4@yahoo.co.uk>"]
 license = "MIT"
 
 [workspace.dependencies]
-gdsr = { path = "crates/gdsr", version = "0.0.1-alpha.2" }
+gdsr = { path = "crates/gdsr", version = "0.0.1-alpha.3" }
 
 approx = "0.5"
 bytemuck = "1.25.0"
