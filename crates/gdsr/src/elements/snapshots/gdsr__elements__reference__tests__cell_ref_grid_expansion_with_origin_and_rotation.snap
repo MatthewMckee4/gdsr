@@ -1,0 +1,74 @@
+---
+source: crates/gdsr/src/elements/reference.rs
+expression: flattened
+---
+[
+    Polygon(
+        Polygon {
+            points: [
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 100,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 205,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 100,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 210,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 95,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 210,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+                Point {
+                    x: Integer(
+                        IntegerUnit {
+                            value: 100,
+                            units: 1e-9,
+                        },
+                    ),
+                    y: Integer(
+                        IntegerUnit {
+                            value: 205,
+                            units: 1e-9,
+                        },
+                    ),
+                },
+            ],
+            layer: Layer(
+                1,
+            ),
+            data_type: DataType(
+                0,
+            ),
+        },
+    ),
+]

@@ -23,6 +23,11 @@ impl Reflection {
         Self { angle, centre }
     }
 
+    /// Returns the axis angle in radians.
+    pub const fn angle(&self) -> AngleInRadians {
+        self.angle
+    }
+
     /// Creates a horizontal reflection (angle = 0) about the x-axis.
     pub const fn new_horizontal() -> Self {
         Self::new(0.0, Point::integer(0, 1, 1e-9))
