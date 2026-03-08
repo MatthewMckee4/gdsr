@@ -4,9 +4,9 @@ use std::io::Write;
 
 use crate::cell::Cell;
 use crate::error::GdsError;
+use crate::io::read::from_gds;
+use crate::io::write::{GdsFileWriter, GdsWriter};
 use crate::types::LayerMapping;
-use crate::utils::io::from_gds;
-use crate::writer::{GdsFileWriter, GdsWriter};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq)]

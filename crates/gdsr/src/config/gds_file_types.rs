@@ -145,6 +145,26 @@ pub enum GDSDataType {
     AsciiString = 6,
 }
 
+const GDS_RECORD_HEADER_SIZE: u16 = 4;
+
+impl GDSDataType {
+    /// Returns the byte size of a single value of this data type.
+    pub const fn byte_size(self) -> u16 {
+        match self {
+            Self::NoData => 0,
+            Self::BitArray | Self::TwoByteSignedInteger => 2,
+            Self::FourByteSignedInteger | Self::FourByteReal => 4,
+            Self::EightByteReal => 8,
+            Self::AsciiString => 0,
+        }
+    }
+
+    /// Returns the total GDS record size for `count` values of this data type.
+    pub const fn record_size(self, count: u16) -> u16 {
+        GDS_RECORD_HEADER_SIZE + self.byte_size() * count
+    }
+}
+
 impl TryFrom<u8> for GDSDataType {
     type Error = ();
 
@@ -171,8 +191,13 @@ pub enum GDSRecordData {
     None,
 }
 
-pub const fn combine_record_and_data_type(record: GDSRecord, data_type: GDSDataType) -> u16 {
+pub const fn record_head(record: GDSRecord, data_type: GDSDataType) -> u16 {
     ((record as u16) << 8) | (data_type as u16)
+}
+
+/// Returns the `[record_size, record_head]` pair for a record with `count` values.
+pub const fn record_header(record: GDSRecord, data_type: GDSDataType, count: u16) -> [u16; 2] {
+    [data_type.record_size(count), record_head(record, data_type)]
 }
 
 #[cfg(test)]
@@ -277,11 +302,11 @@ mod tests {
     #[case(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger, 0x0102)]
     #[case(GDSRecord::Units, GDSDataType::EightByteReal, 0x0305)]
     #[case(GDSRecord::PathType, GDSDataType::TwoByteSignedInteger, 0x2102)]
-    fn combine_record_and_data_type_produces_correct_value(
+    fn record_head_produces_correct_value(
         #[case] record: GDSRecord,
         #[case] data_type: GDSDataType,
         #[case] expected: u16,
     ) {
-        assert_eq!(combine_record_and_data_type(record, data_type), expected);
+        assert_eq!(record_head(record, data_type), expected);
     }
 }
