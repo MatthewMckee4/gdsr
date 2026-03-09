@@ -890,13 +890,6 @@ fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
     let s_max = ctx
         .viewport
         .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
-    let sw = (s_max.x - s_min.x).abs();
-    let sh = (s_min.y - s_max.y).abs();
-
-    if sw < 2.0 && sh < 2.0 {
-        return;
-    }
-
     let screen_rect = Rect::from_two_pos(s_min, s_max);
     let stroke_color = Color32::from_rgb(180, 180, 180);
     ctx.rect_stroke(
@@ -907,6 +900,8 @@ fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
     );
 
     if let Some(name) = label {
+        let sw = (s_max.x - s_min.x).abs();
+        let sh = (s_min.y - s_max.y).abs();
         let font_size = (sw.min(sh) * 0.15).clamp(8.0, 24.0);
         if font_size >= 6.0 {
             let center = screen_rect.center();
