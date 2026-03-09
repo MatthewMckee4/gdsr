@@ -119,6 +119,44 @@ impl Polygon {
         Self::ellipse(center, radius, radius, num_points, layer, data_type)
     }
 
+    /// Creates a ring (annulus) shape as a polygon.
+    ///
+    /// Traces the outer circle counter-clockwise, then cuts back to trace the inner circle
+    /// clockwise, forming a polygon with a hole. `num_points` applies to each circle.
+    pub fn ring(
+        center: Point,
+        inner_radius: f64,
+        outer_radius: f64,
+        num_points: usize,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
+        let num_points = num_points.max(3);
+        let x_units = center.x().units();
+        let y_units = center.y().units();
+
+        let outer = (0..num_points).map(|i| {
+            let angle = (i as f64) * std::f64::consts::TAU / (num_points as f64);
+            center
+                + Point::new(
+                    Unit::float(outer_radius * angle.cos(), x_units),
+                    Unit::float(outer_radius * angle.sin(), y_units),
+                )
+        });
+
+        let inner = (0..num_points).rev().map(|i| {
+            let angle = (i as f64) * std::f64::consts::TAU / (num_points as f64);
+            center
+                + Point::new(
+                    Unit::float(inner_radius * angle.cos(), x_units),
+                    Unit::float(inner_radius * angle.sin(), y_units),
+                )
+        });
+
+        let points: Vec<Point> = outer.chain(inner).collect();
+        Self::new(points, layer, data_type)
+    }
+
     /// Creates an axis-aligned rectangle from two opposing corners.
     ///
     /// The corners are normalized using min/max so the rectangle is well-defined regardless of
@@ -623,4 +661,32 @@ mod tests {
         assert_eq!(circle.points().len(), num_points + 1);
     }
 
+    #[test]
+    fn test_ring_point_count() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let ring = Polygon::ring(origin, 3.0, 5.0, 36, Layer::new(0), DataType::new(0));
+        assert_eq!(ring.points().len(), 2 * 36 + 1);
+    }
+
+    #[test]
+    fn test_ring_num_points_clamped_to_3() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let ring = Polygon::ring(origin, 3.0, 5.0, 1, Layer::new(0), DataType::new(0));
+        assert_eq!(ring.points().len(), 2 * 3 + 1);
+    }
+
+    #[test]
+    fn test_ring_center_not_inside() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let ring = Polygon::ring(origin, 3.0, 5.0, 360, Layer::new(0), DataType::new(0));
+        assert!(!ring.is_point_inside(&origin));
+    }
+
+    #[test]
+    fn test_ring_point_between_radii_is_inside() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let ring = Polygon::ring(origin, 3.0, 5.0, 360, Layer::new(0), DataType::new(0));
+        let mid = Point::float(0.0, 4.0, 1e-6);
+        assert!(ring.is_point_inside(&mid));
+    }
 }
