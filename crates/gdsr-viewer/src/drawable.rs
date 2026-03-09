@@ -337,15 +337,18 @@ impl Drawable for gdsr::Polygon {
             return;
         }
 
+        // Determine closure from world-space points so that open_len is stable
+        // across zoom levels. Screen-space f32 equality can flip between frames,
+        // which would invalidate cached tessellation indices.
+        let world_closed = points.len() >= 2 && points.first() == points.last();
+
         ctx.screen_pts_buf.clear();
         ctx.screen_pts_buf.extend(points.iter().map(|p| {
             ctx.viewport
                 .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
         }));
 
-        let open_len = if ctx.screen_pts_buf.len() >= 2
-            && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
-        {
+        let open_len = if world_closed {
             ctx.screen_pts_buf.len() - 1
         } else {
             ctx.screen_pts_buf.len()
@@ -508,6 +511,8 @@ impl Drawable for gdsr::Path {
         }
 
         if let Some(poly_pts) = self.to_polygon_points(16) {
+            let world_closed = poly_pts.len() >= 2 && poly_pts.first() == poly_pts.last();
+
             ctx.screen_pts_buf.clear();
             ctx.screen_pts_buf.extend(poly_pts.iter().map(|p| {
                 ctx.viewport.world_to_screen(
@@ -517,9 +522,7 @@ impl Drawable for gdsr::Path {
                 )
             }));
 
-            let open_len = if ctx.screen_pts_buf.len() >= 2
-                && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
-            {
+            let open_len = if world_closed {
                 ctx.screen_pts_buf.len() - 1
             } else {
                 ctx.screen_pts_buf.len()
@@ -697,15 +700,16 @@ impl Drawable for gdsr::GdsBox {
             return;
         }
 
+        // GdsBox always has 5 points with first == last.
+        let world_closed = points.len() >= 2 && points.first() == points.last();
+
         ctx.screen_pts_buf.clear();
         ctx.screen_pts_buf.extend(points.iter().map(|p| {
             ctx.viewport
                 .world_to_screen(p.x().absolute_value(), p.y().absolute_value(), ctx.rect)
         }));
 
-        let open_len = if ctx.screen_pts_buf.len() >= 2
-            && ctx.screen_pts_buf.first() == ctx.screen_pts_buf.last()
-        {
+        let open_len = if world_closed {
             ctx.screen_pts_buf.len() - 1
         } else {
             ctx.screen_pts_buf.len()
