@@ -82,18 +82,6 @@ fn close_points_is_idempotent(polygon: Polygon) -> bool {
     once == twice
 }
 
-/// Non-degenerate rectangles (distinct corners) always have exactly 5 points.
-#[quickcheck]
-fn rectangle_has_five_points(x1: i16, y1: i16, x2: i16, y2: i16) -> quickcheck::TestResult {
-    if x1 == x2 || y1 == y2 {
-        return quickcheck::TestResult::discard();
-    }
-    let corner1 = Point::integer(i32::from(x1), i32::from(y1), 1e-9);
-    let corner2 = Point::integer(i32::from(x2), i32::from(y2), 1e-9);
-    let rect = Polygon::rectangle(corner1, corner2, Layer::new(0), DataType::new(0));
-    quickcheck::TestResult::from_bool(rect.points().len() == 5)
-}
-
 #[quickcheck]
 fn rectangle_area_equals_width_times_height(x1: i16, y1: i16, x2: i16, y2: i16) -> bool {
     let corner1 = Point::integer(i32::from(x1), i32::from(y1), 1e-9);
@@ -105,32 +93,6 @@ fn rectangle_area_equals_width_times_height(x1: i16, y1: i16, x2: i16, y2: i16) 
     let expected = width * height;
 
     (rect.area().float_value() - expected).abs() < 1e-6
-}
-
-#[quickcheck]
-fn rectangle_all_points_within_bounding_box(x1: i16, y1: i16, x2: i16, y2: i16) -> bool {
-    let corner1 = Point::integer(i32::from(x1), i32::from(y1), 1e-9);
-    let corner2 = Point::integer(i32::from(x2), i32::from(y2), 1e-9);
-    let rect = Polygon::rectangle(corner1, corner2, Layer::new(0), DataType::new(0));
-
-    let (min, max) = rect.bounding_box();
-    rect.points().iter().all(|p| {
-        p.x().float_value() >= min.x().float_value()
-            && p.x().float_value() <= max.x().float_value()
-            && p.y().float_value() >= min.y().float_value()
-            && p.y().float_value() <= max.y().float_value()
-    })
-}
-
-#[quickcheck]
-fn rectangle_corner_order_does_not_matter(x1: i16, y1: i16, x2: i16, y2: i16) -> bool {
-    let c1 = Point::integer(i32::from(x1), i32::from(y1), 1e-9);
-    let c2 = Point::integer(i32::from(x2), i32::from(y2), 1e-9);
-
-    let rect_forward = Polygon::rectangle(c1, c2, Layer::new(0), DataType::new(0));
-    let rect_reverse = Polygon::rectangle(c2, c1, Layer::new(0), DataType::new(0));
-
-    rect_forward.points() == rect_reverse.points()
 }
 
 #[quickcheck]

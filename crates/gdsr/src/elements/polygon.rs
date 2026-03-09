@@ -537,82 +537,14 @@ mod tests {
             DataType::new(0),
         );
 
-        insta::assert_debug_snapshot!(rect.points(), @r#"
-        [
-            Point {
-                x: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-                y: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-            },
-            Point {
-                x: Float(
-                    FloatUnit {
-                        value: 10.0,
-                        units: 1e-9,
-                    },
-                ),
-                y: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-            },
-            Point {
-                x: Float(
-                    FloatUnit {
-                        value: 10.0,
-                        units: 1e-9,
-                    },
-                ),
-                y: Float(
-                    FloatUnit {
-                        value: 5.0,
-                        units: 1e-9,
-                    },
-                ),
-            },
-            Point {
-                x: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-                y: Float(
-                    FloatUnit {
-                        value: 5.0,
-                        units: 1e-9,
-                    },
-                ),
-            },
-            Point {
-                x: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-                y: Float(
-                    FloatUnit {
-                        value: 0.0,
-                        units: 1e-9,
-                    },
-                ),
-            },
-        ]
-        "#);
+        assert_eq!(rect.points().len(), 5);
         assert_eq!(rect.layer(), Layer::new(1));
         assert_eq!(rect.data_type(), DataType::new(0));
+        assert_eq!(rect.points()[0], Point::float(0.0, 0.0, 1e-9));
+        assert_eq!(rect.points()[1], Point::float(10.0, 0.0, 1e-9));
+        assert_eq!(rect.points()[2], Point::float(10.0, 5.0, 1e-9));
+        assert_eq!(rect.points()[3], Point::float(0.0, 5.0, 1e-9));
+        assert_eq!(rect.points()[4], rect.points()[0]);
     }
 
     #[test]
