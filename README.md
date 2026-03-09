@@ -15,7 +15,7 @@ GDSII manipulation, written in Rust.
 
 ## Installation
 
-Install uv with our standalone installers:
+Install gdsr viewer with our standalone installers:
 
 ```shell
 # On macOS and Linux.
