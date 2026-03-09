@@ -131,7 +131,6 @@ impl Library {
     /// Builds an adjacency list of cell dependencies.
     ///
     /// For each cell in the library, collects the names of cells it directly references.
-    /// Only includes references to cells that exist in the library.
     pub fn dependency_graph(&self) -> HashMap<String, HashSet<String>> {
         self.cells
             .iter()
