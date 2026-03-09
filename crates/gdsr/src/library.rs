@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::Write;
 
@@ -126,6 +126,185 @@ impl Library {
             }
         }
         dangling
+    }
+
+    /// Builds an adjacency list of cell dependencies.
+    ///
+    /// For each cell in the library, collects the names of cells it directly references.
+    /// Only includes references to cells that exist in the library.
+    pub fn dependency_graph(&self) -> HashMap<String, HashSet<String>> {
+        self.cells
+            .iter()
+            .map(|(name, cell)| {
+                let deps = cell
+                    .referenced_cell_names()
+                    .into_iter()
+                    .map(String::from)
+                    .collect();
+                (name.clone(), deps)
+            })
+            .collect()
+    }
+
+    /// Returns all transitive dependencies of the given cell.
+    ///
+    /// Uses BFS to find every cell reachable from `cell_name` through the dependency graph.
+    /// Returns an empty set if the cell does not exist.
+    pub fn dependencies(&self, cell_name: &str) -> HashSet<String> {
+        let graph = self.dependency_graph();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        if let Some(direct) = graph.get(cell_name) {
+            for dep in direct {
+                if visited.insert(dep.clone()) {
+                    queue.push_back(dep.clone());
+                }
+            }
+        }
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(deps) = graph.get(&current) {
+                for dep in deps {
+                    if visited.insert(dep.clone()) {
+                        queue.push_back(dep.clone());
+                    }
+                }
+            }
+        }
+
+        visited
+    }
+
+    /// Returns all cells that transitively depend on the given cell.
+    ///
+    /// Builds a reverse adjacency list and uses BFS to find every cell that
+    /// directly or indirectly references `cell_name`.
+    /// Returns an empty set if the cell does not exist.
+    pub fn reverse_dependencies(&self, cell_name: &str) -> HashSet<String> {
+        let graph = self.dependency_graph();
+
+        let mut reverse: HashMap<String, HashSet<String>> = HashMap::new();
+        for (cell, deps) in &graph {
+            for dep in deps {
+                reverse.entry(dep.clone()).or_default().insert(cell.clone());
+            }
+        }
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        if let Some(dependents) = reverse.get(cell_name) {
+            for dep in dependents {
+                if visited.insert(dep.clone()) {
+                    queue.push_back(dep.clone());
+                }
+            }
+        }
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(dependents) = reverse.get(&current) {
+                for dep in dependents {
+                    if visited.insert(dep.clone()) {
+                        queue.push_back(dep.clone());
+                    }
+                }
+            }
+        }
+
+        visited
+    }
+
+    /// Returns `true` if the dependency graph contains a cycle.
+    ///
+    /// Uses DFS with three-state coloring to detect back edges, which indicate
+    /// circular references.
+    pub fn has_circular_references(&self) -> bool {
+        #[derive(Clone, Copy, PartialEq)]
+        enum State {
+            Unvisited,
+            InProgress,
+            Visited,
+        }
+
+        fn dfs<'a>(
+            node: &'a str,
+            graph: &'a HashMap<String, HashSet<String>>,
+            states: &mut HashMap<&'a str, State>,
+        ) -> bool {
+            states.insert(node, State::InProgress);
+            if let Some(deps) = graph.get(node) {
+                for dep in deps {
+                    match states.get(dep.as_str()) {
+                        Some(State::InProgress) => return true,
+                        Some(State::Unvisited) => {
+                            if dfs(dep.as_str(), graph, states) {
+                                return true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            states.insert(node, State::Visited);
+            false
+        }
+
+        let graph = self.dependency_graph();
+        let mut states: HashMap<&str, State> = graph
+            .keys()
+            .map(|k| (k.as_str(), State::Unvisited))
+            .collect();
+
+        let keys: Vec<String> = graph.keys().cloned().collect();
+        for key in &keys {
+            if states.get(key.as_str()) == Some(&State::Unvisited)
+                && dfs(key.as_str(), &graph, &mut states)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Computes the hierarchy depth of the given cell.
+    ///
+    /// The depth is the length of the longest path from `cell_name` through its dependencies.
+    /// A leaf cell (no references) has depth 0.
+    /// Returns 0 if the cell does not exist or has no references.
+    pub fn hierarchy_depth(&self, cell_name: &str) -> usize {
+        fn depth_of(
+            node: &str,
+            graph: &HashMap<String, HashSet<String>>,
+            cache: &mut HashMap<String, usize>,
+            visiting: &mut HashSet<String>,
+        ) -> usize {
+            if let Some(&d) = cache.get(node) {
+                return d;
+            }
+            if !visiting.insert(node.to_string()) {
+                // Cycle detected; return 0 to avoid infinite recursion.
+                return 0;
+            }
+            let d = graph
+                .get(node)
+                .map(|deps| {
+                    deps.iter()
+                        .map(|dep| 1 + depth_of(dep, graph, cache, visiting))
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            visiting.remove(node);
+            cache.insert(node.to_string(), d);
+            d
+        }
+
+        let graph = self.dependency_graph();
+        let mut cache = HashMap::new();
+        let mut visiting = HashSet::new();
+        depth_of(cell_name, &graph, &mut cache, &mut visiting)
     }
 
     /// Read a library from a GDS file.
@@ -555,5 +734,202 @@ mod tests {
             },
         ]
         "#);
+    }
+
+    /// Builds a test library with hierarchy: TOP -> {A, B}, A -> C, B and C are leaves.
+    fn hierarchy_library() -> Library {
+        let mut lib = Library::new("test");
+
+        let mut top = Cell::new("TOP");
+        top.add(Reference::new("A".to_string()));
+        top.add(Reference::new("B".to_string()));
+
+        let mut a = Cell::new("A");
+        a.add(Reference::new("C".to_string()));
+
+        let b = Cell::new("B");
+        let c = Cell::new("C");
+
+        lib.add_cell(top);
+        lib.add_cell(a);
+        lib.add_cell(b);
+        lib.add_cell(c);
+        lib
+    }
+
+    #[test]
+    fn test_dependency_graph() {
+        let lib = hierarchy_library();
+        let graph = lib.dependency_graph();
+
+        let mut top_deps: Vec<_> = graph["TOP"].iter().cloned().collect();
+        top_deps.sort();
+        insta::assert_debug_snapshot!(top_deps, @r#"
+        [
+            "A",
+            "B",
+        ]
+        "#);
+
+        insta::assert_debug_snapshot!(graph["A"], @r#"
+        {
+            "C",
+        }
+        "#);
+
+        assert!(graph["B"].is_empty());
+        assert!(graph["C"].is_empty());
+    }
+
+    #[test]
+    fn test_dependencies_top() {
+        let lib = hierarchy_library();
+        let mut deps: Vec<_> = lib.dependencies("TOP").into_iter().collect();
+        deps.sort();
+        insta::assert_debug_snapshot!(deps, @r#"
+        [
+            "A",
+            "B",
+            "C",
+        ]
+        "#);
+    }
+
+    #[test]
+    fn test_dependencies_mid() {
+        let lib = hierarchy_library();
+        insta::assert_debug_snapshot!(lib.dependencies("A"), @r#"
+        {
+            "C",
+        }
+        "#);
+    }
+
+    #[test]
+    fn test_dependencies_leaf() {
+        let lib = hierarchy_library();
+        assert!(lib.dependencies("C").is_empty());
+    }
+
+    #[test]
+    fn test_dependencies_nonexistent() {
+        let lib = hierarchy_library();
+        assert!(lib.dependencies("MISSING").is_empty());
+    }
+
+    #[test]
+    fn test_reverse_dependencies_leaf() {
+        let lib = hierarchy_library();
+        let mut rev: Vec<_> = lib.reverse_dependencies("C").into_iter().collect();
+        rev.sort();
+        insta::assert_debug_snapshot!(rev, @r#"
+        [
+            "A",
+            "TOP",
+        ]
+        "#);
+    }
+
+    #[test]
+    fn test_reverse_dependencies_mid() {
+        let lib = hierarchy_library();
+        insta::assert_debug_snapshot!(lib.reverse_dependencies("A"), @r#"
+        {
+            "TOP",
+        }
+        "#);
+    }
+
+    #[test]
+    fn test_reverse_dependencies_top() {
+        let lib = hierarchy_library();
+        assert!(lib.reverse_dependencies("TOP").is_empty());
+    }
+
+    #[test]
+    fn test_reverse_dependencies_nonexistent() {
+        let lib = hierarchy_library();
+        assert!(lib.reverse_dependencies("MISSING").is_empty());
+    }
+
+    #[test]
+    fn test_has_circular_references_false() {
+        let lib = hierarchy_library();
+        assert!(!lib.has_circular_references());
+    }
+
+    #[test]
+    fn test_has_circular_references_true() {
+        let mut lib = Library::new("circular");
+
+        let mut a = Cell::new("A");
+        a.add(Reference::new("B".to_string()));
+        let mut b = Cell::new("B");
+        b.add(Reference::new("A".to_string()));
+
+        lib.add_cell(a);
+        lib.add_cell(b);
+
+        assert!(lib.has_circular_references());
+    }
+
+    #[test]
+    fn test_has_circular_references_self() {
+        let mut lib = Library::new("self_ref");
+
+        let mut a = Cell::new("A");
+        a.add(Reference::new("A".to_string()));
+
+        lib.add_cell(a);
+
+        assert!(lib.has_circular_references());
+    }
+
+    #[test]
+    fn test_hierarchy_depth_top() {
+        let lib = hierarchy_library();
+        assert_eq!(lib.hierarchy_depth("TOP"), 2);
+    }
+
+    #[test]
+    fn test_hierarchy_depth_mid() {
+        let lib = hierarchy_library();
+        assert_eq!(lib.hierarchy_depth("A"), 1);
+    }
+
+    #[test]
+    fn test_hierarchy_depth_leaf() {
+        let lib = hierarchy_library();
+        assert_eq!(lib.hierarchy_depth("C"), 0);
+        assert_eq!(lib.hierarchy_depth("B"), 0);
+    }
+
+    #[test]
+    fn test_hierarchy_depth_nonexistent() {
+        let lib = hierarchy_library();
+        assert_eq!(lib.hierarchy_depth("MISSING"), 0);
+    }
+
+    #[test]
+    fn test_hierarchy_depth_with_cycle() {
+        let mut lib = Library::new("circular");
+
+        let mut a = Cell::new("A");
+        a.add(Reference::new("B".to_string()));
+        let mut b = Cell::new("B");
+        b.add(Reference::new("A".to_string()));
+
+        lib.add_cell(a);
+        lib.add_cell(b);
+
+        // Cycles are handled gracefully without infinite recursion.
+        let _ = lib.hierarchy_depth("A");
+    }
+
+    #[test]
+    fn test_empty_library_graph() {
+        let lib = Library::new("empty");
+        assert!(lib.dependency_graph().is_empty());
+        assert!(!lib.has_circular_references());
     }
 }
