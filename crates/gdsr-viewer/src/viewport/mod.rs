@@ -246,18 +246,20 @@ impl Viewport {
                         );
                         let sw = (s_max.x - s_min.x).abs();
                         let sh = (s_min.y - s_max.y).abs();
-                        let char_count = cell_name.len().max(1) as f32;
-                        let fit_w = sw * 0.9 / (char_count * 0.6);
-                        let fit_h = sh * 0.4;
-                        let font_size = fit_w.min(fit_h).min(48.0);
-                        if font_size >= 1.0 {
-                            painter.text(
-                                screen_rect.center(),
-                                egui::Align2::CENTER_CENTER,
-                                cell_name,
-                                egui::FontId::monospace(font_size),
-                                stroke_color,
-                            );
+                        if sw >= 40.0 && sh >= 20.0 {
+                            let char_count = cell_name.len().max(1) as f32;
+                            let fit_w = sw * 0.9 / (char_count * 0.6);
+                            let fit_h = sh * 0.4;
+                            let font_size = fit_w.min(fit_h).min(48.0);
+                            if font_size >= 8.0 {
+                                painter.text(
+                                    screen_rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    cell_name,
+                                    egui::FontId::monospace(font_size),
+                                    stroke_color,
+                                );
+                            }
                         }
                     }
                 }
