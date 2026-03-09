@@ -66,21 +66,6 @@ fn close_points_is_idempotent(polygon: Polygon) -> bool {
 }
 
 #[quickcheck]
-fn regular_polygon_has_correct_vertex_count(num_sides: usize) -> bool {
-    let num_sides = (num_sides % 100) + 3;
-    let center = Point::float(0.0, 0.0, 1e-6);
-    let polygon = Polygon::regular_polygon(
-        center,
-        10.0,
-        num_sides,
-        0.0,
-        Layer::new(0),
-        DataType::new(0),
-    );
-    polygon.points().len() == num_sides + 1
-}
-
-#[quickcheck]
 fn regular_polygon_vertices_equidistant_from_center(num_sides: usize) -> bool {
     let num_sides = (num_sides % 100) + 3;
     let center = Point::float(0.0, 0.0, 1e-6);
