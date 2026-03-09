@@ -406,7 +406,8 @@ impl eframe::App for ViewerApp {
                         .selected_text(self.grid_spacing.label())
                         .width(60.0)
                         .show_ui(ui, |ui| {
-                            for &(label, preset) in GridSpacing::PRESETS {
+                            for &(label, multiplier) in GridSpacing::PRESETS {
+                                let preset = GridSpacing { multiplier };
                                 ui.selectable_value(&mut self.grid_spacing, preset, label);
                             }
                         });

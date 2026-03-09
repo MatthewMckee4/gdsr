@@ -33,12 +33,9 @@ pub fn first_line(min: f64, spacing: f64) -> f64 {
     (min / spacing).floor() * spacing
 }
 
-/// Resolves the effective grid spacing given a mode and zoom level.
+/// Resolves the effective grid spacing by applying the multiplier to the auto spacing.
 pub fn effective_spacing(mode: GridSpacing, zoom: f64) -> f64 {
-    match mode {
-        GridSpacing::Auto => grid_spacing(zoom),
-        GridSpacing::Fixed(s) => s,
-    }
+    grid_spacing(zoom) * mode.multiplier
 }
 
 /// Draws a background grid on the painter.
@@ -204,14 +201,22 @@ mod tests {
     }
 
     #[test]
-    fn effective_spacing_auto_delegates_to_grid_spacing() {
+    fn effective_spacing_default_equals_auto() {
         let zoom = 100.0;
-        assert!((effective_spacing(GridSpacing::Auto, zoom) - grid_spacing(zoom)).abs() < 1e-10);
+        assert!(
+            (effective_spacing(GridSpacing::default(), zoom) - grid_spacing(zoom)).abs() < 1e-10
+        );
     }
 
     #[test]
-    fn effective_spacing_fixed_ignores_zoom() {
-        assert!((effective_spacing(GridSpacing::Fixed(42.0), 1.0) - 42.0).abs() < 1e-10);
-        assert!((effective_spacing(GridSpacing::Fixed(42.0), 1000.0) - 42.0).abs() < 1e-10);
+    fn effective_spacing_multiplier_scales_auto() {
+        let zoom = 100.0;
+        let auto = grid_spacing(zoom);
+        assert!(
+            (effective_spacing(GridSpacing { multiplier: 0.5 }, zoom) - auto * 0.5).abs() < 1e-10
+        );
+        assert!(
+            (effective_spacing(GridSpacing { multiplier: 2.0 }, zoom) - auto * 2.0).abs() < 1e-10
+        );
     }
 }
