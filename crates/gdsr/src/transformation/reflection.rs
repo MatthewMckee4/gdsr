@@ -1,9 +1,9 @@
-use crate::{AngleInRadians, Point};
+use crate::{Point, Radians};
 
 /// A reflection transformation defined by an axis angle and centre point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reflection {
-    angle: AngleInRadians,
+    angle: Radians,
     centre: Point,
 }
 
@@ -19,25 +19,25 @@ impl std::fmt::Display for Reflection {
 
 impl Reflection {
     /// Creates a new reflection with the given axis angle (in radians) and centre point.
-    pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
+    pub const fn new(angle: Radians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
     /// Returns the axis angle in radians.
-    pub const fn angle(&self) -> AngleInRadians {
+    pub const fn angle(&self) -> Radians {
         self.angle
     }
 
     /// Creates a horizontal reflection (angle = 0) about the x-axis.
     pub const fn new_horizontal() -> Self {
-        Self::new(0.0, Point::integer(0, 1, 1e-9))
+        Self::new(Radians(0.0), Point::integer(0, 1, 1e-9))
     }
 
     /// Creates a reflection from a line defined by two points.
     pub fn from_line(point1: &Point, point2: &Point) -> Self {
         let dx = (point2.x() - point1.x()).absolute_value();
         let dy = (point2.y() - point1.y()).absolute_value();
-        let angle = dy.atan2(dx);
+        let angle = Radians(dy.atan2(dx));
         let centre = Point::new(
             (point1.x() + point2.x()) / 2.0,
             (point1.y() + point2.y()) / 2.0,
@@ -47,8 +47,8 @@ impl Reflection {
 
     /// Reflects a point across this reflection's axis and returns the new point.
     pub fn apply_to_point(&self, point: &Point) -> Point {
-        let cos_2angle = (2.0 * self.angle).cos();
-        let sin_2angle = (2.0 * self.angle).sin();
+        let cos_2angle = (2.0 * self.angle.value()).cos();
+        let sin_2angle = (2.0 * self.angle.value()).sin();
 
         let self_center_x = self.centre.x();
         let self_center_y = self.centre.y();
@@ -69,21 +69,21 @@ mod tests {
 
     #[test]
     fn test_reflection_new() {
-        let reflection = Reflection::new(45.0, Point::integer(10, 20, 1e-9));
-        assert_eq!(reflection.angle, 45.0);
+        let reflection = Reflection::new(Radians(45.0), Point::integer(10, 20, 1e-9));
+        assert_eq!(reflection.angle, Radians(45.0));
         assert_eq!(reflection.centre, Point::integer(10, 20, 1e-9));
     }
 
     #[test]
     fn test_reflection_new_horizontal() {
         let reflection = Reflection::new_horizontal();
-        assert_eq!(reflection.angle, 0.0);
+        assert_eq!(reflection.angle, Radians(0.0));
         assert_eq!(reflection.centre, Point::integer(0, 1, 1e-9));
     }
 
     #[test]
     fn test_reflection_horizontal_axis() {
-        let reflection = Reflection::new(0.0, Point::integer(0, 0, 1e-9));
+        let reflection = Reflection::new(Radians(0.0), Point::integer(0, 0, 1e-9));
         let point = Point::integer(10, 5, 1e-9);
         let reflected = reflection.apply_to_point(&point);
 
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn test_reflection_apply_at_centre() {
         let centre = Point::integer(10, 10, 1e-9);
-        let reflection = Reflection::new(45.0, centre);
+        let reflection = Reflection::new(Radians(45.0), centre);
         let reflected = reflection.apply_to_point(&centre);
 
         // Point at centre should remain unchanged
@@ -111,7 +111,7 @@ mod tests {
         let reflection = Reflection::from_line(&point1, &point2);
 
         // Horizontal line should have angle 0
-        assert_eq!(reflection.angle, 0.0);
+        assert_eq!(reflection.angle, Radians(0.0));
         // Centre should be midpoint
         assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
     }
@@ -124,7 +124,7 @@ mod tests {
 
         // Vertical line should have angle π/2
         let expected_angle = std::f64::consts::FRAC_PI_2;
-        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        assert!((reflection.angle.value() - expected_angle).abs() < 1e-10);
         // Centre should be midpoint
         assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
     }
@@ -137,14 +137,14 @@ mod tests {
 
         // Diagonal line (45 degrees) should have angle π/4
         let expected_angle = std::f64::consts::FRAC_PI_4;
-        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        assert!((reflection.angle.value() - expected_angle).abs() < 1e-10);
         // Centre should be midpoint
         assert_eq!(reflection.centre, Point::integer(5, 5, 1e-9));
     }
 
     #[test]
     fn test_reflection_display() {
-        let reflection = Reflection::new(0.5, Point::integer(10, 20, 1e-9));
+        let reflection = Reflection::new(Radians(0.5), Point::integer(10, 20, 1e-9));
         insta::assert_snapshot!(reflection.to_string(), @"Reflection with angle 0.5 rad about Point(10 (1.000e-9), 20 (1.000e-9))");
     }
 
@@ -170,7 +170,7 @@ mod tests {
         let reflection = Reflection::from_line(&point1, &point2);
 
         let expected_angle = (10.0_f64).atan2(5.0);
-        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        assert!((reflection.angle.value() - expected_angle).abs() < 1e-10);
 
         assert_eq!(reflection.centre, Point::integer(-3, -5, 1e-9));
 
@@ -199,7 +199,7 @@ mod tests {
         let reflection = Reflection::from_line(&point1, &point2);
 
         let expected_angle = (-6.0_f64).atan2(10.0);
-        assert!((reflection.angle - expected_angle).abs() < 1e-10);
+        assert!((reflection.angle.value() - expected_angle).abs() < 1e-10);
 
         assert_eq!(reflection.centre, Point::integer(0, 0, 1e-9));
 

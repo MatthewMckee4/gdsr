@@ -1,9 +1,9 @@
-use crate::{AngleInRadians, Point};
+use crate::{Point, Radians};
 
 /// A rotation transformation defined by an angle (in radians) and a centre point.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rotation {
-    angle: AngleInRadians,
+    angle: Radians,
     centre: Point,
 }
 
@@ -15,12 +15,12 @@ impl std::fmt::Display for Rotation {
 
 impl Rotation {
     /// Creates a new rotation with the given angle (in radians) and centre point.
-    pub const fn new(angle: AngleInRadians, centre: Point) -> Self {
+    pub const fn new(angle: Radians, centre: Point) -> Self {
         Self { angle, centre }
     }
 
     /// Returns the rotation angle in radians.
-    pub const fn angle(&self) -> AngleInRadians {
+    pub const fn angle(&self) -> Radians {
         self.angle
     }
 
@@ -55,23 +55,23 @@ mod tests {
 
     #[test]
     fn test_rotation_new() {
-        let rotation = Rotation::new(FRAC_PI_2, Point::integer(10, 20, 1e-9));
-        assert_eq!(rotation.angle(), FRAC_PI_2);
+        let rotation = Rotation::new(Radians(FRAC_PI_2), Point::integer(10, 20, 1e-9));
+        assert_eq!(rotation.angle(), Radians(FRAC_PI_2));
         assert_eq!(rotation.centre(), &Point::integer(10, 20, 1e-9));
     }
 
     #[test]
     fn test_rotation_getters() {
         let centre = Point::integer(5, 10, 1e-9);
-        let rotation = Rotation::new(FRAC_PI_4, centre);
-        assert_eq!(rotation.angle(), FRAC_PI_4);
+        let rotation = Rotation::new(Radians(FRAC_PI_4), centre);
+        assert_eq!(rotation.angle(), Radians(FRAC_PI_4));
         assert_eq!(rotation.centre(), &centre);
     }
 
     #[test]
     fn test_rotation_apply_at_centre() {
         let centre = Point::integer(10, 10, 1e-9);
-        let rotation = Rotation::new(90.0, centre);
+        let rotation = Rotation::new(Radians(90.0), centre);
         let rotated = rotation.apply_to_point(&centre);
 
         // Point at centre should remain unchanged
@@ -80,13 +80,13 @@ mod tests {
 
     #[test]
     fn test_rotation_display() {
-        let rotation = Rotation::new(FRAC_PI_2, Point::integer(10, 20, 1e-9));
+        let rotation = Rotation::new(Radians(FRAC_PI_2), Point::integer(10, 20, 1e-9));
         insta::assert_snapshot!(rotation.to_string(), @"Rotation of 1.5707963267948966 rad about Point(10 (1.000e-9), 20 (1.000e-9))");
     }
 
     #[test]
     fn test_rotation_90_degrees() {
-        let rotation = Rotation::new(90.0, Point::integer(0, 0, 1e-9));
+        let rotation = Rotation::new(Radians(90.0), Point::integer(0, 0, 1e-9));
         let point = Point::integer(10, 0, 1e-9);
         let rotated = rotation.apply_to_point(&point);
 
@@ -103,8 +103,8 @@ mod tests {
         let origin = Point::integer(0, 0, 1e-9);
         let point = Point::integer(10, 0, 1e-9);
 
-        let rotation_large = Rotation::new(std::f64::consts::TAU + FRAC_PI_2, origin);
-        let rotation_normal = Rotation::new(FRAC_PI_2, origin);
+        let rotation_large = Rotation::new(Radians(std::f64::consts::TAU + FRAC_PI_2), origin);
+        let rotation_normal = Rotation::new(Radians(FRAC_PI_2), origin);
 
         let result_large = rotation_large.apply_to_point(&point);
         let result_normal = rotation_normal.apply_to_point(&point);
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_rotation_negative_angle() {
         let origin = Point::integer(0, 0, 1e-9);
-        let rotation = Rotation::new(-FRAC_PI_2, origin);
+        let rotation = Rotation::new(Radians(-FRAC_PI_2), origin);
         let point = Point::integer(10, 0, 1e-9);
         let rotated = rotation.apply_to_point(&point);
 

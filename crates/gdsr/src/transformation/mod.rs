@@ -110,6 +110,7 @@ impl From<&Self> for Transformation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Radians;
 
     #[test]
     fn test_transformation_default() {
@@ -122,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_reflection() {
-        let reflection = Reflection::new(0.0, Point::integer(0, 0, 1e-9));
+        let reflection = Reflection::new(Radians::new(0.0), Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_reflection(Some(reflection.clone()));
 
@@ -132,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_transformation_with_rotation() {
-        let rotation = Rotation::new(45.0, Point::integer(0, 0, 1e-9));
+        let rotation = Rotation::new(Radians::new(45.0), Point::integer(0, 0, 1e-9));
         let mut transformation = Transformation::default();
         transformation.with_rotation(Some(rotation.clone()));
 
@@ -192,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_from_reflection() {
-        let reflection = Reflection::new(0.0, Point::integer(0, 0, 1e-9));
+        let reflection = Reflection::new(Radians::new(0.0), Point::integer(0, 0, 1e-9));
         let transformation: Transformation = reflection.clone().into();
 
         assert!(transformation.reflection.is_some());
@@ -204,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_from_rotation() {
-        let rotation = Rotation::new(45.0, Point::integer(0, 0, 1e-9));
+        let rotation = Rotation::new(Radians::new(45.0), Point::integer(0, 0, 1e-9));
         let transformation: Transformation = rotation.clone().into();
 
         assert!(transformation.rotation.is_some());
@@ -252,7 +253,7 @@ mod tests {
     #[test]
     fn test_rotation_and_scale_combined() {
         let origin = Point::integer(0, 0, 1e-9);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_2, origin);
         let scale = Scale::new(2.0, origin);
 
         let mut transformation = Transformation::default();
@@ -262,7 +263,7 @@ mod tests {
         let point = Point::integer(3, 0, 1e-9);
         let result = transformation.apply_to_point(&point);
 
-        let rotated = Rotation::new(std::f64::consts::FRAC_PI_2, origin).apply_to_point(&point);
+        let rotated = Rotation::new(Radians::FRAC_PI_2, origin).apply_to_point(&point);
         let expected = Scale::new(2.0, origin).apply_to_point(&rotated);
         assert_point_approx_eq(&result, &expected);
         assert_point_approx_eq(&result, &Point::integer(0, 6, 1e-9));
@@ -271,7 +272,7 @@ mod tests {
     #[test]
     fn test_rotation_and_translation_combined() {
         let origin = Point::integer(0, 0, 1e-9);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_2, origin);
         let translation = Translation::new(Point::integer(10, 5, 1e-9));
 
         let mut transformation = Transformation::default();
@@ -281,7 +282,7 @@ mod tests {
         let point = Point::integer(4, 0, 1e-9);
         let result = transformation.apply_to_point(&point);
 
-        let rotated = Rotation::new(std::f64::consts::FRAC_PI_2, origin).apply_to_point(&point);
+        let rotated = Rotation::new(Radians::FRAC_PI_2, origin).apply_to_point(&point);
         let expected = Translation::new(Point::integer(10, 5, 1e-9)).apply_to_point(&rotated);
         assert_point_approx_eq(&result, &expected);
         assert_point_approx_eq(&result, &Point::integer(10, 9, 1e-9));
@@ -309,8 +310,8 @@ mod tests {
     #[test]
     fn test_reflection_and_rotation_combined() {
         let origin = Point::integer(0, 0, 1e-9);
-        let reflection = Reflection::new(0.0, origin);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let reflection = Reflection::new(Radians::new(0.0), origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_2, origin);
 
         let mut transformation = Transformation::default();
         transformation.with_reflection(Some(reflection.clone()));
@@ -329,8 +330,8 @@ mod tests {
     #[test]
     fn test_all_four_transformations_combined() {
         let origin = Point::integer(0, 0, 1e-9);
-        let reflection = Reflection::new(0.0, origin);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let reflection = Reflection::new(Radians::new(0.0), origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_2, origin);
         let scale = Scale::new(2.0, origin);
         let translation = Translation::new(Point::integer(10, 10, 1e-9));
 
@@ -358,8 +359,8 @@ mod tests {
     #[test]
     fn test_order_of_operations_reflection_before_rotation() {
         let origin = Point::integer(0, 0, 1e-9);
-        let reflection = Reflection::new(0.0, origin);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let reflection = Reflection::new(Radians::new(0.0), origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_2, origin);
         let scale = Scale::new(2.0, origin);
         let translation = Translation::new(Point::integer(5, 5, 1e-9));
 
@@ -447,7 +448,7 @@ mod tests {
     #[test]
     fn test_rotation_greater_than_2pi() {
         let origin = Point::integer(0, 0, 1e-9);
-        let angle = std::f64::consts::TAU + std::f64::consts::FRAC_PI_2;
+        let angle = Radians::TAU + Radians::FRAC_PI_2;
         let rotation = Rotation::new(angle, origin);
         let mut transformation = Transformation::default();
         transformation.with_rotation(Some(rotation));
@@ -455,7 +456,7 @@ mod tests {
         let point = Point::integer(10, 0, 1e-9);
         let result = transformation.apply_to_point(&point);
 
-        let just_90 = Rotation::new(std::f64::consts::FRAC_PI_2, origin);
+        let just_90 = Rotation::new(Radians::FRAC_PI_2, origin);
         let expected = just_90.apply_to_point(&point);
         assert_point_approx_eq(&result, &expected);
     }
@@ -463,7 +464,7 @@ mod tests {
     #[test]
     fn test_rotation_negative_angle() {
         let origin = Point::integer(0, 0, 1e-9);
-        let rotation = Rotation::new(-std::f64::consts::FRAC_PI_2, origin);
+        let rotation = Rotation::new(-Radians::FRAC_PI_2, origin);
         let mut transformation = Transformation::default();
         transformation.with_rotation(Some(rotation));
 
@@ -476,8 +477,8 @@ mod tests {
     #[test]
     fn test_all_transformations_simultaneously() {
         let origin = Point::integer(0, 0, 1e-9);
-        let reflection = Reflection::new(0.0, origin);
-        let rotation = Rotation::new(std::f64::consts::FRAC_PI_4, origin);
+        let reflection = Reflection::new(Radians::new(0.0), origin);
+        let rotation = Rotation::new(Radians::FRAC_PI_4, origin);
         let scale = Scale::new(3.0, origin);
         let translation = Translation::new(Point::integer(100, 200, 1e-9));
 

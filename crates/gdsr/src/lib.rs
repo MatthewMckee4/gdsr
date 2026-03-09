@@ -27,5 +27,5 @@ pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
 pub use traits::{Dimensions, Movable, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
-pub use types::{AngleInRadians, DataType, Layer, LayerMapping};
+pub use types::{DataType, Degrees, Layer, LayerMapping, Radians};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};

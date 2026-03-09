@@ -39,7 +39,7 @@ fn rotation_by_zero_is_identity(x: i32, y: i32, cx: i32, cy: i32) -> bool {
     let cy = (cy % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
     let point = Point::integer(x, y, 1e-9);
     let centre = Point::integer(cx, cy, 1e-9);
-    let rotation = Rotation::new(0.0, centre);
+    let rotation = Rotation::new(Radians::new(0.0), centre);
     let result = rotation.apply_to_point(&point);
     point_approx_eq(&result, &point, 1e-6)
 }
@@ -53,7 +53,7 @@ fn rotation_by_two_pi_is_identity(x: i32, y: i32, cx: i32, cy: i32) -> bool {
     let cy = (cy % MAX_COORD).clamp(-MAX_COORD, MAX_COORD);
     let point = Point::integer(x, y, 1e-9);
     let centre = Point::integer(cx, cy, 1e-9);
-    let rotation = Rotation::new(std::f64::consts::TAU, centre);
+    let rotation = Rotation::new(Radians::TAU, centre);
     let result = rotation.apply_to_point(&point);
     point_approx_eq(&result, &point, 1e-6)
 }

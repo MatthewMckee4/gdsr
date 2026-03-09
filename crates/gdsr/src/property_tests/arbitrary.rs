@@ -84,7 +84,7 @@ impl Arbitrary for Reflection {
             (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD),
             1e-9,
         );
-        Self::new(angle, centre)
+        Self::new(Radians::new(angle), centre)
     }
 }
 
@@ -101,7 +101,7 @@ impl Arbitrary for Rotation {
             (i32::arbitrary(g) % MAX_COORD).clamp(-MAX_COORD, MAX_COORD),
             1e-9,
         );
-        Self::new(angle, centre)
+        Self::new(Radians::new(angle), centre)
     }
 }
 
@@ -304,7 +304,7 @@ impl Arbitrary for Text {
             layer,
             datatype,
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
             hp_options[usize::arbitrary(g) % hp_options.len()],
             vp_options[usize::arbitrary(g) % vp_options.len()],
@@ -327,7 +327,7 @@ impl Arbitrary for Grid {
             Some(Point::integer(sx, 0, 1e-9)),
             Some(Point::integer(0, sy, 1e-9)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         )
     }
@@ -441,7 +441,7 @@ pub(super) fn arb_gds_text(g: &mut Gen) -> Text {
         arb_layer(g),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         hp_options[usize::arbitrary(g) % hp_options.len()],
         vp_options[usize::arbitrary(g) % vp_options.len()],

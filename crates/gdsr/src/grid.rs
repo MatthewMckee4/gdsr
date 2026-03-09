@@ -1,8 +1,6 @@
 use std::f64::consts::PI;
 
-use crate::{
-    AngleInRadians, Movable, Point, Reflection, Rotation, Scale, Transformable, Transformation,
-};
+use crate::{Movable, Point, Radians, Reflection, Rotation, Scale, Transformable, Transformation};
 
 /// A grid layout that repeats elements in rows and columns with optional transformations.
 #[derive(Clone, Debug, PartialEq)]
@@ -13,7 +11,7 @@ pub struct Grid {
     spacing_x: Option<Point>,
     spacing_y: Option<Point>,
     magnification: f64,
-    angle: AngleInRadians,
+    angle: Radians,
     x_reflection: bool,
 }
 
@@ -27,7 +25,7 @@ impl Grid {
         spacing_x: Option<Point>,
         spacing_y: Option<Point>,
         magnification: f64,
-        angle: AngleInRadians,
+        angle: Radians,
         x_reflection: bool,
     ) -> Self {
         Self {
@@ -73,7 +71,7 @@ impl Grid {
     }
 
     /// Returns the rotation angle in radians.
-    pub const fn angle(&self) -> f64 {
+    pub const fn angle(&self) -> Radians {
         self.angle
     }
 
@@ -155,13 +153,13 @@ impl Grid {
     }
 
     /// Sets the rotation angle in radians.
-    pub const fn set_angle(&mut self, angle: AngleInRadians) {
+    pub const fn set_angle(&mut self, angle: Radians) {
         self.angle = angle;
     }
 
     /// Returns a new grid with the given rotation angle.
     #[must_use]
-    pub const fn with_angle(mut self, angle: AngleInRadians) -> Self {
+    pub const fn with_angle(mut self, angle: Radians) -> Self {
         self.angle = angle;
         self
     }
@@ -210,7 +208,7 @@ impl Default for Grid {
             None,
             None,
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         )
     }
@@ -226,7 +224,7 @@ impl std::fmt::Display for Grid {
             .map_or_else(|| "None".to_string(), |p| p.to_string());
         write!(
             f,
-            "Grid at {} with {} columns and {} rows, spacing ({}, {}), magnification {:?}, angle {:?}, x_reflection {}",
+            "Grid at {} with {} columns and {} rows, spacing ({}, {}), magnification {:?}, angle {}, x_reflection {}",
             self.origin,
             self.columns,
             self.rows,
@@ -272,12 +270,12 @@ impl Transformable for Grid {
 
         if let Some(rotation) = &transformation.rotation {
             self.angle += rotation.angle();
-            let result = self.angle % (PI * 2.0);
-            self.angle = if result < 0.0 {
+            let result = self.angle.value() % (PI * 2.0);
+            self.angle = Radians::new(if result < 0.0 {
                 result + PI * 2.0
             } else {
                 result
-            };
+            });
         }
 
         // Handle reflection
@@ -326,7 +324,7 @@ mod tests {
             Some(p(5, 0)),
             Some(p(0, 5)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         )
     }
@@ -340,7 +338,7 @@ mod tests {
             Some(p(5, 0)),
             Some(p(0, 5)),
             1.5,
-            45.0,
+            Radians::new(45.0),
             true,
         );
 
@@ -350,7 +348,7 @@ mod tests {
         assert_eq!(grid.spacing_x(), Some(p(5, 0)));
         assert_eq!(grid.spacing_y(), Some(p(0, 5)));
         assert_eq!(grid.magnification(), 1.5);
-        assert_eq!(grid.angle(), 45.0);
+        assert_eq!(grid.angle(), Radians::new(45.0));
         assert!(grid.x_reflection());
     }
 
@@ -363,7 +361,7 @@ mod tests {
         assert_eq!(grid.spacing_x(), None);
         assert_eq!(grid.spacing_y(), None);
         assert_eq!(grid.magnification(), 1.0);
-        assert_eq!(grid.angle(), 0.0);
+        assert_eq!(grid.angle(), Radians::new(0.0));
         assert!(!grid.x_reflection());
     }
 
@@ -376,15 +374,33 @@ mod tests {
             Some(p(5, 0)),
             Some(p(0, 5)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (Point(5 (1.000e-9), 0 (1.000e-9)), Point(0 (1.000e-9), 5 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
 
-        let grid = Grid::new(p(10, 20), 2, 3, Some(p(5, 0)), None, 1.0, 0.0, false);
+        let grid = Grid::new(
+            p(10, 20),
+            2,
+            3,
+            Some(p(5, 0)),
+            None,
+            1.0,
+            Radians::new(0.0),
+            false,
+        );
         assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (Point(5 (1.000e-9), 0 (1.000e-9)), None), magnification 1.0, angle 0.0, x_reflection false");
 
-        let grid = Grid::new(p(10, 20), 2, 3, None, Some(p(0, 5)), 1.0, 0.0, false);
+        let grid = Grid::new(
+            p(10, 20),
+            2,
+            3,
+            None,
+            Some(p(0, 5)),
+            1.0,
+            Radians::new(0.0),
+            false,
+        );
         assert_snapshot!(format!("{grid}"), @"Grid at Point(10 (1.000e-9), 20 (1.000e-9)) with 2 columns and 3 rows, spacing (None, Point(0 (1.000e-9), 5 (1.000e-9))), magnification 1.0, angle 0.0, x_reflection false");
     }
 
@@ -397,7 +413,7 @@ mod tests {
         grid.set_spacing_x(Some(p(10, 0)));
         grid.set_spacing_y(Some(p(0, 10)));
         grid.set_magnification(2.0);
-        grid.set_angle(90.0);
+        grid.set_angle(Radians::new(90.0));
         grid.set_x_reflection(true);
 
         let grid_with = test_grid()
@@ -407,7 +423,7 @@ mod tests {
             .with_spacing_x(Some(p(10, 0)))
             .with_spacing_y(Some(p(0, 10)))
             .with_magnification(2.0)
-            .with_angle(90.0)
+            .with_angle(Radians::new(90.0))
             .with_x_reflection(true);
 
         assert_eq!(grid, grid_with);
@@ -417,7 +433,7 @@ mod tests {
         assert_eq!(grid.spacing_x(), Some(p(10, 0)));
         assert_eq!(grid.spacing_y(), Some(p(0, 10)));
         assert_eq!(grid.magnification(), 2.0);
-        assert_eq!(grid.angle(), 90.0);
+        assert_eq!(grid.angle(), Radians::new(90.0));
         assert!(grid.x_reflection());
     }
 
@@ -431,13 +447,13 @@ mod tests {
 
     #[test]
     fn test_grid_transform_with_rotation() {
-        let transformed = test_grid().rotate(FRAC_PI_2, origin());
-        assert_eq!(transformed.angle, FRAC_PI_2);
+        let transformed = test_grid().rotate(Radians::new(FRAC_PI_2), origin());
+        assert_eq!(transformed.angle, Radians::new(FRAC_PI_2));
     }
 
     #[test]
     fn test_grid_transform_with_reflection() {
-        let transformed = test_grid().reflect(0.0, origin());
+        let transformed = test_grid().reflect(Radians::new(0.0), origin());
         assert!(transformed.x_reflection);
     }
 
@@ -459,7 +475,7 @@ mod tests {
             Some(p(10, 0)),
             Some(p(0, 10)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         let scaled = grid.scale(3.0, origin());
@@ -476,7 +492,7 @@ mod tests {
             Some(p(10, 0)),
             Some(p(0, 10)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         let scaled = grid.scale(2.0, p(50, 50));
@@ -515,11 +531,11 @@ mod tests {
             Some(p(5, 0)),
             Some(p(0, 5)),
             1.0,
-            FRAC_PI_2,
+            Radians::new(FRAC_PI_2),
             false,
         );
-        let transformed = grid.rotate(PI * 2.0, origin());
-        assert!((transformed.angle - FRAC_PI_2).abs() < 0.001);
+        let transformed = grid.rotate(Radians::new(PI * 2.0), origin());
+        assert!((transformed.angle.value() - FRAC_PI_2).abs() < 0.001);
     }
 
     #[test]
@@ -531,7 +547,7 @@ mod tests {
             Some(p(10, 0)),
             Some(p(0, 10)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         assert_eq!(grid.columns(), 1);
@@ -560,9 +576,9 @@ mod tests {
     #[test]
     fn test_grid_transform_rotation_then_reflection() {
         let transformed = test_grid()
-            .rotate(FRAC_PI_2, origin())
-            .reflect(0.0, origin());
-        assert!((transformed.angle() - FRAC_PI_2).abs() < 0.001);
+            .rotate(Radians::new(FRAC_PI_2), origin())
+            .reflect(Radians::new(0.0), origin());
+        assert!((transformed.angle().value() - FRAC_PI_2).abs() < 0.001);
         assert!(transformed.x_reflection());
     }
 
@@ -575,7 +591,7 @@ mod tests {
             Some(pf(10.0, 0.0)),
             Some(pf(0.0, 10.0)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         let converted = grid.to_integer_unit();
@@ -596,7 +612,7 @@ mod tests {
             Some(p(5, 0)),
             Some(p(0, 5)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         );
         let converted = grid.to_float_unit();
@@ -608,7 +624,16 @@ mod tests {
 
     #[test]
     fn test_grid_to_integer_unit_none_spacing() {
-        let grid = Grid::new(pf(1.0, 2.0), 2, 2, None, None, 1.0, 0.0, false);
+        let grid = Grid::new(
+            pf(1.0, 2.0),
+            2,
+            2,
+            None,
+            None,
+            1.0,
+            Radians::new(0.0),
+            false,
+        );
         let converted = grid.to_integer_unit();
         assert_eq!(converted.spacing_x(), None);
         assert_eq!(converted.spacing_y(), None);

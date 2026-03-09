@@ -1,5 +1,3 @@
-use std::f64::consts::FRAC_PI_2;
-
 use quickcheck::{Arbitrary, Gen};
 use quickcheck_macros::quickcheck;
 use tempfile::tempdir;
@@ -183,7 +181,7 @@ fn rotated_aref_roundtrip(_seed: u8) -> bool {
                 .with_rows(rows)
                 .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
                 .with_spacing_y(Some(Point::integer(0, 20, 1e-9)))
-                .with_angle(FRAC_PI_2),
+                .with_angle(Radians::FRAC_PI_2),
         ),
     );
     library.add_cell(cell);

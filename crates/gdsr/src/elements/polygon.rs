@@ -1,4 +1,6 @@
-use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable, Unit};
+use crate::{
+    DataType, Dimensions, Layer, LayerMapping, Movable, Point, Radians, Transformable, Unit,
+};
 
 fn are_points_closed(points: &[Point]) -> bool {
     let points_vec: Vec<Point> = points.to_vec();
@@ -51,7 +53,7 @@ impl Polygon {
         center: Point,
         radius: f64,
         num_sides: usize,
-        rotation: f64,
+        rotation: Radians,
         layer: Layer,
         data_type: DataType,
     ) -> Self {
@@ -61,7 +63,7 @@ impl Polygon {
         let y_units = center.y().units();
 
         let points = (0..num_sides).map(|i| {
-            let angle = rotation + (i as f64) * std::f64::consts::TAU / (num_sides as f64);
+            let angle = rotation.value() + (i as f64) * std::f64::consts::TAU / (num_sides as f64);
             center
                 + Point::new(
                     Unit::float(radius * angle.cos(), x_units),
@@ -428,8 +430,14 @@ mod tests {
     #[test]
     fn test_regular_polygon_num_sides_clamped_to_3() {
         let origin = Point::float(0.0, 0.0, 1e-6);
-        let polygon =
-            Polygon::regular_polygon(origin, 5.0, 1, 0.0, Layer::new(0), DataType::new(0));
+        let polygon = Polygon::regular_polygon(
+            origin,
+            5.0,
+            1,
+            Radians::new(0.0),
+            Layer::new(0),
+            DataType::new(0),
+        );
         assert_eq!(polygon.points().len(), 4);
     }
 }

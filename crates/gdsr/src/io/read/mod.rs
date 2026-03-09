@@ -8,7 +8,7 @@ use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
-use crate::{DEFAULT_INTEGER_UNITS, DataType, Instance, Layer, Point, Unit};
+use crate::{DEFAULT_INTEGER_UNITS, DataType, Degrees, Instance, Layer, Point, Unit};
 
 #[allow(clippy::too_many_lines)]
 pub fn from_gds<P: AsRef<std::path::Path>>(
@@ -278,10 +278,11 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 }
                 GDSRecord::Angle => {
                     if let GDSRecordData::F64(angle) = data {
+                        let radians = Degrees::new(angle[0]).to_radians();
                         if let Some(text) = &mut text {
-                            text.angle = angle[0];
+                            text.angle = radians;
                         } else if let Some(reference) = &mut reference {
-                            reference.grid.set_angle(angle[0].to_radians());
+                            reference.grid.set_angle(radians);
                         }
                     }
                 }

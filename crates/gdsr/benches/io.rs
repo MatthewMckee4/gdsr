@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use gdsr::{
     Cell, DataType, Grid, HorizontalPresentation, Layer, Library, Path, PathType, Point, Polygon,
-    Reference, Text, Unit, VerticalPresentation,
+    Radians, Reference, Text, Unit, VerticalPresentation,
 };
 
 const DB_UNITS: f64 = 1e-9;
@@ -69,7 +69,7 @@ fn medium_library() -> Library {
             Layer::new((i % 16) as u16),
             DataType::new(0),
             1.0 + f64::from(i % 5) * 0.5,
-            f64::from(i % 4) * 0.785,
+            Radians::new(f64::from(i % 4) * 0.785),
             i % 2 == 0,
             VERT_PRES[i as usize % 3],
             HORIZ_PRES[i as usize % 3],
@@ -132,7 +132,7 @@ fn complex_library() -> Library {
                 Layer::new(((c + i) % 64) as u16),
                 DataType::new((i % 4) as u16),
                 1.0 + f64::from(i % 3) * 0.5,
-                f64::from(i % 8) * std::f64::consts::FRAC_PI_4,
+                Radians::new(f64::from(i % 8) * std::f64::consts::FRAC_PI_4),
                 i % 3 == 0,
                 VERT_PRES[i as usize % 3],
                 HORIZ_PRES[i as usize % 3],
@@ -155,7 +155,7 @@ fn complex_library() -> Library {
                         .with_spacing_x(Some(point(12_000, 0)))
                         .with_spacing_y(Some(point(0, 10_000)))
                         .with_magnification(1.0 + f64::from(c) * 0.1)
-                        .with_angle(f64::from(c) * 0.1)
+                        .with_angle(Radians::new(f64::from(c) * 0.1))
                         .with_x_reflection(c % 2 == 0),
                 ),
             );
@@ -190,7 +190,7 @@ fn complex_library() -> Library {
                         .with_spacing_x(Some(point(100_000, 0)))
                         .with_spacing_y(Some(point(0, 80_000)))
                         .with_magnification(0.9 + f64::from(r) * 0.1)
-                        .with_angle(f64::from(r) * 0.05)
+                        .with_angle(Radians::new(f64::from(r) * 0.05))
                         .with_x_reflection(r % 2 == 1),
                 ),
             );
