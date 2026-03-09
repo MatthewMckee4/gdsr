@@ -110,13 +110,13 @@ impl Polygon {
     /// The corners are normalized using min/max so the rectangle is well-defined regardless of
     /// which opposing corners are passed. Points are generated in counter-clockwise winding order.
     pub fn rectangle(corner1: Point, corner2: Point, layer: Layer, data_type: DataType) -> Self {
-        let x_units = corner1.x().units();
-        let y_units = corner1.y().units();
+        let x_units = corner1.x().units().min(corner2.x().units());
+        let y_units = corner1.y().units().min(corner2.y().units());
 
-        let x1 = corner1.x().float_value();
-        let y1 = corner1.y().float_value();
-        let x2 = corner2.x().float_value();
-        let y2 = corner2.y().float_value();
+        let x1 = corner1.x().scale_to(x_units).float_value();
+        let y1 = corner1.y().scale_to(y_units).float_value();
+        let x2 = corner2.x().scale_to(x_units).float_value();
+        let y2 = corner2.y().scale_to(y_units).float_value();
 
         let min_x = x1.min(x2);
         let max_x = x1.max(x2);
@@ -562,6 +562,19 @@ mod tests {
             DataType::new(0),
         );
         assert_eq!(rect1.points(), rect2.points());
+    }
+
+    #[test]
+    fn test_rectangle_mixed_units() {
+        let rect = Polygon::rectangle(
+            Point::integer(2, 3, 1e-6),
+            Point::integer(5000, 8000, 1e-9),
+            Layer::new(0),
+            DataType::new(0),
+        );
+        assert_eq!(rect.points().len(), 5);
+        assert_eq!(rect.points()[0], Point::float(2000.0, 3000.0, 1e-9));
+        assert_eq!(rect.points()[2], Point::float(5000.0, 8000.0, 1e-9));
     }
 
     #[test]
