@@ -56,17 +56,17 @@ impl Polygon {
         data_type: DataType,
     ) -> Self {
         let num_sides = num_sides.max(3);
-        let cx = center.x().float_value();
-        let cy = center.y().float_value();
+
         let x_units = center.x().units();
         let y_units = center.y().units();
 
         let points = (0..num_sides).map(|i| {
             let angle = rotation + (i as f64) * std::f64::consts::TAU / (num_sides as f64);
-            Point::new(
-                Unit::float(cx + radius * angle.cos(), x_units),
-                Unit::float(cy + radius * angle.sin(), y_units),
-            )
+            center
+                + Point::new(
+                    Unit::float(radius * angle.cos(), x_units),
+                    Unit::float(radius * angle.sin(), y_units),
+                )
         });
 
         Self::new(points, layer, data_type)
