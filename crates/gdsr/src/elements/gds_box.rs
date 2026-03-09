@@ -13,6 +13,11 @@ pub struct GdsBox {
 }
 
 impl GdsBox {
+    /// Returns a builder for constructing a box with method chaining.
+    pub fn builder() -> GdsBoxBuilder {
+        GdsBoxBuilder::default()
+    }
+
     /// Creates a new box from two diagonal corner points, layer, and box type.
     /// The corners are normalised so that `bottom_left` holds the minimum
     /// coordinates and `top_right` holds the maximum.
@@ -104,6 +109,64 @@ impl GdsBox {
             top_right: self.top_right.to_float_unit(),
             ..self
         }
+    }
+}
+
+/// A builder for constructing [`GdsBox`] instances with method chaining.
+///
+/// All fields have sensible defaults (origin point, layer 0, box type 0).
+/// Corners are automatically normalised when `build()` is called.
+///
+/// # Example
+/// ```
+/// # use gdsr::{GdsBox, Layer, DataType, Point};
+/// let gds_box = GdsBox::builder()
+///     .corner1(Point::integer(0, 0, 1e-9))
+///     .corner2(Point::integer(10, 20, 1e-9))
+///     .layer(Layer::new(1))
+///     .box_type(DataType::new(2))
+///     .build();
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct GdsBoxBuilder {
+    corner1: Point,
+    corner2: Point,
+    layer: Layer,
+    box_type: DataType,
+}
+
+impl GdsBoxBuilder {
+    /// Sets the first corner point.
+    #[must_use]
+    pub fn corner1(mut self, corner: Point) -> Self {
+        self.corner1 = corner;
+        self
+    }
+
+    /// Sets the second corner point.
+    #[must_use]
+    pub fn corner2(mut self, corner: Point) -> Self {
+        self.corner2 = corner;
+        self
+    }
+
+    /// Sets the box's layer.
+    #[must_use]
+    pub fn layer(mut self, layer: Layer) -> Self {
+        self.layer = layer;
+        self
+    }
+
+    /// Sets the box's type.
+    #[must_use]
+    pub fn box_type(mut self, box_type: DataType) -> Self {
+        self.box_type = box_type;
+        self
+    }
+
+    /// Builds the box, automatically normalising corners.
+    pub fn build(self) -> GdsBox {
+        GdsBox::new(self.corner1, self.corner2, self.layer, self.box_type)
     }
 }
 
@@ -245,6 +308,55 @@ mod tests {
             converted.top_right(),
             converted.top_right().to_integer_unit()
         );
+    }
+
+    #[test]
+    fn builder_with_all_fields() {
+        let gds_box = GdsBox::builder()
+            .corner1(p(0, 0))
+            .corner2(p(10, 20))
+            .layer(Layer::new(3))
+            .box_type(DataType::new(1))
+            .build();
+
+        assert_eq!(gds_box.bottom_left(), p(0, 0));
+        assert_eq!(gds_box.top_right(), p(10, 20));
+        assert_eq!(gds_box.layer(), Layer::new(3));
+        assert_eq!(gds_box.box_type(), DataType::new(1));
+    }
+
+    #[test]
+    fn builder_defaults() {
+        let gds_box = GdsBox::builder().build();
+
+        assert_eq!(gds_box.bottom_left(), Point::default());
+        assert_eq!(gds_box.top_right(), Point::default());
+        assert_eq!(gds_box.layer(), Layer::default());
+        assert_eq!(gds_box.box_type(), DataType::default());
+    }
+
+    #[test]
+    fn builder_normalises_corners() {
+        let gds_box = GdsBox::builder()
+            .corner1(p(10, 20))
+            .corner2(p(0, 0))
+            .build();
+
+        assert_eq!(gds_box.bottom_left(), p(0, 0));
+        assert_eq!(gds_box.top_right(), p(10, 20));
+    }
+
+    #[test]
+    fn builder_matches_new() {
+        let from_new = GdsBox::new(p(5, 5), p(15, 25), Layer::new(2), DataType::new(3));
+        let from_builder = GdsBox::builder()
+            .corner1(p(5, 5))
+            .corner2(p(15, 25))
+            .layer(Layer::new(2))
+            .box_type(DataType::new(3))
+            .build();
+
+        assert_eq!(from_new, from_builder);
     }
 
     #[test]

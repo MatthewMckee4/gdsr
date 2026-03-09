@@ -7,9 +7,9 @@ pub mod reference;
 pub mod text;
 
 pub use element::Element;
-pub use gds_box::GdsBox;
+pub use gds_box::{GdsBox, GdsBoxBuilder};
 pub use node::Node;
-pub use path::{Path, PathType};
-pub use polygon::Polygon;
+pub use path::{Path, PathBuilder, PathType};
+pub use polygon::{Polygon, PolygonBuilder};
 pub use reference::{Instance, Reference};
 pub use text::Text;

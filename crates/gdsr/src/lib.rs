@@ -17,7 +17,10 @@ mod units;
 
 pub use cell::Cell;
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
-pub use elements::{Element, GdsBox, Instance, Node, Path, PathType, Polygon, Reference, Text};
+pub use elements::{
+    Element, GdsBox, GdsBoxBuilder, Instance, Node, Path, PathBuilder, PathType, Polygon,
+    PolygonBuilder, Reference, Text,
+};
 pub use error::GdsError;
 pub use grid::Grid;
 pub use io::write::svg::cell_to_svg;

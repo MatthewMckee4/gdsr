@@ -33,6 +33,11 @@ pub struct Polygon {
 }
 
 impl Polygon {
+    /// Returns a builder for constructing a polygon with method chaining.
+    pub fn builder() -> PolygonBuilder {
+        PolygonBuilder::default()
+    }
+
     /// Creates a new polygon from the given points, layer, and data type.
     /// The polygon is automatically closed if needed.
     pub fn new(points: impl IntoIterator<Item = Point>, layer: Layer, data_type: DataType) -> Self {
@@ -245,6 +250,59 @@ impl Polygon {
     /// Check if a point lies on the edge of the polygon
     pub fn is_point_on_edge(&self, point: &Point) -> bool {
         crate::geometry::is_point_on_edge(point, &self.points)
+    }
+}
+
+/// A builder for constructing [`Polygon`] instances with method chaining.
+///
+/// All fields have sensible defaults (empty points, layer 0, data type 0).
+/// Points are automatically closed when `build()` is called.
+///
+/// # Example
+/// ```
+/// # use gdsr::{Polygon, Layer, DataType, Point};
+/// let polygon = Polygon::builder()
+///     .points(vec![
+///         Point::integer(0, 0, 1e-9),
+///         Point::integer(10, 0, 1e-9),
+///         Point::integer(5, 10, 1e-9),
+///     ])
+///     .layer(Layer::new(1))
+///     .data_type(DataType::new(2))
+///     .build();
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct PolygonBuilder {
+    points: Vec<Point>,
+    layer: Layer,
+    data_type: DataType,
+}
+
+impl PolygonBuilder {
+    /// Sets the polygon's points.
+    #[must_use]
+    pub fn points(mut self, points: impl IntoIterator<Item = Point>) -> Self {
+        self.points = points.into_iter().collect();
+        self
+    }
+
+    /// Sets the polygon's layer.
+    #[must_use]
+    pub fn layer(mut self, layer: Layer) -> Self {
+        self.layer = layer;
+        self
+    }
+
+    /// Sets the polygon's data type.
+    #[must_use]
+    pub fn data_type(mut self, data_type: DataType) -> Self {
+        self.data_type = data_type;
+        self
+    }
+
+    /// Builds the polygon, automatically closing the point sequence if needed.
+    pub fn build(self) -> Polygon {
+        Polygon::new(self.points, self.layer, self.data_type)
     }
 }
 
@@ -680,6 +738,49 @@ mod tests {
         let origin = Point::float(0.0, 0.0, 1e-6);
         let ring = Polygon::ring(origin, 3.0, 5.0, 360, Layer::new(0), DataType::new(0));
         assert!(!ring.is_point_inside(&origin));
+    }
+
+    #[test]
+    fn test_builder_with_all_fields() {
+        let polygon = Polygon::builder()
+            .points(vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(5, 10, 1e-9),
+            ])
+            .layer(Layer::new(1))
+            .data_type(DataType::new(2))
+            .build();
+
+        assert_eq!(polygon.layer(), Layer::new(1));
+        assert_eq!(polygon.data_type(), DataType::new(2));
+        assert_eq!(polygon.points().len(), 4);
+    }
+
+    #[test]
+    fn test_builder_defaults() {
+        let polygon = Polygon::builder().build();
+
+        assert_eq!(polygon.layer(), Layer::new(0));
+        assert_eq!(polygon.data_type(), DataType::new(0));
+        assert!(polygon.points().is_empty());
+    }
+
+    #[test]
+    fn test_builder_matches_new() {
+        let points = vec![
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 0, 1e-9),
+            Point::integer(10, 10, 1e-9),
+        ];
+        let from_new = Polygon::new(points.clone(), Layer::new(3), DataType::new(4));
+        let from_builder = Polygon::builder()
+            .points(points)
+            .layer(Layer::new(3))
+            .data_type(DataType::new(4))
+            .build();
+
+        assert_eq!(from_new, from_builder);
     }
 
     #[test]

@@ -41,6 +41,11 @@ pub struct Path {
 }
 
 impl Path {
+    /// Returns a builder for constructing a path with method chaining.
+    pub fn builder() -> PathBuilder {
+        PathBuilder::default()
+    }
+
     /// Creates a new path from the given points, layer, data type, optional end cap type, optional width, and optional extensions.
     pub fn new(
         points: impl IntoIterator<Item = Point>,
@@ -217,6 +222,99 @@ impl Path {
             end_extension: self.end_extension.map(Unit::to_float_unit),
             ..self
         }
+    }
+}
+
+/// A builder for constructing [`Path`] instances with method chaining.
+///
+/// All fields have sensible defaults (empty points, layer 0, data type 0,
+/// all optional fields `None`).
+///
+/// # Example
+/// ```
+/// # use gdsr::{Path, PathType, Layer, DataType, Point, Unit};
+/// let path = Path::builder()
+///     .points(vec![
+///         Point::integer(0, 0, 1e-9),
+///         Point::integer(10, 0, 1e-9),
+///     ])
+///     .layer(Layer::new(5))
+///     .width(Unit::default_integer(100))
+///     .path_type(PathType::Round)
+///     .build();
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct PathBuilder {
+    points: Vec<Point>,
+    layer: Layer,
+    data_type: DataType,
+    path_type: Option<PathType>,
+    width: Option<Unit>,
+    begin_extension: Option<Unit>,
+    end_extension: Option<Unit>,
+}
+
+impl PathBuilder {
+    /// Sets the path's points.
+    #[must_use]
+    pub fn points(mut self, points: impl IntoIterator<Item = Point>) -> Self {
+        self.points = points.into_iter().collect();
+        self
+    }
+
+    /// Sets the path's layer.
+    #[must_use]
+    pub fn layer(mut self, layer: Layer) -> Self {
+        self.layer = layer;
+        self
+    }
+
+    /// Sets the path's data type.
+    #[must_use]
+    pub fn data_type(mut self, data_type: DataType) -> Self {
+        self.data_type = data_type;
+        self
+    }
+
+    /// Sets the path's end cap type.
+    #[must_use]
+    pub fn path_type(mut self, path_type: PathType) -> Self {
+        self.path_type = Some(path_type);
+        self
+    }
+
+    /// Sets the path's width.
+    #[must_use]
+    pub fn width(mut self, width: Unit) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Sets the path's begin extension distance.
+    #[must_use]
+    pub fn begin_extension(mut self, ext: Unit) -> Self {
+        self.begin_extension = Some(ext);
+        self
+    }
+
+    /// Sets the path's end extension distance.
+    #[must_use]
+    pub fn end_extension(mut self, ext: Unit) -> Self {
+        self.end_extension = Some(ext);
+        self
+    }
+
+    /// Builds the path.
+    pub fn build(self) -> Path {
+        Path::new(
+            self.points,
+            self.layer,
+            self.data_type,
+            self.path_type,
+            self.width,
+            self.begin_extension,
+            self.end_extension,
+        )
     }
 }
 
@@ -594,6 +692,82 @@ mod tests {
         let last = arc.points().last().expect("arc should have points");
         assert!(last.x().float_value().abs() < tolerance);
         assert!((last.y().float_value() - radius).abs() < tolerance);
+    }
+
+    #[test]
+    fn test_builder_minimal() {
+        let path = Path::builder()
+            .points(vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+            ])
+            .build();
+
+        assert_eq!(path.points().len(), 2);
+        assert_eq!(path.layer(), Layer::new(0));
+        assert_eq!(path.data_type(), DataType::new(0));
+        assert_eq!(path.width(), None);
+        assert_eq!(path.path_type(), &None);
+        assert_eq!(path.begin_extension(), None);
+        assert_eq!(path.end_extension(), None);
+    }
+
+    #[test]
+    fn test_builder_with_all_fields() {
+        let path = Path::builder()
+            .points(vec![
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+            ])
+            .layer(Layer::new(5))
+            .data_type(DataType::new(3))
+            .width(Unit::default_integer(100))
+            .path_type(PathType::Round)
+            .begin_extension(Unit::default_integer(5))
+            .end_extension(Unit::default_integer(15))
+            .build();
+
+        assert_eq!(path.layer(), Layer::new(5));
+        assert_eq!(path.data_type(), DataType::new(3));
+        assert_eq!(path.width(), Some(Unit::default_integer(100)));
+        assert_eq!(path.path_type(), &Some(PathType::Round));
+        assert_eq!(path.begin_extension(), Some(Unit::default_integer(5)));
+        assert_eq!(path.end_extension(), Some(Unit::default_integer(15)));
+    }
+
+    #[test]
+    fn test_builder_defaults() {
+        let path = Path::builder().build();
+
+        assert!(path.points().is_empty());
+        assert_eq!(path.layer(), Layer::new(0));
+        assert_eq!(path.data_type(), DataType::new(0));
+        assert_eq!(path.width(), None);
+    }
+
+    #[test]
+    fn test_builder_matches_new() {
+        let points = vec![Point::integer(0, 0, 1e-9), Point::integer(10, 0, 1e-9)];
+        let from_new = Path::new(
+            points.clone(),
+            Layer::new(2),
+            DataType::new(1),
+            Some(PathType::Overlap),
+            Some(Unit::default_integer(50)),
+            Some(Unit::default_integer(10)),
+            Some(Unit::default_integer(20)),
+        );
+        let from_builder = Path::builder()
+            .points(points)
+            .layer(Layer::new(2))
+            .data_type(DataType::new(1))
+            .path_type(PathType::Overlap)
+            .width(Unit::default_integer(50))
+            .begin_extension(Unit::default_integer(10))
+            .end_extension(Unit::default_integer(20))
+            .build();
+
+        assert_eq!(from_new, from_builder);
     }
 
     #[test]
