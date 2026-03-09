@@ -246,7 +246,7 @@ impl Viewport {
                         );
                         let sw = (s_max.x - s_min.x).abs();
                         let sh = (s_min.y - s_max.y).abs();
-                        let font_size = (sw.min(sh) * 0.15).clamp(8.0, 24.0);
+                        let font_size = sw.min(sh) * 0.15;
                         if font_size >= 6.0 {
                             painter.text(
                                 screen_rect.center(),
