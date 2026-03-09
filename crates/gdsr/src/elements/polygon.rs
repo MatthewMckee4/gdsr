@@ -41,6 +41,37 @@ impl Polygon {
         }
     }
 
+    /// Creates a regular N-sided polygon (equilateral triangle, square, pentagon, hexagon, etc.).
+    ///
+    /// `center` is the center of the polygon. `radius` is the circumradius (distance from center
+    /// to each vertex), interpreted in the same units as the center point. `num_sides` is the
+    /// number of sides (clamped to a minimum of 3). `rotation` controls the starting angle of
+    /// the first vertex in radians. Vertices are generated counter-clockwise.
+    pub fn regular_polygon(
+        center: Point,
+        radius: f64,
+        num_sides: usize,
+        rotation: f64,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
+        let num_sides = num_sides.max(3);
+        let cx = center.x().float_value();
+        let cy = center.y().float_value();
+        let x_units = center.x().units();
+        let y_units = center.y().units();
+
+        let points = (0..num_sides).map(|i| {
+            let angle = rotation + (i as f64) * std::f64::consts::TAU / (num_sides as f64);
+            Point::new(
+                Unit::float(cx + radius * angle.cos(), x_units),
+                Unit::float(cy + radius * angle.sin(), y_units),
+            )
+        });
+
+        Self::new(points, layer, data_type)
+    }
+
     /// Returns the polygon's points (including the closing point).
     pub fn points(&self) -> &[Point] {
         &self.points
@@ -392,5 +423,72 @@ mod tests {
         let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
         assert_eq!(moved.points().len(), 0);
+    }
+
+    #[test]
+    fn test_regular_polygon_hexagon() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let hexagon =
+            Polygon::regular_polygon(center, 10.0, 6, 0.0, Layer::new(1), DataType::new(0));
+
+        assert_eq!(hexagon.points().len(), 7);
+        assert_eq!(hexagon.layer(), Layer::new(1));
+        assert_eq!(hexagon.data_type(), DataType::new(0));
+
+        let first = hexagon.points()[0];
+        assert!((first.x().float_value() - 10.0).abs() < 1e-10);
+        assert!(first.y().float_value().abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_regular_polygon_square() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let square = Polygon::regular_polygon(center, 1.0, 4, 0.0, Layer::new(0), DataType::new(0));
+
+        assert_eq!(square.points().len(), 5);
+
+        let area = square.area().float_value();
+        let expected_area = 2.0; // area of square with circumradius 1 = 2*r^2*sin(π/2) = 2
+        assert!((area - expected_area).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_regular_polygon_triangle() {
+        let center = Point::float(5.0, 5.0, 1e-6);
+        let triangle =
+            Polygon::regular_polygon(center, 10.0, 3, 0.0, Layer::new(2), DataType::new(1));
+
+        assert_eq!(triangle.points().len(), 4);
+
+        let first = triangle.points()[0];
+        assert!((first.x().float_value() - 15.0).abs() < 1e-10);
+        assert!((first.y().float_value() - 5.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_regular_polygon_with_rotation() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let rotated = Polygon::regular_polygon(
+            center,
+            10.0,
+            4,
+            std::f64::consts::FRAC_PI_4,
+            Layer::new(0),
+            DataType::new(0),
+        );
+
+        let first = rotated.points()[0];
+        let expected = 10.0 * std::f64::consts::FRAC_PI_4.cos();
+        assert!((first.x().float_value() - expected).abs() < 1e-10);
+        assert!((first.y().float_value() - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_regular_polygon_num_sides_clamped() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let polygon =
+            Polygon::regular_polygon(center, 5.0, 1, 0.0, Layer::new(0), DataType::new(0));
+
+        assert_eq!(polygon.points().len(), 4);
     }
 }
