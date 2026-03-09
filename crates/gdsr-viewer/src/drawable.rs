@@ -63,6 +63,9 @@ pub struct DrawContext<'a> {
     pub screen_pts_buf: &'a mut Vec<Pos2>,
     /// When true, the element is drawn with a brighter fill and bolder outline.
     pub highlight: bool,
+    /// When true, un-flattened cell references draw as outlined bounding boxes
+    /// with the cell name centered, instead of expanding their contents.
+    pub show_ref_bbox: bool,
 }
 
 /// Fill alpha for normal and highlighted elements.
@@ -826,6 +829,98 @@ impl Drawable for gdsr::Node {
     }
 }
 
+/// Draws an un-flattened reference as an outlined bounding box with a centered cell name label.
+fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
+    let (label, bbox) = if let Some(cell_name) = reference.instance().as_cell() {
+        let Some(lib) = ctx.library else { return };
+        let Some(cell) = lib.get_cell(cell_name) else {
+            return;
+        };
+        let (min_pt, max_pt) = cell.bounding_box();
+        let bbox_poly = gdsr::Polygon::new(
+            vec![
+                min_pt,
+                gdsr::Point::new(max_pt.x(), min_pt.y()),
+                max_pt,
+                gdsr::Point::new(min_pt.x(), max_pt.y()),
+                min_pt,
+            ],
+            Layer::new(0),
+            DataType::new(0),
+        );
+        let bbox_element = Element::Polygon(bbox_poly);
+        let mut merged: Option<WorldBBox> = None;
+        for el in reference.get_elements_in_grid(&bbox_element) {
+            if let Some(bb) = el.world_bbox() {
+                merged = Some(match merged {
+                    Some(acc) => acc.merge(&bb),
+                    None => bb,
+                });
+            }
+        }
+        match merged {
+            Some(bb) => (Some(cell_name.as_str()), bb),
+            None => return,
+        }
+    } else if let Some(element) = reference.instance().as_element() {
+        let mut merged: Option<WorldBBox> = None;
+        for el in reference.get_elements_in_grid(element) {
+            if let Some(bb) = el.world_bbox() {
+                merged = Some(match merged {
+                    Some(acc) => acc.merge(&bb),
+                    None => bb,
+                });
+            }
+        }
+        match merged {
+            Some(bb) => (None, bb),
+            None => return,
+        }
+    } else {
+        return;
+    };
+
+    if !bbox.overlaps(ctx.visible) {
+        return;
+    }
+
+    let s_min = ctx
+        .viewport
+        .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+    let s_max = ctx
+        .viewport
+        .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
+    let sw = (s_max.x - s_min.x).abs();
+    let sh = (s_min.y - s_max.y).abs();
+
+    if sw < 2.0 && sh < 2.0 {
+        return;
+    }
+
+    let screen_rect = Rect::from_two_pos(s_min, s_max);
+    let stroke_color = Color32::from_rgb(180, 180, 180);
+    ctx.rect_stroke(
+        screen_rect,
+        0.0,
+        Stroke::new(1.0, stroke_color),
+        StrokeKind::Outside,
+    );
+
+    if let Some(name) = label {
+        let font_size = (sw.min(sh) * 0.15).clamp(8.0, 24.0);
+        if font_size >= 6.0 {
+            let center = screen_rect.center();
+            ctx.text(
+                center,
+                egui::Align2::CENTER_CENTER,
+                name,
+                FontId::monospace(font_size),
+                stroke_color,
+            );
+        }
+    }
+}
+
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self.instance().as_element() {
@@ -860,6 +955,10 @@ impl Drawable for gdsr::Reference {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
+        if ctx.show_ref_bbox {
+            draw_ref_as_bbox(self, ctx);
+            return;
+        }
         if let Some(element) = self.instance().as_element() {
             for el in self.get_elements_in_grid(element) {
                 el.draw(ctx);
@@ -952,6 +1051,7 @@ pub fn draw_highlight(
         tessellation_cache,
         screen_pts_buf: &mut screen_pts_buf,
         highlight: true,
+        show_ref_bbox: false,
     };
     element.draw(&mut ctx);
     for (_, mesh) in layer_meshes {

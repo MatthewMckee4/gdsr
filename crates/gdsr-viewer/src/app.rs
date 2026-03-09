@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
-use crate::drawable::Drawable;
+use crate::drawable::{Drawable, WorldBBox};
 use crate::panels;
 use crate::quick_pick::{QuickPick, QuickPickResult};
 use crate::recent::{RecentProjectItem, RecentProjects};
@@ -121,13 +121,20 @@ impl ViewerApp {
             cell.spatial_grid = None;
             cell.cell_stats = cell.library.get_cell(name).map(gdsr::CellStats::from_cell);
 
+            let depth = cell.render_depth;
+            if depth == 0 {
+                cell.elements_loading = false;
+                return;
+            }
+
             if let Some(cell_data) = cell.library.get_cell(name) {
                 let cell_data = cell_data.clone();
                 let library = cell.library.clone();
                 let (tx, rx) = mpsc::channel();
+                let stream_depth = Some((depth - 1) as usize);
 
                 thread::spawn(move || {
-                    cell_data.stream_elements(None, &library, &tx);
+                    cell_data.stream_elements(stream_depth, &library, &tx);
                 });
 
                 cell.element_receiver = Some(rx);
@@ -139,7 +146,21 @@ impl ViewerApp {
     /// Adjusts the viewport to fit all currently loaded elements.
     fn zoom_to_fit(&mut self) {
         if let Some(cell) = self.cell.as_ref() {
-            if let Some(bounds) = viewport::compute_bounds(&cell.elements) {
+            let bounds = if cell.render_depth == 0 {
+                cell.selected_cell.as_ref().and_then(|name| {
+                    let c = cell.library.get_cell(name)?;
+                    let (min_pt, max_pt) = gdsr::Dimensions::bounding_box(c);
+                    Some(WorldBBox::new(
+                        min_pt.x().absolute_value(),
+                        min_pt.y().absolute_value(),
+                        max_pt.x().absolute_value(),
+                        max_pt.y().absolute_value(),
+                    ))
+                })
+            } else {
+                viewport::compute_bounds(&cell.elements)
+            };
+            if let Some(bounds) = bounds {
                 let rect =
                     egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
                 self.viewport.zoom_to_fit(&bounds, rect);
@@ -328,6 +349,7 @@ impl eframe::App for ViewerApp {
         });
 
         // Bottom activity bar
+        let mut depth_changed = false;
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let is_tree = self.side_panel_tab == SidePanelTab::Cells
@@ -411,6 +433,17 @@ impl eframe::App for ViewerApp {
                                 ui.selectable_value(&mut self.grid_spacing, preset, label);
                             }
                         });
+                    if let Some(cell) = &mut self.cell {
+                        let prev_depth = cell.render_depth;
+                        ui.add(
+                            egui::DragValue::new(&mut cell.render_depth)
+                                .range(0..=99_u32)
+                                .prefix("Depth: "),
+                        );
+                        if cell.render_depth != prev_depth {
+                            depth_changed = true;
+                        }
+                    }
                     if self.ruler.active {
                         ui.label("Ruler: click to place point (Esc to cancel)");
                     }
@@ -420,6 +453,13 @@ impl eframe::App for ViewerApp {
                 });
             });
         });
+
+        if depth_changed {
+            if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
+                self.select_cell(&name);
+            }
+            self.render_cache.clear();
+        }
 
         // Cell picker (⌘P)
         self.cell_picker.set_items(
@@ -498,6 +538,9 @@ impl eframe::App for ViewerApp {
         let grid_spacing = self.grid_spacing;
         let hovered_element = &mut self.hovered_element;
         let query_buf = &mut self.query_buf;
+        let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
+        let selected_cell_name: Option<String> =
+            cell.as_ref().and_then(|c| c.selected_cell.clone());
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -524,6 +567,8 @@ impl eframe::App for ViewerApp {
                 show_grid,
                 grid_spacing,
                 *hovered_element,
+                render_depth,
+                selected_cell_name.as_deref(),
             );
 
             let prev_hovered = *hovered_element;

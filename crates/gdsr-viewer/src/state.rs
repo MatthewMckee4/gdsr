@@ -34,6 +34,7 @@ pub struct CellState {
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
     pub cell_stats: Option<CellStats>,
+    pub render_depth: u32,
 }
 
 impl CellState {
@@ -57,6 +58,7 @@ impl CellState {
             spatial_grid: None,
             tessellation_cache: HashMap::new(),
             cell_stats: None,
+            render_depth: 1,
         }
     }
 }
@@ -78,6 +80,7 @@ pub struct RenderCache {
     /// Invalidation metadata — if any of these change, full re-render.
     hidden_layers: Vec<(Layer, DataType)>,
     element_count: usize,
+    render_depth: u32,
     populated: bool,
 }
 
@@ -92,6 +95,7 @@ impl Default for RenderCache {
             render_rect_center: Pos2::ZERO,
             hidden_layers: Vec::new(),
             element_count: 0,
+            render_depth: 1,
             populated: false,
         }
     }
@@ -103,6 +107,7 @@ impl RenderCache {
         &self,
         hidden_layers: &[(Layer, DataType)],
         element_count: usize,
+        render_depth: u32,
         current_center_x: f64,
         current_center_y: f64,
         current_zoom: f64,
@@ -111,7 +116,10 @@ impl RenderCache {
         if !self.populated {
             return true;
         }
-        if self.hidden_layers != hidden_layers || self.element_count != element_count {
+        if self.hidden_layers != hidden_layers
+            || self.element_count != element_count
+            || self.render_depth != render_depth
+        {
             return true;
         }
 
@@ -162,6 +170,7 @@ impl RenderCache {
         rect_center: Pos2,
         hidden_layers: Vec<(Layer, DataType)>,
         element_count: usize,
+        render_depth: u32,
     ) {
         self.layer_meshes = layer_meshes;
         self.extra_shapes = extra_shapes;
@@ -171,6 +180,7 @@ impl RenderCache {
         self.render_rect_center = rect_center;
         self.hidden_layers = hidden_layers;
         self.element_count = element_count;
+        self.render_depth = render_depth;
         self.populated = true;
     }
 
@@ -207,6 +217,7 @@ mod tests {
             test_rect().center(),
             vec![],
             42,
+            1,
         );
         cache
     }
@@ -215,20 +226,20 @@ mod tests {
     fn no_rerender_on_same_state() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
     }
 
     #[test]
     fn rerender_when_empty() {
         let cache = RenderCache::default();
-        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, test_rect()));
+        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, test_rect()));
     }
 
     #[test]
     fn no_rerender_on_small_pan() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 100.0, 0.0, 1.0, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 100.0, 0.0, 1.0, rect));
     }
 
     #[test]
@@ -237,14 +248,14 @@ mod tests {
         let rect = test_rect();
         // 800px viewport width, margin budget = 800, 80% = 640px.
         // dx_screen = (0.0 - 700.0) * 1.0 = -700, |700| > 640 → re-render
-        assert!(cache.needs_full_render(&[], 42, 700.0, 0.0, 1.0, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 700.0, 0.0, 1.0, rect));
     }
 
     #[test]
     fn no_rerender_on_small_zoom() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 1.5, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.5, rect));
     }
 
     #[test]
@@ -252,7 +263,7 @@ mod tests {
         let cache = populated_cache();
         let rect = test_rect();
         // zoom ratio 3.0 / 1.0 = 3.0, outside [0.5, 2.0]
-        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 3.0, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 3.0, rect));
     }
 
     #[test]
@@ -261,6 +272,7 @@ mod tests {
         assert!(cache.needs_full_render(
             &[(Layer::new(1), DataType::new(0))],
             42,
+            1,
             0.0,
             0.0,
             1.0,
@@ -271,7 +283,13 @@ mod tests {
     #[test]
     fn rerender_on_element_count_change() {
         let cache = populated_cache();
-        assert!(cache.needs_full_render(&[], 43, 0.0, 0.0, 1.0, test_rect()));
+        assert!(cache.needs_full_render(&[], 43, 1, 0.0, 0.0, 1.0, test_rect()));
+    }
+
+    #[test]
+    fn rerender_on_render_depth_change() {
+        let cache = populated_cache();
+        assert!(cache.needs_full_render(&[], 42, 2, 0.0, 0.0, 1.0, test_rect()));
     }
 
     #[test]
@@ -321,6 +339,7 @@ mod tests {
             rect.center(),
             vec![],
             1,
+            1,
         );
 
         let new_vp = Viewport {
@@ -352,28 +371,28 @@ mod tests {
     fn no_rerender_at_zoom_ratio_boundary_low() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 0.5, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 0.5, rect));
     }
 
     #[test]
     fn rerender_just_below_zoom_ratio_boundary() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 0.49, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 0.49, rect));
     }
 
     #[test]
     fn no_rerender_at_zoom_ratio_boundary_high() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 2.0, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 2.0, rect));
     }
 
     #[test]
     fn rerender_just_above_zoom_ratio_boundary() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 2.01, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 2.01, rect));
     }
 
     #[test]
@@ -381,14 +400,14 @@ mod tests {
         let cache = populated_cache();
         let rect = test_rect();
         // margin_x = 800 * 0.8 = 640, dx_screen = |0 - 640| = 640, NOT > 640
-        assert!(!cache.needs_full_render(&[], 42, 640.0, 0.0, 1.0, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 640.0, 0.0, 1.0, rect));
     }
 
     #[test]
     fn rerender_just_beyond_margin() {
         let cache = populated_cache();
         let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 641.0, 0.0, 1.0, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 641.0, 0.0, 1.0, rect));
     }
 
     #[test]
@@ -414,9 +433,9 @@ mod tests {
     fn clear_forces_rerender() {
         let mut cache = populated_cache();
         let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, rect));
+        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
         cache.clear();
-        assert!(cache.needs_full_render(&[], 42, 0.0, 0.0, 1.0, rect));
+        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
     }
 
     #[test]

@@ -5,7 +5,7 @@ pub use bounds::compute_bounds;
 use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Rect, Sense};
-use gdsr::{DataType, Element, Layer, Library};
+use gdsr::{DataType, Dimensions, Element, Layer, Library};
 
 use crate::drawable::{DrawContext, Drawable, WorldBBox, draw_highlight};
 use crate::grid;
@@ -106,6 +106,8 @@ impl Viewport {
         show_grid: bool,
         grid_spacing: GridSpacing,
         hovered_element: Option<usize>,
+        render_depth: u32,
+        selected_cell: Option<&str>,
     ) -> Option<(f64, f64)> {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
@@ -178,6 +180,7 @@ impl Viewport {
         if !render_cache.needs_full_render(
             &hidden_layers,
             elements.len(),
+            render_depth,
             self.center_x,
             self.center_y,
             self.zoom,
@@ -221,6 +224,48 @@ impl Viewport {
             return mouse_world;
         }
 
+        // Depth-0: draw just the selected cell's bounding box with its name.
+        if render_depth == 0 {
+            if let Some(cell_name) = selected_cell {
+                if let Some(lib) = library {
+                    if let Some(cell) = lib.get_cell(cell_name) {
+                        let (min_pt, max_pt) = cell.bounding_box();
+                        let min_x = min_pt.x().absolute_value();
+                        let min_y = min_pt.y().absolute_value();
+                        let max_x = max_pt.x().absolute_value();
+                        let max_y = max_pt.y().absolute_value();
+                        let s_min = self.world_to_screen(min_x, min_y, rect);
+                        let s_max = self.world_to_screen(max_x, max_y, rect);
+                        let screen_rect = Rect::from_two_pos(s_min, s_max);
+                        let stroke_color = Color32::from_rgb(180, 180, 180);
+                        painter.rect_stroke(
+                            screen_rect,
+                            0.0,
+                            egui::Stroke::new(1.0, stroke_color),
+                            egui::StrokeKind::Outside,
+                        );
+                        let sw = (s_max.x - s_min.x).abs();
+                        let sh = (s_min.y - s_max.y).abs();
+                        let font_size = (sw.min(sh) * 0.15).clamp(8.0, 24.0);
+                        if font_size >= 6.0 {
+                            painter.text(
+                                screen_rect.center(),
+                                egui::Align2::CENTER_CENTER,
+                                cell_name,
+                                egui::FontId::monospace(font_size),
+                                stroke_color,
+                            );
+                        }
+                    }
+                }
+            }
+            let mouse_world = response
+                .hover_pos()
+                .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+            ruler.draw(&painter, self, rect, mouse_world);
+            return mouse_world;
+        }
+
         // Full render: query a 3× expanded region so the cache has margin for panning.
         let visible = self.visible_world_rect(rect);
         let w = visible.max_x - visible.min_x;
@@ -235,6 +280,7 @@ impl Viewport {
         let mut layer_meshes = HashMap::new();
         let mut extra_shapes = Vec::new();
         let mut screen_pts_buf = Vec::new();
+        let show_ref_bbox = render_depth > 0;
         let mut ctx = DrawContext {
             painter: &painter,
             layer_meshes: &mut layer_meshes,
@@ -248,6 +294,7 @@ impl Viewport {
             tessellation_cache,
             screen_pts_buf: &mut screen_pts_buf,
             highlight: false,
+            show_ref_bbox,
         };
 
         if let Some(grid) = spatial_grid {
@@ -317,6 +364,7 @@ impl Viewport {
             rect.center(),
             hidden_layers,
             elements.len(),
+            render_depth,
         );
 
         if let Some(idx) = hovered_element {
