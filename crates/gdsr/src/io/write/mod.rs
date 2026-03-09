@@ -446,7 +446,7 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
     )?;
     write_transformation_to_file(
         &mut buffer,
-        text.angle(),
+        text.angle().to_degrees().value(),
         text.magnification(),
         text.x_reflection(),
     )?;
@@ -485,7 +485,7 @@ fn write_reference_element(
 
             let mut new_element = element.clone();
             if grid.x_reflection() {
-                new_element = new_element.reflect(0.0, Point::default());
+                new_element = new_element.reflect(crate::Radians::new(0.0), Point::default());
             }
             new_element = new_element.rotate(grid.angle(), Point::default());
             new_element = new_element.scale(grid.magnification(), Point::default());
@@ -519,7 +519,7 @@ fn write_reference_cell(
     write_string_with_record_to_file(&mut buffer, GDSRecord::SName, cell_name)?;
     write_transformation_to_file(
         &mut buffer,
-        grid.angle().to_degrees(),
+        grid.angle().to_degrees().value(),
         grid.magnification(),
         grid.x_reflection(),
     )?;

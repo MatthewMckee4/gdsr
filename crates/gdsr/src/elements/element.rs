@@ -257,7 +257,7 @@ impl Dimensions for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DataType, GdsBox, Grid, Layer, Node, Point};
+    use crate::{DataType, GdsBox, Grid, Layer, Node, Point, Radians};
 
     const UNITS: f64 = 1e-9;
 
@@ -452,7 +452,7 @@ mod tests {
     fn test_element_transform_preserves_variant() {
         let centre = origin();
         for element in all_elements() {
-            let rotated = element.clone().rotate(std::f64::consts::PI / 2.0, centre);
+            let rotated = element.clone().rotate(Radians::FRAC_PI_2, centre);
             assert_eq!(
                 std::mem::discriminant(&element),
                 std::mem::discriminant(&rotated)

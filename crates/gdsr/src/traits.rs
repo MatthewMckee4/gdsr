@@ -1,5 +1,5 @@
 use crate::transformation::{Reflection, Rotation, Scale, Transformation, Translation};
-use crate::{AngleInRadians, Point};
+use crate::{Point, Radians};
 
 /// Trait for types that can be geometrically transformed (rotated, scaled, reflected, translated).
 pub trait Transformable: Sized {
@@ -15,7 +15,7 @@ pub trait Transformable: Sized {
 
     /// Rotates by the given angle (in radians) around the centre point.
     #[must_use]
-    fn rotate(self, angle: AngleInRadians, centre: Point) -> Self {
+    fn rotate(self, angle: Radians, centre: Point) -> Self {
         self.transform_impl(
             Transformation::default().with_rotation(Some(Rotation::new(angle, centre))),
         )
@@ -29,7 +29,7 @@ pub trait Transformable: Sized {
 
     /// Reflects across the axis defined by the given angle (in radians) through the centre point.
     #[must_use]
-    fn reflect(self, angle: f64, centre: Point) -> Self {
+    fn reflect(self, angle: Radians, centre: Point) -> Self {
         self.transform_impl(
             Transformation::default().with_reflection(Some(Reflection::new(angle, centre))),
         )

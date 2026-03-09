@@ -64,7 +64,9 @@ expression: moved_elements
                 0,
             ),
             magnification: 1.0,
-            angle: 0.0,
+            angle: Radians(
+                0.0,
+            ),
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,

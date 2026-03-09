@@ -223,7 +223,7 @@ impl Movable for Cell {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DataType, Layer};
+    use crate::{DataType, Layer, Radians};
 
     #[test]
     fn test_cell_new() {
@@ -366,7 +366,7 @@ mod tests {
 
         insta::assert_debug_snapshot!(moved_elements);
 
-        let rotated_cell = moved_cell.rotate(90.0, Point::integer(5, 5, 1e-9));
+        let rotated_cell = moved_cell.rotate(Radians::new(90.0), Point::integer(5, 5, 1e-9));
 
         let rotated_elements = rotated_cell.get_elements(None, &library);
 

@@ -40,7 +40,7 @@ pub mod helpers {
             Layer::new(layer),
             DataType::new(0),
             1.0,
-            0.0,
+            gdsr::Radians::new(0.0),
             false,
             VerticalPresentation::default(),
             HorizontalPresentation::default(),

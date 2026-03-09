@@ -1,5 +1,3 @@
-use std::f64::consts::TAU;
-
 use quickcheck_macros::quickcheck;
 
 use crate::*;
@@ -72,7 +70,7 @@ fn scalar_multiplication_distributivity(a: Point, b: Point, s: i32) -> bool {
 fn rotation_by_2pi_is_identity(a: Point) -> bool {
     let a = a.to_float_unit();
     let origin = Point::float(0.0, 0.0, a.units().0);
-    let rotated = a.rotate(TAU, origin);
+    let rotated = a.rotate(Radians::TAU, origin);
 
     let dx = (rotated.x().absolute_value() - a.x().absolute_value()).abs();
     let dy = (rotated.y().absolute_value() - a.y().absolute_value()).abs();

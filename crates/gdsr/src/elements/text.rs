@@ -1,4 +1,4 @@
-use crate::{DataType, Dimensions, Layer, Movable, Point, Transformable};
+use crate::{DataType, Dimensions, Layer, Movable, Point, Radians, Transformable};
 
 // --- Presentation types ---
 
@@ -158,7 +158,7 @@ pub struct Text {
     pub(crate) layer: Layer,
     pub(crate) datatype: DataType,
     pub(crate) magnification: f64,
-    pub(crate) angle: f64,
+    pub(crate) angle: Radians,
     pub(crate) x_reflection: bool,
     pub(crate) vertical_presentation: VerticalPresentation,
     pub(crate) horizontal_presentation: HorizontalPresentation,
@@ -172,7 +172,7 @@ impl Default for Text {
             layer: Layer::new(0),
             datatype: DataType::new(0),
             magnification: 1.0,
-            angle: 0.0,
+            angle: Radians::new(0.0),
             x_reflection: false,
             vertical_presentation: VerticalPresentation::default(),
             horizontal_presentation: HorizontalPresentation::default(),
@@ -188,7 +188,7 @@ impl Text {
         layer: Layer,
         datatype: DataType,
         magnification: f64,
-        angle: f64,
+        angle: Radians,
         x_reflection: bool,
         vertical_presentation: VerticalPresentation,
         horizontal_presentation: HorizontalPresentation,
@@ -269,13 +269,13 @@ impl Text {
     }
 
     /// Returns the rotation angle in radians.
-    pub const fn angle(&self) -> f64 {
+    pub const fn angle(&self) -> Radians {
         self.angle
     }
 
     /// Sets the rotation angle and returns the modified value.
     #[must_use]
-    pub fn set_angle(mut self, angle: f64) -> Self {
+    pub fn set_angle(mut self, angle: Radians) -> Self {
         self.angle = angle;
         self
     }
@@ -664,7 +664,7 @@ mod tests {
             Layer::new(5),
             DataType::new(0),
             2.0,
-            45.0,
+            Radians::new(45.0),
             true,
             VerticalPresentation::Top,
             HorizontalPresentation::Right,
@@ -674,7 +674,7 @@ mod tests {
         assert_eq!(text.origin(), &Point::integer(100, 200, 1e-9));
         assert_eq!(text.layer(), Layer::new(5));
         assert_eq!(text.magnification(), 2.0);
-        assert_eq!(text.angle(), 45.0);
+        assert_eq!(text.angle(), Radians::new(45.0));
         assert!(text.x_reflection());
     }
 
@@ -686,7 +686,7 @@ mod tests {
         assert_eq!(text.origin(), &Point::integer(0, 0, 1e-9));
         assert_eq!(text.layer(), Layer::new(0));
         assert_eq!(text.magnification(), 1.0);
-        assert_eq!(text.angle(), 0.0);
+        assert_eq!(text.angle(), Radians::new(0.0));
         assert!(!text.x_reflection());
     }
 
@@ -698,7 +698,7 @@ mod tests {
             Layer::new(1),
             DataType::new(0),
             1.5,
-            30.0,
+            Radians::new(30.0),
             false,
             VerticalPresentation::Bottom,
             HorizontalPresentation::Left,
@@ -734,8 +734,8 @@ mod tests {
 
     #[test]
     fn test_set_angle() {
-        let text = Text::default().set_angle(90.0);
-        assert_eq!(text.angle(), 90.0);
+        let text = Text::default().set_angle(Radians::new(90.0));
+        assert_eq!(text.angle(), Radians::new(90.0));
     }
 
     #[test]
@@ -766,7 +766,7 @@ mod tests {
             .set_origin(Point::integer(100, 200, 1e-9))
             .set_layer(Layer::new(5))
             .set_magnification(2.0)
-            .set_angle(45.0)
+            .set_angle(Radians::new(45.0))
             .set_x_reflection(true)
             .set_vertical_presentation(VerticalPresentation::Bottom)
             .set_horizontal_presentation(HorizontalPresentation::Left);
@@ -775,7 +775,7 @@ mod tests {
         assert_eq!(text.origin(), &Point::integer(100, 200, 1e-9));
         assert_eq!(text.layer(), Layer::new(5));
         assert_eq!(text.magnification(), 2.0);
-        assert_eq!(text.angle(), 45.0);
+        assert_eq!(text.angle(), Radians::new(45.0));
         assert!(text.x_reflection());
         assert_eq!(text.vertical_presentation(), &VerticalPresentation::Bottom);
         assert_eq!(
@@ -810,7 +810,7 @@ mod tests {
     fn test_text_rotate() {
         let text = Text::default();
 
-        let rotated_text = text.rotate(PI / 2.0, Point::origin());
+        let rotated_text = text.rotate(Radians::new(PI / 2.0), Point::origin());
 
         assert_debug_snapshot!(rotated_text, @r#"
         Text {
@@ -836,7 +836,9 @@ mod tests {
                 0,
             ),
             magnification: 1.0,
-            angle: 1.5707963267948966,
+            angle: Radians(
+                1.5707963267948966,
+            ),
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
@@ -850,12 +852,12 @@ mod tests {
             .set_origin(Point::integer(10, 20, 1e-9))
             .set_x_reflection(false);
 
-        let reflected = text.reflect(0.0, Point::origin());
+        let reflected = text.reflect(Radians::new(0.0), Point::origin());
 
         assert!(reflected.x_reflection());
         assert_eq!(reflected.origin(), &Point::integer(10, -20, 1e-9));
 
-        let reflected_again = reflected.reflect(0.0, Point::origin());
+        let reflected_again = reflected.reflect(Radians::new(0.0), Point::origin());
 
         assert!(!reflected_again.x_reflection());
         assert_eq!(reflected_again.origin(), &Point::integer(10, 20, 1e-9));
@@ -899,13 +901,13 @@ mod tests {
             .set_x_reflection(false);
 
         let transformed = text
-            .reflect(0.0, Point::origin())
+            .reflect(Radians::new(0.0), Point::origin())
             .scale(2.0, Point::origin())
-            .rotate(PI / 2.0, Point::origin());
+            .rotate(Radians::new(PI / 2.0), Point::origin());
 
         assert!(transformed.x_reflection());
         assert_eq!(transformed.magnification(), 2.0);
-        assert_eq!(transformed.angle(), PI / 2.0);
+        assert_eq!(transformed.angle(), Radians::new(PI / 2.0));
 
         assert_debug_snapshot!(transformed, @r#"
         Text {
@@ -931,7 +933,9 @@ mod tests {
                 0,
             ),
             magnification: 2.0,
-            angle: 1.5707963267948966,
+            angle: Radians(
+                1.5707963267948966,
+            ),
             x_reflection: true,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,

@@ -38,7 +38,7 @@ fn translation_preserves_perimeter(polygon: Polygon, dx: i32, dy: i32) -> bool {
 fn rotation_preserves_area(polygon: Polygon) -> bool {
     let units = polygon.points()[0].units().0;
     let centre = Point::integer(0, 0, units);
-    let rotated = polygon.clone().rotate(std::f64::consts::FRAC_PI_2, centre);
+    let rotated = polygon.clone().rotate(Radians::FRAC_PI_2, centre);
     let original_area = polygon.area().float_value();
     let rotated_area = rotated.area().float_value();
     if original_area == 0.0 {
@@ -74,7 +74,7 @@ fn regular_polygon_vertices_equidistant_from_center(num_sides: usize) -> bool {
         center,
         radius,
         num_sides,
-        0.0,
+        Radians::new(0.0),
         Layer::new(0),
         DataType::new(0),
     );

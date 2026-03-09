@@ -1,6 +1,6 @@
 use gdsr::{
     Cell, DataType, Grid, HorizontalPresentation, Layer, Library, Path, PathType, Point, Polygon,
-    Reference, Text, Unit, VerticalPresentation, cell_to_svg,
+    Radians, Reference, Text, Unit, VerticalPresentation, cell_to_svg,
 };
 
 fn main() -> Result<(), gdsr::GdsError> {
@@ -87,7 +87,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         Layer::new(6),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::Bottom,
         HorizontalPresentation::Left,
@@ -98,7 +98,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         Layer::new(7),
         DataType::new(0),
         2.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::Middle,
         HorizontalPresentation::Centre,
@@ -113,7 +113,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         None,
         None,
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
     )));
     top.add(Reference::new("paths").with_grid(Grid::new(
@@ -123,7 +123,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         None,
         None,
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
     )));
     top.add(Reference::new("text").with_grid(Grid::new(
@@ -133,7 +133,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         None,
         None,
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
     )));
     // Array reference: 3x2 grid of the polygons cell
@@ -144,7 +144,7 @@ fn main() -> Result<(), gdsr::GdsError> {
         Some(Point::default_integer(5000, 0)),
         Some(Point::default_integer(0, 2000)),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
     )));
 

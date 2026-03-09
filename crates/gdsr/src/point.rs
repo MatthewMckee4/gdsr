@@ -1,7 +1,7 @@
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::units::Unit;
-use crate::{AngleInRadians, Movable, Transformable, Transformation};
+use crate::{Movable, Radians, Transformable, Transformation};
 
 /// A 2D point with x and y coordinates, each carrying their own unit of measurement.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -135,8 +135,8 @@ impl Point {
     /// # Returns
     /// A new `Point` representing the rotated position
     #[must_use]
-    pub fn rotate_around_point(&self, angle: AngleInRadians, center: &Self) -> Self {
-        if angle == 0.0 {
+    pub fn rotate_around_point(&self, angle: Radians, center: &Self) -> Self {
+        if angle.value() == 0.0 {
             return *self;
         }
 
@@ -386,7 +386,7 @@ mod tests {
         #[test]
         fn chaining_from_and_methods() {
             let point = Point::integer(100, 200, 1e-9);
-            let rotated = point.rotate(std::f64::consts::PI, Point::integer(0, 0, 1e-9));
+            let rotated = point.rotate(Radians(std::f64::consts::PI), Point::integer(0, 0, 1e-9));
 
             assert_eq!(point.x(), Unit::integer(100, 1e-9));
             assert_eq!(point.y(), Unit::integer(200, 1e-9));
@@ -478,11 +478,12 @@ mod tests {
         use std::f64::consts::PI;
 
         use super::*;
+        use crate::Radians;
 
         #[test]
         fn rotate_90_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(PI / 2.0, Point::float(0.0, 0.0, 1e-6));
+            let rotated = point.rotate(Radians(PI / 2.0), Point::float(0.0, 0.0, 1e-6));
 
             assert!((rotated.x().absolute_value() - 0.0) < 1e-15);
             assert!((rotated.y().absolute_value() - 1e-6) < 1e-15);
@@ -491,7 +492,7 @@ mod tests {
         #[test]
         fn rotate_180_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(PI, Point::float(0.0, 0.0, 1e-6));
+            let rotated = point.rotate(Radians(PI), Point::float(0.0, 0.0, 1e-6));
 
             assert!((rotated.x().absolute_value() - (-1e-6)) < 1e-15);
             assert!((rotated.y().absolute_value() - 0.0) < 1e-15);
@@ -500,7 +501,7 @@ mod tests {
         #[test]
         fn rotate_270_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(3.0 * PI / 2.0, Point::float(0.0, 0.0, 1e-6));
+            let rotated = point.rotate(Radians(3.0 * PI / 2.0), Point::float(0.0, 0.0, 1e-6));
 
             assert!((rotated.x().absolute_value() - 0.0) < 1e-15);
             assert!((rotated.y().absolute_value() - (-1e-6)) < 1e-15);
@@ -509,7 +510,7 @@ mod tests {
         #[test]
         fn rotate_360_degrees() {
             let point = Point::float(1.0, 0.0, 1e-6);
-            let rotated = point.rotate(2.0 * PI, Point::float(0.0, 0.0, 1e-6));
+            let rotated = point.rotate(Radians(2.0 * PI), Point::float(0.0, 0.0, 1e-6));
 
             assert!((rotated.x().absolute_value() - 1e-6) < 1e-15);
             assert!((rotated.y().absolute_value() - 0.0) < 1e-15);
@@ -518,7 +519,7 @@ mod tests {
         #[test]
         fn rotate_arbitrary_point() {
             let point = Point::float(3.0, 4.0, 1e-6);
-            let rotated = point.rotate(PI / 4.0, Point::float(0.0, 0.0, 1e-6)); // 45 degrees
+            let rotated = point.rotate(Radians(PI / 4.0), Point::float(0.0, 0.0, 1e-6));
 
             let expected_x = 3e-6f64.mul_add((PI / 4.0).cos(), -(4e-6 * (PI / 4.0).sin()));
             let expected_y = 3e-6f64.mul_add((PI / 4.0).sin(), 4e-6 * (PI / 4.0).cos());

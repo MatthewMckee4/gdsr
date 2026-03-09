@@ -5,7 +5,9 @@ use crate::*;
 #[quickcheck]
 fn double_reflection_cancels(grid: Grid) -> bool {
     let centre = Point::integer(0, 0, 1e-9);
-    let transformed = grid.reflect(0.0, centre).reflect(0.0, centre);
+    let transformed = grid
+        .reflect(Radians::new(0.0), centre)
+        .reflect(Radians::new(0.0), centre);
     !transformed.x_reflection()
 }
 

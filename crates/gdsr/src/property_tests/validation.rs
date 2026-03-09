@@ -1,5 +1,3 @@
-use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
-
 use quickcheck::Gen;
 use quickcheck_macros::quickcheck;
 use tempfile::tempdir;
@@ -44,7 +42,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             Layer::new(3),
             DataType::new(0),
             2.0,
-            0.0,
+            Radians::new(0.0),
             false,
             VerticalPresentation::Middle,
             HorizontalPresentation::Centre,
@@ -94,7 +92,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             Some(Point::integer(0, 10, units)),
             Some(Point::integer(10, 0, units)),
             1.0,
-            FRAC_PI_4,
+            Radians::FRAC_PI_4,
             false,
         ))
         .into(),
@@ -114,7 +112,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             None,
             None,
             2.0,
-            FRAC_PI_4,
+            Radians::FRAC_PI_4,
             false,
         ))
         .into(),
@@ -134,7 +132,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             None,
             None,
             2.0,
-            -FRAC_PI_4,
+            Radians::new(-std::f64::consts::FRAC_PI_4),
             false,
         ))
         .into(),
@@ -155,49 +153,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             None,
             None,
             1.0,
-            0.0,
-            false,
-        ))
-        .into(),
-        Reference::new(Polygon::new(
-            [
-                Point::integer(0, 0, units),
-                Point::integer(20, 0, units),
-                Point::integer(20, 20, units),
-                Point::integer(0, 20, units),
-            ],
-            Layer::new(4),
-            DataType::new(0),
-        ))
-        .with_grid(Grid::new(
-            Point::integer(300, 50, units),
-            1,
-            2,
-            None,
-            Some(Point::integer(10, 10, units)),
-            1.0,
-            0.0,
-            false,
-        ))
-        .into(),
-        Reference::new(Polygon::new(
-            [
-                Point::integer(0, 0, units),
-                Point::integer(20, 0, units),
-                Point::integer(20, 20, units),
-                Point::integer(0, 20, units),
-            ],
-            Layer::new(4),
-            DataType::new(0),
-        ))
-        .with_grid(Grid::new(
-            Point::integer(300, 50, units),
-            2,
-            1,
-            Some(Point::integer(10, 10, units)),
-            None,
-            1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         ))
         .into(),
@@ -218,7 +174,7 @@ fn get_elements(units: f64) -> Vec<Element> {
             None,
             Some(Point::integer(10, 10, units)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         ))
         .into(),
@@ -239,7 +195,49 @@ fn get_elements(units: f64) -> Vec<Element> {
             Some(Point::integer(10, 10, units)),
             None,
             1.0,
-            0.0,
+            Radians::new(0.0),
+            false,
+        ))
+        .into(),
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            Layer::new(4),
+            DataType::new(0),
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            1,
+            2,
+            None,
+            Some(Point::integer(10, 10, units)),
+            1.0,
+            Radians::new(0.0),
+            false,
+        ))
+        .into(),
+        Reference::new(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(20, 0, units),
+                Point::integer(20, 20, units),
+                Point::integer(0, 20, units),
+            ],
+            Layer::new(4),
+            DataType::new(0),
+        ))
+        .with_grid(Grid::new(
+            Point::integer(300, 50, units),
+            2,
+            1,
+            Some(Point::integer(10, 10, units)),
+            None,
+            1.0,
+            Radians::new(0.0),
             false,
         ))
         .into(),
@@ -272,7 +270,7 @@ fn test_library_roundtrip_mixed_elements() {
         Layer::new(1),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::default(),
         HorizontalPresentation::default(),
@@ -360,7 +358,7 @@ fn test_library_roundtrip_different_units() {
             Some(Point::integer(150, 0, units)),
             Some(Point::integer(0, 150, units)),
             1.5,
-            45.0,
+            Radians::new(45.0),
             true,
         ));
 
@@ -484,7 +482,7 @@ fn test_text_with_various_presentations() {
         Layer::new(1),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::Top,
         HorizontalPresentation::Left,
@@ -496,7 +494,7 @@ fn test_text_with_various_presentations() {
         Layer::new(1),
         DataType::new(0),
         1.5,
-        45.0,
+        Radians::new(45.0),
         false,
         VerticalPresentation::Middle,
         HorizontalPresentation::Centre,
@@ -508,7 +506,7 @@ fn test_text_with_various_presentations() {
         Layer::new(2),
         DataType::new(0),
         2.0,
-        90.0,
+        Radians::new(90.0),
         true,
         VerticalPresentation::Bottom,
         HorizontalPresentation::Right,
@@ -699,7 +697,7 @@ fn test_single_cell_with_all_element_types() {
         Layer::new(3),
         DataType::new(0),
         2.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::Middle,
         HorizontalPresentation::Centre,
@@ -749,7 +747,7 @@ fn test_element_reference() {
             Some(Point::integer(10, 10, units)),
             Some(Point::integer(10, 10, units)),
             1.0,
-            0.0,
+            Radians::new(0.0),
             false,
         ));
 
@@ -799,7 +797,7 @@ fn test_cell_reference() {
             Some(Point::integer(10, 10, units)),
             Some(Point::integer(10, 10, units)),
             2.0,
-            FRAC_PI_2,
+            Radians::FRAC_PI_2,
             true,
         ));
 
@@ -812,7 +810,7 @@ fn test_cell_reference() {
             Some(Point::integer(10, 10, units)),
             None,
             2.0,
-            FRAC_PI_2,
+            Radians::FRAC_PI_2,
             true,
         ));
 
@@ -825,7 +823,7 @@ fn test_cell_reference() {
             None,
             Some(Point::integer(10, 10, units)),
             2.0,
-            FRAC_PI_2,
+            Radians::FRAC_PI_2,
             true,
         ));
 
@@ -1013,7 +1011,7 @@ fn test_all_presentation_combinations_roundtrip() {
                 Layer::new(1),
                 DataType::new(0),
                 1.0,
-                0.0,
+                Radians::new(0.0),
                 false,
                 *vp,
                 *hp,
@@ -1159,7 +1157,7 @@ fn test_text_invalid_layer() {
         Layer::new(256),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::default(),
         HorizontalPresentation::default(),
@@ -1180,7 +1178,7 @@ fn test_text_string_too_long() {
         Layer::new(0),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::default(),
         HorizontalPresentation::default(),
@@ -1201,7 +1199,7 @@ fn test_text_string_at_max_length() {
         Layer::new(0),
         DataType::new(0),
         1.0,
-        0.0,
+        Radians::new(0.0),
         false,
         VerticalPresentation::default(),
         HorizontalPresentation::default(),

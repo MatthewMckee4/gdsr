@@ -3,7 +3,7 @@ use std::sync::mpsc;
 
 use crate::elements::Element;
 use crate::traits::{Movable, Transformable};
-use crate::{Cell, Grid, Library, Point, Transformation};
+use crate::{Cell, Grid, Library, Point, Radians, Transformation};
 
 /// The target of a [`Reference`](crate::Reference): either a cell name or an inline element.
 #[derive(Clone, Debug, PartialEq)]
@@ -168,7 +168,7 @@ impl Reference {
 
                 // Apply transformations around cell-local origin (0,0)
                 if grid.x_reflection() {
-                    new_element = new_element.reflect(0.0, Point::default());
+                    new_element = new_element.reflect(Radians::new(0.0), Point::default());
                 }
 
                 new_element = new_element.rotate(grid.angle(), Point::default());
@@ -396,7 +396,7 @@ mod tests {
                 Layer::new(1),
                 DataType::new(0),
                 1.0,
-                0.0,
+                Radians::new(0.0),
                 false,
                 VerticalPresentation::Middle,
                 HorizontalPresentation::Centre,
@@ -712,7 +712,7 @@ mod tests {
             .with_spacing_x(Some(Point::integer(10, 0, 1e-9)))
             .with_spacing_y(Some(Point::integer(0, 10, 1e-9)))
             .with_magnification(2.0)
-            .with_angle(std::f64::consts::PI / 2.0)
+            .with_angle(Radians::FRAC_PI_2)
             .with_x_reflection(false);
 
         let reference = Reference::new(polygon.clone()).with_grid(grid);
@@ -743,9 +743,9 @@ mod tests {
         let reference = Reference::new(polygon).with_grid(grid);
 
         let centre = Point::integer(5, 5, 1e-9);
-        let transformed = reference.rotate(std::f64::consts::PI / 2.0, centre);
+        let transformed = reference.rotate(Radians::FRAC_PI_2, centre);
 
-        assert!(transformed.grid().angle() != 0.0);
+        assert!(transformed.grid().angle() != Radians::new(0.0));
     }
 
     #[test]
@@ -1350,7 +1350,7 @@ mod tests {
             .with_columns(2)
             .with_rows(1)
             .with_spacing_x(Some(Point::integer(20, 0, 1e-9)))
-            .with_angle(std::f64::consts::FRAC_PI_2);
+            .with_angle(Radians::FRAC_PI_2);
 
         let reference = Reference::new(polygon.clone()).with_grid(grid);
         let elements = reference.get_elements_in_grid(&Element::Polygon(polygon));
@@ -1441,7 +1441,7 @@ mod tests {
             .with_origin(Point::integer(100, 200, 1e-9))
             .with_columns(1)
             .with_rows(1)
-            .with_angle(std::f64::consts::FRAC_PI_2);
+            .with_angle(Radians::FRAC_PI_2);
 
         let reference = Reference::new("base").with_grid(grid);
         let flattened = reference.flatten(None, &library);
