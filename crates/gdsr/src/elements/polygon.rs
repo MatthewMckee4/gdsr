@@ -105,6 +105,20 @@ impl Polygon {
         Self::new(points, layer, data_type)
     }
 
+    /// Creates a circle approximation as a polygon.
+    ///
+    /// This is a convenience wrapper around `ellipse()` with equal radii. `num_points` vertices
+    /// are generated counter-clockwise starting from angle 0 (positive x-axis).
+    pub fn circle(
+        center: Point,
+        radius: f64,
+        num_points: usize,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
+        Self::ellipse(center, radius, radius, num_points, layer, data_type)
+    }
+
     /// Creates an axis-aligned rectangle from two opposing corners.
     ///
     /// The corners are normalized using min/max so the rectangle is well-defined regardless of
@@ -590,4 +604,23 @@ mod tests {
         );
         assert_eq!(polygon.points().len(), 4);
     }
+
+    #[test]
+    fn test_circle_matches_ellipse_with_equal_radii() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let radius = 5.0;
+        let num_points = 36;
+        let circle = Polygon::circle(origin, radius, num_points, Layer::new(0), DataType::new(0));
+        let ellipse = Polygon::ellipse(
+            origin,
+            radius,
+            radius,
+            num_points,
+            Layer::new(0),
+            DataType::new(0),
+        );
+        assert_eq!(circle.points(), ellipse.points());
+        assert_eq!(circle.points().len(), num_points + 1);
+    }
+
 }
