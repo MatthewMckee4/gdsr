@@ -105,6 +105,34 @@ impl Polygon {
         Self::new(points, layer, data_type)
     }
 
+    /// Creates an axis-aligned rectangle from two opposing corners.
+    ///
+    /// The corners are normalized using min/max so the rectangle is well-defined regardless of
+    /// which opposing corners are passed. Points are generated in counter-clockwise winding order.
+    pub fn rectangle(corner1: Point, corner2: Point, layer: Layer, data_type: DataType) -> Self {
+        let x_units = corner1.x().units();
+        let y_units = corner1.y().units();
+
+        let x1 = corner1.x().float_value();
+        let y1 = corner1.y().float_value();
+        let x2 = corner2.x().float_value();
+        let y2 = corner2.y().float_value();
+
+        let min_x = x1.min(x2);
+        let max_x = x1.max(x2);
+        let min_y = y1.min(y2);
+        let max_y = y1.max(y2);
+
+        let points = [
+            Point::new(Unit::float(min_x, x_units), Unit::float(min_y, y_units)),
+            Point::new(Unit::float(max_x, x_units), Unit::float(min_y, y_units)),
+            Point::new(Unit::float(max_x, x_units), Unit::float(max_y, y_units)),
+            Point::new(Unit::float(min_x, x_units), Unit::float(max_y, y_units)),
+        ];
+
+        Self::new(points, layer, data_type)
+    }
+
     /// Returns the polygon's points (including the closing point).
     pub fn points(&self) -> &[Point] {
         &self.points
@@ -498,6 +526,110 @@ mod tests {
         assert!((min.y().float_value() - (-5.0)).abs() < 1e-6);
         assert!((max.x().float_value() - 10.0).abs() < 1e-6);
         assert!((max.y().float_value() - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_rectangle_creation() {
+        let rect = Polygon::rectangle(
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 5, 1e-9),
+            Layer::new(1),
+            DataType::new(0),
+        );
+
+        insta::assert_debug_snapshot!(rect.points(), @r#"
+        [
+            Point {
+                x: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            Point {
+                x: Float(
+                    FloatUnit {
+                        value: 10.0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            Point {
+                x: Float(
+                    FloatUnit {
+                        value: 10.0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    FloatUnit {
+                        value: 5.0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            Point {
+                x: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    FloatUnit {
+                        value: 5.0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+            Point {
+                x: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+                y: Float(
+                    FloatUnit {
+                        value: 0.0,
+                        units: 1e-9,
+                    },
+                ),
+            },
+        ]
+        "#);
+        assert_eq!(rect.layer(), Layer::new(1));
+        assert_eq!(rect.data_type(), DataType::new(0));
+    }
+
+    #[test]
+    fn test_rectangle_swapped_corners() {
+        let rect1 = Polygon::rectangle(
+            Point::integer(0, 0, 1e-9),
+            Point::integer(10, 5, 1e-9),
+            Layer::new(0),
+            DataType::new(0),
+        );
+        let rect2 = Polygon::rectangle(
+            Point::integer(10, 5, 1e-9),
+            Point::integer(0, 0, 1e-9),
+            Layer::new(0),
+            DataType::new(0),
+        );
+        assert_eq!(rect1.points(), rect2.points());
     }
 
     #[test]
