@@ -7,6 +7,7 @@ use crate::error::GdsError;
 use crate::io::read::from_gds;
 use crate::io::write::{GdsFileWriter, GdsWriter};
 use crate::types::LayerMapping;
+use crate::{Element, Instance};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq)]
@@ -99,6 +100,91 @@ impl Library {
         let mut file = File::create(file_name)?;
         file.write_all(&bytes)?;
         Ok(file.flush()?)
+    }
+
+    /// Detects and merges structurally identical cells.
+    ///
+    /// Two cells are considered identical if they have the same elements (ignoring cell name).
+    /// When duplicates are found, the first cell (alphabetically) is kept as canonical,
+    /// and all references to duplicates are updated to point to the canonical cell.
+    ///
+    /// Returns a map of removed cell names to the canonical cell name they were merged into.
+    pub fn deduplicate_cells(&mut self) -> HashMap<String, String> {
+        let mut names: Vec<String> = self.cells.keys().cloned().collect();
+        names.sort();
+
+        // Group cells with identical elements using pairwise comparison.
+        // Each group is a vec of names sharing the same elements content.
+        let mut groups: Vec<Vec<String>> = Vec::new();
+        let mut assigned: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for i in 0..names.len() {
+            if assigned.contains(&names[i]) {
+                continue;
+            }
+            let mut group = vec![names[i].clone()];
+            for name in names.iter().skip(i + 1) {
+                if assigned.contains(name) {
+                    continue;
+                }
+                if let (Some(cell_i), Some(cell_j)) =
+                    (self.cells.get(&names[i]), self.cells.get(name))
+                {
+                    if cell_i.elements() == cell_j.elements() {
+                        group.push(name.clone());
+                        assigned.insert(name.clone());
+                    }
+                }
+            }
+            assigned.insert(names[i].clone());
+            if group.len() > 1 {
+                groups.push(group);
+            }
+        }
+
+        // Build rename map: duplicate_name -> canonical_name (first alphabetically)
+        let mut rename_map: HashMap<String, String> = HashMap::new();
+        for group in &groups {
+            let canonical = &group[0];
+            for name in group.iter().skip(1) {
+                rename_map.insert(name.clone(), canonical.clone());
+            }
+        }
+
+        if rename_map.is_empty() {
+            return rename_map;
+        }
+
+        // Remove duplicate cells
+        for name in rename_map.keys() {
+            self.cells.remove(name);
+        }
+
+        // Update all Instance::Cell references that point to removed duplicates
+        for cell in self.cells.values_mut() {
+            for element in cell.iter_elements_mut() {
+                Self::update_reference_names(element, &rename_map);
+            }
+        }
+
+        rename_map
+    }
+
+    /// Recursively updates `Instance::Cell` names in a reference element using the rename map.
+    fn update_reference_names(element: &mut Element, rename_map: &HashMap<String, String>) {
+        if let Element::Reference(reference) = element {
+            match &mut reference.instance {
+                Instance::Cell(name) => {
+                    if let Some(canonical) = rename_map.get(name.as_str()) {
+                        *name = canonical.clone();
+                    }
+                }
+                Instance::Element(arc_elem) => {
+                    let elem = std::sync::Arc::make_mut(arc_elem);
+                    Self::update_reference_names(elem, rename_map);
+                }
+            }
+        }
     }
 
     /// Remaps layer/data type pairs on all elements in all cells using the given mapping.
@@ -555,5 +641,213 @@ mod tests {
             },
         ]
         "#);
+    }
+
+    #[test]
+    fn test_deduplicate_identical_cells() {
+        let units = 1e-9;
+        let mut lib = Library::new("test");
+
+        let mut cell_a = Cell::new("A");
+        cell_a.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+
+        let mut cell_b = Cell::new("B");
+        cell_b.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+
+        let mut cell_top = Cell::new("TOP");
+        cell_top.add(Reference::new("A".to_string()));
+        cell_top.add(Reference::new("B".to_string()));
+        lib.add_cell(cell_a);
+        lib.add_cell(cell_b);
+        lib.add_cell(cell_top);
+
+        let merged = lib.deduplicate_cells();
+
+        insta::assert_debug_snapshot!(merged, @r#"
+        {
+            "B": "A",
+        }
+        "#);
+        assert!(lib.get_cell("B").is_none());
+        assert!(lib.get_cell("A").is_some());
+
+        let top = lib.get_cell("TOP").expect("TOP cell should exist");
+        let refs: Vec<&str> = top.referenced_cell_names().into_iter().collect();
+        assert!(refs.iter().all(|&r| r == "A"));
+        assert!(!refs.contains(&"B"));
+    }
+
+    #[test]
+    fn test_deduplicate_no_duplicates() {
+        let units = 1e-9;
+        let mut lib = Library::new("test");
+
+        let mut cell_a = Cell::new("A");
+        cell_a.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+
+        let mut cell_b = Cell::new("B");
+        cell_b.add(Polygon::new(
+            [
+                Point::integer(5, 5, units),
+                Point::integer(6, 5, units),
+                Point::integer(5, 6, units),
+            ],
+            Layer::new(2),
+            DataType::new(0),
+        ));
+
+        lib.add_cell(cell_a);
+        lib.add_cell(cell_b);
+
+        let merged = lib.deduplicate_cells();
+        assert!(merged.is_empty());
+        assert_eq!(lib.cells().len(), 2);
+    }
+
+    #[test]
+    fn test_deduplicate_empty_library() {
+        let mut lib = Library::new("empty");
+        let merged = lib.deduplicate_cells();
+        assert!(merged.is_empty());
+        assert!(lib.cells().is_empty());
+    }
+
+    #[test]
+    fn test_deduplicate_multiple_groups() {
+        let units = 1e-9;
+        let mut lib = Library::new("test");
+
+        // Group 1: A and C have the same polygon
+        let polygon1 = Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut cell_a = Cell::new("A");
+        cell_a.add(polygon1.clone());
+        let mut cell_c = Cell::new("C");
+        cell_c.add(polygon1);
+
+        // Group 2: B and D have a different polygon
+        let polygon2 = Polygon::new(
+            [
+                Point::integer(10, 10, units),
+                Point::integer(20, 10, units),
+                Point::integer(10, 20, units),
+            ],
+            Layer::new(2),
+            DataType::new(0),
+        );
+        let mut cell_b = Cell::new("B");
+        cell_b.add(polygon2.clone());
+        let mut cell_d = Cell::new("D");
+        cell_d.add(polygon2);
+
+        lib.add_cell(cell_a);
+        lib.add_cell(cell_b);
+        lib.add_cell(cell_c);
+        lib.add_cell(cell_d);
+
+        let merged = lib.deduplicate_cells();
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.get("C"), Some(&"A".to_string()));
+        assert_eq!(merged.get("D"), Some(&"B".to_string()));
+        assert_eq!(lib.cells().len(), 2);
+        assert!(lib.get_cell("A").is_some());
+        assert!(lib.get_cell("B").is_some());
+    }
+
+    #[test]
+    fn test_deduplicate_updates_nested_references() {
+        let units = 1e-9;
+        let mut lib = Library::new("test");
+
+        let mut cell_a = Cell::new("A");
+        cell_a.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+
+        let mut cell_b = Cell::new("B");
+        cell_b.add(Polygon::new(
+            [
+                Point::integer(0, 0, units),
+                Point::integer(1, 0, units),
+                Point::integer(0, 1, units),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+
+        // Cell with a nested inline reference pointing to "B"
+        let mut cell_top = Cell::new("TOP");
+        let inner_ref = Reference::new("B".to_string());
+        cell_top.add(Reference::new(inner_ref));
+        lib.add_cell(cell_a);
+        lib.add_cell(cell_b);
+        lib.add_cell(cell_top);
+
+        let merged = lib.deduplicate_cells();
+
+        insta::assert_debug_snapshot!(merged, @r#"
+        {
+            "B": "A",
+        }
+        "#);
+
+        let top = lib.get_cell("TOP").expect("TOP cell should exist");
+        let refs: Vec<&str> = top.referenced_cell_names().into_iter().collect();
+        assert_eq!(refs, vec!["A"]);
+    }
+
+    #[test]
+    fn test_deduplicate_empty_cells_are_duplicates() {
+        let mut lib = Library::new("test");
+        lib.add_cell(Cell::new("X"));
+        lib.add_cell(Cell::new("Y"));
+        lib.add_cell(Cell::new("Z"));
+
+        let merged = lib.deduplicate_cells();
+
+        // All empty cells are identical; X is canonical (alphabetically first)
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.get("Y"), Some(&"X".to_string()));
+        assert_eq!(merged.get("Z"), Some(&"X".to_string()));
+        assert_eq!(lib.cells().len(), 1);
+        assert!(lib.get_cell("X").is_some());
     }
 }
