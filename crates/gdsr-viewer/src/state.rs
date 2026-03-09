@@ -515,6 +515,27 @@ mod tests {
     fn display_unit_default_is_auto() {
         assert_eq!(DisplayUnit::default(), DisplayUnit::Auto);
     }
+
+    #[test]
+    fn grid_spacing_default_is_auto() {
+        assert_eq!(GridSpacing::default(), GridSpacing::Auto);
+    }
+
+    #[test]
+    fn grid_spacing_label_auto() {
+        insta::assert_snapshot!(GridSpacing::Auto.label(), @"Auto");
+    }
+
+    #[test]
+    fn grid_spacing_label_fixed_preset() {
+        insta::assert_snapshot!(GridSpacing::Fixed(1.0).label(), @"1");
+        insta::assert_snapshot!(GridSpacing::Fixed(10.0).label(), @"10");
+    }
+
+    #[test]
+    fn grid_spacing_label_fixed_custom() {
+        insta::assert_snapshot!(GridSpacing::Fixed(7.5).label(), @"Custom");
+    }
 }
 
 /// Controls how world coordinates (meters) are displayed to the user.
@@ -578,6 +599,36 @@ pub enum CellViewMode {
     #[default]
     Tree,
     Flat,
+}
+
+/// Controls grid line spacing.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub enum GridSpacing {
+    /// Automatic 1-2-5 sequence that adapts to zoom level.
+    #[default]
+    Auto,
+    /// Fixed spacing in world units.
+    Fixed(f64),
+}
+
+impl GridSpacing {
+    pub const PRESETS: &[(&str, Self)] = &[
+        ("Auto", Self::Auto),
+        ("0.1", Self::Fixed(0.1)),
+        ("1", Self::Fixed(1.0)),
+        ("10", Self::Fixed(10.0)),
+        ("100", Self::Fixed(100.0)),
+        ("1000", Self::Fixed(1000.0)),
+    ];
+
+    pub fn label(self) -> &'static str {
+        for &(label, preset) in Self::PRESETS {
+            if self == preset {
+                return label;
+            }
+        }
+        "Custom"
+    }
 }
 
 /// Groups layer visibility and color state.

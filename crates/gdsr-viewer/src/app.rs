@@ -9,7 +9,8 @@ use crate::recent::{RecentProjectItem, RecentProjects};
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{
-    CellState, CellViewMode, DisplayUnit, FileLoadState, LayerState, RenderCache, SidePanelTab,
+    CellState, CellViewMode, DisplayUnit, FileLoadState, GridSpacing, LayerState, RenderCache,
+    SidePanelTab,
 };
 use crate::viewport::{self, Viewport};
 
@@ -40,6 +41,7 @@ pub struct ViewerApp {
     scroll_to_selected: bool,
     recent_projects: RecentProjects,
     display_unit: DisplayUnit,
+    grid_spacing: GridSpacing,
     cell_picker: QuickPick<String>,
     recent_picker: QuickPick<RecentProjectItem>,
 }
@@ -61,6 +63,7 @@ impl Default for ViewerApp {
             cell_view_mode: CellViewMode::default(),
             scroll_to_selected: false,
             display_unit: DisplayUnit::default(),
+            grid_spacing: GridSpacing::default(),
             recent_projects: RecentProjects::load(),
             cell_picker: QuickPick::new("Search cells…", true),
             recent_picker: QuickPick::new("Recent projects…", false),
@@ -398,6 +401,15 @@ impl eframe::App for ViewerApp {
                                 ui.selectable_value(&mut self.display_unit, unit, unit.label());
                             }
                         });
+                    ui.label("Grid:");
+                    egui::ComboBox::from_id_salt("grid_spacing")
+                        .selected_text(self.grid_spacing.label())
+                        .width(60.0)
+                        .show_ui(ui, |ui| {
+                            for &(label, preset) in GridSpacing::PRESETS {
+                                ui.selectable_value(&mut self.grid_spacing, preset, label);
+                            }
+                        });
                     if self.ruler.active {
                         ui.label("Ruler: click to place point (Esc to cancel)");
                     }
@@ -482,6 +494,7 @@ impl eframe::App for ViewerApp {
         let render_cache = &mut self.render_cache;
         let ruler = &mut self.ruler;
         let show_grid = self.show_grid;
+        let grid_spacing = self.grid_spacing;
         let hovered_element = &mut self.hovered_element;
         let query_buf = &mut self.query_buf;
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -508,6 +521,7 @@ impl eframe::App for ViewerApp {
                 tessellation_cache,
                 ruler,
                 show_grid,
+                grid_spacing,
                 *hovered_element,
             );
 

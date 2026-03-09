@@ -11,7 +11,7 @@ use crate::drawable::{DrawContext, Drawable, WorldBBox, draw_highlight};
 use crate::grid;
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
-use crate::state::{LayerState, RenderCache};
+use crate::state::{GridSpacing, LayerState, RenderCache};
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
 pub struct Viewport {
@@ -104,6 +104,7 @@ impl Viewport {
         tessellation_cache: &mut HashMap<u32, Vec<usize>>,
         ruler: &mut RulerState,
         show_grid: bool,
+        grid_spacing: GridSpacing,
         hovered_element: Option<usize>,
     ) -> Option<(f64, f64)> {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
@@ -112,7 +113,7 @@ impl Viewport {
         painter.rect_filled(rect, 0.0, Color32::from_rgb(30, 30, 30));
 
         if show_grid {
-            grid::draw_grid(&painter, self, rect);
+            grid::draw_grid(&painter, self, rect, grid_spacing);
             grid::draw_origin_axes(&painter, self, rect);
         }
 
