@@ -436,11 +436,13 @@ impl eframe::App for ViewerApp {
                         });
                     if let Some(cell) = &mut self.cell {
                         let prev_depth = cell.render_depth;
-                        ui.add(
-                            egui::DragValue::new(&mut cell.render_depth)
-                                .range(0..=99_u32)
-                                .prefix("Depth: "),
-                        );
+                        if ui.small_button("+").clicked() && cell.render_depth < 99 {
+                            cell.render_depth += 1;
+                        }
+                        ui.label(format!("Depth: {}", cell.render_depth));
+                        if ui.small_button("−").clicked() && cell.render_depth > 0 {
+                            cell.render_depth -= 1;
+                        }
                         if cell.render_depth != prev_depth {
                             depth_changed = true;
                         }
