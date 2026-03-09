@@ -74,6 +74,37 @@ impl Polygon {
         Self::new(points, layer, data_type)
     }
 
+    /// Creates an ellipse approximation as a polygon.
+    ///
+    /// `center` is the center of the ellipse. `radius_x` and `radius_y` are the semi-axes along
+    /// the x and y directions, interpreted in the same units as the center point. `num_points` is
+    /// the number of vertices (clamped to a minimum of 3). Vertices are generated counter-clockwise
+    /// starting from angle 0. When `radius_x == radius_y`, the result is identical to a circle.
+    pub fn ellipse(
+        center: Point,
+        radius_x: f64,
+        radius_y: f64,
+        num_points: usize,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
+        let num_points = num_points.max(3);
+
+        let x_units = center.x().units();
+        let y_units = center.y().units();
+
+        let points = (0..num_points).map(|i| {
+            let angle = (i as f64) * std::f64::consts::TAU / (num_points as f64);
+            center
+                + Point::new(
+                    Unit::float(radius_x * angle.cos(), x_units),
+                    Unit::float(radius_y * angle.sin(), y_units),
+                )
+        });
+
+        Self::new(points, layer, data_type)
+    }
+
     /// Returns the polygon's points (including the closing point).
     pub fn points(&self) -> &[Point] {
         &self.points
@@ -425,6 +456,48 @@ mod tests {
         let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
         assert_eq!(moved.points().len(), 0);
+    }
+
+    #[test]
+    fn test_ellipse_num_points_clamped_to_3() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let polygon = Polygon::ellipse(origin, 5.0, 3.0, 1, Layer::new(0), DataType::new(0));
+        assert_eq!(polygon.points().len(), 4);
+    }
+
+    #[test]
+    fn test_ellipse_equal_radii_matches_circle() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let radius = 5.0;
+        let num_points = 36;
+        let ellipse = Polygon::ellipse(
+            origin,
+            radius,
+            radius,
+            num_points,
+            Layer::new(0),
+            DataType::new(0),
+        );
+        let circle = Polygon::regular_polygon(
+            origin,
+            radius,
+            num_points,
+            Radians::new(0.0),
+            Layer::new(0),
+            DataType::new(0),
+        );
+        assert_eq!(ellipse.points(), circle.points());
+    }
+
+    #[test]
+    fn test_ellipse_bounding_box() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let ellipse = Polygon::ellipse(origin, 10.0, 5.0, 360, Layer::new(0), DataType::new(0));
+        let (min, max) = ellipse.bounding_box();
+        assert!((min.x().float_value() - (-10.0)).abs() < 1e-6);
+        assert!((min.y().float_value() - (-5.0)).abs() < 1e-6);
+        assert!((max.x().float_value() - 10.0).abs() < 1e-6);
+        assert!((max.y().float_value() - 5.0).abs() < 1e-6);
     }
 
     #[test]
