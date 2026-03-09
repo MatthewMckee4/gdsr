@@ -83,6 +83,19 @@ fn close_points_is_idempotent(polygon: Polygon) -> bool {
 }
 
 #[quickcheck]
+fn rectangle_area_equals_width_times_height(x1: i16, y1: i16, x2: i16, y2: i16) -> bool {
+    let corner1 = Point::integer(i32::from(x1), i32::from(y1), 1e-9);
+    let corner2 = Point::integer(i32::from(x2), i32::from(y2), 1e-9);
+    let rect = Polygon::rectangle(corner1, corner2, Layer::new(0), DataType::new(0));
+
+    let width = (f64::from(x2) - f64::from(x1)).abs();
+    let height = (f64::from(y2) - f64::from(y1)).abs();
+    let expected = width * height;
+
+    (rect.area().float_value() - expected).abs() < 1e-6
+}
+
+#[quickcheck]
 fn regular_polygon_vertices_equidistant_from_center(num_sides: usize) -> bool {
     let num_sides = (num_sides % 100) + 3;
     let center = Point::float(0.0, 0.0, 1e-6);
