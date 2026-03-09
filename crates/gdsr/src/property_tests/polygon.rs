@@ -4,6 +4,60 @@ use crate::elements::polygon::close_points;
 use crate::*;
 
 #[quickcheck]
+fn ellipse_has_correct_point_count(num_points: usize) -> bool {
+    let num_points = (num_points % 100) + 3;
+    let center = Point::float(0.0, 0.0, 1e-6);
+    let polygon = Polygon::ellipse(
+        center,
+        10.0,
+        5.0,
+        num_points,
+        Layer::new(0),
+        DataType::new(0),
+    );
+    polygon.points().len() == num_points + 1
+}
+
+#[quickcheck]
+fn ellipse_equal_radii_points_equidistant(num_points: usize) -> bool {
+    let num_points = (num_points % 100) + 3;
+    let center = Point::float(0.0, 0.0, 1e-6);
+    let radius = 10.0;
+    let polygon = Polygon::ellipse(
+        center,
+        radius,
+        radius,
+        num_points,
+        Layer::new(0),
+        DataType::new(0),
+    );
+
+    polygon.points().iter().take(num_points).all(|p| {
+        let dx = p.x().float_value();
+        let dy = p.y().float_value();
+        let dist = (dx * dx + dy * dy).sqrt();
+        (dist - radius).abs() < 1e-9
+    })
+}
+
+/// All vertices satisfy the ellipse equation (x-cx)^2/rx^2 + (y-cy)^2/ry^2 ~= 1.
+#[quickcheck]
+fn ellipse_points_satisfy_ellipse_equation(num_points: usize) -> bool {
+    let num_points = (num_points % 100) + 3;
+    let center = Point::float(3.0, -2.0, 1e-6);
+    let rx = 7.0;
+    let ry = 4.0;
+    let polygon = Polygon::ellipse(center, rx, ry, num_points, Layer::new(0), DataType::new(0));
+
+    polygon.points().iter().take(num_points).all(|p| {
+        let dx = p.x().float_value() - 3.0;
+        let dy = p.y().float_value() - (-2.0);
+        let val = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+        (val - 1.0).abs() < 1e-9
+    })
+}
+
+#[quickcheck]
 fn area_is_non_negative(polygon: Polygon) -> bool {
     polygon.area().float_value() >= 0.0
 }
