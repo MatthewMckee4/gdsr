@@ -1,4 +1,6 @@
-use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable, Unit};
+use crate::{
+    DataType, Dimensions, Layer, LayerMapping, Movable, Point, Radians, Transformable, Unit,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum PathType {
@@ -58,6 +60,44 @@ impl Path {
             begin_extension,
             end_extension,
         }
+    }
+
+    /// Creates a curved arc path.
+    ///
+    /// Generates `num_points` along a circular arc from `start_angle` to `end_angle`,
+    /// centered at `center` with the given `radius`. All points are equidistant from center.
+    /// Supports arcs in both directions depending on angle order.
+    pub fn arc(
+        center: Point,
+        radius: f64,
+        start_angle: Radians,
+        end_angle: Radians,
+        num_points: usize,
+        layer: Layer,
+        data_type: DataType,
+        width: Option<Unit>,
+    ) -> Self {
+        let num_points = num_points.max(2);
+        let x_units = center.x().units();
+        let y_units = center.y().units();
+
+        let angle_span = end_angle.value() - start_angle.value();
+
+        let points = (0..num_points).map(|i| {
+            let t = if num_points > 1 {
+                i as f64 / (num_points - 1) as f64
+            } else {
+                0.0
+            };
+            let angle = start_angle.value() + t * angle_span;
+            center
+                + Point::new(
+                    Unit::float(radius * angle.cos(), x_units),
+                    Unit::float(radius * angle.sin(), y_units),
+                )
+        });
+
+        Self::new(points, layer, data_type, None, width, None, None)
     }
 
     /// Returns the path's points.
@@ -488,5 +528,87 @@ mod tests {
         let (min, max) = path.bounding_box();
         assert_eq!(min, Point::integer(5, 10, 1e-9));
         assert_eq!(max, Point::integer(5, 10, 1e-9));
+    }
+
+    #[test]
+    fn test_arc_point_count() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let arc = Path::arc(
+            center,
+            10.0,
+            Radians::new(0.0),
+            Radians::PI,
+            20,
+            Layer::new(0),
+            DataType::new(0),
+            None,
+        );
+        assert_eq!(arc.points().len(), 20);
+    }
+
+    #[test]
+    fn test_arc_equidistant_from_center() {
+        let center = Point::float(5.0, 5.0, 1e-6);
+        let radius = 10.0;
+        let arc = Path::arc(
+            center,
+            radius,
+            Radians::new(0.0),
+            Radians::TAU,
+            36,
+            Layer::new(0),
+            DataType::new(0),
+            None,
+        );
+        let tolerance = 1e-9;
+        for point in arc.points() {
+            let dx = point.x().float_value() - center.x().float_value();
+            let dy = point.y().float_value() - center.y().float_value();
+            let dist = (dx * dx + dy * dy).sqrt();
+            assert!(
+                (dist - radius).abs() < tolerance,
+                "point distance {dist} differs from radius {radius}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_arc_quarter_circle() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let radius = 10.0;
+        let arc = Path::arc(
+            center,
+            radius,
+            Radians::new(0.0),
+            Radians::FRAC_PI_2,
+            5,
+            Layer::new(1),
+            DataType::new(2),
+            Some(Unit::default_float(1.0)),
+        );
+        let tolerance = 1e-9;
+        let first = arc.points().first().expect("arc should have points");
+        assert!((first.x().float_value() - radius).abs() < tolerance);
+        assert!(first.y().float_value().abs() < tolerance);
+
+        let last = arc.points().last().expect("arc should have points");
+        assert!(last.x().float_value().abs() < tolerance);
+        assert!((last.y().float_value() - radius).abs() < tolerance);
+    }
+
+    #[test]
+    fn test_arc_num_points_clamped_to_two() {
+        let center = Point::float(0.0, 0.0, 1e-6);
+        let arc = Path::arc(
+            center,
+            5.0,
+            Radians::new(0.0),
+            Radians::PI,
+            1,
+            Layer::new(0),
+            DataType::new(0),
+            None,
+        );
+        assert_eq!(arc.points().len(), 2);
     }
 }
