@@ -1,6 +1,7 @@
 use egui::{Color32, Painter, Rect, Stroke};
 
 use crate::drawable::WorldBBox;
+use crate::state::GridSpacing;
 use crate::viewport::Viewport;
 
 /// Grid line color — subtle against the dark background.
@@ -32,10 +33,15 @@ pub fn first_line(min: f64, spacing: f64) -> f64 {
     (min / spacing).floor() * spacing
 }
 
+/// Resolves the effective grid spacing by applying the multiplier to the auto spacing.
+pub fn effective_spacing(mode: GridSpacing, zoom: f64) -> f64 {
+    grid_spacing(zoom) * mode.multiplier
+}
+
 /// Draws a background grid on the painter.
-pub fn draw_grid(painter: &Painter, viewport: &Viewport, rect: Rect) {
+pub fn draw_grid(painter: &Painter, viewport: &Viewport, rect: Rect, spacing_mode: GridSpacing) {
     let visible = viewport.visible_world_rect(rect);
-    let spacing = grid_spacing(viewport.zoom);
+    let spacing = effective_spacing(spacing_mode, viewport.zoom);
     let stroke = Stroke::new(1.0, GRID_COLOR);
 
     draw_grid_lines(painter, viewport, rect, &visible, spacing, stroke);
@@ -192,5 +198,25 @@ mod tests {
     fn first_line_exact_multiple() {
         assert!((first_line(20.0, 10.0) - 20.0).abs() < 1e-10);
         assert!((first_line(-20.0, 10.0) - (-20.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn effective_spacing_default_equals_auto() {
+        let zoom = 100.0;
+        assert!(
+            (effective_spacing(GridSpacing::default(), zoom) - grid_spacing(zoom)).abs() < 1e-10
+        );
+    }
+
+    #[test]
+    fn effective_spacing_multiplier_scales_auto() {
+        let zoom = 100.0;
+        let auto = grid_spacing(zoom);
+        assert!(
+            (effective_spacing(GridSpacing { multiplier: 0.5 }, zoom) - auto * 0.5).abs() < 1e-10
+        );
+        assert!(
+            (effective_spacing(GridSpacing { multiplier: 2.0 }, zoom) - auto * 2.0).abs() < 1e-10
+        );
     }
 }

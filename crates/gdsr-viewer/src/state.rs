@@ -515,6 +515,23 @@ mod tests {
     fn display_unit_default_is_auto() {
         assert_eq!(DisplayUnit::default(), DisplayUnit::Auto);
     }
+
+    #[test]
+    fn grid_spacing_default_is_1x() {
+        assert!((GridSpacing::default().multiplier - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn grid_spacing_label_preset() {
+        insta::assert_snapshot!(GridSpacing { multiplier: 1.0 }.label(), @"1x");
+        insta::assert_snapshot!(GridSpacing { multiplier: 0.5 }.label(), @"0.5x");
+        insta::assert_snapshot!(GridSpacing { multiplier: 2.0 }.label(), @"2x");
+    }
+
+    #[test]
+    fn grid_spacing_label_custom() {
+        insta::assert_snapshot!(GridSpacing { multiplier: 3.0 }.label(), @"Custom");
+    }
 }
 
 /// Controls how world coordinates (meters) are displayed to the user.
@@ -578,6 +595,41 @@ pub enum CellViewMode {
     #[default]
     Tree,
     Flat,
+}
+
+/// Controls grid line spacing as a multiplier on the auto-calculated spacing.
+///
+/// A multiplier of 1.0 gives the default auto spacing. Smaller values produce
+/// a denser grid; larger values produce a sparser grid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GridSpacing {
+    pub multiplier: f64,
+}
+
+impl Default for GridSpacing {
+    fn default() -> Self {
+        Self { multiplier: 1.0 }
+    }
+}
+
+impl GridSpacing {
+    pub const PRESETS: &[(&str, f64)] = &[
+        ("1x", 1.0),
+        ("0.5x", 0.5),
+        ("0.25x", 0.25),
+        ("0.1x", 0.1),
+        ("2x", 2.0),
+        ("5x", 5.0),
+    ];
+
+    pub fn label(self) -> &'static str {
+        for &(label, multiplier) in Self::PRESETS {
+            if (self.multiplier - multiplier).abs() < f64::EPSILON {
+                return label;
+            }
+        }
+        "Custom"
+    }
 }
 
 /// Groups layer visibility and color state.
