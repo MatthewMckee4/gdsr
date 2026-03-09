@@ -41,6 +41,37 @@ impl Polygon {
         }
     }
 
+    /// Creates a regular N-sided polygon.
+    ///
+    /// `center` is the center of the polygon. `radius` is the circumradius (distance from center
+    /// to each vertex), interpreted in the same units as the center point. `num_sides` is the
+    /// number of sides (clamped to a minimum of 3). `rotation` controls the starting angle of
+    /// the first vertex in radians. Vertices are generated counter-clockwise.
+    pub fn regular_polygon(
+        center: Point,
+        radius: f64,
+        num_sides: usize,
+        rotation: f64,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Self {
+        let num_sides = num_sides.max(3);
+
+        let x_units = center.x().units();
+        let y_units = center.y().units();
+
+        let points = (0..num_sides).map(|i| {
+            let angle = rotation + (i as f64) * std::f64::consts::TAU / (num_sides as f64);
+            center
+                + Point::new(
+                    Unit::float(radius * angle.cos(), x_units),
+                    Unit::float(radius * angle.sin(), y_units),
+                )
+        });
+
+        Self::new(points, layer, data_type)
+    }
+
     /// Returns the polygon's points (including the closing point).
     pub fn points(&self) -> &[Point] {
         &self.points
@@ -392,5 +423,13 @@ mod tests {
         let polygon = Polygon::new(vec![], Layer::new(1), DataType::new(0));
         let moved = polygon.move_to(Point::integer(5, 5, 1e-9));
         assert_eq!(moved.points().len(), 0);
+    }
+
+    #[test]
+    fn test_regular_polygon_num_sides_clamped_to_3() {
+        let origin = Point::float(0.0, 0.0, 1e-6);
+        let polygon =
+            Polygon::regular_polygon(origin, 5.0, 1, 0.0, Layer::new(0), DataType::new(0));
+        assert_eq!(polygon.points().len(), 4);
     }
 }
