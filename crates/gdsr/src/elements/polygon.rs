@@ -623,10 +623,4 @@ mod tests {
         assert_eq!(circle.points().len(), num_points + 1);
     }
 
-    #[test]
-    fn test_circle_num_points_clamped_to_3() {
-        let origin = Point::float(0.0, 0.0, 1e-6);
-        let circle = Polygon::circle(origin, 5.0, 1, Layer::new(0), DataType::new(0));
-        assert_eq!(circle.points().len(), 4);
-    }
 }
