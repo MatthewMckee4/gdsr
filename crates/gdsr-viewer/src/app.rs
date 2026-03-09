@@ -119,6 +119,7 @@ impl ViewerApp {
             cell.elements.clear();
             cell.layers.clear();
             cell.spatial_grid = None;
+            cell.tessellation_cache.clear();
             cell.cell_stats = cell.library.get_cell(name).map(gdsr::CellStats::from_cell);
 
             let depth = cell.render_depth;
