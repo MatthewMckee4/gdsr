@@ -312,15 +312,11 @@ impl Viewport {
                 let has_area =
                     cell.bbox.min_x < cell.bbox.max_x || cell.bbox.min_y < cell.bbox.max_y;
 
-                let load_culled = has_area && sw < 1.0 && sh < 1.0;
-                let load_simplified =
-                    has_area && sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX;
-
-                if load_culled && !show_ref_bbox {
+                if has_area && sw < 1.0 && sh < 1.0 {
                     continue;
                 }
 
-                if load_simplified && !load_culled {
+                if has_area && sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
                     if !ctx.layer_state.hidden_layers.contains(&cell.dominant_layer) {
                         let color = ctx
                             .layer_state
@@ -331,13 +327,8 @@ impl Viewport {
                         let cell_rect = Rect::from_two_pos(s_min, s_max);
                         ctx.rect_filled(cell_rect, 0.0, fill);
                     }
-                    if !show_ref_bbox {
-                        continue;
-                    }
+                    continue;
                 }
-
-                // When LOD-culled/simplified but show_ref_bbox is active, only draw references.
-                let refs_only = show_ref_bbox && (load_culled || load_simplified);
 
                 for &idx in &cell.indices {
                     let i = idx as usize;
@@ -346,10 +337,18 @@ impl Viewport {
                     }
                     seen[i] = true;
                     if let Some(element) = elements.get(i) {
-                        if refs_only && !matches!(element, Element::Reference(_)) {
-                            continue;
-                        }
                         ctx.current_element_idx = Some(idx);
+                        element.draw(&mut ctx);
+                    }
+                }
+            }
+
+            // Cell references (Instance::Cell) have no world_bbox so the spatial
+            // grid never contains them. Draw any unseen references in a second pass.
+            if show_ref_bbox {
+                for (i, element) in elements.iter().enumerate() {
+                    if !seen[i] && matches!(element, Element::Reference(_)) {
+                        ctx.current_element_idx = Some(i as u32);
                         element.draw(&mut ctx);
                     }
                 }
