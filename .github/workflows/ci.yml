@@ -34,7 +34,7 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -91,18 +91,18 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-linux-deps
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: "Install Rust components"
         run: rustup component add rustfmt clippy
 
-      - uses: j178/prek-action@91fd7d7cf70ae1dee9f4f44e7dfa5d1073fe6623 # v1.0.11
+      - uses: j178/prek-action@e98a699c41eb69ab013a45817a0406469a748f8d # v2.0.5
 
   build-docs:
     name: "Build docs"
@@ -111,11 +111,11 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: false
@@ -141,19 +141,19 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-linux-deps
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@a416ddeedbd372e614cc1386e8b642692f66865e # v2.57.1
+        uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2.82.8
         with:
           tool: cargo-nextest
 
@@ -174,19 +174,19 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-linux-deps
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@62da238c048aa0f865cc5a322082957d34e7fc1a # v2.62.54
+        uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2.82.8
         with:
           tool: cargo-llvm-cov,cargo-nextest
 
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ github.event_name != 'pull_request' }}
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: lcov.info
           slug: MatthewMckee4/gdsr
@@ -219,19 +219,19 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-linux-deps
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install cargo-codspeed"
-        uses: taiki-e/install-action@a416ddeedbd372e614cc1386e8b642692f66865e # v2.57.1
+        uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2.82.8
         with:
           tool: cargo-codspeed
 
@@ -239,7 +239,7 @@ jobs:
         run: cargo codspeed build -m walltime
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+        uses: CodSpeedHQ/action@a4a36bb07c0638b0b4ca52bf1f3dad1b4289e52f # v4.18.1
         with:
           run: cargo codspeed run
           mode: walltime
