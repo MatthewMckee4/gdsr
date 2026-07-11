@@ -7,8 +7,10 @@ use emath::{TSTransform, Vec2};
 use gdsr::{CellStats, DataType, Element, Layer, Library};
 
 use crate::colors::LayerColorMap;
+use crate::drawable::Drawable;
 use crate::hierarchy::{self, CellTreeNode, ExpandState};
 use crate::spatial::SpatialGrid;
+use crate::viewport;
 
 /// Tracks an in-flight file-open operation.
 #[derive(Default)]
@@ -60,6 +62,27 @@ impl CellState {
             cell_stats: None,
             render_depth: 1,
         }
+    }
+
+    pub fn delete_element(&mut self, index: usize) -> bool {
+        if index >= self.elements.len() {
+            return false;
+        }
+
+        self.elements.remove(index);
+        self.rebuild_render_indexes();
+        self.cell_stats = None;
+        true
+    }
+
+    fn rebuild_render_indexes(&mut self) {
+        self.layers.clear();
+        for element in &self.elements {
+            self.layers.extend(element.layer_keys());
+        }
+        self.spatial_grid = viewport::compute_bounds(&self.elements)
+            .map(|bounds| SpatialGrid::build(&self.elements, &bounds));
+        self.tessellation_cache.clear();
     }
 }
 
@@ -201,6 +224,9 @@ impl RenderCache {
 mod tests {
     use super::*;
     use egui::Rect;
+    use gdsr::Library;
+
+    use crate::testutil::helpers::polygon;
 
     fn test_rect() -> Rect {
         Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
@@ -220,6 +246,43 @@ mod tests {
             1,
         );
         cache
+    }
+
+    #[test]
+    fn delete_element_rebuilds_render_indexes() {
+        let mut cell = CellState::new(Library::new("test"));
+        cell.elements = vec![
+            polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0),
+            polygon(vec![(1000, 1000), (1100, 1000), (1100, 1100)], 2, 0),
+        ];
+        cell.tessellation_cache.insert(0, vec![0, 1, 2]);
+        cell.rebuild_render_indexes();
+
+        assert!(cell.delete_element(0));
+
+        assert_eq!(cell.elements.len(), 1);
+        assert_eq!(
+            cell.layers,
+            BTreeSet::from([(Layer::new(2), DataType::new(0))])
+        );
+        assert!(cell.spatial_grid.is_some());
+        assert!(cell.tessellation_cache.is_empty());
+    }
+
+    #[test]
+    fn delete_element_rejects_missing_index() {
+        let mut cell = CellState::new(Library::new("test"));
+        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        cell.rebuild_render_indexes();
+
+        assert!(!cell.delete_element(1));
+
+        assert_eq!(cell.elements.len(), 1);
+        assert_eq!(
+            cell.layers,
+            BTreeSet::from([(Layer::new(1), DataType::new(0))])
+        );
+        assert!(cell.spatial_grid.is_some());
     }
 
     #[test]

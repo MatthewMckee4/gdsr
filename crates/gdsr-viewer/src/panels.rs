@@ -25,9 +25,10 @@ pub fn draw_side_panel(
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
     selected_element: Option<&Element>,
-) {
+) -> bool {
+    let mut delete_selected = false;
     if let Some(element) = selected_element {
-        draw_element_panel(ui, element);
+        delete_selected = draw_element_panel(ui, element);
         ui.separator();
     }
 
@@ -50,52 +51,63 @@ pub fn draw_side_panel(
             draw_layer_panel(ui, layers, layer_state, color_changed);
         }
     }
+
+    delete_selected
 }
 
-fn draw_element_panel(ui: &mut Ui, element: &Element) {
+fn draw_element_panel(ui: &mut Ui, element: &Element) -> bool {
+    let mut delete_selected = false;
     egui::CollapsingHeader::new("Selected element")
         .default_open(true)
-        .show(ui, |ui| match element {
-            Element::Path(path) => {
-                draw_layer_data(ui, "Path", path.layer(), path.data_type());
-                ui.label(format!("Vertices: {}", path.points().len()));
-                ui.label(format!(
-                    "Width: {}",
-                    path.width()
-                        .map_or_else(|| "Unset".to_string(), |width| width.to_string())
-                ));
-                draw_points(ui, path.points());
+        .show(ui, |ui| {
+            if ui.button("Delete").clicked() {
+                delete_selected = true;
             }
-            Element::Polygon(polygon) => {
-                draw_layer_data(ui, "Polygon", polygon.layer(), polygon.data_type());
-                ui.label(format!(
-                    "Vertices: {}",
-                    polygon.points().len().saturating_sub(1)
-                ));
-                draw_points(ui, polygon.points());
-            }
-            Element::Box(gds_box) => {
-                draw_layer_data(ui, "Box", gds_box.layer(), gds_box.box_type());
-                draw_points(ui, &gds_box.points());
-            }
-            Element::Node(node) => {
-                draw_layer_data(ui, "Node", node.layer(), node.node_type());
-                ui.label(format!("Points: {}", node.points().len()));
-                draw_points(ui, node.points());
-            }
-            Element::Text(text) => {
-                draw_layer_data(ui, "Text", text.layer(), text.data_type());
-                ui.label(format!("Value: {}", text.text()));
-                ui.label(format!("Origin: {}", format_point(text.origin())));
-            }
-            Element::Reference(reference) => {
-                ui.label("Type: Reference");
-                ui.label(format!(
-                    "Grid origin: {}",
-                    format_point(&reference.grid().origin())
-                ));
+            ui.separator();
+
+            match element {
+                Element::Path(path) => {
+                    draw_layer_data(ui, "Path", path.layer(), path.data_type());
+                    ui.label(format!("Vertices: {}", path.points().len()));
+                    ui.label(format!(
+                        "Width: {}",
+                        path.width()
+                            .map_or_else(|| "Unset".to_string(), |width| width.to_string())
+                    ));
+                    draw_points(ui, path.points());
+                }
+                Element::Polygon(polygon) => {
+                    draw_layer_data(ui, "Polygon", polygon.layer(), polygon.data_type());
+                    ui.label(format!(
+                        "Vertices: {}",
+                        polygon.points().len().saturating_sub(1)
+                    ));
+                    draw_points(ui, polygon.points());
+                }
+                Element::Box(gds_box) => {
+                    draw_layer_data(ui, "Box", gds_box.layer(), gds_box.box_type());
+                    draw_points(ui, &gds_box.points());
+                }
+                Element::Node(node) => {
+                    draw_layer_data(ui, "Node", node.layer(), node.node_type());
+                    ui.label(format!("Points: {}", node.points().len()));
+                    draw_points(ui, node.points());
+                }
+                Element::Text(text) => {
+                    draw_layer_data(ui, "Text", text.layer(), text.data_type());
+                    ui.label(format!("Value: {}", text.text()));
+                    ui.label(format!("Origin: {}", format_point(text.origin())));
+                }
+                Element::Reference(reference) => {
+                    ui.label("Type: Reference");
+                    ui.label(format!(
+                        "Grid origin: {}",
+                        format_point(&reference.grid().origin())
+                    ));
+                }
             }
         });
+    delete_selected
 }
 
 fn draw_layer_data(ui: &mut Ui, kind: &str, layer: Layer, data_type: DataType) {
