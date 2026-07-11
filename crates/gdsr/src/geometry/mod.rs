@@ -2,7 +2,7 @@ mod area;
 mod bounding_box;
 mod is_point_inside;
 mod is_point_on_edge;
-pub(crate) mod path_expansion;
+mod path_expansion;
 mod perimeter;
 mod round;
 

@@ -284,7 +284,7 @@ impl Reference {
                         reference.clone().flatten(Some(depth - 1), library);
 
                     for reference_element in flattened_reference_elements {
-                        elements.extend(self.get_elements_in_grid(&reference_element).into_iter());
+                        elements.extend(self.get_elements_in_grid(&reference_element));
                     }
                 }
             },
@@ -1225,7 +1225,7 @@ mod tests {
         );
 
         let mut cell = crate::Cell::new("test_cell");
-        cell.add(polygon.clone());
+        cell.add(polygon);
         library.add_cell(cell);
 
         let grid = Grid::default()

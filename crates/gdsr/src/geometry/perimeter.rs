@@ -21,7 +21,7 @@ pub fn perimeter(points: &[Point]) -> Unit {
     for i in 0..points.len() - 1 {
         let dx = points[i + 1].x().float_value() - points[i].x().float_value();
         let dy = points[i + 1].y().float_value() - points[i].y().float_value();
-        length += (dx * dx + dy * dy).sqrt();
+        length += dx.hypot(dy);
     }
 
     Unit::float(length, units)
@@ -99,7 +99,7 @@ mod property_tests {
         let b = Point::float(f64::from(x2), f64::from(y2), 1e-6);
         let dx = f64::from(x2) - f64::from(x1);
         let dy = f64::from(y2) - f64::from(y1);
-        let expected = (dx * dx + dy * dy).sqrt();
+        let expected = dx.hypot(dy);
         (perimeter(&[a, b]).float_value() - expected).abs() < 1e-10
     }
 }

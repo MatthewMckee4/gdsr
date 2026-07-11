@@ -303,7 +303,7 @@ fn test_library_roundtrip_mixed_elements() {
         DataType::new(0),
     );
 
-    let reference = Reference::new(ref_polygon.clone()).with_grid(
+    let reference = Reference::new(ref_polygon).with_grid(
         Grid::default()
             .with_origin(Point::integer(0, 25, units))
             .with_columns(2)

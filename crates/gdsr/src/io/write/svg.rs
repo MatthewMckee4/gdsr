@@ -234,7 +234,8 @@ fn bounding_box_of_elements(elements: &[Element]) -> (Point, Point) {
         .iter()
         .flat_map(|e| {
             let (min, max) = e.bounding_box();
-            [min, max]
+            let corners: [Point; 2] = (min, max).into();
+            corners
         })
         .collect();
     if points.is_empty() {

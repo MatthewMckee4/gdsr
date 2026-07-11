@@ -1,5 +1,25 @@
 /target
+/site
 
-node_modules/
+uv.lock
+
+__pycache__/
+*.py[cod]
+.venv*/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+*.rs.pending-snap
+**/*.rs.bk
+
+*.profraw
+.coverage
+.coverage.*
+htmlcov/
 
 .DS_Store
+
+node_modules/

@@ -10,7 +10,7 @@ use crate::types::LayerMapping;
 use crate::{Element, Instance};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DanglingCellReference {
     /// The cell containing the dangling reference.
     pub cell_name: String,
@@ -305,7 +305,7 @@ impl Library {
     /// Uses DFS with three-state coloring to detect back edges, which indicate
     /// circular references.
     pub fn has_circular_references(&self) -> bool {
-        #[derive(Clone, Copy, PartialEq)]
+        #[derive(Clone, Copy, PartialEq, Eq)]
         enum State {
             Unvisited,
             InProgress,
@@ -634,11 +634,10 @@ mod tests {
         cell.add(Reference::new(polygon));
         library.add_cell(cell);
 
-        let mapping: crate::LayerMapping = [(
+        let mapping: crate::LayerMapping = std::iter::once((
             (Layer::new(1), DataType::new(0)),
             (Layer::new(50), DataType::new(60)),
-        )]
-        .into_iter()
+        ))
         .collect();
 
         library.remap_layers(&mapping);
@@ -679,11 +678,10 @@ mod tests {
         ));
         library.add_cell(cell);
 
-        let mapping: crate::LayerMapping = [(
+        let mapping: crate::LayerMapping = std::iter::once((
             (Layer::new(99), DataType::new(99)),
             (Layer::new(1), DataType::new(1)),
-        )]
-        .into_iter()
+        ))
         .collect();
 
         library.remap_layers(&mapping);

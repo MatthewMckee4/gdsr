@@ -111,7 +111,7 @@ fn apply_extensions(
 fn direction(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
     let dx = b.0 - a.0;
     let dy = b.1 - a.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = dx.hypot(dy);
     if len < f64::EPSILON {
         return (0.0, 0.0);
     }

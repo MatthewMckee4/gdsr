@@ -10,7 +10,7 @@ fn are_points_closed(points: &[Point]) -> bool {
     points_vec.first() == points_vec.last()
 }
 
-pub(crate) fn close_points(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
+pub fn close_points(points: impl IntoIterator<Item = Point>) -> Vec<Point> {
     let mut points_vec = points.into_iter().collect::<Vec<_>>();
     if !are_points_closed(&points_vec) {
         if let Some(first) = points_vec.first().copied() {

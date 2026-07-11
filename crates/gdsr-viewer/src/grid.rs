@@ -56,6 +56,10 @@ fn draw_grid_lines(
     stroke: Stroke,
 ) {
     let mut x = first_line(visible.min_x, spacing);
+    #[expect(
+        clippy::while_float,
+        reason = "grid lines advance in visible world coordinates"
+    )]
     while x <= visible.max_x {
         let top = viewport.world_to_screen(x, visible.max_y, rect);
         let bottom = viewport.world_to_screen(x, visible.min_y, rect);
@@ -64,6 +68,10 @@ fn draw_grid_lines(
     }
 
     let mut y = first_line(visible.min_y, spacing);
+    #[expect(
+        clippy::while_float,
+        reason = "grid lines advance in visible world coordinates"
+    )]
     while y <= visible.max_y {
         let left = viewport.world_to_screen(visible.min_x, y, rect);
         let right = viewport.world_to_screen(visible.max_x, y, rect);

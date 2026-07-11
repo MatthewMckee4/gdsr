@@ -29,7 +29,7 @@ impl Measurement {
     pub fn distance(&self) -> f64 {
         let dx = self.end.0 - self.start.0;
         let dy = self.end.1 - self.start.1;
-        (dx * dx + dy * dy).sqrt()
+        dx.hypot(dy)
     }
 }
 
@@ -66,11 +66,10 @@ impl RulerState {
                 end: (wx, wy),
             });
             self.start = None;
-            true
         } else {
             self.start = Some((wx, wy));
-            true
         }
+        true
     }
 
     /// Draws all ruler overlays: completed measurements and in-progress line to cursor.
@@ -99,7 +98,7 @@ impl RulerState {
                 });
                 draw_endpoint(painter, s_end);
 
-                let distance = ((mx - start.0).powi(2) + (my - start.1).powi(2)).sqrt();
+                let distance = (mx - start.0).hypot(my - start.1);
                 let label = format_distance(distance);
                 let midpoint = Pos2::new(
                     f32::midpoint(s_start.x, s_end.x),

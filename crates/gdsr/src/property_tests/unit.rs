@@ -90,10 +90,7 @@ fn addition_inverse_property(a: Unit) -> bool {
 /// Verifies exact integer addition when units are identical.
 #[quickcheck]
 fn addition_same_units_no_scaling_error_integer(a: IntegerUnit, b: IntegerUnit) -> bool {
-    let a_unit = Unit::Integer(IntegerUnit {
-        value: a.value,
-        units: a.units,
-    });
+    let a_unit = Unit::Integer(a);
     let b_unit = Unit::Integer(IntegerUnit {
         value: b.value,
         units: a.units,
@@ -107,10 +104,7 @@ fn addition_same_units_no_scaling_error_integer(a: IntegerUnit, b: IntegerUnit) 
 /// Verifies precise float addition when units are identical.
 #[quickcheck]
 fn addition_same_units_no_scaling_error_float(a: FloatUnit, b: FloatUnit) -> bool {
-    let a_unit = Unit::Float(FloatUnit {
-        value: a.value,
-        units: a.units,
-    });
+    let a_unit = Unit::Float(a);
     let b_unit = Unit::Float(FloatUnit {
         value: b.value,
         units: a.units,
