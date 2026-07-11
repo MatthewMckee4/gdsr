@@ -87,10 +87,9 @@ fn reference_world_bbox(
 ) -> Option<WorldBBox> {
     let source_bbox = if let Some(cell_name) = reference.instance().as_cell() {
         named_cell_world_bbox(cell_name, library, visiting)?
-    } else if let Some(element) = reference.instance().as_element() {
-        element_world_bbox(element.as_ref().as_ref(), library, visiting)?
     } else {
-        return None;
+        let element = reference.instance().as_element()?;
+        element_world_bbox(element.as_ref().as_ref(), library, visiting)?
     };
 
     let bbox_element = Element::Polygon(bbox_polygon(source_bbox));
@@ -952,7 +951,7 @@ fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
     ctx.rect_stroke(
         screen_rect,
         0.0,
-        Stroke::new(1.0, stroke_color),
+        Stroke::new(1.0_f32, stroke_color),
         StrokeKind::Outside,
     );
 
@@ -1654,7 +1653,7 @@ mod tests {
 
     #[test]
     fn stroke_polyline_empty() {
-        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let mesh = stroke_polyline_to_mesh(&[], stroke, false);
         assert!(mesh.vertices.is_empty());
         assert!(mesh.indices.is_empty());
@@ -1662,7 +1661,7 @@ mod tests {
 
     #[test]
     fn stroke_polyline_single_point() {
-        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let mesh = stroke_polyline_to_mesh(&[Pos2::new(5.0, 5.0)], stroke, false);
         assert!(mesh.vertices.is_empty());
         assert!(mesh.indices.is_empty());
@@ -1670,7 +1669,7 @@ mod tests {
 
     #[test]
     fn stroke_polyline_coincident_points() {
-        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let pts = vec![
             Pos2::new(5.0, 5.0),
             Pos2::new(5.0, 5.0),
@@ -1685,7 +1684,7 @@ mod tests {
 
     #[test]
     fn stroke_polyline_closed_vs_open() {
-        let stroke = Stroke::new(2.0, Color32::WHITE);
+        let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let pts = vec![
             Pos2::new(0.0, 0.0),
             Pos2::new(10.0, 0.0),

@@ -42,7 +42,7 @@ pub fn effective_spacing(mode: GridSpacing, zoom: f64) -> f64 {
 pub fn draw_grid(painter: &Painter, viewport: &Viewport, rect: Rect, spacing_mode: GridSpacing) {
     let visible = viewport.visible_world_rect(rect);
     let spacing = effective_spacing(spacing_mode, viewport.zoom);
-    let stroke = Stroke::new(1.0, GRID_COLOR);
+    let stroke = Stroke::new(1.0_f32, GRID_COLOR);
 
     draw_grid_lines(painter, viewport, rect, &visible, spacing, stroke);
 }
@@ -83,7 +83,7 @@ fn draw_grid_lines(
 /// Draws the origin axes with slightly brighter lines.
 pub fn draw_origin_axes(painter: &Painter, viewport: &Viewport, rect: Rect) {
     let visible = viewport.visible_world_rect(rect);
-    let stroke = Stroke::new(1.0, Color32::from_rgb(100, 100, 100));
+    let stroke = Stroke::new(1.0_f32, Color32::from_rgb(100, 100, 100));
 
     if visible.min_x <= 0.0 && visible.max_x >= 0.0 {
         let top = viewport.world_to_screen(0.0, visible.max_y, rect);

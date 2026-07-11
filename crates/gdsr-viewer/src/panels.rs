@@ -154,7 +154,7 @@ fn draw_tree_node(
             let x = base_x + level as f32 * INDENT_PX + INDENT_PX * 0.5;
             painter.line_segment(
                 [Pos2::new(x, top_y), Pos2::new(x, top_y + row_height)],
-                Stroke::new(1.0, GUIDE_COLOR),
+                Stroke::new(1.0_f32, GUIDE_COLOR),
             );
         }
 

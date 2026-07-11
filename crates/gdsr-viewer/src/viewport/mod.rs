@@ -240,7 +240,7 @@ impl Viewport {
                         painter.rect_stroke(
                             screen_rect,
                             0.0,
-                            egui::Stroke::new(1.0, stroke_color),
+                            egui::Stroke::new(1.0_f32, stroke_color),
                             egui::StrokeKind::Outside,
                         );
                         let sw = (s_max.x - s_min.x).abs();
