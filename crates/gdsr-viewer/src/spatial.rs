@@ -142,6 +142,20 @@ impl SpatialGrid {
             (col_min..=col_max).filter_map(move |col| cells_ref[row * grid_size + col].as_ref())
         })
     }
+
+    pub fn query_visible_indices<'a>(
+        &self,
+        visible: &WorldBBox,
+        buf: &'a mut Vec<u32>,
+    ) -> &'a [u32] {
+        buf.clear();
+        for cell in self.query_visible(visible) {
+            buf.extend_from_slice(&cell.indices);
+        }
+        buf.sort_unstable();
+        buf.dedup();
+        buf
+    }
 }
 
 #[cfg(test)]
@@ -513,6 +527,22 @@ mod tests {
         let huge_visible = WorldBBox::new(-1.0, -1.0, 1.0, 1.0);
         let indices = query_element_indices(&grid, &huge_visible);
         assert!(indices.contains(&0));
+    }
+
+    #[test]
+    fn query_visible_indices_reuses_buffer() {
+        let scale = 1e-9;
+        let p1 = polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0);
+        let p2 = polygon(vec![(9900, 9900), (10000, 9900), (10000, 10000)], 2, 0);
+        let bounds = WorldBBox::new(0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
+        let grid = SpatialGrid::build(&[p1, p2], &bounds);
+        let visible = WorldBBox::new(0.0, 0.0, 1000.0 * scale, 1000.0 * scale);
+        let mut buf = vec![99];
+
+        let indices = grid.query_visible_indices(&visible, &mut buf);
+
+        assert_eq!(indices, &[0]);
+        assert_eq!(buf, vec![0]);
     }
 
     #[test]

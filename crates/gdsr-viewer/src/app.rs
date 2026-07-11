@@ -37,6 +37,8 @@ pub struct ViewerApp {
     selected_element: Option<usize>,
     /// Reusable scratch buffer for spatial grid point queries.
     query_buf: Vec<u32>,
+    /// Reusable mark buffer for deduplicating elements across visible spatial cells.
+    drawn_element_marks: Vec<bool>,
     side_panel_tab: SidePanelTab,
     cell_view_mode: CellViewMode,
     scroll_to_selected: bool,
@@ -61,6 +63,7 @@ impl Default for ViewerApp {
             hovered_element: None,
             selected_element: None,
             query_buf: Vec::new(),
+            drawn_element_marks: Vec::new(),
             side_panel_tab: SidePanelTab::default(),
             cell_view_mode: CellViewMode::default(),
             scroll_to_selected: false,
@@ -570,6 +573,7 @@ impl eframe::App for ViewerApp {
         let hovered_element = &mut self.hovered_element;
         let selected_element = &mut self.selected_element;
         let query_buf = &mut self.query_buf;
+        let drawn_element_marks = &mut self.drawn_element_marks;
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
@@ -592,6 +596,8 @@ impl eframe::App for ViewerApp {
                 elements,
                 layer_state,
                 spatial_grid,
+                query_buf,
+                drawn_element_marks,
                 library,
                 render_cache,
                 tessellation_cache,
