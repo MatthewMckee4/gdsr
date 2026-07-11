@@ -3,7 +3,6 @@ fail_fast: false
 exclude:
   glob:
     - "*.svg"
-    - .claude/commands/**
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

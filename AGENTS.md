@@ -12,6 +12,9 @@ Run the test suite with nextest:
 cargo nextest run
 ```
 
+Run `cargo nextest run` for code changes before finishing. Prefer focused
+tests during iteration, then run the full suite when behavior changed.
+
 Pass package or test filters directly when a narrower run is enough during
 iteration:
 
@@ -40,14 +43,16 @@ independent of staged state.
 
 ## Snapshots And Generated Files
 
-Prefer property or integration tests when behavior crosses parser, writer,
-geometry, or viewer boundaries. Keep UI changes tested through pure logic such
-as coordinate transforms, selection state, or data preparation instead of
-rendering.
+Prefer property tests under `src/property_tests/` or integration tests when
+behavior crosses parser, writer, geometry, or viewer boundaries. Keep UI
+changes tested through pure logic such as coordinate transforms, selection
+state, or data preparation instead of rendering.
 
-Prefer inline snapshots for small expected values. Use external snapshot files
-only when the output is too large to read inline. After updating snapshots,
-review the diff before accepting them and check for pending snapshot files.
+Use snapshot tests for command-output integration tests. Prefer inline
+snapshots for small expected values instead of chains of individual
+`assert_eq!` calls. Use external snapshot files only when the output is too
+large to read inline. After updating snapshots, review the diff before
+accepting them and check for pending snapshot files.
 
 `scripts/prepare_docs.py` generates `docs/index.md` from `README.md`; update the
 source content rather than hand-editing the generated file.
@@ -71,6 +76,8 @@ source content rather than hand-editing the generated file.
 - Prefer function comments over inline comments.
 - Add new dependencies to `[workspace.dependencies]` in the root `Cargo.toml`
   and reference them with `{ workspace = true }` in crate manifests.
+- Do not commit directly to `main`; use a feature branch and open a pull
+  request.
 - Consider whether a change needs docs under `docs/`. New public APIs, CLI
   changes, changed defaults, and release behavior changes usually need docs.
 
@@ -78,4 +85,4 @@ source content rather than hand-editing the generated file.
 
 Always use the pull request template and add labels. Write the description in
 concise prose paragraphs, with code examples only when they help the reviewer.
-Do not add AI tooling as an author or co-author.
+Do not use checkboxes. Do not add AI tooling as an author or co-author.
