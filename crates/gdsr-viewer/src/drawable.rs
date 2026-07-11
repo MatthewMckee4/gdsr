@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use egui::epaint;
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
@@ -43,6 +43,87 @@ impl WorldBBox {
     }
 }
 
+pub fn cell_world_bbox(cell_name: &str, library: &Library) -> Option<WorldBBox> {
+    let mut visiting = HashSet::new();
+    named_cell_world_bbox(cell_name, library, &mut visiting)
+}
+
+fn named_cell_world_bbox(
+    cell_name: &str,
+    library: &Library,
+    visiting: &mut HashSet<String>,
+) -> Option<WorldBBox> {
+    if !visiting.insert(cell_name.to_owned()) {
+        return None;
+    }
+
+    let cell = library.get_cell(cell_name)?;
+    let mut result = None;
+    for element in cell.iter_elements() {
+        if let Some(bbox) = element_world_bbox(element, library, visiting) {
+            merge_bbox(&mut result, bbox);
+        }
+    }
+
+    visiting.remove(cell_name);
+    result
+}
+
+fn element_world_bbox(
+    element: &Element,
+    library: &Library,
+    visiting: &mut HashSet<String>,
+) -> Option<WorldBBox> {
+    match element {
+        Element::Reference(reference) => reference_world_bbox(reference, library, visiting),
+        _ => element.world_bbox(),
+    }
+}
+
+fn reference_world_bbox(
+    reference: &gdsr::Reference,
+    library: &Library,
+    visiting: &mut HashSet<String>,
+) -> Option<WorldBBox> {
+    let source_bbox = if let Some(cell_name) = reference.instance().as_cell() {
+        named_cell_world_bbox(cell_name, library, visiting)?
+    } else if let Some(element) = reference.instance().as_element() {
+        element_world_bbox(element.as_ref().as_ref(), library, visiting)?
+    } else {
+        return None;
+    };
+
+    let bbox_element = Element::Polygon(bbox_polygon(source_bbox));
+    let mut result = None;
+    for element in reference.get_elements_in_grid(&bbox_element) {
+        if let Some(bbox) = element.world_bbox() {
+            merge_bbox(&mut result, bbox);
+        }
+    }
+    result
+}
+
+fn bbox_polygon(bbox: WorldBBox) -> gdsr::Polygon {
+    gdsr::Polygon::new(
+        [
+            gdsr::Point::float(bbox.min_x, bbox.min_y, 1.0),
+            gdsr::Point::float(bbox.max_x, bbox.min_y, 1.0),
+            gdsr::Point::float(bbox.max_x, bbox.max_y, 1.0),
+            gdsr::Point::float(bbox.min_x, bbox.max_y, 1.0),
+            gdsr::Point::float(bbox.min_x, bbox.min_y, 1.0),
+        ],
+        Layer::new(0),
+        DataType::new(0),
+    )
+}
+
+fn merge_bbox(result: &mut Option<WorldBBox>, bbox: WorldBBox) {
+    *result = Some(match result {
+        Some(acc) => acc.merge(&bbox),
+        None => bbox,
+    });
+}
+
 /// Bundles the rendering context passed to every `Drawable::draw` call.
 ///
 /// Geometry is batched by layer into large meshes (`layer_meshes`) to minimize
@@ -63,6 +144,9 @@ pub struct DrawContext<'a> {
     pub screen_pts_buf: &'a mut Vec<Pos2>,
     /// When true, the element is drawn with a brighter fill and bolder outline.
     pub highlight: bool,
+    /// When true, un-flattened cell references draw as outlined bounding boxes
+    /// with the cell name centered, instead of expanding their contents.
+    pub show_ref_bbox: bool,
 }
 
 /// Fill alpha for normal and highlighted elements.
@@ -826,6 +910,74 @@ impl Drawable for gdsr::Node {
     }
 }
 
+/// Draws an un-flattened reference as an outlined bounding box with a centered cell name label.
+fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
+    let (label, bbox) = if let Some(cell_name) = reference.instance().as_cell() {
+        let Some(lib) = ctx.library else { return };
+        let mut visiting = HashSet::new();
+        match reference_world_bbox(reference, lib, &mut visiting) {
+            Some(bbox) => (Some(cell_name.as_str()), bbox),
+            None => return,
+        }
+    } else if let Some(element) = reference.instance().as_element() {
+        let mut merged: Option<WorldBBox> = None;
+        for el in reference.get_elements_in_grid(element) {
+            if let Some(bb) = el.world_bbox() {
+                merged = Some(match merged {
+                    Some(acc) => acc.merge(&bb),
+                    None => bb,
+                });
+            }
+        }
+        match merged {
+            Some(bb) => (None, bb),
+            None => return,
+        }
+    } else {
+        return;
+    };
+
+    if !bbox.overlaps(ctx.visible) {
+        return;
+    }
+
+    let s_min = ctx
+        .viewport
+        .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+    let s_max = ctx
+        .viewport
+        .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
+    let screen_rect = Rect::from_two_pos(s_min, s_max);
+    let stroke_color = Color32::from_rgb(180, 180, 180);
+    ctx.rect_stroke(
+        screen_rect,
+        0.0,
+        Stroke::new(1.0, stroke_color),
+        StrokeKind::Outside,
+    );
+
+    if let Some(name) = label {
+        let sw = (s_max.x - s_min.x).abs();
+        let sh = (s_min.y - s_max.y).abs();
+        if sw >= 40.0 && sh >= 20.0 {
+            let char_count = name.len().max(1) as f32;
+            let fit_w = sw * 0.9 / (char_count * 0.6);
+            let fit_h = sh * 0.4;
+            let font_size = fit_w.min(fit_h).min(48.0);
+            if font_size >= 8.0 {
+                let center = screen_rect.center();
+                ctx.text(
+                    center,
+                    egui::Align2::CENTER_CENTER,
+                    name,
+                    FontId::monospace(font_size),
+                    stroke_color,
+                );
+            }
+        }
+    }
+}
+
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
         match self.instance().as_element() {
@@ -860,6 +1012,10 @@ impl Drawable for gdsr::Reference {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
+        if ctx.show_ref_bbox {
+            draw_ref_as_bbox(self, ctx);
+            return;
+        }
         if let Some(element) = self.instance().as_element() {
             for el in self.get_elements_in_grid(element) {
                 el.draw(ctx);
@@ -952,6 +1108,7 @@ pub fn draw_highlight(
         tessellation_cache,
         screen_pts_buf: &mut screen_pts_buf,
         highlight: true,
+        show_ref_bbox: false,
     };
     element.draw(&mut ctx);
     for (_, mesh) in layer_meshes {
@@ -1175,6 +1332,63 @@ mod tests {
         let bbox = r.world_bbox().expect("should have bbox");
         assert!((bbox.min_x - 0.0).abs() < 1e-15);
         assert!((bbox.max_x - 100.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn cell_world_bbox_includes_referenced_cells() {
+        let mut leaf = gdsr::Cell::new("leaf");
+        leaf.add(polygon(vec![(10, 20), (110, 20), (110, 220)], 1, 0));
+
+        let mut top = gdsr::Cell::new("top");
+        top.add(gdsr::Reference::new("leaf"));
+
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(leaf);
+        library.add_cell(top);
+
+        let bbox = cell_world_bbox("top", &library).expect("should have bbox");
+        assert!((bbox.min_x - 10.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.min_y - 20.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_x - 110.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_y - 220.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn cell_world_bbox_applies_reference_origin() {
+        let mut leaf = gdsr::Cell::new("leaf");
+        leaf.add(polygon(vec![(10, 20), (110, 20), (110, 220)], 1, 0));
+
+        let mut top = gdsr::Cell::new("top");
+        top.add(
+            gdsr::Reference::new("leaf").with_grid(
+                gdsr::Grid::default().with_origin(gdsr::Point::default_integer(100, 200)),
+            ),
+        );
+
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(leaf);
+        library.add_cell(top);
+
+        let bbox = cell_world_bbox("top", &library).expect("should have bbox");
+        assert!((bbox.min_x - 110.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.min_y - 220.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_x - 210.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_y - 420.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn cell_world_bbox_handles_reference_cycles() {
+        let mut a = gdsr::Cell::new("a");
+        a.add(gdsr::Reference::new("b"));
+
+        let mut b = gdsr::Cell::new("b");
+        b.add(gdsr::Reference::new("a"));
+
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(a);
+        library.add_cell(b);
+
+        assert!(cell_world_bbox("a", &library).is_none());
     }
 
     #[test]

@@ -320,13 +320,10 @@ impl Library {
             states.insert(node, State::InProgress);
             if let Some(deps) = graph.get(node) {
                 for dep in deps {
-                    match states.get(dep.as_str()) {
+                    match states.get(dep.as_str()).copied() {
                         Some(State::InProgress) => return true,
-                        Some(State::Unvisited) => {
-                            if dfs(dep.as_str(), graph, states) {
-                                return true;
-                            }
-                        }
+                        Some(State::Unvisited) if dfs(dep.as_str(), graph, states) => return true,
+                        Some(State::Unvisited) => {}
                         _ => {}
                     }
                 }

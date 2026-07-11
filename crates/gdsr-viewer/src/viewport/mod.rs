@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use egui::{Color32, Pos2, Rect, Sense};
 use gdsr::{DataType, Element, Layer, Library};
 
-use crate::drawable::{DrawContext, Drawable, WorldBBox, draw_highlight};
+use crate::drawable::{DrawContext, Drawable, WorldBBox, cell_world_bbox, draw_highlight};
 use crate::grid;
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
@@ -106,6 +106,8 @@ impl Viewport {
         show_grid: bool,
         grid_spacing: GridSpacing,
         hovered_element: Option<usize>,
+        render_depth: u32,
+        selected_cell: Option<&str>,
     ) -> Option<(f64, f64)> {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
@@ -178,6 +180,7 @@ impl Viewport {
         if !render_cache.needs_full_render(
             &hidden_layers,
             elements.len(),
+            render_depth,
             self.center_x,
             self.center_y,
             self.zoom,
@@ -221,6 +224,52 @@ impl Viewport {
             return mouse_world;
         }
 
+        // Depth-0: draw just the selected cell's bounding box with its name.
+        if render_depth == 0 {
+            if let Some(cell_name) = selected_cell {
+                if let Some(lib) = library {
+                    if let Some(bbox) = cell_world_bbox(cell_name, lib) {
+                        let min_x = bbox.min_x;
+                        let min_y = bbox.min_y;
+                        let max_x = bbox.max_x;
+                        let max_y = bbox.max_y;
+                        let s_min = self.world_to_screen(min_x, min_y, rect);
+                        let s_max = self.world_to_screen(max_x, max_y, rect);
+                        let screen_rect = Rect::from_two_pos(s_min, s_max);
+                        let stroke_color = Color32::from_rgb(180, 180, 180);
+                        painter.rect_stroke(
+                            screen_rect,
+                            0.0,
+                            egui::Stroke::new(1.0, stroke_color),
+                            egui::StrokeKind::Outside,
+                        );
+                        let sw = (s_max.x - s_min.x).abs();
+                        let sh = (s_min.y - s_max.y).abs();
+                        if sw >= 40.0 && sh >= 20.0 {
+                            let char_count = cell_name.len().max(1) as f32;
+                            let fit_w = sw * 0.9 / (char_count * 0.6);
+                            let fit_h = sh * 0.4;
+                            let font_size = fit_w.min(fit_h).min(48.0);
+                            if font_size >= 8.0 {
+                                painter.text(
+                                    screen_rect.center(),
+                                    egui::Align2::CENTER_CENTER,
+                                    cell_name,
+                                    egui::FontId::monospace(font_size),
+                                    stroke_color,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            let mouse_world = response
+                .hover_pos()
+                .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+            ruler.draw(&painter, self, rect, mouse_world);
+            return mouse_world;
+        }
+
         // Full render: query a 3× expanded region so the cache has margin for panning.
         let visible = self.visible_world_rect(rect);
         let w = visible.max_x - visible.min_x;
@@ -235,6 +284,7 @@ impl Viewport {
         let mut layer_meshes = HashMap::new();
         let mut extra_shapes = Vec::new();
         let mut screen_pts_buf = Vec::new();
+        let show_ref_bbox = render_depth > 0;
         let mut ctx = DrawContext {
             painter: &painter,
             layer_meshes: &mut layer_meshes,
@@ -248,6 +298,7 @@ impl Viewport {
             tessellation_cache,
             screen_pts_buf: &mut screen_pts_buf,
             highlight: false,
+            show_ref_bbox,
         };
 
         if let Some(grid) = spatial_grid {
@@ -295,6 +346,17 @@ impl Viewport {
                     }
                 }
             }
+
+            // Cell references (Instance::Cell) have no world_bbox so the spatial
+            // grid never contains them. Draw any unseen references in a second pass.
+            if show_ref_bbox {
+                for (i, element) in elements.iter().enumerate() {
+                    if !seen[i] && matches!(element, Element::Reference(_)) {
+                        ctx.current_element_idx = Some(i as u32);
+                        element.draw(&mut ctx);
+                    }
+                }
+            }
         } else {
             for (i, element) in elements.iter().enumerate() {
                 ctx.current_element_idx = Some(i as u32);
@@ -317,6 +379,7 @@ impl Viewport {
             rect.center(),
             hidden_layers,
             elements.len(),
+            render_depth,
         );
 
         if let Some(idx) = hovered_element {
