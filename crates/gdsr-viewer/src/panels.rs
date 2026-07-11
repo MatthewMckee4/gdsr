@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use egui::{Color32, Pos2, Stroke, Ui};
-use gdsr::{CellStats, DataType, Layer};
+use gdsr::{CellStats, DataType, Element, Layer, Point};
 
 use crate::hierarchy::{CellTreeNode, ExpandState};
 use crate::state::{CellViewMode, LayerState, SidePanelTab};
@@ -24,7 +24,13 @@ pub fn draw_side_panel(
     scroll_to_selected: &mut bool,
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
+    selected_element: Option<&Element>,
 ) {
+    if let Some(element) = selected_element {
+        draw_element_panel(ui, element);
+        ui.separator();
+    }
+
     match active_tab {
         SidePanelTab::Cells => {
             let tree = match view_mode {
@@ -44,6 +50,80 @@ pub fn draw_side_panel(
             draw_layer_panel(ui, layers, layer_state, color_changed);
         }
     }
+}
+
+fn draw_element_panel(ui: &mut Ui, element: &Element) {
+    egui::CollapsingHeader::new("Selected element")
+        .default_open(true)
+        .show(ui, |ui| match element {
+            Element::Path(path) => {
+                draw_layer_data(ui, "Path", path.layer(), path.data_type());
+                ui.label(format!("Vertices: {}", path.points().len()));
+                ui.label(format!(
+                    "Width: {}",
+                    path.width()
+                        .map_or_else(|| "Unset".to_string(), |width| width.to_string())
+                ));
+                draw_points(ui, path.points());
+            }
+            Element::Polygon(polygon) => {
+                draw_layer_data(ui, "Polygon", polygon.layer(), polygon.data_type());
+                ui.label(format!(
+                    "Vertices: {}",
+                    polygon.points().len().saturating_sub(1)
+                ));
+                draw_points(ui, polygon.points());
+            }
+            Element::Box(gds_box) => {
+                draw_layer_data(ui, "Box", gds_box.layer(), gds_box.box_type());
+                draw_points(ui, &gds_box.points());
+            }
+            Element::Node(node) => {
+                draw_layer_data(ui, "Node", node.layer(), node.node_type());
+                ui.label(format!("Points: {}", node.points().len()));
+                draw_points(ui, node.points());
+            }
+            Element::Text(text) => {
+                draw_layer_data(ui, "Text", text.layer(), text.data_type());
+                ui.label(format!("Value: {}", text.text()));
+                ui.label(format!("Origin: {}", format_point(text.origin())));
+            }
+            Element::Reference(reference) => {
+                ui.label("Type: Reference");
+                ui.label(format!(
+                    "Grid origin: {}",
+                    format_point(&reference.grid().origin())
+                ));
+            }
+        });
+}
+
+fn draw_layer_data(ui: &mut Ui, kind: &str, layer: Layer, data_type: DataType) {
+    ui.label(format!("Type: {kind}"));
+    ui.label(format!("Layer: {layer}"));
+    ui.label(format!("Datatype: {data_type}"));
+}
+
+fn draw_points(ui: &mut Ui, points: &[Point]) {
+    egui::ScrollArea::vertical()
+        .id_salt("selected_element_points")
+        .max_height(160.0)
+        .show(ui, |ui| {
+            egui::Grid::new("selected_element_points_grid")
+                .num_columns(2)
+                .striped(true)
+                .show(ui, |ui| {
+                    for (idx, point) in points.iter().enumerate() {
+                        ui.label(format!("#{idx}"));
+                        ui.monospace(format_point(point));
+                        ui.end_row();
+                    }
+                });
+        });
+}
+
+fn format_point(point: &Point) -> String {
+    format!("({}, {})", point.x(), point.y())
 }
 
 fn draw_cell_panel(

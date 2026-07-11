@@ -34,6 +34,7 @@ pub struct ViewerApp {
     ruler: RulerState,
     show_grid: bool,
     hovered_element: Option<usize>,
+    selected_element: Option<usize>,
     /// Reusable scratch buffer for spatial grid point queries.
     query_buf: Vec<u32>,
     side_panel_tab: SidePanelTab,
@@ -58,6 +59,7 @@ impl Default for ViewerApp {
             ruler: RulerState::default(),
             show_grid: true,
             hovered_element: None,
+            selected_element: None,
             query_buf: Vec::new(),
             side_panel_tab: SidePanelTab::default(),
             cell_view_mode: CellViewMode::default(),
@@ -104,6 +106,8 @@ impl ViewerApp {
 
         let cell_state = CellState::new(library);
         self.cell = Some(cell_state);
+        self.hovered_element = None;
+        self.selected_element = None;
         self.file_load.file_path = Some(path);
         self.file_load.loading = false;
     }
@@ -117,6 +121,8 @@ impl ViewerApp {
             self.scroll_to_selected = true;
             cell.element_receiver = None;
             cell.elements.clear();
+            self.hovered_element = None;
+            self.selected_element = None;
             cell.layers.clear();
             cell.spatial_grid = None;
             cell.tessellation_cache.clear();
@@ -169,6 +175,25 @@ impl ViewerApp {
         self.file_load.loading = true;
         self.file_load.error_message = None;
     }
+}
+
+fn hit_test_element(
+    elements: &[gdsr::Element],
+    grid: &SpatialGrid,
+    query_buf: &mut Vec<u32>,
+    wx: f64,
+    wy: f64,
+    zoom: f64,
+) -> Option<usize> {
+    let candidates = grid.query_point(wx, wy, query_buf);
+    for &idx in candidates.iter().rev() {
+        if let Some(el) = elements.get(idx as usize) {
+            if el.hit_test(wx, wy, zoom) {
+                return Some(idx as usize);
+            }
+        }
+    }
+    None
 }
 
 impl eframe::App for ViewerApp {
@@ -226,6 +251,12 @@ impl eframe::App for ViewerApp {
 
             if cell.elements_loading {
                 ctx.request_repaint();
+            }
+            if self
+                .selected_element
+                .is_some_and(|idx| idx >= cell.elements.len())
+            {
+                self.selected_element = None;
             }
         }
 
@@ -489,6 +520,7 @@ impl eframe::App for ViewerApp {
         let active_tab = self.side_panel_tab;
         let view_mode = self.cell_view_mode;
         let scroll_to_selected = &mut self.scroll_to_selected;
+        let selected_element_idx = self.selected_element;
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
             .width_range(40.0..=800.0)
@@ -496,6 +528,8 @@ impl eframe::App for ViewerApp {
             .show(ctx, |ui| {
                 ui.allocate_at_least(egui::vec2(ui.available_width(), 0.0), egui::Sense::hover());
                 if let Some(cell) = cell.as_mut() {
+                    let selected_element =
+                        selected_element_idx.and_then(|idx| cell.elements.get(idx));
                     panels::draw_side_panel(
                         ui,
                         active_tab,
@@ -509,6 +543,7 @@ impl eframe::App for ViewerApp {
                         scroll_to_selected,
                         &cell.layers,
                         layer_state,
+                        selected_element,
                     );
                 }
             });
@@ -533,6 +568,7 @@ impl eframe::App for ViewerApp {
         let show_grid = self.show_grid;
         let grid_spacing = self.grid_spacing;
         let hovered_element = &mut self.hovered_element;
+        let selected_element = &mut self.selected_element;
         let query_buf = &mut self.query_buf;
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
         let selected_cell_name: Option<String> =
@@ -551,7 +587,7 @@ impl eframe::App for ViewerApp {
                     (&[] as &[gdsr::Element], None, None, &mut empty_cache)
                 };
 
-            *mouse_world_pos = viewport.draw(
+            let interaction = viewport.draw(
                 ui,
                 elements,
                 layer_state,
@@ -563,28 +599,78 @@ impl eframe::App for ViewerApp {
                 show_grid,
                 grid_spacing,
                 *hovered_element,
+                *selected_element,
                 render_depth,
                 selected_cell_name.as_deref(),
             );
+            *mouse_world_pos = interaction.mouse_world;
 
             let prev_hovered = *hovered_element;
+            let prev_selected = *selected_element;
             *hovered_element = None;
             if let Some((wx, wy)) = *mouse_world_pos {
                 if let Some(grid) = spatial_grid {
-                    let candidates = grid.query_point(wx, wy, query_buf);
-                    for &idx in candidates.iter().rev() {
-                        if let Some(el) = elements.get(idx as usize) {
-                            if el.hit_test(wx, wy, viewport.zoom) {
-                                *hovered_element = Some(idx as usize);
-                                break;
-                            }
-                        }
-                    }
+                    *hovered_element =
+                        hit_test_element(elements, grid, query_buf, wx, wy, viewport.zoom);
                 }
             }
-            if *hovered_element != prev_hovered {
+            if interaction.clicked {
+                *selected_element = *hovered_element;
+            }
+            if *hovered_element != prev_hovered || *selected_element != prev_selected {
                 ctx.request_repaint();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gdsr::{DataType, Element, Layer, Point, Polygon};
+
+    fn p(x: f64, y: f64) -> Point {
+        Point::float(x, y, 1.0)
+    }
+
+    fn test_elements() -> Vec<Element> {
+        vec![
+            Polygon::new(
+                [p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0), p(0.0, 10.0)],
+                Layer::new(1),
+                DataType::new(0),
+            )
+            .into(),
+        ]
+    }
+
+    #[test]
+    fn hit_test_element_returns_matching_index() {
+        let elements = test_elements();
+        let Some(bounds) = viewport::compute_bounds(&elements) else {
+            panic!("test elements should have bounds");
+        };
+        let grid = SpatialGrid::build(&elements, &bounds);
+        let mut query_buf = Vec::new();
+
+        assert_eq!(
+            hit_test_element(&elements, &grid, &mut query_buf, 5.0, 5.0, 1.0),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn hit_test_element_returns_none_for_miss() {
+        let elements = test_elements();
+        let Some(bounds) = viewport::compute_bounds(&elements) else {
+            panic!("test elements should have bounds");
+        };
+        let grid = SpatialGrid::build(&elements, &bounds);
+        let mut query_buf = Vec::new();
+
+        assert_eq!(
+            hit_test_element(&elements, &grid, &mut query_buf, 20.0, 20.0, 1.0),
+            None
+        );
     }
 }
