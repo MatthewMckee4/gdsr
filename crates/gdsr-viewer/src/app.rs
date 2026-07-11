@@ -14,6 +14,8 @@ use crate::state::{
 };
 use crate::viewport::{self, Viewport};
 
+const MAX_STREAMED_ELEMENTS_PER_FRAME: usize = 20_000;
+
 /// Returns shortcut text with the platform-appropriate modifier (⌘ on macOS, Ctrl on others).
 fn shortcut_text(key: &str) -> String {
     let modifier = if cfg!(target_os = "macos") {
@@ -199,6 +201,14 @@ fn hit_test_element(
     None
 }
 
+fn should_render_elements(elements_loading: bool, has_spatial_grid: bool) -> bool {
+    !elements_loading || has_spatial_grid
+}
+
+fn should_continue_streaming_drain(received_this_frame: usize) -> bool {
+    received_this_frame < MAX_STREAMED_ELEMENTS_PER_FRAME
+}
+
 impl eframe::App for ViewerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Poll background loader
@@ -227,9 +237,14 @@ impl eframe::App for ViewerApp {
         let mut streaming_finished = false;
         if let Some(cell) = self.cell.as_mut() {
             if let Some(rx) = &cell.element_receiver {
+                let mut received_this_frame = 0;
                 loop {
+                    if !should_continue_streaming_drain(received_this_frame) {
+                        break;
+                    }
                     match rx.try_recv() {
                         Ok(element) => {
+                            received_this_frame += 1;
                             for key in element.layer_keys() {
                                 if cell.layers.insert(key) {
                                     self.layer_state.layer_colors.get(key.0, key.1);
@@ -575,15 +590,29 @@ impl eframe::App for ViewerApp {
         let query_buf = &mut self.query_buf;
         let drawn_element_marks = &mut self.drawn_element_marks;
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
+        let render_elements = cell
+            .as_ref()
+            .is_none_or(|c| should_render_elements(c.elements_loading, c.spatial_grid.is_some()));
+        let viewport_render_depth = if render_elements { render_depth } else { 0 };
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
                 if let Some(cell) = cell.as_mut() {
+                    let elements = if render_elements {
+                        cell.elements.as_slice()
+                    } else {
+                        &[] as &[gdsr::Element]
+                    };
+                    let spatial_grid = if render_elements {
+                        cell.spatial_grid.as_ref()
+                    } else {
+                        None
+                    };
                     (
-                        cell.elements.as_slice(),
-                        cell.spatial_grid.as_ref(),
+                        elements,
+                        spatial_grid,
                         Some(&cell.library),
                         &mut cell.tessellation_cache,
                     )
@@ -606,7 +635,7 @@ impl eframe::App for ViewerApp {
                 grid_spacing,
                 *hovered_element,
                 *selected_element,
-                render_depth,
+                viewport_render_depth,
                 selected_cell_name.as_deref(),
             );
             *mouse_world_pos = interaction.mouse_world;
@@ -648,6 +677,27 @@ mod tests {
             )
             .into(),
         ]
+    }
+
+    #[test]
+    fn suppress_element_rendering_until_streaming_grid_exists() {
+        assert!(!should_render_elements(true, false));
+    }
+
+    #[test]
+    fn render_elements_when_grid_exists_or_streaming_finished() {
+        assert!(should_render_elements(true, true));
+        assert!(should_render_elements(false, false));
+    }
+
+    #[test]
+    fn stop_streaming_drain_at_frame_budget() {
+        assert!(should_continue_streaming_drain(
+            MAX_STREAMED_ELEMENTS_PER_FRAME - 1
+        ));
+        assert!(!should_continue_streaming_drain(
+            MAX_STREAMED_ELEMENTS_PER_FRAME
+        ));
     }
 
     #[test]
