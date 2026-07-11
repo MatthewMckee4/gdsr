@@ -495,7 +495,7 @@ fn stroke_polyline_mesh_dimensions(xs: Vec<(i16, i16)>) -> bool {
         .iter()
         .map(|&(x, y)| Pos2::new(f32::from(x), f32::from(y)))
         .collect();
-    let stroke = Stroke::new(2.0, egui::Color32::WHITE);
+    let stroke = Stroke::new(2.0_f32, egui::Color32::WHITE);
 
     for closed in [false, true] {
         let mesh = stroke_polyline_to_mesh(&points, stroke, closed);

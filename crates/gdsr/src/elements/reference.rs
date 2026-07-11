@@ -745,7 +745,7 @@ mod tests {
         let centre = Point::integer(5, 5, 1e-9);
         let transformed = reference.rotate(Radians::FRAC_PI_2, centre);
 
-        assert!(transformed.grid().angle() != Radians::new(0.0));
+        assert_ne!(transformed.grid().angle(), Radians::new(0.0));
     }
 
     #[test]
