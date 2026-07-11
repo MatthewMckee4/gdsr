@@ -180,6 +180,28 @@ impl ViewerApp {
         self.file_load.loading = true;
         self.file_load.error_message = None;
     }
+
+    fn delete_selected_element(&mut self) -> bool {
+        let Some(index) = self.selected_element else {
+            return false;
+        };
+        let Some(cell) = self.cell.as_mut() else {
+            self.selected_element = None;
+            return false;
+        };
+        if cell.elements_loading {
+            return false;
+        }
+        if !cell.delete_element(index) {
+            self.selected_element = None;
+            return false;
+        }
+
+        self.selected_element = None;
+        self.hovered_element = None;
+        self.render_cache.clear();
+        true
+    }
 }
 
 fn hit_test_element(
@@ -308,6 +330,15 @@ impl eframe::App for ViewerApp {
             && !self.recent_picker.is_open()
         {
             self.ruler.cancel();
+        }
+        let delete_pressed =
+            ctx.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace));
+        if delete_pressed
+            && !self.cell_picker.is_open()
+            && !self.recent_picker.is_open()
+            && self.delete_selected_element()
+        {
+            ctx.request_repaint();
         }
         if self.ruler.start.is_some() {
             ctx.request_repaint();
@@ -539,6 +570,7 @@ impl eframe::App for ViewerApp {
         let view_mode = self.cell_view_mode;
         let scroll_to_selected = &mut self.scroll_to_selected;
         let selected_element_idx = self.selected_element;
+        let mut delete_selected = false;
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
             .width_range(40.0..=800.0)
@@ -548,7 +580,7 @@ impl eframe::App for ViewerApp {
                 if let Some(cell) = cell.as_mut() {
                     let selected_element =
                         selected_element_idx.and_then(|idx| cell.elements.get(idx));
-                    panels::draw_side_panel(
+                    delete_selected = panels::draw_side_panel(
                         ui,
                         active_tab,
                         &cell.cell_tree,
@@ -565,6 +597,10 @@ impl eframe::App for ViewerApp {
                     );
                 }
             });
+
+        if delete_selected && self.delete_selected_element() {
+            ctx.request_repaint();
+        }
 
         if cell_changed {
             if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
@@ -728,5 +764,43 @@ mod tests {
             hit_test_element(&elements, &grid, &mut query_buf, 20.0, 20.0, 1.0),
             None
         );
+    }
+
+    #[test]
+    fn delete_selected_element_removes_element_and_clears_selection() {
+        let mut app = ViewerApp::default();
+        let mut cell = CellState::new(gdsr::Library::new("test"));
+        cell.elements = test_elements();
+        let Some(bounds) = viewport::compute_bounds(&cell.elements) else {
+            panic!("test elements should have bounds");
+        };
+        cell.spatial_grid = Some(SpatialGrid::build(&cell.elements, &bounds));
+        app.cell = Some(cell);
+        app.selected_element = Some(0);
+        app.hovered_element = Some(0);
+
+        assert!(app.delete_selected_element());
+
+        let cell = app.cell.expect("cell should remain loaded");
+        assert!(cell.elements.is_empty());
+        assert!(cell.spatial_grid.is_none());
+        assert!(app.selected_element.is_none());
+        assert!(app.hovered_element.is_none());
+    }
+
+    #[test]
+    fn delete_selected_element_waits_for_streaming_to_finish() {
+        let mut app = ViewerApp::default();
+        let mut cell = CellState::new(gdsr::Library::new("test"));
+        cell.elements = test_elements();
+        cell.elements_loading = true;
+        app.cell = Some(cell);
+        app.selected_element = Some(0);
+
+        assert!(!app.delete_selected_element());
+
+        let cell = app.cell.expect("cell should remain loaded");
+        assert_eq!(cell.elements.len(), 1);
+        assert_eq!(app.selected_element, Some(0));
     }
 }
