@@ -10,6 +10,8 @@ authors = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+bevy_asset = { workspace = true }
+bevy_mesh = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 earcutr = { workspace = true }
 eframe = { workspace = true }

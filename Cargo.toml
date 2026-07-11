@@ -14,6 +14,8 @@ license = "MIT"
 gdsr = { path = "crates/gdsr", version = "0.0.1-alpha.3" }
 
 approx = "0.5"
+bevy_asset = "0.16.1"
+bevy_mesh = "0.16.1"
 bytemuck = "1.25.0"
 chrono = "0.4.44"
 clap = "4.5.55"

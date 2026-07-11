@@ -1,6 +1,7 @@
 use clap::Parser;
 
 mod app;
+pub mod bevy_renderer;
 mod colors;
 mod drawable;
 mod grid;

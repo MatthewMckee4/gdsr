@@ -104,6 +104,8 @@ impl Viewport {
         elements: &[Element],
         layer_state: &mut LayerState,
         spatial_grid: Option<&SpatialGrid>,
+        query_buf: &mut Vec<u32>,
+        drawn_element_marks: &mut Vec<bool>,
         library: Option<&Library>,
         render_cache: &mut RenderCache,
         tessellation_cache: &mut HashMap<u32, Vec<usize>>,
@@ -325,7 +327,11 @@ impl Viewport {
         };
 
         if let Some(grid) = spatial_grid {
-            let mut seen = vec![false; elements.len()];
+            if drawn_element_marks.len() < elements.len() {
+                drawn_element_marks.resize(elements.len(), false);
+            }
+            query_buf.clear();
+
             for cell in grid.query_visible(&render_visible) {
                 let s_min = ctx
                     .viewport
@@ -359,10 +365,11 @@ impl Viewport {
 
                 for &idx in &cell.indices {
                     let i = idx as usize;
-                    if seen[i] {
+                    if drawn_element_marks[i] {
                         continue;
                     }
-                    seen[i] = true;
+                    drawn_element_marks[i] = true;
+                    query_buf.push(idx);
                     if let Some(element) = elements.get(i) {
                         ctx.current_element_idx = Some(idx);
                         element.draw(&mut ctx);
@@ -374,10 +381,18 @@ impl Viewport {
             // grid never contains them. Draw any unseen references in a second pass.
             if show_ref_bbox {
                 for (i, element) in elements.iter().enumerate() {
-                    if !seen[i] && matches!(element, Element::Reference(_)) {
+                    if matches!(element, Element::Reference(_))
+                        && !drawn_element_marks.get(i).copied().unwrap_or_default()
+                    {
                         ctx.current_element_idx = Some(i as u32);
                         element.draw(&mut ctx);
                     }
+                }
+            }
+
+            for &idx in query_buf.iter() {
+                if let Some(mark) = drawn_element_marks.get_mut(idx as usize) {
+                    *mark = false;
                 }
             }
         } else {
