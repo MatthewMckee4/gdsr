@@ -52,6 +52,10 @@ fn build_node<'a>(
 ) -> CellTreeNode {
     ancestors.insert(name);
     let children = if let Some(kids) = children_of.get(name) {
+        #[expect(
+            clippy::needless_collect,
+            reason = "collect avoids borrowing ancestors across recursive mutation"
+        )]
         let valid_kids: Vec<&str> = kids
             .iter()
             .filter(|kid| !ancestors.contains(**kid))

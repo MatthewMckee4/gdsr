@@ -1,28 +1,133 @@
-# Contributing
+# Contributing to GDSR
 
-## Finding ways to help
+Thanks for your interest in contributing to GDSR. Contributions of all kinds are
+welcome, and we try to keep the development process as smooth as possible.
 
-We label issues that would be good for a first time contributor as
+If you hit a bug, have a feature idea, or want to suggest an improvement to the
+contributing docs themselves, please
+[open an issue](https://github.com/MatthewMckee4/gdsr/issues/new).
+
+For small changes like bug fixes, feel free to jump straight to a pull request.
+For anything larger, it is usually worth opening an issue first to discuss the
+approach.
+
+If you want to tackle an issue that is already open, please leave a comment
+letting me know you would like to work on it. There is only one person working
+on this project right now, so issues may be out of date and I do not want you to
+work on something that does not align with the goals for the project.
+
+## Finding Ways To Help
+
+We label issues that would be good for a first-time contributor as
 [`good first issue`](https://github.com/MatthewMckee4/gdsr/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
-These usually do not require significant experience with code base.
+These usually do not require significant experience with the codebase.
 
-We label issues that we think are a good opportunity for subsequent contributions as
+We label issues that we think are a good opportunity for subsequent
+contributions as
 [`help wanted`](https://github.com/MatthewMckee4/gdsr/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
 These require varying levels of experience.
 
-## Setup
+## Architecture
 
-[Rust](https://rustup.rs/) is required to build and work on the project.
+GDSR is a Rust workspace with a library crate, a viewer crate, docs, and
+benchmark tooling.
 
-## Testing
+The main crates:
 
-For running tests, we recommend [nextest](https://nexte.st/).
+- `gdsr` - the library crate. Contains the GDSII data model, binary reader and
+  writer, units, element types, and geometry helpers.
+- `gdsr-viewer` - the `egui`/`eframe` viewer binary. Loads GDSII libraries,
+  renders cells, and provides the interactive inspection workflow.
+
+Infrastructure and tooling:
+
+- `docs/` - zensical documentation.
+- `scripts/prepare_docs.py` - prepares generated docs pages before serving or
+  building the docs.
+- `scripts/benchmark/` - benchmark plotting and benchmark result assets.
+
+## Prerequisites
+
+GDSR is written in Rust. Install the
+[Rust toolchain](https://www.rust-lang.org/tools/install) to get started. The
+repository includes `rust-toolchain.toml`, so `rustup` will select the expected
+toolchain automatically.
+
+You can optionally install prek hooks to automatically run validation checks
+when making a commit:
+
+```bash
+uv tool install prek
+prek install
+```
+
+We recommend [nextest](https://nexte.st/) for running the Rust test suite:
+
+```bash
+cargo install cargo-nextest --locked
+```
+
+## Development
+
+To run the tests:
+
+```bash
+cargo nextest run
+```
+
+Pass test arguments directly for focused iteration:
+
+```bash
+cargo nextest run -p gdsr
+```
+
+Before opening a pull request, run the relevant tests plus the full validation
+sweep:
+
+```bash
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+uvx prek run -a
+```
 
 ## Documentation
 
-To prepare and run the documentation locally, run:
+We use zensical to build the documentation.
 
-```shell
+```bash
+uv run -s scripts/prepare_docs.py
+uv run --isolated --with-requirements docs/requirements.txt zensical build
+```
+
+To serve the docs locally:
+
+```bash
 uv run -s scripts/prepare_docs.py
 uv run --isolated --with-requirements docs/requirements.txt zensical serve
+```
+
+## Release Process
+
+Releases are automated through the release workflow and `seal`.
+
+First, install [seal](https://github.com/MatthewMckee4/seal), then bump the
+version with:
+
+```bash
+seal bump alpha
+```
+
+or:
+
+```bash
+seal bump <version>
+```
+
+This creates a branch and commit, so you just need to open a pull request.
+
+## GitHub Actions
+
+If you update GitHub Actions, run `pinact` to pin action versions:
+
+```bash
+pinact run
 ```

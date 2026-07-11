@@ -151,7 +151,7 @@ impl DrawContext<'_> {
 
 /// Pre-tessellates a polyline stroke into a [`Mesh`] of quads (2 triangles per edge).
 /// For `closed` polylines, the last point connects back to the first.
-pub(crate) fn stroke_polyline_to_mesh(points: &[Pos2], stroke: Stroke, closed: bool) -> Mesh {
+pub fn stroke_polyline_to_mesh(points: &[Pos2], stroke: Stroke, closed: bool) -> Mesh {
     let mut mesh = Mesh::default();
     if points.len() < 2 {
         return mesh;
@@ -449,7 +449,7 @@ impl Drawable for gdsr::Path {
             if let Some(first) = segments.first_mut() {
                 let dx = first.2 - first.0;
                 let dy = first.3 - first.1;
-                let len = (dx * dx + dy * dy).sqrt();
+                let len = dx.hypot(dy);
                 if len > f64::EPSILON {
                     first.0 -= dx / len * begin_ext;
                     first.1 -= dy / len * begin_ext;
@@ -458,7 +458,7 @@ impl Drawable for gdsr::Path {
             if let Some(last) = segments.last_mut() {
                 let dx = last.2 - last.0;
                 let dy = last.3 - last.1;
-                let len = (dx * dx + dy * dy).sqrt();
+                let len = dx.hypot(dy);
                 if len > f64::EPSILON {
                     last.2 += dx / len * end_ext;
                     last.3 += dy / len * end_ext;

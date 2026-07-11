@@ -15,7 +15,7 @@ pub fn area(points: &[Point]) -> Unit {
     let units = first_point.units().0;
 
     let points = ensure_points_same_units(points, units);
-    let closed = get_correct_polygon_points_format(points.clone());
+    let closed = get_correct_polygon_points_format(points);
 
     let mut sum = 0.0;
     for i in 0..closed.len() - 1 {

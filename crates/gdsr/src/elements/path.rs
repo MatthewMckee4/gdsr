@@ -564,7 +564,7 @@ mod tests {
         for point in arc.points() {
             let dx = point.x().float_value() - center.x().float_value();
             let dy = point.y().float_value() - center.y().float_value();
-            let dist = (dx * dx + dy * dy).sqrt();
+            let dist = dx.hypot(dy);
             assert!(
                 (dist - radius).abs() < tolerance,
                 "point distance {dist} differs from radius {radius}"

@@ -112,7 +112,7 @@ fn regular_polygon_vertices_equidistant_from_center(num_sides: usize) -> bool {
     polygon.points().iter().take(num_sides).all(|p| {
         let dx = p.x().float_value();
         let dy = p.y().float_value();
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dist = dx.hypot(dy);
         (dist - radius).abs() < 1e-9
     })
 }

@@ -1,3 +1,5 @@
+fail_fast: false
+
 exclude:
   glob:
     - "*.svg"
@@ -8,43 +10,77 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        priority: 0
       - id: check-case-conflict
+        priority: 0
       - id: check-merge-conflict
+        priority: 0
       - id: check-symlinks
+        priority: 0
       - id: check-yaml
+        priority: 0
       - id: check-toml
+        priority: 0
       - id: debug-statements
+        priority: 0
       - id: end-of-file-fixer
+        priority: 0
       - id: mixed-line-ending
+        priority: 0
       - id: detect-private-key
+        priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
+    rev: v0.25
     hooks:
       - id: validate-pyproject
+        priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.40.0
+    rev: v1.47.2
     hooks:
       - id: typos
+        priority: 0
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        priority: 0
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.26.1
+    hooks:
+      - id: zizmor
+        priority: 0
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.37.3
+    hooks:
+      - id: check-github-workflows
+        priority: 0
 
   - repo: https://github.com/executablebooks/mdformat
     rev: 1.0.0
     hooks:
       - id: mdformat
+        priority: 1
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.46.0
+    rev: v0.49.0
     hooks:
       - id: markdownlint-fix
+        priority: 2
 
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
     hooks:
       - id: cargo-check
         args: ["--all-targets", "--all-features"]
+        priority: 2
       - id: clippy
         args: ["--all-targets", "--all-features", "--", "-D", "warnings"]
+        priority: 2
 
   - repo: local
     hooks:
@@ -54,27 +90,20 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        types_or: [yaml, toml]
+        priority: 1
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.7
+    rev: v0.15.18
     hooks:
       - id: ruff-check
-        args: [--fix]
+        args: [--fix, --exit-non-zero-on-fix]
+        priority: 1
       - id: ruff-format
-
-  - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.18.0
-    hooks:
-      - id: zizmor
+        priority: 1
 
   - repo: https://github.com/DevinR528/cargo-sort
-    rev: v2.0.2
+    rev: v2.1.4
     hooks:
       - id: cargo-sort
         args: ["-g", "-w"]
+        priority: 1

@@ -1,4 +1,4 @@
-pub(crate) mod bounds;
+pub mod bounds;
 
 pub use bounds::compute_bounds;
 

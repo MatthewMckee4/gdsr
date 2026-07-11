@@ -1,0 +1,7 @@
+# Configuration for the actionlint tool, which we run via prek to verify the
+# syntax of GitHub Actions workflows.
+
+self-hosted-runner:
+  labels:
+    - macos-15-intel
+    - ubuntu-22.04-arm
