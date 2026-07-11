@@ -93,6 +93,20 @@ impl Viewport {
 /// Screen-pixel threshold below which a grid cell draws as a single LOAD rectangle
 /// instead of rendering individual elements.
 const CELL_LOAD_THRESHOLD_PX: f32 = 24.0;
+const CELL_LOAD_DENSITY_MIN_ELEMENTS: usize = 128;
+const CELL_LOAD_MIN_AVG_ELEMENT_AREA_PX: f32 = 16.0;
+
+fn should_draw_cell_load(width_px: f32, height_px: f32, element_count: usize) -> bool {
+    if width_px < CELL_LOAD_THRESHOLD_PX && height_px < CELL_LOAD_THRESHOLD_PX {
+        return true;
+    }
+    if element_count < CELL_LOAD_DENSITY_MIN_ELEMENTS {
+        return false;
+    }
+
+    let area_px = width_px * height_px;
+    area_px.is_finite() && area_px / element_count as f32 <= CELL_LOAD_MIN_AVG_ELEMENT_AREA_PX
+}
 
 impl Viewport {
     /// Draws the viewport and handles pan/zoom interaction.
@@ -349,7 +363,7 @@ impl Viewport {
                     continue;
                 }
 
-                if has_area && sw < CELL_LOAD_THRESHOLD_PX && sh < CELL_LOAD_THRESHOLD_PX {
+                if has_area && should_draw_cell_load(sw, sh, cell.indices.len()) {
                     if !ctx.layer_state.hidden_layers.contains(&cell.dominant_layer) {
                         let color = ctx
                             .layer_state
@@ -617,6 +631,21 @@ mod tests {
         vp.pan(10.0, -5.0);
         assert!((vp.center_x - 10.0).abs() < EPSILON);
         assert!((vp.center_y - (-5.0)).abs() < EPSILON);
+    }
+
+    #[test]
+    fn load_cell_for_small_screen_area() {
+        assert!(should_draw_cell_load(12.0, 20.0, 1));
+    }
+
+    #[test]
+    fn load_cell_for_dense_screen_area() {
+        assert!(should_draw_cell_load(400.0, 200.0, 10_000));
+    }
+
+    #[test]
+    fn draw_sparse_large_cell_elements() {
+        assert!(!should_draw_cell_load(400.0, 200.0, 100));
     }
 
     #[test]
