@@ -21,6 +21,11 @@ pub struct Viewport {
     pub zoom: f64,
 }
 
+pub struct ViewportInteraction {
+    pub mouse_world: Option<(f64, f64)>,
+    pub clicked: bool,
+}
+
 impl Default for Viewport {
     fn default() -> Self {
         Self {
@@ -106,9 +111,10 @@ impl Viewport {
         show_grid: bool,
         grid_spacing: GridSpacing,
         hovered_element: Option<usize>,
+        selected_element: Option<usize>,
         render_depth: u32,
         selected_cell: Option<&str>,
-    ) -> Option<(f64, f64)> {
+    ) -> ViewportInteraction {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
 
@@ -120,12 +126,14 @@ impl Viewport {
         }
 
         // Handle ruler clicks before drag so ruler gets priority when active.
-        if ruler.active && response.clicked() {
+        let ruler_was_active = ruler.active;
+        if ruler_was_active && response.clicked() {
             if let Some(pos) = response.interact_pointer_pos() {
                 let (wx, wy) = self.screen_to_world(pos.x, pos.y, rect);
                 ruler.handle_click(wx, wy);
             }
         }
+        let clicked = response.clicked() && !ruler_was_active;
 
         if response.dragged() {
             let delta = response.drag_delta();
@@ -204,24 +212,36 @@ impl Viewport {
                 s.transform(tsf);
                 painter.add(s);
             }
-            if let Some(idx) = hovered_element {
-                if let Some(el) = elements.get(idx) {
-                    draw_highlight(
-                        el,
-                        self,
-                        &painter,
-                        rect,
-                        layer_state,
-                        library,
-                        tessellation_cache,
-                    );
-                }
+            draw_element_highlight(
+                selected_element,
+                elements,
+                self,
+                &painter,
+                rect,
+                layer_state,
+                library,
+                tessellation_cache,
+            );
+            if hovered_element != selected_element {
+                draw_element_highlight(
+                    hovered_element,
+                    elements,
+                    self,
+                    &painter,
+                    rect,
+                    layer_state,
+                    library,
+                    tessellation_cache,
+                );
             }
             let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
             ruler.draw(&painter, self, rect, mouse_world);
-            return mouse_world;
+            return ViewportInteraction {
+                mouse_world,
+                clicked,
+            };
         }
 
         // Depth-0: draw just the selected cell's bounding box with its name.
@@ -267,7 +287,10 @@ impl Viewport {
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
             ruler.draw(&painter, self, rect, mouse_world);
-            return mouse_world;
+            return ViewportInteraction {
+                mouse_world,
+                clicked,
+            };
         }
 
         // Full render: query a 3× expanded region so the cache has margin for panning.
@@ -382,25 +405,60 @@ impl Viewport {
             render_depth,
         );
 
-        if let Some(idx) = hovered_element {
-            if let Some(el) = elements.get(idx) {
-                draw_highlight(
-                    el,
-                    self,
-                    &painter,
-                    rect,
-                    layer_state,
-                    library,
-                    tessellation_cache,
-                );
-            }
+        draw_element_highlight(
+            selected_element,
+            elements,
+            self,
+            &painter,
+            rect,
+            layer_state,
+            library,
+            tessellation_cache,
+        );
+        if hovered_element != selected_element {
+            draw_element_highlight(
+                hovered_element,
+                elements,
+                self,
+                &painter,
+                rect,
+                layer_state,
+                library,
+                tessellation_cache,
+            );
         }
 
         let mouse_world = response
             .hover_pos()
             .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
         ruler.draw(&painter, self, rect, mouse_world);
-        mouse_world
+        ViewportInteraction {
+            mouse_world,
+            clicked,
+        }
+    }
+}
+
+fn draw_element_highlight(
+    idx: Option<usize>,
+    elements: &[Element],
+    viewport: &Viewport,
+    painter: &egui::Painter,
+    rect: Rect,
+    layer_state: &mut LayerState,
+    library: Option<&Library>,
+    tessellation_cache: &mut HashMap<u32, Vec<usize>>,
+) {
+    if let Some(el) = idx.and_then(|idx| elements.get(idx)) {
+        draw_highlight(
+            el,
+            viewport,
+            painter,
+            rect,
+            layer_state,
+            library,
+            tessellation_cache,
+        );
     }
 }
 
