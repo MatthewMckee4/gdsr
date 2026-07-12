@@ -21,7 +21,7 @@ pub struct FileLoadState {
     pub error_message: Option<String>,
 }
 
-/// Holds the loaded library, selected cell, and its streamed elements.
+/// Holds the loaded library, selected cell, and render indexes.
 pub struct CellState {
     pub library: Library,
     pub cell_names: Vec<String>,
@@ -30,8 +30,6 @@ pub struct CellState {
     pub expand_state: ExpandState,
     pub selected_cell: Option<String>,
     pub elements: Vec<Element>,
-    pub element_receiver: Option<mpsc::Receiver<Element>>,
-    pub elements_loading: bool,
     pub layers: BTreeSet<(Layer, DataType)>,
     pub spatial_grid: Option<SpatialGrid>,
     pub tessellation_cache: HashMap<u32, Vec<usize>>,
@@ -54,8 +52,6 @@ impl CellState {
             expand_state,
             selected_cell: None,
             elements: Vec::new(),
-            element_receiver: None,
-            elements_loading: false,
             layers: BTreeSet::new(),
             spatial_grid: None,
             tessellation_cache: HashMap::new(),
@@ -75,6 +71,29 @@ impl CellState {
         true
     }
 
+    pub fn load_direct_cell_elements(&mut self, name: &str) -> bool {
+        self.cell_stats = self.library.get_cell(name).map(CellStats::from_cell);
+
+        let Some(cell) = self.library.get_cell(name) else {
+            self.elements.clear();
+            self.rebuild_render_indexes();
+            return false;
+        };
+        self.elements = cell.elements().to_vec();
+        self.rebuild_render_indexes();
+
+        self.layers.clear();
+        let mut visiting = HashSet::new();
+        collect_layers_from_cell(
+            name,
+            &self.library,
+            self.render_depth,
+            &mut self.layers,
+            &mut visiting,
+        );
+        true
+    }
+
     fn rebuild_render_indexes(&mut self) {
         self.layers.clear();
         for element in &self.elements {
@@ -83,6 +102,55 @@ impl CellState {
         self.spatial_grid = viewport::compute_bounds(&self.elements)
             .map(|bounds| SpatialGrid::build(&self.elements, &bounds));
         self.tessellation_cache.clear();
+    }
+}
+
+fn collect_layers_from_cell(
+    cell_name: &str,
+    library: &Library,
+    depth: u32,
+    layers: &mut BTreeSet<(Layer, DataType)>,
+    visiting: &mut HashSet<String>,
+) {
+    if depth == 0 || !visiting.insert(cell_name.to_owned()) {
+        return;
+    }
+
+    if let Some(cell) = library.get_cell(cell_name) {
+        for element in cell.iter_elements() {
+            collect_layers_from_element(element, library, depth, layers, visiting);
+        }
+    }
+
+    visiting.remove(cell_name);
+}
+
+fn collect_layers_from_element(
+    element: &Element,
+    library: &Library,
+    depth: u32,
+    layers: &mut BTreeSet<(Layer, DataType)>,
+    visiting: &mut HashSet<String>,
+) {
+    let Element::Reference(reference) = element else {
+        layers.extend(element.layer_keys());
+        return;
+    };
+
+    if depth <= 1 {
+        return;
+    }
+
+    if let Some(cell_name) = reference.instance().as_cell() {
+        collect_layers_from_cell(cell_name, library, depth - 1, layers, visiting);
+    } else if let Some(inner) = reference.instance().as_element() {
+        collect_layers_from_element(
+            inner.as_ref().as_ref(),
+            library,
+            depth - 1,
+            layers,
+            visiting,
+        );
     }
 }
 
