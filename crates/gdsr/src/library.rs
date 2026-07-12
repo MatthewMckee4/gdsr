@@ -61,6 +61,31 @@ impl Library {
         }
     }
 
+    /// Renames a cell and updates references to that cell.
+    pub fn rename_cell(&mut self, old_name: &str, new_name: &str) -> bool {
+        if old_name == new_name {
+            return self.cells.contains_key(old_name);
+        }
+        if !self.cells.contains_key(old_name) || self.cells.contains_key(new_name) {
+            return false;
+        }
+
+        let Some(mut cell) = self.cells.remove(old_name) else {
+            return false;
+        };
+        cell.set_name(new_name);
+        self.cells.insert(new_name.to_string(), cell);
+
+        let rename_map = HashMap::from([(old_name.to_string(), new_name.to_string())]);
+        for cell in self.cells.values_mut() {
+            for element in cell.iter_elements_mut() {
+                Self::update_reference_names(element, &rename_map);
+            }
+        }
+
+        true
+    }
+
     /// Returns a reference to the cell with the given name, if it exists.
     pub fn get_cell(&self, name: &str) -> Option<&Cell> {
         self.cells.get(name)
@@ -516,6 +541,37 @@ mod tests {
 
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("cell1"));
+    }
+
+    #[test]
+    fn test_library_rename_cell_updates_references() {
+        let mut library: Library = Library::new("test_lib");
+        let target = Cell::new("old");
+        let mut parent = Cell::new("parent");
+        parent.add(Reference::new("old"));
+        library.add_cell(target);
+        library.add_cell(parent);
+
+        assert!(library.rename_cell("old", "new"));
+
+        assert!(library.get_cell("old").is_none());
+        assert!(library.get_cell("new").is_some());
+        let refs: Vec<&str> = library
+            .get_cell("parent")
+            .expect("parent cell should exist")
+            .referenced_cell_names();
+        assert_eq!(refs, vec!["new"]);
+    }
+
+    #[test]
+    fn test_library_rename_cell_rejects_missing_or_duplicate_names() {
+        let mut library: Library = Library::new("test_lib");
+        library.add_cell(Cell::new("a"));
+        library.add_cell(Cell::new("b"));
+
+        assert!(!library.rename_cell("missing", "c"));
+        assert!(!library.rename_cell("a", "b"));
+        assert!(library.rename_cell("a", "a"));
     }
 
     #[test]

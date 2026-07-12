@@ -127,6 +127,19 @@ impl EditAction {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum CellNameDialogMode {
+    Create,
+    Rename { old_name: String },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct CellNameDialog {
+    mode: CellNameDialogMode,
+    name: String,
+    error: Option<String>,
+}
+
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -155,6 +168,7 @@ pub struct ViewerApp {
     show_unsaved_close_prompt: bool,
     undo_stack: Vec<EditAction>,
     redo_stack: Vec<EditAction>,
+    cell_name_dialog: Option<CellNameDialog>,
 }
 
 impl Default for ViewerApp {
@@ -185,6 +199,7 @@ impl Default for ViewerApp {
             show_unsaved_close_prompt: false,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            cell_name_dialog: None,
         }
     }
 }
@@ -231,6 +246,7 @@ impl ViewerApp {
         self.show_unsaved_close_prompt = false;
         self.undo_stack.clear();
         self.redo_stack.clear();
+        self.cell_name_dialog = None;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -346,6 +362,182 @@ impl ViewerApp {
 
         self.show_unsaved_close_prompt = true;
         true
+    }
+
+    fn unique_cell_name(&self, base: &str) -> String {
+        let Some(cell) = self.cell.as_ref() else {
+            return base.to_string();
+        };
+        if !cell.library.cells().contains_key(base) {
+            return base.to_string();
+        }
+
+        for suffix in 1.. {
+            let candidate = format!("{base}_{suffix}");
+            if !cell.library.cells().contains_key(&candidate) {
+                return candidate;
+            }
+        }
+
+        base.to_string()
+    }
+
+    fn open_create_cell_dialog(&mut self) {
+        self.cell_name_dialog = Some(CellNameDialog {
+            mode: CellNameDialogMode::Create,
+            name: self.unique_cell_name("new_cell"),
+            error: None,
+        });
+    }
+
+    fn open_rename_cell_dialog(&mut self) {
+        let Some(old_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            return;
+        };
+
+        self.cell_name_dialog = Some(CellNameDialog {
+            mode: CellNameDialogMode::Rename {
+                old_name: old_name.clone(),
+            },
+            name: old_name,
+            error: None,
+        });
+    }
+
+    fn validate_cell_name(
+        &self,
+        name: &str,
+        existing_name: Option<&str>,
+    ) -> Result<String, String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("Cell name is required".to_string());
+        }
+
+        let Some(cell) = self.cell.as_ref() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        if Some(trimmed) != existing_name && cell.library.cells().contains_key(trimmed) {
+            return Err("Cell name already exists".to_string());
+        }
+
+        Ok(trimmed.to_string())
+    }
+
+    fn mark_cell_structure_changed(&mut self) {
+        self.selected_element = None;
+        self.hovered_element = None;
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+
+    fn create_cell_named(&mut self, name: &str) -> Result<(), String> {
+        let name = self.validate_cell_name(name, None)?;
+        let Some(cell) = self.cell.as_mut() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        if !cell.create_cell(&name) {
+            return Err("Could not create cell".to_string());
+        }
+
+        self.scroll_to_selected = true;
+        self.mark_cell_structure_changed();
+        Ok(())
+    }
+
+    fn rename_cell_named(&mut self, old_name: &str, new_name: &str) -> Result<(), String> {
+        let new_name = self.validate_cell_name(new_name, Some(old_name))?;
+        if new_name == old_name {
+            return Ok(());
+        }
+
+        let Some(cell) = self.cell.as_mut() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        if !cell.rename_cell(old_name, &new_name) {
+            return Err("Could not rename cell".to_string());
+        }
+
+        self.scroll_to_selected = true;
+        self.mark_cell_structure_changed();
+        Ok(())
+    }
+
+    fn submit_cell_name_dialog(&mut self) {
+        let Some(dialog) = self.cell_name_dialog.clone() else {
+            return;
+        };
+
+        let result = match dialog.mode {
+            CellNameDialogMode::Create => self.create_cell_named(&dialog.name),
+            CellNameDialogMode::Rename { old_name } => {
+                self.rename_cell_named(&old_name, &dialog.name)
+            }
+        };
+
+        match result {
+            Ok(()) => {
+                self.cell_name_dialog = None;
+            }
+            Err(err) => {
+                if let Some(dialog) = self.cell_name_dialog.as_mut() {
+                    dialog.error = Some(err);
+                }
+            }
+        }
+    }
+
+    fn draw_cell_name_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.cell_name_dialog.as_mut() else {
+            return;
+        };
+
+        let mut submit = false;
+        let mut cancel = false;
+        let title = match dialog.mode {
+            CellNameDialogMode::Create => "New Cell",
+            CellNameDialogMode::Rename { .. } => "Rename Cell",
+        };
+        let primary_label = match dialog.mode {
+            CellNameDialogMode::Create => "Create",
+            CellNameDialogMode::Rename { .. } => "Rename",
+        };
+
+        egui::Window::new(title)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                let response =
+                    ui.add(egui::TextEdit::singleline(&mut dialog.name).desired_width(240.0));
+                if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                    submit = true;
+                }
+                if let Some(err) = &dialog.error {
+                    ui.colored_label(egui::Color32::RED, err);
+                }
+                ui.horizontal(|ui| {
+                    if ui.button(primary_label).clicked() {
+                        submit = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+
+        if cancel {
+            self.cell_name_dialog = None;
+        } else if submit {
+            self.submit_cell_name_dialog();
+        }
     }
 
     fn record_edit(&mut self, action: EditAction) {
@@ -904,7 +1096,7 @@ impl eframe::App for ViewerApp {
         let view_mode = self.cell_view_mode;
         let scroll_to_selected = &mut self.scroll_to_selected;
         let selected_element_idx = self.selected_element;
-        let mut delete_selected = false;
+        let mut side_panel_actions = panels::SidePanelActions::default();
         egui::SidePanel::left("side_panel")
             .default_width(200.0)
             .width_range(40.0..=800.0)
@@ -914,7 +1106,7 @@ impl eframe::App for ViewerApp {
                 if let Some(cell) = cell.as_mut() {
                     let selected_element =
                         selected_element_idx.and_then(|idx| cell.elements.get(idx));
-                    delete_selected = panels::draw_side_panel(
+                    side_panel_actions = panels::draw_side_panel(
                         ui,
                         active_tab,
                         &cell.cell_tree,
@@ -932,8 +1124,14 @@ impl eframe::App for ViewerApp {
                 }
             });
 
-        if delete_selected && self.delete_selected_element() {
+        if side_panel_actions.delete_selected && self.delete_selected_element() {
             ctx.request_repaint();
+        }
+        if side_panel_actions.create_cell {
+            self.open_create_cell_dialog();
+        }
+        if side_panel_actions.rename_cell {
+            self.open_rename_cell_dialog();
         }
 
         if cell_changed {
@@ -1020,6 +1218,7 @@ impl eframe::App for ViewerApp {
             }
         }
 
+        self.draw_cell_name_dialog(ctx);
         self.draw_unsaved_close_prompt(ctx);
     }
 }
@@ -1074,6 +1273,19 @@ mod tests {
             .elements[0]
             .world_bbox()
             .expect("element has bbox")
+    }
+
+    fn library_with_referenced_leaf() -> Library {
+        let mut leaf = Cell::new("leaf");
+        leaf.add(test_elements().remove(0));
+
+        let mut top = Cell::new("top");
+        top.add(Reference::new("leaf"));
+
+        let mut library = Library::new("test");
+        library.add_cell(leaf);
+        library.add_cell(top);
+        library
     }
 
     #[test]
@@ -1230,6 +1442,67 @@ mod tests {
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.undo_stack.len(), 1);
         assert!(app.redo_stack.is_empty());
+    }
+
+    #[test]
+    fn create_cell_named_adds_selects_and_marks_dirty() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            ..Default::default()
+        };
+        assert!(app.move_selected_element(Point::float(1.0, 0.0, 1.0)));
+
+        assert!(app.create_cell_named("created").is_ok());
+
+        let cell = app.cell.as_ref().expect("cell should remain loaded");
+        assert!(cell.library.get_cell("created").is_some());
+        assert_eq!(cell.selected_cell.as_deref(), Some("created"));
+        assert!(cell.cell_names.contains(&"created".to_string()));
+        assert!(cell.elements.is_empty());
+        assert!(app.has_unsaved_changes);
+        assert!(app.undo_stack.is_empty());
+        assert!(app.redo_stack.is_empty());
+    }
+
+    #[test]
+    fn rename_cell_named_updates_selection_references_and_marks_dirty() {
+        let mut cell = CellState::new(library_with_referenced_leaf());
+        cell.selected_cell = Some("leaf".to_string());
+        assert!(cell.load_direct_cell_elements("leaf"));
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert!(app.rename_cell_named("leaf", "renamed").is_ok());
+
+        let cell = app.cell.as_ref().expect("cell should remain loaded");
+        assert!(cell.library.get_cell("leaf").is_none());
+        assert!(cell.library.get_cell("renamed").is_some());
+        assert_eq!(cell.selected_cell.as_deref(), Some("renamed"));
+        assert_eq!(
+            cell.library
+                .get_cell("top")
+                .expect("top cell should exist")
+                .referenced_cell_names(),
+            vec!["renamed"]
+        );
+        assert!(app.has_unsaved_changes);
+    }
+
+    #[test]
+    fn rename_cell_named_rejects_duplicate_name() {
+        let mut app = ViewerApp {
+            cell: Some(CellState::new(library_with_referenced_leaf())),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            app.rename_cell_named("leaf", "top"),
+            Err("Cell name already exists".to_string())
+        );
     }
 
     #[test]
