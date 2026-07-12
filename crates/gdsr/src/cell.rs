@@ -88,6 +88,16 @@ impl Cell {
         self.elements.push(element.into());
     }
 
+    /// Inserts an element at `index`.
+    pub fn insert_element(&mut self, index: usize, element: impl Into<Element>) -> bool {
+        if index > self.elements.len() {
+            return false;
+        }
+
+        self.elements.insert(index, element.into());
+        true
+    }
+
     /// Returns a mutable reference to the element at `index`.
     pub fn element_mut(&mut self, index: usize) -> Option<&mut Element> {
         self.elements.get_mut(index)
@@ -296,6 +306,19 @@ mod tests {
         assert_eq!(cell.elements().len(), 1);
         assert!(matches!(cell.elements()[0], Element::Path(_)));
         assert!(cell.remove_element(1).is_none());
+    }
+
+    #[test]
+    fn test_insert_element() {
+        let mut cell = Cell::new("test_cell");
+        cell.add(Path::default());
+
+        assert!(cell.insert_element(0, Polygon::default()));
+
+        assert_eq!(cell.elements().len(), 2);
+        assert!(matches!(cell.elements()[0], Element::Polygon(_)));
+        assert!(matches!(cell.elements()[1], Element::Path(_)));
+        assert!(!cell.insert_element(3, Text::default()));
     }
 
     #[test]
