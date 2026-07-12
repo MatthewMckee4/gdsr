@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::thread;
 
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
@@ -12,9 +11,7 @@ use crate::state::{
     CellState, CellViewMode, DisplayUnit, FileLoadState, GridSpacing, LayerState, RenderCache,
     SidePanelTab,
 };
-use crate::viewport::{self, Viewport};
-
-const MAX_STREAMED_ELEMENTS_PER_FRAME: usize = 20_000;
+use crate::viewport::Viewport;
 
 /// Returns shortcut text with the platform-appropriate modifier (⌘ on macOS, Ctrl on others).
 fn shortcut_text(key: &str) -> String {
@@ -117,54 +114,30 @@ impl ViewerApp {
         self.file_load.loading = false;
     }
 
-    /// Switches to a new cell, cancelling any in-flight element streaming and starting
-    /// a new streaming thread for the selected cell's elements.
+    /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
     fn select_cell(&mut self, name: &str) {
         if let Some(cell) = self.cell.as_mut() {
             cell.selected_cell = Some(name.to_string());
             cell.expand_state.set_expanded(name, true);
             self.scroll_to_selected = true;
-            cell.element_receiver = None;
-            cell.elements.clear();
             self.hovered_element = None;
             self.selected_element = None;
-            cell.layers.clear();
-            cell.spatial_grid = None;
-            cell.tessellation_cache.clear();
-            cell.cell_stats = cell.library.get_cell(name).map(gdsr::CellStats::from_cell);
-
-            let depth = cell.render_depth;
-            if depth == 0 {
-                cell.elements_loading = false;
-                return;
-            }
-
-            if let Some(cell_data) = cell.library.get_cell(name) {
-                let cell_data = cell_data.clone();
-                let library = cell.library.clone();
-                let (tx, rx) = mpsc::channel();
-                let stream_depth = Some((depth - 1) as usize);
-
-                thread::spawn(move || {
-                    cell_data.stream_elements(stream_depth, &library, &tx);
-                });
-
-                cell.element_receiver = Some(rx);
-                cell.elements_loading = true;
+            if cell.load_direct_cell_elements(name) {
+                for &(layer, data_type) in &cell.layers {
+                    self.layer_state.layer_colors.get(layer, data_type);
+                }
             }
         }
+        self.render_cache.clear();
     }
 
     /// Adjusts the viewport to fit all currently loaded elements.
     fn zoom_to_fit(&mut self) {
         if let Some(cell) = self.cell.as_ref() {
-            let bounds = if cell.render_depth == 0 {
-                cell.selected_cell
-                    .as_ref()
-                    .and_then(|name| cell_world_bbox(name, &cell.library))
-            } else {
-                viewport::compute_bounds(&cell.elements)
-            };
+            let bounds = cell
+                .selected_cell
+                .as_ref()
+                .and_then(|name| cell_world_bbox(name, &cell.library));
             if let Some(bounds) = bounds {
                 let rect =
                     egui::Rect::from_min_size(egui::Pos2::ZERO, egui::Vec2::new(800.0, 600.0));
@@ -189,9 +162,6 @@ impl ViewerApp {
             self.selected_element = None;
             return false;
         };
-        if cell.elements_loading {
-            return false;
-        }
         if !cell.delete_element(index) {
             self.selected_element = None;
             return false;
@@ -223,14 +193,6 @@ fn hit_test_element(
     None
 }
 
-fn should_render_elements(elements_loading: bool, has_spatial_grid: bool) -> bool {
-    !elements_loading || has_spatial_grid
-}
-
-fn should_continue_streaming_drain(received_this_frame: usize) -> bool {
-    received_this_frame < MAX_STREAMED_ELEMENTS_PER_FRAME
-}
-
 impl eframe::App for ViewerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Poll background loader
@@ -255,53 +217,13 @@ impl eframe::App for ViewerApp {
             }
         }
 
-        // Drain element streaming channel
-        let mut streaming_finished = false;
         if let Some(cell) = self.cell.as_mut() {
-            if let Some(rx) = &cell.element_receiver {
-                let mut received_this_frame = 0;
-                loop {
-                    if !should_continue_streaming_drain(received_this_frame) {
-                        break;
-                    }
-                    match rx.try_recv() {
-                        Ok(element) => {
-                            received_this_frame += 1;
-                            for key in element.layer_keys() {
-                                if cell.layers.insert(key) {
-                                    self.layer_state.layer_colors.get(key.0, key.1);
-                                }
-                            }
-                            cell.elements.push(element);
-                        }
-                        Err(mpsc::TryRecvError::Empty) => break,
-                        Err(mpsc::TryRecvError::Disconnected) => {
-                            cell.elements_loading = false;
-                            cell.element_receiver = None;
-                            if let Some(bounds) = viewport::compute_bounds(&cell.elements) {
-                                cell.spatial_grid =
-                                    Some(SpatialGrid::build(&cell.elements, &bounds));
-                            }
-                            streaming_finished = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if cell.elements_loading {
-                ctx.request_repaint();
-            }
             if self
                 .selected_element
                 .is_some_and(|idx| idx >= cell.elements.len())
             {
                 self.selected_element = None;
             }
-        }
-
-        if streaming_finished {
-            self.zoom_to_fit();
         }
 
         // Global keyboard shortcuts
@@ -473,11 +395,6 @@ impl eframe::App for ViewerApp {
 
                 if self.file_load.loading {
                     ui.label("Loading...");
-                } else if self.cell.as_ref().is_some_and(|c| c.elements_loading) {
-                    ui.label(format!(
-                        "Expanding elements... ({})",
-                        self.cell.as_ref().map_or(0, |c| c.elements.len())
-                    ));
                 } else if let Some(err) = &self.file_load.error_message {
                     ui.colored_label(egui::Color32::RED, format!("Error: {err}"));
                 } else if let Some(path) = &self.file_load.file_path {
@@ -626,29 +543,15 @@ impl eframe::App for ViewerApp {
         let query_buf = &mut self.query_buf;
         let drawn_element_marks = &mut self.drawn_element_marks;
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
-        let render_elements = cell
-            .as_ref()
-            .is_none_or(|c| should_render_elements(c.elements_loading, c.spatial_grid.is_some()));
-        let viewport_render_depth = if render_elements { render_depth } else { 0 };
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
                 if let Some(cell) = cell.as_mut() {
-                    let elements = if render_elements {
-                        cell.elements.as_slice()
-                    } else {
-                        &[] as &[gdsr::Element]
-                    };
-                    let spatial_grid = if render_elements {
-                        cell.spatial_grid.as_ref()
-                    } else {
-                        None
-                    };
                     (
-                        elements,
-                        spatial_grid,
+                        cell.elements.as_slice(),
+                        cell.spatial_grid.as_ref(),
                         Some(&cell.library),
                         &mut cell.tessellation_cache,
                     )
@@ -671,7 +574,7 @@ impl eframe::App for ViewerApp {
                 grid_spacing,
                 *hovered_element,
                 *selected_element,
-                viewport_render_depth,
+                render_depth,
                 selected_cell_name.as_deref(),
             );
             *mouse_world_pos = interaction.mouse_world;
@@ -698,7 +601,7 @@ impl eframe::App for ViewerApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gdsr::{DataType, Element, Layer, Point, Polygon};
+    use gdsr::{Cell, DataType, Element, Layer, Library, Point, Polygon, Reference};
 
     fn p(x: f64, y: f64) -> Point {
         Point::float(x, y, 1.0)
@@ -716,30 +619,9 @@ mod tests {
     }
 
     #[test]
-    fn suppress_element_rendering_until_streaming_grid_exists() {
-        assert!(!should_render_elements(true, false));
-    }
-
-    #[test]
-    fn render_elements_when_grid_exists_or_streaming_finished() {
-        assert!(should_render_elements(true, true));
-        assert!(should_render_elements(false, false));
-    }
-
-    #[test]
-    fn stop_streaming_drain_at_frame_budget() {
-        assert!(should_continue_streaming_drain(
-            MAX_STREAMED_ELEMENTS_PER_FRAME - 1
-        ));
-        assert!(!should_continue_streaming_drain(
-            MAX_STREAMED_ELEMENTS_PER_FRAME
-        ));
-    }
-
-    #[test]
     fn hit_test_element_returns_matching_index() {
         let elements = test_elements();
-        let Some(bounds) = viewport::compute_bounds(&elements) else {
+        let Some(bounds) = crate::viewport::compute_bounds(&elements) else {
             panic!("test elements should have bounds");
         };
         let grid = SpatialGrid::build(&elements, &bounds);
@@ -754,7 +636,7 @@ mod tests {
     #[test]
     fn hit_test_element_returns_none_for_miss() {
         let elements = test_elements();
-        let Some(bounds) = viewport::compute_bounds(&elements) else {
+        let Some(bounds) = crate::viewport::compute_bounds(&elements) else {
             panic!("test elements should have bounds");
         };
         let grid = SpatialGrid::build(&elements, &bounds);
@@ -768,16 +650,18 @@ mod tests {
 
     #[test]
     fn delete_selected_element_removes_element_and_clears_selection() {
-        let mut app = ViewerApp::default();
         let mut cell = CellState::new(gdsr::Library::new("test"));
         cell.elements = test_elements();
-        let Some(bounds) = viewport::compute_bounds(&cell.elements) else {
+        let Some(bounds) = crate::viewport::compute_bounds(&cell.elements) else {
             panic!("test elements should have bounds");
         };
         cell.spatial_grid = Some(SpatialGrid::build(&cell.elements, &bounds));
-        app.cell = Some(cell);
-        app.selected_element = Some(0);
-        app.hovered_element = Some(0);
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            hovered_element: Some(0),
+            ..Default::default()
+        };
 
         assert!(app.delete_selected_element());
 
@@ -789,18 +673,32 @@ mod tests {
     }
 
     #[test]
-    fn delete_selected_element_waits_for_streaming_to_finish() {
-        let mut app = ViewerApp::default();
-        let mut cell = CellState::new(gdsr::Library::new("test"));
-        cell.elements = test_elements();
-        cell.elements_loading = true;
-        app.cell = Some(cell);
-        app.selected_element = Some(0);
+    fn select_cell_loads_direct_elements_without_flattening_references() {
+        let mut leaf = Cell::new("leaf");
+        leaf.add(test_elements().remove(0));
 
-        assert!(!app.delete_selected_element());
+        let mut top = Cell::new("top");
+        top.add(Reference::new("leaf"));
 
-        let cell = app.cell.expect("cell should remain loaded");
+        let mut library = Library::new("test");
+        library.add_cell(leaf);
+        library.add_cell(top);
+
+        let mut cell_state = CellState::new(library);
+        cell_state.render_depth = 8;
+        let mut app = ViewerApp {
+            cell: Some(cell_state),
+            ..Default::default()
+        };
+
+        app.select_cell("top");
+
+        let cell = app.cell.expect("cell should be loaded");
         assert_eq!(cell.elements.len(), 1);
-        assert_eq!(app.selected_element, Some(0));
+        assert!(matches!(cell.elements[0], Element::Reference(_)));
+        assert_eq!(
+            cell.layers,
+            std::collections::BTreeSet::from([(Layer::new(1), DataType::new(0))])
+        );
     }
 }

@@ -323,7 +323,7 @@ impl Viewport {
         let mut layer_meshes = HashMap::new();
         let mut extra_shapes = Vec::new();
         let mut screen_pts_buf = Vec::new();
-        let show_ref_bbox = render_depth > 0;
+        let mut cell_bbox_cache = HashMap::new();
         let mut ctx = DrawContext {
             painter: &painter,
             layer_meshes: &mut layer_meshes,
@@ -337,7 +337,10 @@ impl Viewport {
             tessellation_cache,
             screen_pts_buf: &mut screen_pts_buf,
             highlight: false,
-            show_ref_bbox,
+            show_ref_bbox: false,
+            reference_depth: render_depth,
+            reference_stack: selected_cell.map_or_else(Vec::new, |name| vec![name.to_string()]),
+            cell_bbox_cache: &mut cell_bbox_cache,
         };
 
         if let Some(grid) = spatial_grid {
@@ -391,16 +394,14 @@ impl Viewport {
                 }
             }
 
-            // Cell references (Instance::Cell) have no world_bbox so the spatial
-            // grid never contains them. Draw any unseen references in a second pass.
-            if show_ref_bbox {
-                for (i, element) in elements.iter().enumerate() {
-                    if matches!(element, Element::Reference(_))
-                        && !drawn_element_marks.get(i).copied().unwrap_or_default()
-                    {
-                        ctx.current_element_idx = Some(i as u32);
-                        element.draw(&mut ctx);
-                    }
+            // Cell references have no direct world bbox, so the spatial grid never
+            // contains them. Draw any unseen references in a second pass.
+            for (i, element) in elements.iter().enumerate() {
+                if matches!(element, Element::Reference(_))
+                    && !drawn_element_marks.get(i).copied().unwrap_or_default()
+                {
+                    ctx.current_element_idx = Some(i as u32);
+                    element.draw(&mut ctx);
                 }
             }
 

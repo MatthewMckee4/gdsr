@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use egui::epaint;
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
-use gdsr::{DataType, Dimensions, Element, Layer, Library};
+use gdsr::{DataType, Dimensions, Element, Layer, Library, Point};
 
 use crate::state::LayerState;
 use crate::viewport::Viewport;
@@ -45,27 +45,37 @@ impl WorldBBox {
 
 pub fn cell_world_bbox(cell_name: &str, library: &Library) -> Option<WorldBBox> {
     let mut visiting = HashSet::new();
-    named_cell_world_bbox(cell_name, library, &mut visiting)
+    let mut cache = HashMap::new();
+    named_cell_world_bbox(cell_name, library, &mut visiting, &mut cache)
 }
 
 fn named_cell_world_bbox(
     cell_name: &str,
     library: &Library,
     visiting: &mut HashSet<String>,
+    cache: &mut HashMap<String, Option<WorldBBox>>,
 ) -> Option<WorldBBox> {
+    if let Some(bbox) = cache.get(cell_name) {
+        return *bbox;
+    }
     if !visiting.insert(cell_name.to_owned()) {
         return None;
     }
 
-    let cell = library.get_cell(cell_name)?;
+    let Some(cell) = library.get_cell(cell_name) else {
+        visiting.remove(cell_name);
+        cache.insert(cell_name.to_owned(), None);
+        return None;
+    };
     let mut result = None;
     for element in cell.iter_elements() {
-        if let Some(bbox) = element_world_bbox(element, library, visiting) {
+        if let Some(bbox) = element_world_bbox(element, library, visiting, cache) {
             merge_bbox(&mut result, bbox);
         }
     }
 
     visiting.remove(cell_name);
+    cache.insert(cell_name.to_owned(), result);
     result
 }
 
@@ -73,9 +83,10 @@ fn element_world_bbox(
     element: &Element,
     library: &Library,
     visiting: &mut HashSet<String>,
+    cache: &mut HashMap<String, Option<WorldBBox>>,
 ) -> Option<WorldBBox> {
     match element {
-        Element::Reference(reference) => reference_world_bbox(reference, library, visiting),
+        Element::Reference(reference) => reference_world_bbox(reference, library, visiting, cache),
         _ => element.world_bbox(),
     }
 }
@@ -84,22 +95,88 @@ fn reference_world_bbox(
     reference: &gdsr::Reference,
     library: &Library,
     visiting: &mut HashSet<String>,
+    cache: &mut HashMap<String, Option<WorldBBox>>,
 ) -> Option<WorldBBox> {
     let source_bbox = if let Some(cell_name) = reference.instance().as_cell() {
-        named_cell_world_bbox(cell_name, library, visiting)?
+        named_cell_world_bbox(cell_name, library, visiting, cache)?
     } else {
         let element = reference.instance().as_element()?;
-        element_world_bbox(element.as_ref().as_ref(), library, visiting)?
+        element_world_bbox(element.as_ref().as_ref(), library, visiting, cache)?
     };
 
-    let bbox_element = Element::Polygon(bbox_polygon(source_bbox));
+    reference_bbox_from_source_bbox(reference, source_bbox)
+}
+
+fn reference_bbox_from_source_bbox(
+    reference: &gdsr::Reference,
+    source_bbox: WorldBBox,
+) -> Option<WorldBBox> {
+    let grid = reference.grid();
+    if grid.columns() == 0 || grid.rows() == 0 {
+        return None;
+    }
+
     let mut result = None;
-    for element in reference.get_elements_in_grid(&bbox_element) {
-        if let Some(bbox) = element.world_bbox() {
-            merge_bbox(&mut result, bbox);
+    let bbox_element = Element::Polygon(bbox_polygon(source_bbox));
+    let spacing_x = grid.spacing_x().unwrap_or_default();
+    let spacing_y = grid.spacing_y().unwrap_or_default();
+
+    for column_index in [0, grid.columns() - 1] {
+        for row_index in [0, grid.rows() - 1] {
+            let offset = (spacing_x * column_index) + (spacing_y * row_index);
+            let rotated_offset = offset.rotate_around_point(grid.angle(), &Point::default());
+            let final_position = grid.origin() + rotated_offset;
+            let single_grid = grid
+                .clone()
+                .with_columns(1)
+                .with_rows(1)
+                .with_spacing_x(None)
+                .with_spacing_y(None)
+                .with_origin(final_position);
+            let single_reference = reference.clone().with_grid(single_grid);
+
+            for element in single_reference.get_elements_in_grid(&bbox_element) {
+                if let Some(bbox) = element.world_bbox() {
+                    merge_bbox(&mut result, bbox);
+                }
+            }
         }
     }
+
     result
+}
+
+fn reference_grid_count(reference: &gdsr::Reference) -> u64 {
+    let grid = reference.grid();
+    u64::from(grid.columns()) * u64::from(grid.rows())
+}
+
+fn reference_screen_size(bbox: WorldBBox, ctx: &DrawContext) -> (f32, f32, Rect) {
+    let s_min = ctx
+        .viewport
+        .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
+    let s_max = ctx
+        .viewport
+        .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
+    let sw = (s_max.x - s_min.x).abs();
+    let sh = (s_min.y - s_max.y).abs();
+    (sw, sh, Rect::from_two_pos(s_min, s_max))
+}
+
+fn reference_instance_bbox(
+    reference: &gdsr::Reference,
+    ctx: &mut DrawContext,
+) -> Option<WorldBBox> {
+    if reference.instance().as_cell().is_some() {
+        let lib = ctx.library?;
+        let mut visiting = HashSet::new();
+        reference_world_bbox(reference, lib, &mut visiting, ctx.cell_bbox_cache)
+    } else if let Some(element) = reference.instance().as_element() {
+        let source_bbox = element.as_ref().as_ref().world_bbox()?;
+        reference_bbox_from_source_bbox(reference, source_bbox)
+    } else {
+        None
+    }
 }
 
 fn bbox_polygon(bbox: WorldBBox) -> gdsr::Polygon {
@@ -146,6 +223,9 @@ pub struct DrawContext<'a> {
     /// When true, un-flattened cell references draw as outlined bounding boxes
     /// with the cell name centered, instead of expanding their contents.
     pub show_ref_bbox: bool,
+    pub reference_depth: u32,
+    pub reference_stack: Vec<String>,
+    pub cell_bbox_cache: &'a mut HashMap<String, Option<WorldBBox>>,
 }
 
 /// Fill alpha for normal and highlighted elements.
@@ -154,6 +234,10 @@ const HIGHLIGHT_FILL_ALPHA: u8 = 160;
 /// Stroke width for normal and highlighted outlines.
 const STROKE_WIDTH: f32 = 1.0;
 const HIGHLIGHT_STROKE_WIDTH: f32 = 3.0;
+const REF_LOAD_THRESHOLD_PX: f32 = 24.0;
+const REF_DENSE_GRID_MIN_INSTANCES: u64 = 128;
+const REF_LOAD_MIN_AVG_INSTANCE_AREA_PX: f32 = 16.0;
+const REF_MAX_GRID_EXPANSION: u64 = 8_192;
 
 impl DrawContext<'_> {
     /// Returns the fill and stroke colors for the given layer, brightened when highlighted.
@@ -909,44 +993,57 @@ impl Drawable for gdsr::Node {
     }
 }
 
-/// Draws an un-flattened reference as an outlined bounding box with a centered cell name label.
-fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
-    let (label, bbox) = if let Some(cell_name) = reference.instance().as_cell() {
-        let Some(lib) = ctx.library else { return };
-        let mut visiting = HashSet::new();
-        match reference_world_bbox(reference, lib, &mut visiting) {
-            Some(bbox) => (Some(cell_name.as_str()), bbox),
-            None => return,
-        }
-    } else if let Some(element) = reference.instance().as_element() {
-        let mut merged: Option<WorldBBox> = None;
-        for el in reference.get_elements_in_grid(element) {
-            if let Some(bb) = el.world_bbox() {
-                merged = Some(match merged {
-                    Some(acc) => acc.merge(&bb),
-                    None => bb,
-                });
-            }
-        }
-        match merged {
-            Some(bb) => (None, bb),
-            None => return,
-        }
-    } else {
-        return;
-    };
+fn should_draw_reference_bbox(
+    reference: &gdsr::Reference,
+    bbox: WorldBBox,
+    ctx: &DrawContext,
+) -> bool {
+    let (sw, sh, _) = reference_screen_size(bbox, ctx);
+    should_collapse_reference(
+        sw,
+        sh,
+        reference_grid_count(reference),
+        ctx.reference_depth,
+        ctx.show_ref_bbox,
+    )
+}
 
+fn should_collapse_reference(
+    width_px: f32,
+    height_px: f32,
+    instance_count: u64,
+    reference_depth: u32,
+    force_bbox: bool,
+) -> bool {
+    if force_bbox || reference_depth <= 1 {
+        return true;
+    }
+
+    if width_px < REF_LOAD_THRESHOLD_PX && height_px < REF_LOAD_THRESHOLD_PX {
+        return true;
+    }
+
+    if instance_count > REF_MAX_GRID_EXPANSION {
+        return true;
+    }
+    if instance_count < REF_DENSE_GRID_MIN_INSTANCES {
+        return false;
+    }
+
+    let area_px = width_px * height_px;
+    area_px.is_finite() && area_px / instance_count as f32 <= REF_LOAD_MIN_AVG_INSTANCE_AREA_PX
+}
+
+fn draw_ref_bbox(reference: &gdsr::Reference, bbox: WorldBBox, ctx: &mut DrawContext) {
     if !bbox.overlaps(ctx.visible) {
         return;
     }
 
-    let s_min = ctx
-        .viewport
-        .world_to_screen(bbox.min_x, bbox.min_y, ctx.rect);
-    let s_max = ctx
-        .viewport
-        .world_to_screen(bbox.max_x, bbox.max_y, ctx.rect);
-    let screen_rect = Rect::from_two_pos(s_min, s_max);
+    let (sw, sh, screen_rect) = reference_screen_size(bbox, ctx);
+    if sw < 1.0 && sh < 1.0 {
+        return;
+    }
+
     let stroke_color = Color32::from_rgb(180, 180, 180);
     ctx.rect_stroke(
         screen_rect,
@@ -955,9 +1052,7 @@ fn draw_ref_as_bbox(reference: &gdsr::Reference, ctx: &mut DrawContext) {
         StrokeKind::Outside,
     );
 
-    if let Some(name) = label {
-        let sw = (s_max.x - s_min.x).abs();
-        let sh = (s_min.y - s_max.y).abs();
+    if let Some(name) = reference.instance().as_cell() {
         if sw >= 40.0 && sh >= 20.0 {
             let char_count = name.len().max(1) as f32;
             let fit_w = sw * 0.9 / (char_count * 0.6);
@@ -987,16 +1082,7 @@ impl Drawable for gdsr::Reference {
 
     fn world_bbox(&self) -> Option<WorldBBox> {
         let element = self.instance().as_element()?;
-        let mut result: Option<WorldBBox> = None;
-        for el in self.get_elements_in_grid(element) {
-            if let Some(bbox) = el.world_bbox() {
-                result = Some(match result {
-                    Some(acc) => acc.merge(&bbox),
-                    None => bbox,
-                });
-            }
-        }
-        result
+        reference_bbox_from_source_bbox(self, element.as_ref().as_ref().world_bbox()?)
     }
 
     fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
@@ -1011,15 +1097,31 @@ impl Drawable for gdsr::Reference {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
-        if ctx.show_ref_bbox {
-            draw_ref_as_bbox(self, ctx);
+        let Some(bbox) = reference_instance_bbox(self, ctx) else {
+            return;
+        };
+        if !bbox.overlaps(ctx.visible) {
             return;
         }
+        if should_draw_reference_bbox(self, bbox, ctx) {
+            draw_ref_bbox(self, bbox, ctx);
+            return;
+        }
+
+        let previous_depth = ctx.reference_depth;
+        ctx.reference_depth = ctx.reference_depth.saturating_sub(1);
+
         if let Some(element) = self.instance().as_element() {
             for el in self.get_elements_in_grid(element) {
                 el.draw(ctx);
             }
         } else if let Some(cell_name) = self.instance().as_cell() {
+            if ctx.reference_stack.iter().any(|name| name == cell_name) {
+                draw_ref_bbox(self, bbox, ctx);
+                ctx.reference_depth = previous_depth;
+                return;
+            }
+            ctx.reference_stack.push(cell_name.clone());
             if let Some(lib) = ctx.library {
                 if let Some(cell) = lib.get_cell(cell_name) {
                     for element in cell.iter_elements() {
@@ -1029,7 +1131,10 @@ impl Drawable for gdsr::Reference {
                     }
                 }
             }
+            ctx.reference_stack.pop();
         }
+
+        ctx.reference_depth = previous_depth;
     }
 }
 
@@ -1094,6 +1199,7 @@ pub fn draw_highlight(
     let mut layer_meshes = HashMap::new();
     let mut extra_shapes = Vec::new();
     let mut screen_pts_buf = Vec::new();
+    let mut cell_bbox_cache = HashMap::new();
     let mut ctx = DrawContext {
         painter,
         layer_meshes: &mut layer_meshes,
@@ -1108,6 +1214,9 @@ pub fn draw_highlight(
         screen_pts_buf: &mut screen_pts_buf,
         highlight: true,
         show_ref_bbox: false,
+        reference_depth: u32::MAX,
+        reference_stack: Vec::new(),
+        cell_bbox_cache: &mut cell_bbox_cache,
     };
     element.draw(&mut ctx);
     for (_, mesh) in layer_meshes {
@@ -1314,6 +1423,37 @@ mod tests {
     fn reference_empty_world_bbox() {
         let r = gdsr::Reference::default();
         assert!(r.world_bbox().is_none());
+    }
+
+    #[test]
+    fn reference_load_collapses_at_depth_limit() {
+        assert!(should_collapse_reference(400.0, 400.0, 1, 1, false));
+    }
+
+    #[test]
+    fn reference_load_collapses_tiny_references() {
+        assert!(should_collapse_reference(12.0, 20.0, 1, 2, false));
+    }
+
+    #[test]
+    fn reference_load_collapses_huge_grids() {
+        assert!(should_collapse_reference(
+            10_000.0,
+            10_000.0,
+            REF_MAX_GRID_EXPANSION + 1,
+            2,
+            false,
+        ));
+    }
+
+    #[test]
+    fn reference_load_draws_sparse_large_references() {
+        assert!(!should_collapse_reference(400.0, 400.0, 100, 2, false));
+    }
+
+    #[test]
+    fn reference_load_collapses_dense_screen_area() {
+        assert!(should_collapse_reference(400.0, 200.0, 10_000, 2, false));
     }
 
     #[test]
