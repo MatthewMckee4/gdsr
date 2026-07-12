@@ -298,11 +298,6 @@ impl DrawContext<'_> {
             )));
     }
 
-    pub fn line_segment(&mut self, points: [Pos2; 2], stroke: Stroke) {
-        self.extra_shapes
-            .push(Shape::LineSegment { points, stroke });
-    }
-
     pub fn text(
         &mut self,
         pos: Pos2,
@@ -408,8 +403,16 @@ pub trait Drawable {
     fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool;
 }
 
-/// Screen-pixel threshold below which polygons render as a filled bounding box.
+/// Screen-pixel threshold below which detailed geometry renders as a cheaper proxy.
 const BBOX_FALLBACK_PX: f32 = 8.0;
+
+fn invalid_screen_bbox(width_px: f32, height_px: f32) -> bool {
+    !width_px.is_finite() || !height_px.is_finite()
+}
+
+fn should_use_bbox_fallback(width_px: f32, height_px: f32) -> bool {
+    width_px < BBOX_FALLBACK_PX || height_px < BBOX_FALLBACK_PX
+}
 
 impl Drawable for gdsr::Polygon {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
@@ -488,13 +491,13 @@ impl Drawable for gdsr::Polygon {
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs();
 
-        if sw < 2.0 && sh < 2.0 {
+        if invalid_screen_bbox(sw, sh) || (sw < 2.0 && sh < 2.0) {
             return;
         }
 
         let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
 
-        if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
+        if should_use_bbox_fallback(sw, sh) {
             let bbox_rect = Rect::from_two_pos(s_min, s_max);
             ctx.rect_filled(bbox_rect, 0.0, fill);
             ctx.rect_stroke(
@@ -667,15 +670,23 @@ impl Drawable for gdsr::Path {
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs();
 
-        if sw < 1.0 && sh < 1.0 {
+        if invalid_screen_bbox(sw, sh) || (sw < 1.0 && sh < 1.0) {
             return;
         }
 
         let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
-
-        if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
+        if should_use_bbox_fallback(sw, sh) {
+            ctx.screen_pts_buf.clear();
+            ctx.screen_pts_buf.extend(points.iter().map(|p| {
+                ctx.viewport.world_to_screen(
+                    p.x().absolute_value(),
+                    p.y().absolute_value(),
+                    ctx.rect,
+                )
+            }));
             let stroke = Stroke::new(stroke_width, stroke_color);
-            ctx.line_segment([s_min, s_max], stroke);
+            let stroke_mesh = stroke_polyline_to_mesh(ctx.screen_pts_buf, stroke, false);
+            ctx.merge_mesh(key, &stroke_mesh);
             return;
         }
 
@@ -851,13 +862,13 @@ impl Drawable for gdsr::GdsBox {
         let sw = (s_max.x - s_min.x).abs();
         let sh = (s_min.y - s_max.y).abs();
 
-        if sw < 2.0 && sh < 2.0 {
+        if invalid_screen_bbox(sw, sh) || (sw < 2.0 && sh < 2.0) {
             return;
         }
 
         let (fill, stroke_color, stroke_width) = ctx.element_style(key.0, key.1);
 
-        if sw < BBOX_FALLBACK_PX && sh < BBOX_FALLBACK_PX {
+        if should_use_bbox_fallback(sw, sh) {
             let bbox_rect = Rect::from_two_pos(s_min, s_max);
             ctx.rect_filled(bbox_rect, 0.0, fill);
             ctx.rect_stroke(
@@ -1117,7 +1128,7 @@ pub fn should_collapse_reference(
         return true;
     }
 
-    if width_px < REF_LOAD_THRESHOLD_PX && height_px < REF_LOAD_THRESHOLD_PX {
+    if width_px < REF_LOAD_THRESHOLD_PX || height_px < REF_LOAD_THRESHOLD_PX {
         return true;
     }
 
@@ -1536,6 +1547,11 @@ mod tests {
     }
 
     #[test]
+    fn reference_load_collapses_skinny_references() {
+        assert!(should_collapse_reference(4000.0, 4.0, 1, 1, 2, false));
+    }
+
+    #[test]
     fn reference_load_collapses_huge_grids() {
         assert!(should_collapse_reference(
             10_000.0,
@@ -1555,6 +1571,13 @@ mod tests {
     #[test]
     fn reference_load_collapses_dense_screen_area() {
         assert!(should_collapse_reference(400.0, 200.0, 1, 10_000, 2, false,));
+    }
+
+    #[test]
+    fn bbox_fallback_handles_skinny_geometry() {
+        assert!(should_use_bbox_fallback(4000.0, 4.0));
+        assert!(should_use_bbox_fallback(4.0, 4000.0));
+        assert!(!should_use_bbox_fallback(40.0, 40.0));
     }
 
     #[test]
