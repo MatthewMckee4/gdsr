@@ -15,6 +15,19 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
     file_name: P,
     units: Option<f64>,
 ) -> Result<Library, GdsError> {
+    from_gds_filtered(file_name, units, |_, _| true)
+}
+
+#[allow(clippy::too_many_lines)]
+pub fn from_gds_filtered<P, F>(
+    file_name: P,
+    units: Option<f64>,
+    layer_filter: F,
+) -> Result<Library, GdsError>
+where
+    P: AsRef<std::path::Path>,
+    F: Fn(Layer, DataType) -> bool,
+{
     let mut library = Library::new("Library");
 
     let file = File::open(file_name)?;
@@ -108,6 +121,13 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                         }
                     }
                 }
+                GDSRecord::TextType => {
+                    if let GDSRecordData::I16(data_type) = data {
+                        if let Some(text) = &mut text {
+                            text.datatype = DataType::new(data_type[0] as u16);
+                        }
+                    }
+                }
                 GDSRecord::BoxType => {
                     if let GDSRecordData::I16(data_type) = data {
                         if let Some(gds_box) = &mut gds_box {
@@ -133,6 +153,18 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 }
                 GDSRecord::XY => {
                     if let GDSRecordData::I32(xy) = data {
+                        if !should_parse_xy(
+                            &layer_filter,
+                            polygon.as_ref(),
+                            gds_box.as_ref(),
+                            node.as_ref(),
+                            path.as_ref(),
+                            text.as_ref(),
+                            reference.as_ref(),
+                        ) {
+                            continue;
+                        }
+
                         let points = get_points_from_i32_vec(&xy, db_units)
                             .iter()
                             .map(|p| {
@@ -200,17 +232,27 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
                 GDSRecord::EndEl => {
                     if let Some(cell) = &mut cell {
                         if let Some(polygon) = polygon.take() {
-                            cell.add(polygon);
+                            if layer_filter(polygon.layer, polygon.data_type) {
+                                cell.add(polygon);
+                            }
                         } else if let Some(gds_box) = gds_box.take() {
-                            cell.add(gds_box);
+                            if layer_filter(gds_box.layer, gds_box.box_type) {
+                                cell.add(gds_box);
+                            }
                         } else if let Some(node) = node.take() {
-                            cell.add(node);
+                            if layer_filter(node.layer, node.node_type) {
+                                cell.add(node);
+                            }
                         } else if let Some(path) = path.take() {
-                            cell.add(path);
+                            if layer_filter(path.layer, path.data_type) {
+                                cell.add(path);
+                            }
                         } else if let Some(reference) = reference.take() {
                             cell.add(reference);
                         } else if let Some(text) = text.take() {
-                            cell.add(text);
+                            if layer_filter(text.layer, text.datatype) {
+                                cell.add(text);
+                            }
                         }
                     }
                     polygon = None;
@@ -316,6 +358,39 @@ pub fn from_gds<P: AsRef<std::path::Path>>(
     }
 
     Ok(library)
+}
+
+fn should_parse_xy<F>(
+    layer_filter: &F,
+    polygon: Option<&Polygon>,
+    gds_box: Option<&GdsBox>,
+    node: Option<&Node>,
+    path: Option<&Path>,
+    text: Option<&Text>,
+    reference: Option<&Reference>,
+) -> bool
+where
+    F: Fn(Layer, DataType) -> bool,
+{
+    if reference.is_some() {
+        return true;
+    }
+    if let Some(polygon) = polygon {
+        return layer_filter(polygon.layer, polygon.data_type);
+    }
+    if let Some(gds_box) = gds_box {
+        return layer_filter(gds_box.layer, gds_box.box_type);
+    }
+    if let Some(node) = node {
+        return layer_filter(node.layer, node.node_type);
+    }
+    if let Some(path) = path {
+        return layer_filter(path.layer, path.data_type);
+    }
+    if let Some(text) = text {
+        return layer_filter(text.layer, text.datatype);
+    }
+    true
 }
 
 pub struct RecordReader<R: Read> {

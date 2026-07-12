@@ -4,10 +4,10 @@ use std::io::Write;
 
 use crate::cell::Cell;
 use crate::error::GdsError;
-use crate::io::read::from_gds;
+use crate::io::read::{from_gds, from_gds_filtered};
 use crate::io::write::{GdsFileWriter, GdsWriter};
 use crate::types::LayerMapping;
-use crate::{Element, Instance};
+use crate::{DataType, Element, Instance, Layer};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -431,6 +431,23 @@ impl Library {
     ) -> Result<Self, GdsError> {
         from_gds(file_name, units)
     }
+
+    /// Read a library from a GDS file, keeping only elements whose layer/data type
+    /// pair matches the given filter.
+    ///
+    /// References are preserved because they do not carry layer/data type metadata.
+    /// The given units behave the same way as [`Self::read_file`].
+    pub fn read_file_filtered<P, F>(
+        file_name: P,
+        units: Option<f64>,
+        layer_filter: F,
+    ) -> Result<Self, GdsError>
+    where
+        P: AsRef<std::path::Path>,
+        F: Fn(Layer, DataType) -> bool,
+    {
+        from_gds_filtered(file_name, units, layer_filter)
+    }
 }
 
 impl std::fmt::Display for Library {
@@ -441,8 +458,11 @@ impl std::fmt::Display for Library {
 
 #[cfg(test)]
 mod tests {
-    use crate::elements::{Polygon, Reference};
-    use crate::{DataType, Layer, Point};
+    use crate::elements::{Path, Polygon, Reference, Text};
+    use crate::{
+        DEFAULT_INTEGER_UNITS, DataType, HorizontalPresentation, Layer, Point, Radians, Unit,
+        VerticalPresentation,
+    };
 
     use super::*;
 
@@ -465,6 +485,100 @@ mod tests {
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("test_cell"));
         assert_eq!(library.cells.get("test_cell"), Some(&cell));
+    }
+
+    #[test]
+    fn read_file_filtered_keeps_only_matching_layer_data_type() {
+        let dir = tempfile::tempdir().expect("temporary directory should be created");
+        let path = dir.path().join("filtered.gds");
+
+        let mut cell = Cell::new("top");
+        cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 10, DEFAULT_INTEGER_UNITS),
+                Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+        cell.add(Path::new(
+            [
+                Point::integer(20, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(30, 0, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(2),
+            DataType::new(0),
+            None,
+            Some(Unit::float(1.0, DEFAULT_INTEGER_UNITS)),
+            None,
+            None,
+        ));
+
+        let mut library = Library::new("test");
+        library.add_cell(cell);
+        library
+            .write_file(&path, DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect("library should be writable");
+
+        let read =
+            Library::read_file_filtered(&path, Some(DEFAULT_INTEGER_UNITS), |layer, data| {
+                layer == Layer::new(1) && data == DataType::new(0)
+            })
+            .expect("filtered library should be readable");
+        let top = read.get_cell("top").expect("top cell should exist");
+
+        assert_eq!(top.elements().len(), 1);
+        assert!(matches!(top.elements()[0], Element::Polygon(_)));
+    }
+
+    #[test]
+    fn read_file_filtered_uses_text_type() {
+        let dir = tempfile::tempdir().expect("temporary directory should be created");
+        let path = dir.path().join("filtered_text.gds");
+
+        let mut cell = Cell::new("top");
+        cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 10, DEFAULT_INTEGER_UNITS),
+                Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(3),
+            DataType::new(0),
+        ));
+        cell.add(Text::new(
+            "label",
+            Point::integer(20, 0, DEFAULT_INTEGER_UNITS),
+            Layer::new(3),
+            DataType::new(7),
+            1.0,
+            Radians::new(0.0),
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        ));
+
+        let mut library = Library::new("test");
+        library.add_cell(cell);
+        library
+            .write_file(&path, DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect("library should be writable");
+
+        let read =
+            Library::read_file_filtered(&path, Some(DEFAULT_INTEGER_UNITS), |layer, data| {
+                layer == Layer::new(3) && data == DataType::new(7)
+            })
+            .expect("filtered library should be readable");
+        let top = read.get_cell("top").expect("top cell should exist");
+
+        assert_eq!(top.elements().len(), 1);
+        let Element::Text(text) = &top.elements()[0] else {
+            panic!("filtered element should be text");
+        };
+        assert_eq!(text.data_type(), DataType::new(7));
     }
 
     #[test]
