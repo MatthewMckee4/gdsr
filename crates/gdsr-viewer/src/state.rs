@@ -61,14 +61,17 @@ impl CellState {
     }
 
     pub fn delete_element(&mut self, index: usize) -> bool {
-        if index >= self.elements.len() {
+        let Some(cell_name) = self.selected_cell.clone() else {
             return false;
-        }
+        };
 
-        self.elements.remove(index);
-        self.rebuild_render_indexes();
-        self.cell_stats = None;
-        true
+        let removed = self
+            .library
+            .get_cell_mut(&cell_name)
+            .and_then(|cell| cell.remove_element(index))
+            .is_some();
+
+        removed && self.load_direct_cell_elements(&cell_name)
     }
 
     pub fn load_direct_cell_elements(&mut self, name: &str) -> bool {
@@ -95,14 +98,20 @@ impl CellState {
     }
 
     pub fn move_element(&mut self, index: usize, delta: Point) -> bool {
-        let Some(element) = self.elements.get_mut(index) else {
+        let Some(cell_name) = self.selected_cell.clone() else {
             return false;
         };
 
-        *element = element.clone().move_by(delta);
-        self.rebuild_render_indexes();
-        self.cell_stats = None;
-        true
+        let moved = if let Some(cell) = self.library.get_cell_mut(&cell_name)
+            && let Some(element) = cell.element_mut(index)
+        {
+            *element = element.clone().move_by(delta);
+            true
+        } else {
+            false
+        };
+
+        moved && self.load_direct_cell_elements(&cell_name)
     }
 
     fn rebuild_render_indexes(&mut self) {
@@ -303,7 +312,7 @@ impl RenderCache {
 mod tests {
     use super::*;
     use egui::Rect;
-    use gdsr::Library;
+    use gdsr::{Cell, Element, Library};
 
     use crate::testutil::helpers::polygon;
 
@@ -327,19 +336,41 @@ mod tests {
         cache
     }
 
+    fn cell_state_with_elements(elements: Vec<Element>) -> CellState {
+        let mut source_cell = Cell::new("top");
+        for element in elements {
+            source_cell.add(element);
+        }
+
+        let mut library = Library::new("test");
+        library.add_cell(source_cell);
+
+        let mut cell = CellState::new(library);
+        cell.selected_cell = Some("top".to_string());
+        assert!(cell.load_direct_cell_elements("top"));
+        cell
+    }
+
     #[test]
     fn delete_element_rebuilds_render_indexes() {
-        let mut cell = CellState::new(Library::new("test"));
-        cell.elements = vec![
+        let mut cell = cell_state_with_elements(vec![
             polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0),
             polygon(vec![(1000, 1000), (1100, 1000), (1100, 1100)], 2, 0),
-        ];
+        ]);
         cell.tessellation_cache.insert(0, vec![0, 1, 2]);
         cell.rebuild_render_indexes();
 
         assert!(cell.delete_element(0));
 
         assert_eq!(cell.elements.len(), 1);
+        assert_eq!(
+            cell.library
+                .get_cell("top")
+                .expect("top cell should exist")
+                .elements()
+                .len(),
+            1
+        );
         assert_eq!(
             cell.layers,
             BTreeSet::from([(Layer::new(2), DataType::new(0))])
@@ -350,8 +381,8 @@ mod tests {
 
     #[test]
     fn delete_element_rejects_missing_index() {
-        let mut cell = CellState::new(Library::new("test"));
-        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        let mut cell =
+            cell_state_with_elements(vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)]);
         cell.rebuild_render_indexes();
 
         assert!(!cell.delete_element(1));
@@ -366,8 +397,8 @@ mod tests {
 
     #[test]
     fn move_element_rebuilds_render_indexes() {
-        let mut cell = CellState::new(Library::new("test"));
-        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        let mut cell =
+            cell_state_with_elements(vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)]);
         cell.tessellation_cache.insert(0, vec![0, 1, 2]);
         cell.rebuild_render_indexes();
 
@@ -384,12 +415,21 @@ mod tests {
         );
         assert!(cell.spatial_grid.is_some());
         assert!(cell.tessellation_cache.is_empty());
+
+        let library_bbox = cell
+            .library
+            .get_cell("top")
+            .expect("top cell should exist")
+            .elements()[0]
+            .world_bbox()
+            .expect("moved element has bbox");
+        assert!((library_bbox.min_x - 1000.0e-9).abs() < 1e-15);
     }
 
     #[test]
     fn move_element_rejects_missing_index() {
-        let mut cell = CellState::new(Library::new("test"));
-        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        let mut cell =
+            cell_state_with_elements(vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)]);
         cell.rebuild_render_indexes();
 
         assert!(!cell.move_element(1, Point::default_integer(1000, 2000)));
