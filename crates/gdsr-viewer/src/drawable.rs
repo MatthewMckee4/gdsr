@@ -146,7 +146,7 @@ fn reference_bbox_from_source_bbox(
     result
 }
 
-fn reference_grid_count(reference: &gdsr::Reference) -> u64 {
+pub fn reference_grid_count(reference: &gdsr::Reference) -> u64 {
     let grid = reference.grid();
     u64::from(grid.columns()) * u64::from(grid.rows())
 }
@@ -163,14 +163,15 @@ fn reference_screen_size(bbox: WorldBBox, ctx: &DrawContext) -> (f32, f32, Rect)
     (sw, sh, Rect::from_two_pos(s_min, s_max))
 }
 
-fn reference_instance_bbox(
+pub fn reference_instance_bbox(
     reference: &gdsr::Reference,
-    ctx: &mut DrawContext,
+    library: Option<&Library>,
+    cell_bbox_cache: &mut HashMap<String, Option<WorldBBox>>,
 ) -> Option<WorldBBox> {
     if reference.instance().as_cell().is_some() {
-        let lib = ctx.library?;
+        let lib = library?;
         let mut visiting = HashSet::new();
-        reference_world_bbox(reference, lib, &mut visiting, ctx.cell_bbox_cache)
+        reference_world_bbox(reference, lib, &mut visiting, cell_bbox_cache)
     } else if let Some(element) = reference.instance().as_element() {
         let source_bbox = element.as_ref().as_ref().world_bbox()?;
         reference_bbox_from_source_bbox(reference, source_bbox)
@@ -226,6 +227,7 @@ pub struct DrawContext<'a> {
     pub reference_depth: u32,
     pub reference_stack: Vec<String>,
     pub cell_bbox_cache: &'a mut HashMap<String, Option<WorldBBox>>,
+    pub cell_complexity_cache: &'a mut HashMap<(String, u32), u64>,
 }
 
 /// Fill alpha for normal and highlighted elements.
@@ -993,25 +995,121 @@ impl Drawable for gdsr::Node {
     }
 }
 
+fn reference_draw_units(reference: &gdsr::Reference, ctx: &mut DrawContext) -> u64 {
+    let mut visiting = HashSet::new();
+    reference_draw_units_for_depth(
+        reference,
+        ctx.library,
+        ctx.reference_depth,
+        ctx.cell_complexity_cache,
+        &mut visiting,
+    )
+}
+
+pub fn reference_draw_units_for_depth(
+    reference: &gdsr::Reference,
+    library: Option<&Library>,
+    depth: u32,
+    cache: &mut HashMap<(String, u32), u64>,
+    visiting: &mut HashSet<String>,
+) -> u64 {
+    let grid_count = reference_grid_count(reference);
+    if grid_count == 0 {
+        return 0;
+    }
+
+    let source_count = if depth <= 1 {
+        1
+    } else if let Some(cell_name) = reference.instance().as_cell() {
+        library
+            .and_then(|lib| cell_draw_units(cell_name, lib, depth - 1, cache, visiting))
+            .unwrap_or(1)
+    } else if let Some(element) = reference.instance().as_element() {
+        element_draw_units(
+            element.as_ref().as_ref(),
+            library,
+            depth - 1,
+            cache,
+            visiting,
+        )
+    } else {
+        1
+    };
+
+    grid_count.saturating_mul(source_count)
+}
+
+fn cell_draw_units(
+    cell_name: &str,
+    library: &Library,
+    depth: u32,
+    cache: &mut HashMap<(String, u32), u64>,
+    visiting: &mut HashSet<String>,
+) -> Option<u64> {
+    let key = (cell_name.to_owned(), depth);
+    if let Some(count) = cache.get(&key) {
+        return Some(*count);
+    }
+    let cell = library.get_cell(cell_name)?;
+    if !visiting.insert(cell_name.to_owned()) {
+        return Some(1);
+    }
+
+    let mut count = 0_u64;
+    for element in cell.iter_elements() {
+        count = count.saturating_add(element_draw_units(
+            element,
+            Some(library),
+            depth,
+            cache,
+            visiting,
+        ));
+    }
+    visiting.remove(cell_name);
+
+    let count = count.max(1);
+    cache.insert(key, count);
+    Some(count)
+}
+
+fn element_draw_units(
+    element: &Element,
+    library: Option<&Library>,
+    depth: u32,
+    cache: &mut HashMap<(String, u32), u64>,
+    visiting: &mut HashSet<String>,
+) -> u64 {
+    match element {
+        Element::Reference(reference) => {
+            reference_draw_units_for_depth(reference, library, depth, cache, visiting)
+        }
+        _ => 1,
+    }
+}
+
 fn should_draw_reference_bbox(
     reference: &gdsr::Reference,
     bbox: WorldBBox,
-    ctx: &DrawContext,
+    ctx: &mut DrawContext,
 ) -> bool {
     let (sw, sh, _) = reference_screen_size(bbox, ctx);
+    let grid_count = reference_grid_count(reference);
+    let draw_unit_count = reference_draw_units(reference, ctx);
     should_collapse_reference(
         sw,
         sh,
-        reference_grid_count(reference),
+        grid_count,
+        draw_unit_count,
         ctx.reference_depth,
         ctx.show_ref_bbox,
     )
 }
 
-fn should_collapse_reference(
+pub fn should_collapse_reference(
     width_px: f32,
     height_px: f32,
-    instance_count: u64,
+    grid_count: u64,
+    draw_unit_count: u64,
     reference_depth: u32,
     force_bbox: bool,
 ) -> bool {
@@ -1023,15 +1121,15 @@ fn should_collapse_reference(
         return true;
     }
 
-    if instance_count > REF_MAX_GRID_EXPANSION {
+    if grid_count > REF_MAX_GRID_EXPANSION {
         return true;
     }
-    if instance_count < REF_DENSE_GRID_MIN_INSTANCES {
+    if draw_unit_count < REF_DENSE_GRID_MIN_INSTANCES {
         return false;
     }
 
     let area_px = width_px * height_px;
-    area_px.is_finite() && area_px / instance_count as f32 <= REF_LOAD_MIN_AVG_INSTANCE_AREA_PX
+    area_px.is_finite() && area_px / draw_unit_count as f32 <= REF_LOAD_MIN_AVG_INSTANCE_AREA_PX
 }
 
 fn draw_ref_bbox(reference: &gdsr::Reference, bbox: WorldBBox, ctx: &mut DrawContext) {
@@ -1097,7 +1195,7 @@ impl Drawable for gdsr::Reference {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
-        let Some(bbox) = reference_instance_bbox(self, ctx) else {
+        let Some(bbox) = reference_instance_bbox(self, ctx.library, ctx.cell_bbox_cache) else {
             return;
         };
         if !bbox.overlaps(ctx.visible) {
@@ -1200,6 +1298,7 @@ pub fn draw_highlight(
     let mut extra_shapes = Vec::new();
     let mut screen_pts_buf = Vec::new();
     let mut cell_bbox_cache = HashMap::new();
+    let mut cell_complexity_cache = HashMap::new();
     let mut ctx = DrawContext {
         painter,
         layer_meshes: &mut layer_meshes,
@@ -1217,6 +1316,7 @@ pub fn draw_highlight(
         reference_depth: u32::MAX,
         reference_stack: Vec::new(),
         cell_bbox_cache: &mut cell_bbox_cache,
+        cell_complexity_cache: &mut cell_complexity_cache,
     };
     element.draw(&mut ctx);
     for (_, mesh) in layer_meshes {
@@ -1427,12 +1527,12 @@ mod tests {
 
     #[test]
     fn reference_load_collapses_at_depth_limit() {
-        assert!(should_collapse_reference(400.0, 400.0, 1, 1, false));
+        assert!(should_collapse_reference(400.0, 400.0, 1, 1, 1, false));
     }
 
     #[test]
     fn reference_load_collapses_tiny_references() {
-        assert!(should_collapse_reference(12.0, 20.0, 1, 2, false));
+        assert!(should_collapse_reference(12.0, 20.0, 1, 1, 2, false));
     }
 
     #[test]
@@ -1441,6 +1541,7 @@ mod tests {
             10_000.0,
             10_000.0,
             REF_MAX_GRID_EXPANSION + 1,
+            REF_MAX_GRID_EXPANSION + 1,
             2,
             false,
         ));
@@ -1448,12 +1549,44 @@ mod tests {
 
     #[test]
     fn reference_load_draws_sparse_large_references() {
-        assert!(!should_collapse_reference(400.0, 400.0, 100, 2, false));
+        assert!(!should_collapse_reference(400.0, 400.0, 1, 100, 2, false));
     }
 
     #[test]
     fn reference_load_collapses_dense_screen_area() {
-        assert!(should_collapse_reference(400.0, 200.0, 10_000, 2, false));
+        assert!(should_collapse_reference(400.0, 200.0, 1, 10_000, 2, false,));
+    }
+
+    #[test]
+    fn reference_draw_units_include_cell_contents_and_grid() {
+        let mut leaf = gdsr::Cell::new("leaf");
+        leaf.add(polygon(vec![(0, 0), (10, 0), (10, 10)], 1, 0));
+        leaf.add(polygon(vec![(20, 0), (30, 0), (30, 10)], 1, 0));
+        leaf.add(polygon(vec![(40, 0), (50, 0), (50, 10)], 1, 0));
+
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(leaf);
+
+        let reference = gdsr::Reference::new("leaf").with_grid(
+            gdsr::Grid::default()
+                .with_columns(2)
+                .with_rows(3)
+                .with_spacing_x(Some(gdsr::Point::default_integer(20, 0)))
+                .with_spacing_y(Some(gdsr::Point::default_integer(0, 20))),
+        );
+        let mut cache = HashMap::new();
+        let mut visiting = HashSet::new();
+
+        assert_eq!(
+            reference_draw_units_for_depth(
+                &reference,
+                Some(&library),
+                2,
+                &mut cache,
+                &mut visiting,
+            ),
+            18,
+        );
     }
 
     #[test]
