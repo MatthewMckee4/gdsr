@@ -163,6 +163,7 @@ pub struct ViewerApp {
     render_cache: RenderCache,
     ruler: RulerState,
     show_grid: bool,
+    snap_to_grid: bool,
     hovered_element: Option<usize>,
     selected_element: Option<usize>,
     /// Reusable scratch buffer for spatial grid point queries.
@@ -197,6 +198,7 @@ impl Default for ViewerApp {
             render_cache: RenderCache::default(),
             ruler: RulerState::default(),
             show_grid: true,
+            snap_to_grid: false,
             hovered_element: None,
             selected_element: None,
             query_buf: Vec::new(),
@@ -397,6 +399,48 @@ impl ViewerApp {
         }
 
         base.to_string()
+    }
+
+    fn snap_world_position(&self, x: f64, y: f64) -> (f64, f64) {
+        if !self.snap_to_grid {
+            return (x, y);
+        }
+
+        let spacing = crate::grid::effective_spacing(self.grid_spacing, self.viewport.zoom);
+        if !spacing.is_finite() || spacing <= 0.0 {
+            return (x, y);
+        }
+
+        (
+            (x / spacing).round() * spacing,
+            (y / spacing).round() * spacing,
+        )
+    }
+
+    fn snapped_move_delta(&self, index: usize, delta: Point) -> Option<Point> {
+        if !self.snap_to_grid {
+            return Some(delta);
+        }
+
+        let bbox = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.elements.get(index))
+            .and_then(Element::world_bbox)?;
+        let center_x = (bbox.min_x + bbox.max_x) * 0.5;
+        let center_y = (bbox.min_y + bbox.max_y) * 0.5;
+        let target_x = center_x + delta.x().absolute_value();
+        let target_y = center_y + delta.y().absolute_value();
+        let (snapped_x, snapped_y) = self.snap_world_position(target_x, target_y);
+        Some(Point::float(
+            snapped_x - center_x,
+            snapped_y - center_y,
+            1.0,
+        ))
+    }
+
+    fn delta_is_zero(delta: Point) -> bool {
+        delta.x().absolute_value().abs() < 1e-15 && delta.y().absolute_value().abs() < 1e-15
     }
 
     fn open_create_cell_dialog(&mut self) {
@@ -665,6 +709,7 @@ impl ViewerApp {
             return false;
         };
 
+        let (wx, wy) = self.snap_world_position(wx, wy);
         let pasted = move_element_to_cursor(element, wx, wy);
         let Some(cell) = self.cell.as_mut() else {
             return false;
@@ -725,6 +770,12 @@ impl ViewerApp {
         let Some(index) = self.selected_element else {
             return false;
         };
+        let Some(delta) = self.snapped_move_delta(index, delta) else {
+            return false;
+        };
+        if Self::delta_is_zero(delta) {
+            return false;
+        }
         let Some(cell_name) = self
             .cell
             .as_ref()
@@ -1052,6 +1103,7 @@ impl eframe::App for ViewerApp {
                         ui.close_kind(egui::UiKind::Menu);
                         self.show_grid = !self.show_grid;
                     }
+                    ui.checkbox(&mut self.snap_to_grid, "Snap to Grid");
                     ui.separator();
                     ui.label("Pan: Arrow Keys");
                 });
@@ -1144,6 +1196,7 @@ impl eframe::App for ViewerApp {
                                 ui.selectable_value(&mut self.grid_spacing, preset, label);
                             }
                         });
+                    ui.checkbox(&mut self.snap_to_grid, "Snap");
                     if let Some(cell) = &mut self.cell {
                         let prev_depth = cell.render_depth;
                         if ui.small_button("+").clicked() && cell.render_depth < 99 {
@@ -1602,6 +1655,26 @@ mod tests {
     }
 
     #[test]
+    fn paste_clipboard_element_snaps_cursor_when_enabled() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            mouse_world_pos: Some((23.0, 37.0)),
+            snap_to_grid: true,
+            ..Default::default()
+        };
+        app.viewport.zoom = 10.0;
+        assert!(app.copy_selected_element());
+
+        assert!(app.paste_clipboard_element());
+
+        let pasted_bbox = first_element_bbox_at(&app, 1);
+        assert!((pasted_bbox.min_x - 15.0).abs() < 1e-12);
+        assert!((pasted_bbox.min_y - 35.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn paste_clipboard_element_can_paste_across_cells() {
         let cell = cell_state_with_test_elements();
         let mut app = ViewerApp {
@@ -1625,6 +1698,24 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn move_selected_element_snaps_center_when_enabled() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            snap_to_grid: true,
+            ..Default::default()
+        };
+        app.viewport.zoom = 10.0;
+
+        assert!(app.move_selected_element(Point::float(6.0, 6.0, 1.0)));
+
+        let bbox = first_element_bbox(&app);
+        assert!((bbox.min_x - 5.0).abs() < 1e-12);
+        assert!((bbox.min_y - 5.0).abs() < 1e-12);
     }
 
     #[test]
