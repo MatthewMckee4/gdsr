@@ -339,6 +339,7 @@ impl Viewport {
         let mut extra_shapes = Vec::new();
         let mut screen_pts_buf = Vec::new();
         let mut cell_bbox_cache = HashMap::new();
+        let mut cell_complexity_cache = HashMap::new();
         let mut ctx = DrawContext {
             painter: &painter,
             layer_meshes: &mut layer_meshes,
@@ -356,6 +357,7 @@ impl Viewport {
             reference_depth: render_depth,
             reference_stack: selected_cell.map_or_else(Vec::new, |name| vec![name.to_string()]),
             cell_bbox_cache: &mut cell_bbox_cache,
+            cell_complexity_cache: &mut cell_complexity_cache,
         };
 
         if let Some(grid) = spatial_grid {
