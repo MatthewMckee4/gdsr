@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Element, Movable, Point, Unit};
+use gdsr::{
+    DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, DataType, Element, HorizontalPresentation, Layer,
+    Movable, Point, Radians, Text, Unit, VerticalPresentation,
+};
 
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
@@ -154,6 +157,12 @@ struct CellNameDialog {
     error: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct TextDialog {
+    value: String,
+    error: Option<String>,
+}
+
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -185,6 +194,7 @@ pub struct ViewerApp {
     redo_stack: Vec<EditAction>,
     cell_name_dialog: Option<CellNameDialog>,
     clipboard_element: Option<Element>,
+    text_dialog: Option<TextDialog>,
 }
 
 impl Default for ViewerApp {
@@ -218,6 +228,7 @@ impl Default for ViewerApp {
             redo_stack: Vec::new(),
             cell_name_dialog: None,
             clipboard_element: None,
+            text_dialog: None,
         }
     }
 }
@@ -266,6 +277,7 @@ impl ViewerApp {
         self.redo_stack.clear();
         self.cell_name_dialog = None;
         self.clipboard_element = None;
+        self.text_dialog = None;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -469,6 +481,22 @@ impl ViewerApp {
         });
     }
 
+    fn open_text_dialog(&mut self) {
+        if self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.as_ref())
+            .is_none()
+        {
+            return;
+        }
+
+        self.text_dialog = Some(TextDialog {
+            value: "Text".to_string(),
+            error: None,
+        });
+    }
+
     fn validate_cell_name(
         &self,
         name: &str,
@@ -555,6 +583,77 @@ impl ViewerApp {
         }
     }
 
+    fn text_insert_position(&self) -> (f64, f64) {
+        let (x, y) = self
+            .mouse_world_pos
+            .unwrap_or((self.viewport.center_x, self.viewport.center_y));
+        self.snap_world_position(x, y)
+    }
+
+    fn add_text_element(&mut self, value: &str) -> Result<(), String> {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err("Text is required".to_string());
+        }
+        let Some(cell_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            return Err("No cell selected".to_string());
+        };
+
+        let (x, y) = self.text_insert_position();
+        let element = Element::Text(Text::new(
+            value,
+            Point::float(x, y, 1.0),
+            Layer::new(0),
+            DataType::new(0),
+            1.0,
+            Radians::new(0.0),
+            false,
+            VerticalPresentation::default(),
+            HorizontalPresentation::default(),
+        ));
+
+        let Some(cell) = self.cell.as_mut() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        let index = cell.elements.len();
+        if !cell.insert_element(index, element.clone()) {
+            return Err("Could not add text".to_string());
+        }
+
+        self.selected_element = Some(index);
+        self.hovered_element = Some(index);
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        self.record_edit(EditAction::Add {
+            cell_name,
+            index,
+            element,
+        });
+        Ok(())
+    }
+
+    fn submit_text_dialog(&mut self) {
+        let Some(dialog) = self.text_dialog.clone() else {
+            return;
+        };
+
+        match self.add_text_element(&dialog.value) {
+            Ok(()) => {
+                self.text_dialog = None;
+            }
+            Err(err) => {
+                if let Some(dialog) = self.text_dialog.as_mut() {
+                    dialog.error = Some(err);
+                }
+            }
+        }
+    }
+
     fn draw_cell_name_dialog(&mut self, ctx: &egui::Context) {
         let Some(dialog) = self.cell_name_dialog.as_mut() else {
             return;
@@ -598,6 +697,43 @@ impl ViewerApp {
             self.cell_name_dialog = None;
         } else if submit {
             self.submit_cell_name_dialog();
+        }
+    }
+
+    fn draw_text_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.text_dialog.as_mut() else {
+            return;
+        };
+
+        let mut submit = false;
+        let mut cancel = false;
+        egui::Window::new("Add Text")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                let response =
+                    ui.add(egui::TextEdit::singleline(&mut dialog.value).desired_width(240.0));
+                if response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+                    submit = true;
+                }
+                if let Some(err) = &dialog.error {
+                    ui.colored_label(egui::Color32::RED, err);
+                }
+                ui.horizontal(|ui| {
+                    if ui.button("Add").clicked() {
+                        submit = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+
+        if cancel {
+            self.text_dialog = None;
+        } else if submit {
+            self.submit_text_dialog();
         }
     }
 
@@ -913,6 +1049,7 @@ impl eframe::App for ViewerApp {
             ctx.request_repaint();
         }
         let text_input_open = self.cell_name_dialog.is_some()
+            || self.text_dialog.is_some()
             || self.cell_picker.is_open()
             || self.recent_picker.is_open();
         if !text_input_open && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::C)) {
@@ -1050,6 +1187,20 @@ impl eframe::App for ViewerApp {
                         if self.paste_clipboard_element() {
                             ctx.request_repaint();
                         }
+                    }
+                    ui.separator();
+                    if ui
+                        .add_enabled(
+                            self.cell
+                                .as_ref()
+                                .and_then(|cell| cell.selected_cell.as_ref())
+                                .is_some(),
+                            egui::Button::new("Add Text..."),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.open_text_dialog();
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -1383,6 +1534,7 @@ impl eframe::App for ViewerApp {
         }
 
         self.draw_cell_name_dialog(ctx);
+        self.draw_text_dialog(ctx);
         self.draw_unsaved_close_prompt(ctx);
     }
 }
@@ -1610,6 +1762,84 @@ mod tests {
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.undo_stack.len(), 1);
         assert!(app.redo_stack.is_empty());
+    }
+
+    #[test]
+    fn add_text_element_adds_selects_and_marks_dirty() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            mouse_world_pos: Some((12.0, 34.0)),
+            ..Default::default()
+        };
+
+        assert!(app.add_text_element(" label ").is_ok());
+
+        assert_eq!(loaded_element_count(&app), 2);
+        assert_eq!(app.selected_element, Some(1));
+        assert_eq!(app.hovered_element, Some(1));
+        assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
+
+        let Some(Element::Text(text)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be text");
+        };
+        assert_eq!(text.text(), "label");
+        assert!((text.origin().x().absolute_value() - 12.0).abs() < 1e-12);
+        assert!((text.origin().y().absolute_value() - 34.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn add_text_element_snaps_position_when_enabled() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            mouse_world_pos: Some((23.0, 37.0)),
+            snap_to_grid: true,
+            ..Default::default()
+        };
+        app.viewport.zoom = 10.0;
+
+        assert!(app.add_text_element("pin").is_ok());
+
+        let Some(Element::Text(text)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be text");
+        };
+        assert!((text.origin().x().absolute_value() - 20.0).abs() < 1e-12);
+        assert!((text.origin().y().absolute_value() - 40.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn undo_add_text_element_removes_it() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            mouse_world_pos: Some((12.0, 34.0)),
+            ..Default::default()
+        };
+
+        assert!(app.add_text_element("label").is_ok());
+        assert_eq!(loaded_element_count(&app), 2);
+
+        assert!(app.undo_edit());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert!(app.selected_element.is_none());
+        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.redo_stack.len(), 1);
     }
 
     #[test]
