@@ -24,6 +24,7 @@ pub struct Viewport {
 pub struct ViewportInteraction {
     pub mouse_world: Option<(f64, f64)>,
     pub clicked: bool,
+    pub selected_element_drag_delta: Option<(f64, f64)>,
 }
 
 impl Default for Viewport {
@@ -151,7 +152,19 @@ impl Viewport {
         }
         let clicked = response.clicked() && !ruler_was_active;
 
-        if response.dragged() {
+        let move_selected_element =
+            selected_element.is_some() && ui.input(|i| i.modifiers.shift) && response.dragged();
+        let selected_element_drag_delta = if move_selected_element {
+            let delta = response.drag_delta();
+            Some((
+                f64::from(delta.x) / self.zoom,
+                -f64::from(delta.y) / self.zoom,
+            ))
+        } else {
+            None
+        };
+
+        if response.dragged() && !move_selected_element {
             let delta = response.drag_delta();
             self.center_x -= f64::from(delta.x) / self.zoom;
             self.center_y += f64::from(delta.y) / self.zoom;
@@ -257,6 +270,7 @@ impl Viewport {
             return ViewportInteraction {
                 mouse_world,
                 clicked,
+                selected_element_drag_delta,
             };
         }
 
@@ -306,6 +320,7 @@ impl Viewport {
             return ViewportInteraction {
                 mouse_world,
                 clicked,
+                selected_element_drag_delta,
             };
         }
 
@@ -465,6 +480,7 @@ impl Viewport {
         ViewportInteraction {
             mouse_world,
             clicked,
+            selected_element_drag_delta,
         }
     }
 }

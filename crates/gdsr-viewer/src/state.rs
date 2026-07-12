@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use egui::{Mesh, Pos2, Shape};
 use emath::{TSTransform, Vec2};
-use gdsr::{CellStats, DataType, Element, Layer, Library};
+use gdsr::{CellStats, DataType, Element, Layer, Library, Movable, Point};
 
 use crate::colors::LayerColorMap;
 use crate::drawable::Drawable;
@@ -91,6 +91,17 @@ impl CellState {
             &mut self.layers,
             &mut visiting,
         );
+        true
+    }
+
+    pub fn move_element(&mut self, index: usize, delta: Point) -> bool {
+        let Some(element) = self.elements.get_mut(index) else {
+            return false;
+        };
+
+        *element = element.clone().move_by(delta);
+        self.rebuild_render_indexes();
+        self.cell_stats = None;
         true
     }
 
@@ -350,6 +361,43 @@ mod tests {
             cell.layers,
             BTreeSet::from([(Layer::new(1), DataType::new(0))])
         );
+        assert!(cell.spatial_grid.is_some());
+    }
+
+    #[test]
+    fn move_element_rebuilds_render_indexes() {
+        let mut cell = CellState::new(Library::new("test"));
+        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        cell.tessellation_cache.insert(0, vec![0, 1, 2]);
+        cell.rebuild_render_indexes();
+
+        assert!(cell.move_element(0, Point::default_integer(1000, 2000)));
+
+        let bbox = cell.elements[0]
+            .world_bbox()
+            .expect("moved element has bbox");
+        assert!((bbox.min_x - 1000.0e-9).abs() < 1e-15);
+        assert!((bbox.min_y - 2000.0e-9).abs() < 1e-15);
+        assert_eq!(
+            cell.layers,
+            BTreeSet::from([(Layer::new(1), DataType::new(0))])
+        );
+        assert!(cell.spatial_grid.is_some());
+        assert!(cell.tessellation_cache.is_empty());
+    }
+
+    #[test]
+    fn move_element_rejects_missing_index() {
+        let mut cell = CellState::new(Library::new("test"));
+        cell.elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)];
+        cell.rebuild_render_indexes();
+
+        assert!(!cell.move_element(1, Point::default_integer(1000, 2000)));
+
+        let bbox = cell.elements[0]
+            .world_bbox()
+            .expect("unchanged element has bbox");
+        assert!((bbox.min_x - 0.0).abs() < 1e-15);
         assert!(cell.spatial_grid.is_some());
     }
 
