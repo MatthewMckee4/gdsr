@@ -47,6 +47,9 @@ struct MeshBuilder {
     element_count: usize,
 }
 
+const MIN_VISIBLE_PX: f32 = 1.0;
+const BBOX_FALLBACK_PX: f32 = 8.0;
+
 pub fn build_visible_scene(
     elements: &[Element],
     visible_indices: &[u32],
@@ -196,6 +199,10 @@ impl<'a> SceneBuilder<'a> {
             return Ok(());
         }
 
+        let Some(points) = element_level_of_detail_points(&bbox, points, self.options.zoom) else {
+            return Ok(());
+        };
+
         let builder = self.builders.entry(layer).or_default();
         if builder.push_polygon(layer, &points)? {
             builder.element_count += 1;
@@ -273,6 +280,50 @@ impl<'a> SceneBuilder<'a> {
 
         Ok(())
     }
+}
+
+fn element_level_of_detail_points(
+    bbox: &WorldBBox,
+    points: Vec<Point>,
+    zoom: f64,
+) -> Option<Vec<Point>> {
+    let Some((width_px, height_px)) = screen_size(bbox, zoom) else {
+        return Some(points);
+    };
+
+    if width_px < MIN_VISIBLE_PX && height_px < MIN_VISIBLE_PX {
+        return None;
+    }
+
+    if width_px < BBOX_FALLBACK_PX || height_px < BBOX_FALLBACK_PX {
+        Some(bbox_points(bbox))
+    } else {
+        Some(points)
+    }
+}
+
+fn screen_size(bbox: &WorldBBox, zoom: f64) -> Option<(f32, f32)> {
+    if !zoom.is_finite() || zoom <= 1.0 {
+        return None;
+    }
+
+    let width = ((bbox.max_x - bbox.min_x) * zoom).abs() as f32;
+    let height = ((bbox.max_y - bbox.min_y) * zoom).abs() as f32;
+    if width.is_finite() && height.is_finite() {
+        Some((width, height))
+    } else {
+        None
+    }
+}
+
+fn bbox_points(bbox: &WorldBBox) -> Vec<Point> {
+    vec![
+        Point::float(bbox.min_x, bbox.min_y, 1.0),
+        Point::float(bbox.max_x, bbox.min_y, 1.0),
+        Point::float(bbox.max_x, bbox.max_y, 1.0),
+        Point::float(bbox.min_x, bbox.max_y, 1.0),
+        Point::float(bbox.min_x, bbox.min_y, 1.0),
+    ]
 }
 
 impl MeshBuilder {
@@ -515,5 +566,55 @@ mod tests {
 
         assert_eq!(scene.reference_lods.len(), 0);
         assert_eq!(scene.batched_element_count, 2);
+    }
+
+    #[test]
+    fn bevy_scene_skips_subpixel_polygon() {
+        let elements = vec![polygon(vec![(0, 0), (100, 0), (100, 100), (0, 100)], 1, 0)];
+        let visible = visible();
+
+        let scene = build_visible_scene_with_options(
+            &elements,
+            &[0],
+            &BTreeSet::new(),
+            &BevySceneOptions {
+                visible: &visible,
+                zoom: 1.0e6,
+                library: None,
+                render_depth: 1,
+            },
+        )
+        .expect("scene should build");
+
+        assert!(scene.batches.is_empty());
+        assert_eq!(scene.batched_element_count, 0);
+    }
+
+    #[test]
+    fn bevy_scene_uses_bbox_proxy_for_skinny_polygon() {
+        let elements = vec![polygon(
+            vec![(0, 0), (4000, 0), (4000, 4), (3000, 4), (2000, 2), (0, 4)],
+            1,
+            0,
+        )];
+        let visible = visible();
+
+        let scene = build_visible_scene_with_options(
+            &elements,
+            &[0],
+            &BTreeSet::new(),
+            &BevySceneOptions {
+                visible: &visible,
+                zoom: 1.0e9,
+                library: None,
+                render_depth: 1,
+            },
+        )
+        .expect("scene should build");
+
+        assert_eq!(scene.batched_element_count, 1);
+        assert_eq!(scene.batches.len(), 1);
+        assert_eq!(mesh_positions(&scene.batches[0].mesh).len(), 4);
+        assert_eq!(mesh_index_count(&scene.batches[0].mesh), 6);
     }
 }
