@@ -5,7 +5,7 @@ pub use bounds::compute_bounds;
 use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Rect, Sense};
-use gdsr::{DataType, Element, Layer, Library};
+use gdsr::{DataType, Element, Layer, Library, Point};
 
 use crate::drawable::{DrawContext, Drawable, WorldBBox, cell_world_bbox, draw_highlight};
 use crate::grid;
@@ -24,6 +24,7 @@ pub struct Viewport {
 pub struct ViewportInteraction {
     pub mouse_world: Option<(f64, f64)>,
     pub clicked: bool,
+    pub double_clicked: bool,
     pub selected_element_drag_delta: Option<(f64, f64)>,
 }
 
@@ -131,6 +132,7 @@ impl Viewport {
         selected_element: Option<usize>,
         render_depth: u32,
         selected_cell: Option<&str>,
+        polygon_preview_points: Option<&[Point]>,
     ) -> ViewportInteraction {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
@@ -151,6 +153,7 @@ impl Viewport {
             }
         }
         let clicked = response.clicked() && !ruler_was_active;
+        let double_clicked = response.double_clicked() && !ruler_was_active;
 
         let move_selected_element =
             selected_element.is_some() && ui.input(|i| i.modifiers.shift) && response.dragged();
@@ -266,10 +269,12 @@ impl Viewport {
             let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+            draw_polygon_preview(polygon_preview_points, self, &painter, rect);
             ruler.draw(&painter, self, rect, mouse_world);
             return ViewportInteraction {
                 mouse_world,
                 clicked,
+                double_clicked,
                 selected_element_drag_delta,
             };
         }
@@ -316,10 +321,12 @@ impl Viewport {
             let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+            draw_polygon_preview(polygon_preview_points, self, &painter, rect);
             ruler.draw(&painter, self, rect, mouse_world);
             return ViewportInteraction {
                 mouse_world,
                 clicked,
+                double_clicked,
                 selected_element_drag_delta,
             };
         }
@@ -478,12 +485,44 @@ impl Viewport {
         let mouse_world = response
             .hover_pos()
             .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
+        draw_polygon_preview(polygon_preview_points, self, &painter, rect);
         ruler.draw(&painter, self, rect, mouse_world);
         ViewportInteraction {
             mouse_world,
             clicked,
+            double_clicked,
             selected_element_drag_delta,
         }
+    }
+}
+
+fn draw_polygon_preview(
+    points: Option<&[Point]>,
+    viewport: &Viewport,
+    painter: &egui::Painter,
+    rect: Rect,
+) {
+    let Some(points) = points else {
+        return;
+    };
+    if points.is_empty() {
+        return;
+    }
+
+    let color = Color32::from_rgb(120, 220, 255);
+    let stroke = egui::Stroke::new(1.5_f32, color);
+    let screen_points: Vec<Pos2> = points
+        .iter()
+        .map(|point| {
+            viewport.world_to_screen(point.x().absolute_value(), point.y().absolute_value(), rect)
+        })
+        .collect();
+
+    for pair in screen_points.windows(2) {
+        painter.line_segment([pair[0], pair[1]], stroke);
+    }
+    for point in screen_points {
+        painter.circle_filled(point, 3.5, color);
     }
 }
 

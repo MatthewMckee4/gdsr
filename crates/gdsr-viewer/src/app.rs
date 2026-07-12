@@ -3,7 +3,7 @@ use std::sync::mpsc;
 
 use gdsr::{
     DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, DataType, Element, HorizontalPresentation, Layer,
-    Movable, Point, Radians, Text, Unit, VerticalPresentation,
+    Movable, Point, Polygon, Radians, Text, Unit, VerticalPresentation,
 };
 
 use crate::drawable::{Drawable, cell_world_bbox};
@@ -163,6 +163,20 @@ struct TextDialog {
     error: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct PolygonDialog {
+    layer: u16,
+    data_type: u16,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PolygonTool {
+    layer: u16,
+    data_type: u16,
+    points: Vec<Point>,
+    error: Option<String>,
+}
+
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -195,6 +209,8 @@ pub struct ViewerApp {
     cell_name_dialog: Option<CellNameDialog>,
     clipboard_element: Option<Element>,
     text_dialog: Option<TextDialog>,
+    polygon_dialog: Option<PolygonDialog>,
+    polygon_tool: Option<PolygonTool>,
 }
 
 impl Default for ViewerApp {
@@ -229,6 +245,8 @@ impl Default for ViewerApp {
             cell_name_dialog: None,
             clipboard_element: None,
             text_dialog: None,
+            polygon_dialog: None,
+            polygon_tool: None,
         }
     }
 }
@@ -278,6 +296,8 @@ impl ViewerApp {
         self.cell_name_dialog = None;
         self.clipboard_element = None;
         self.text_dialog = None;
+        self.polygon_dialog = None;
+        self.polygon_tool = None;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -295,6 +315,8 @@ impl ViewerApp {
             }
         }
         self.render_cache.clear();
+        self.polygon_dialog = None;
+        self.polygon_tool = None;
     }
 
     /// Adjusts the viewport to fit all currently loaded elements.
@@ -497,6 +519,22 @@ impl ViewerApp {
         });
     }
 
+    fn open_polygon_dialog(&mut self) {
+        if self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.as_ref())
+            .is_none()
+        {
+            return;
+        }
+
+        self.polygon_dialog = Some(PolygonDialog {
+            layer: 0,
+            data_type: 0,
+        });
+    }
+
     fn validate_cell_name(
         &self,
         name: &str,
@@ -637,6 +675,101 @@ impl ViewerApp {
         Ok(())
     }
 
+    fn add_polygon_element(
+        &mut self,
+        points: Vec<Point>,
+        layer: Layer,
+        data_type: DataType,
+    ) -> Result<(), String> {
+        if points.len() < 3 {
+            return Err("Polygon requires at least three vertices".to_string());
+        }
+        let Some(cell_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            return Err("No cell selected".to_string());
+        };
+
+        let element = Element::Polygon(Polygon::new(points, layer, data_type));
+        let Some(cell) = self.cell.as_mut() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        let index = cell.elements.len();
+        if !cell.insert_element(index, element.clone()) {
+            return Err("Could not add polygon".to_string());
+        }
+
+        self.selected_element = Some(index);
+        self.hovered_element = Some(index);
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        self.record_edit(EditAction::Add {
+            cell_name,
+            index,
+            element,
+        });
+        Ok(())
+    }
+
+    fn begin_polygon_tool(&mut self, layer: u16, data_type: u16) {
+        self.ruler.cancel();
+        self.selected_element = None;
+        self.hovered_element = None;
+        self.polygon_tool = Some(PolygonTool {
+            layer,
+            data_type,
+            points: Vec::new(),
+            error: None,
+        });
+    }
+
+    fn add_polygon_vertex(&mut self, wx: f64, wy: f64) -> bool {
+        let (wx, wy) = self.snap_world_position(wx, wy);
+        let point = Point::float(wx, wy, 1.0);
+        let Some(tool) = self.polygon_tool.as_mut() else {
+            return false;
+        };
+
+        if tool.points.last().is_some_and(|last| *last == point) {
+            return false;
+        }
+
+        tool.points.push(point);
+        tool.error = None;
+        true
+    }
+
+    fn finish_polygon_tool(&mut self) -> bool {
+        let Some(tool) = self.polygon_tool.clone() else {
+            return false;
+        };
+
+        let result = self.add_polygon_element(
+            tool.points,
+            Layer::new(tool.layer),
+            DataType::new(tool.data_type),
+        );
+        match result {
+            Ok(()) => {
+                self.polygon_tool = None;
+                true
+            }
+            Err(err) => {
+                if let Some(tool) = self.polygon_tool.as_mut() {
+                    tool.error = Some(err);
+                }
+                false
+            }
+        }
+    }
+
+    fn cancel_polygon_tool(&mut self) {
+        self.polygon_tool = None;
+    }
+
     fn submit_text_dialog(&mut self) {
         let Some(dialog) = self.text_dialog.clone() else {
             return;
@@ -734,6 +867,46 @@ impl ViewerApp {
             self.text_dialog = None;
         } else if submit {
             self.submit_text_dialog();
+        }
+    }
+
+    fn draw_polygon_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.polygon_dialog.as_mut() else {
+            return;
+        };
+
+        let mut begin = false;
+        let mut cancel = false;
+        egui::Window::new("Add Polygon")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Layer");
+                    ui.add(egui::DragValue::new(&mut dialog.layer).range(0..=255));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Datatype");
+                    ui.add(egui::DragValue::new(&mut dialog.data_type).range(0..=255));
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Draw").clicked() {
+                        begin = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+
+        if cancel {
+            self.polygon_dialog = None;
+        } else if begin {
+            let layer = dialog.layer;
+            let data_type = dialog.data_type;
+            self.polygon_dialog = None;
+            self.begin_polygon_tool(layer, data_type);
         }
     }
 
@@ -1025,6 +1198,7 @@ impl eframe::App for ViewerApp {
                 self.selected_element = None;
             }
         }
+        let polygon_tool_active = self.polygon_tool.is_some();
 
         // Global keyboard shortcuts
         if ctx.input(|i| i.key_pressed(egui::Key::F)) {
@@ -1050,8 +1224,16 @@ impl eframe::App for ViewerApp {
         }
         let text_input_open = self.cell_name_dialog.is_some()
             || self.text_dialog.is_some()
+            || self.polygon_dialog.is_some()
             || self.cell_picker.is_open()
             || self.recent_picker.is_open();
+        if !text_input_open
+            && ctx.input(|i| i.key_pressed(egui::Key::Enter))
+            && self.polygon_tool.is_some()
+            && self.finish_polygon_tool()
+        {
+            ctx.request_repaint();
+        }
         if !text_input_open && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::C)) {
             self.copy_selected_element();
         }
@@ -1069,22 +1251,29 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::P)) {
             self.cell_picker.toggle();
         }
-        if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R)) {
+        if !polygon_tool_active && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R))
+        {
             self.ruler.clear_all();
-        } else if ctx.input(|i| i.key_pressed(egui::Key::R)) {
+        } else if !polygon_tool_active && ctx.input(|i| i.key_pressed(egui::Key::R)) {
             self.ruler.toggle();
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape))
             && !self.cell_picker.is_open()
             && !self.recent_picker.is_open()
         {
-            self.ruler.cancel();
+            if self.polygon_tool.is_some() {
+                self.cancel_polygon_tool();
+                ctx.request_repaint();
+            } else {
+                self.ruler.cancel();
+            }
         }
         let delete_pressed =
             ctx.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace));
         if delete_pressed
             && !self.cell_picker.is_open()
             && !self.recent_picker.is_open()
+            && self.polygon_tool.is_none()
             && self.delete_selected_element()
         {
             ctx.request_repaint();
@@ -1201,6 +1390,19 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.open_text_dialog();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.cell
+                                .as_ref()
+                                .and_then(|cell| cell.selected_cell.as_ref())
+                                .is_some(),
+                            egui::Button::new("Add Polygon..."),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.open_polygon_dialog();
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -1364,6 +1566,12 @@ impl eframe::App for ViewerApp {
                     if self.ruler.active {
                         ui.label("Ruler: click to place point (Esc to cancel)");
                     }
+                    if let Some(tool) = &self.polygon_tool {
+                        ui.label(format!("Polygon: {} vertices", tool.points.len()));
+                        if let Some(err) = &tool.error {
+                            ui.colored_label(egui::Color32::RED, err);
+                        }
+                    }
                     if let Some(stats) = self.cell.as_ref().and_then(|c| c.cell_stats.as_ref()) {
                         panels::draw_stats_bar(ui, stats);
                     }
@@ -1475,7 +1683,10 @@ impl eframe::App for ViewerApp {
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
+        let polygon_preview_points = self.polygon_tool.as_ref().map(|tool| tool.points.clone());
         let mut selected_element_drag_delta = None;
+        let mut viewport_click_world = None;
+        let mut viewport_double_clicked = false;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -1507,27 +1718,43 @@ impl eframe::App for ViewerApp {
                 *selected_element,
                 render_depth,
                 selected_cell_name.as_deref(),
+                polygon_preview_points.as_deref(),
             );
             selected_element_drag_delta = interaction.selected_element_drag_delta;
             *mouse_world_pos = interaction.mouse_world;
+            if interaction.clicked || interaction.double_clicked {
+                viewport_click_world = interaction.mouse_world;
+                viewport_double_clicked = interaction.double_clicked;
+            }
 
             let prev_hovered = *hovered_element;
             let prev_selected = *selected_element;
             *hovered_element = None;
-            if let Some((wx, wy)) = *mouse_world_pos {
-                if let Some(grid) = spatial_grid {
-                    *hovered_element =
-                        hit_test_element(elements, grid, query_buf, wx, wy, viewport.zoom);
+            if !polygon_tool_active {
+                if let Some((wx, wy)) = *mouse_world_pos {
+                    if let Some(grid) = spatial_grid {
+                        *hovered_element =
+                            hit_test_element(elements, grid, query_buf, wx, wy, viewport.zoom);
+                    }
                 }
-            }
-            if interaction.clicked {
-                *selected_element = *hovered_element;
+                if interaction.clicked {
+                    *selected_element = *hovered_element;
+                }
             }
             if *hovered_element != prev_hovered || *selected_element != prev_selected {
                 ctx.request_repaint();
             }
         });
-        if let Some((dx, dy)) = selected_element_drag_delta {
+        if polygon_tool_active {
+            if let Some((wx, wy)) = viewport_click_world {
+                if self.add_polygon_vertex(wx, wy) {
+                    ctx.request_repaint();
+                }
+                if viewport_double_clicked && self.finish_polygon_tool() {
+                    ctx.request_repaint();
+                }
+            }
+        } else if let Some((dx, dy)) = selected_element_drag_delta {
             if self.move_selected_element(Point::float(dx, dy, 1.0)) {
                 ctx.request_repaint();
             }
@@ -1535,6 +1762,7 @@ impl eframe::App for ViewerApp {
 
         self.draw_cell_name_dialog(ctx);
         self.draw_text_dialog(ctx);
+        self.draw_polygon_dialog(ctx);
         self.draw_unsaved_close_prompt(ctx);
     }
 }
@@ -1832,6 +2060,139 @@ mod tests {
         };
 
         assert!(app.add_text_element("label").is_ok());
+        assert_eq!(loaded_element_count(&app), 2);
+
+        assert!(app.undo_edit());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert!(app.selected_element.is_none());
+        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.redo_stack.len(), 1);
+    }
+
+    #[test]
+    fn add_polygon_element_adds_selects_and_marks_dirty() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert!(
+            app.add_polygon_element(
+                vec![p(1.0, 2.0), p(3.0, 2.0), p(3.0, 4.0)],
+                Layer::new(7),
+                DataType::new(2),
+            )
+            .is_ok()
+        );
+
+        assert_eq!(loaded_element_count(&app), 2);
+        assert_eq!(app.selected_element, Some(1));
+        assert_eq!(app.hovered_element, Some(1));
+        assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
+
+        let Some(Element::Polygon(polygon)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be polygon");
+        };
+        assert_eq!(polygon.layer(), Layer::new(7));
+        assert_eq!(polygon.data_type(), DataType::new(2));
+        assert_eq!(polygon.points().len(), 4);
+        assert_eq!(polygon.points().first(), polygon.points().last());
+    }
+
+    #[test]
+    fn polygon_tool_snaps_vertices_when_enabled() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            snap_to_grid: true,
+            ..Default::default()
+        };
+        app.viewport.zoom = 10.0;
+        app.begin_polygon_tool(7, 2);
+
+        assert!(app.add_polygon_vertex(23.0, 37.0));
+
+        let tool = app.polygon_tool.expect("polygon tool should remain active");
+        assert_eq!(tool.points, vec![p(20.0, 40.0)]);
+    }
+
+    #[test]
+    fn finish_polygon_tool_requires_three_vertices() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+        app.begin_polygon_tool(7, 2);
+        assert!(app.add_polygon_vertex(1.0, 1.0));
+        assert!(app.add_polygon_vertex(2.0, 2.0));
+
+        assert!(!app.finish_polygon_tool());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert_eq!(
+            app.polygon_tool
+                .as_ref()
+                .and_then(|tool| tool.error.as_deref()),
+            Some("Polygon requires at least three vertices")
+        );
+    }
+
+    #[test]
+    fn finish_polygon_tool_adds_polygon_with_target_layer() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+        app.begin_polygon_tool(9, 4);
+        assert!(app.add_polygon_vertex(1.0, 1.0));
+        assert!(app.add_polygon_vertex(3.0, 1.0));
+        assert!(app.add_polygon_vertex(3.0, 3.0));
+
+        assert!(app.finish_polygon_tool());
+
+        assert!(app.polygon_tool.is_none());
+        assert_eq!(loaded_element_count(&app), 2);
+        let Some(Element::Polygon(polygon)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be polygon");
+        };
+        assert_eq!(polygon.layer(), Layer::new(9));
+        assert_eq!(polygon.data_type(), DataType::new(4));
+    }
+
+    #[test]
+    fn undo_add_polygon_element_removes_it() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert!(
+            app.add_polygon_element(
+                vec![p(1.0, 2.0), p(3.0, 2.0), p(3.0, 4.0)],
+                Layer::new(7),
+                DataType::new(2),
+            )
+            .is_ok()
+        );
         assert_eq!(loaded_element_count(&app), 2);
 
         assert!(app.undo_edit());
