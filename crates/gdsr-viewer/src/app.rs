@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
+use gdsr::Point;
+
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
 use crate::quick_pick::{QuickPick, QuickPickResult};
@@ -169,6 +171,24 @@ impl ViewerApp {
 
         self.selected_element = None;
         self.hovered_element = None;
+        self.render_cache.clear();
+        true
+    }
+
+    fn move_selected_element(&mut self, delta: Point) -> bool {
+        let Some(index) = self.selected_element else {
+            return false;
+        };
+        let Some(cell) = self.cell.as_mut() else {
+            self.selected_element = None;
+            return false;
+        };
+        if !cell.move_element(index, delta) {
+            self.selected_element = None;
+            return false;
+        }
+
+        self.hovered_element = Some(index);
         self.render_cache.clear();
         true
     }
@@ -545,6 +565,7 @@ impl eframe::App for ViewerApp {
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
+        let mut selected_element_drag_delta = None;
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut empty_cache = std::collections::HashMap::new();
             let (elements, spatial_grid, library, tessellation_cache) =
@@ -577,6 +598,7 @@ impl eframe::App for ViewerApp {
                 render_depth,
                 selected_cell_name.as_deref(),
             );
+            selected_element_drag_delta = interaction.selected_element_drag_delta;
             *mouse_world_pos = interaction.mouse_world;
 
             let prev_hovered = *hovered_element;
@@ -595,6 +617,11 @@ impl eframe::App for ViewerApp {
                 ctx.request_repaint();
             }
         });
+        if let Some((dx, dy)) = selected_element_drag_delta {
+            if self.move_selected_element(Point::float(dx, dy, 1.0)) {
+                ctx.request_repaint();
+            }
+        }
     }
 }
 
@@ -670,6 +697,29 @@ mod tests {
         assert!(cell.spatial_grid.is_none());
         assert!(app.selected_element.is_none());
         assert!(app.hovered_element.is_none());
+    }
+
+    #[test]
+    fn move_selected_element_moves_element_and_keeps_selection() {
+        let mut cell = CellState::new(gdsr::Library::new("test"));
+        cell.elements = test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            ..Default::default()
+        };
+
+        assert!(app.move_selected_element(Point::float(2.0, 3.0, 1.0)));
+
+        let cell = app.cell.expect("cell should remain loaded");
+        let bbox = cell.elements[0]
+            .world_bbox()
+            .expect("moved element has bbox");
+        assert!((bbox.min_x - 2.0).abs() < 1e-12);
+        assert!((bbox.min_y - 3.0).abs() < 1e-12);
+        assert_eq!(app.selected_element, Some(0));
+        assert_eq!(app.hovered_element, Some(0));
+        assert!(cell.spatial_grid.is_some());
     }
 
     #[test]
