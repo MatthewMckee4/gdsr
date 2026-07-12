@@ -10,6 +10,13 @@ const INDENT_PX: f32 = 16.0;
 const GUIDE_COLOR: Color32 = Color32::from_gray(60);
 const EXPANDED_COLOR: Color32 = Color32::from_gray(140);
 
+#[derive(Default)]
+pub struct SidePanelActions {
+    pub delete_selected: bool,
+    pub create_cell: bool,
+    pub rename_cell: bool,
+}
+
 /// Draws the side panel content, dispatching to cell or layer panel based on active tab.
 pub fn draw_side_panel(
     ui: &mut Ui,
@@ -25,10 +32,10 @@ pub fn draw_side_panel(
     layers: &BTreeSet<(Layer, DataType)>,
     layer_state: &mut LayerState,
     selected_element: Option<&Element>,
-) -> bool {
-    let mut delete_selected = false;
+) -> SidePanelActions {
+    let mut actions = SidePanelActions::default();
     if let Some(element) = selected_element {
-        delete_selected = draw_element_panel(ui, element);
+        actions.delete_selected = draw_element_panel(ui, element);
         ui.separator();
     }
 
@@ -38,7 +45,7 @@ pub fn draw_side_panel(
                 CellViewMode::Tree => cell_tree,
                 CellViewMode::Flat => flat_tree,
             };
-            draw_cell_panel(
+            let cell_actions = draw_cell_panel(
                 ui,
                 tree,
                 selected_cell,
@@ -46,13 +53,15 @@ pub fn draw_side_panel(
                 expand_state,
                 scroll_to_selected,
             );
+            actions.create_cell = cell_actions.create_cell;
+            actions.rename_cell = cell_actions.rename_cell;
         }
         SidePanelTab::Layers => {
             draw_layer_panel(ui, layers, layer_state, color_changed);
         }
     }
 
-    delete_selected
+    actions
 }
 
 fn draw_element_panel(ui: &mut Ui, element: &Element) -> bool {
@@ -145,7 +154,21 @@ fn draw_cell_panel(
     cell_changed: &mut bool,
     expand_state: &mut ExpandState,
     scroll_to_selected: &mut bool,
-) {
+) -> SidePanelActions {
+    let mut actions = SidePanelActions::default();
+    ui.horizontal(|ui| {
+        if ui.button("New Cell").clicked() {
+            actions.create_cell = true;
+        }
+        if ui
+            .add_enabled(selected_cell.is_some(), egui::Button::new("Rename"))
+            .clicked()
+        {
+            actions.rename_cell = true;
+        }
+    });
+    ui.separator();
+
     egui::ScrollArea::vertical()
         .id_salt("cell_tree")
         .show(ui, |ui| {
@@ -161,6 +184,7 @@ fn draw_cell_panel(
                 );
             }
         });
+    actions
 }
 
 fn draw_layer_panel(

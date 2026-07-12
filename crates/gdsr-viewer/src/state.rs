@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use egui::{Mesh, Pos2, Shape};
 use emath::{TSTransform, Vec2};
-use gdsr::{CellStats, DataType, Element, Layer, Library, Movable, Point};
+use gdsr::{Cell, CellStats, DataType, Element, Layer, Library, Movable, Point};
 
 use crate::colors::LayerColorMap;
 use crate::drawable::Drawable;
@@ -39,16 +39,12 @@ pub struct CellState {
 
 impl CellState {
     pub fn new(library: Library) -> Self {
-        let mut cell_names: Vec<String> = library.cells().keys().cloned().collect();
-        cell_names.sort();
-        let cell_tree = hierarchy::build_cell_tree(&library);
-        let flat_tree = hierarchy::build_flat_cell_tree(&library);
         let expand_state = ExpandState::default();
-        Self {
+        let mut state = Self {
             library,
-            cell_names,
-            cell_tree,
-            flat_tree,
+            cell_names: Vec::new(),
+            cell_tree: Vec::new(),
+            flat_tree: Vec::new(),
             expand_state,
             selected_cell: None,
             elements: Vec::new(),
@@ -57,7 +53,16 @@ impl CellState {
             tessellation_cache: HashMap::new(),
             cell_stats: None,
             render_depth: 1,
-        }
+        };
+        state.rebuild_cell_indexes();
+        state
+    }
+
+    fn rebuild_cell_indexes(&mut self) {
+        self.cell_names = self.library.cells().keys().cloned().collect();
+        self.cell_names.sort();
+        self.cell_tree = hierarchy::build_cell_tree(&self.library);
+        self.flat_tree = hierarchy::build_flat_cell_tree(&self.library);
     }
 
     pub fn delete_element(&mut self, index: usize) -> bool {
@@ -108,6 +113,37 @@ impl CellState {
             .is_some_and(|cell| cell.insert_element(index, element));
 
         inserted && self.load_direct_cell_elements(&cell_name)
+    }
+
+    pub fn create_cell(&mut self, name: &str) -> bool {
+        if name.is_empty() || self.library.cells().contains_key(name) {
+            return false;
+        }
+
+        self.library.add_cell(Cell::new(name));
+        self.rebuild_cell_indexes();
+        self.selected_cell = Some(name.to_string());
+        self.expand_state.set_expanded(name, true);
+        self.load_direct_cell_elements(name)
+    }
+
+    pub fn rename_cell(&mut self, old_name: &str, new_name: &str) -> bool {
+        if new_name.is_empty() || !self.library.rename_cell(old_name, new_name) {
+            return false;
+        }
+
+        self.rebuild_cell_indexes();
+        if self.selected_cell.as_deref() == Some(old_name) {
+            self.selected_cell = Some(new_name.to_string());
+        }
+        self.expand_state.set_expanded(old_name, false);
+        self.expand_state.set_expanded(new_name, true);
+
+        if let Some(name) = self.selected_cell.clone() {
+            self.load_direct_cell_elements(&name)
+        } else {
+            true
+        }
     }
 
     pub fn move_element(&mut self, index: usize, delta: Point) -> bool {
@@ -325,7 +361,7 @@ impl RenderCache {
 mod tests {
     use super::*;
     use egui::Rect;
-    use gdsr::{Cell, Element, Library};
+    use gdsr::{Cell, Element, Library, Reference};
 
     use crate::testutil::helpers::polygon;
 
@@ -390,6 +426,49 @@ mod tests {
         );
         assert!(cell.spatial_grid.is_some());
         assert!(cell.tessellation_cache.is_empty());
+    }
+
+    #[test]
+    fn create_cell_updates_cell_indexes_and_selects_new_cell() {
+        let mut cell = CellState::new(Library::new("test"));
+
+        assert!(cell.create_cell("new_cell"));
+
+        assert!(cell.library.get_cell("new_cell").is_some());
+        assert_eq!(cell.cell_names, vec!["new_cell"]);
+        assert_eq!(cell.selected_cell.as_deref(), Some("new_cell"));
+        assert!(cell.elements.is_empty());
+        assert!(cell.spatial_grid.is_none());
+    }
+
+    #[test]
+    fn rename_cell_updates_indexes_selection_and_references() {
+        let mut leaf = Cell::new("leaf");
+        leaf.add(polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0));
+        let mut top = Cell::new("top");
+        top.add(Reference::new("leaf"));
+
+        let mut library = Library::new("test");
+        library.add_cell(leaf);
+        library.add_cell(top);
+
+        let mut cell = CellState::new(library);
+        cell.selected_cell = Some("leaf".to_string());
+        assert!(cell.load_direct_cell_elements("leaf"));
+
+        assert!(cell.rename_cell("leaf", "renamed"));
+
+        assert!(cell.library.get_cell("leaf").is_none());
+        assert!(cell.library.get_cell("renamed").is_some());
+        assert_eq!(cell.selected_cell.as_deref(), Some("renamed"));
+        assert_eq!(cell.cell_names, vec!["renamed", "top"]);
+        assert_eq!(
+            cell.library
+                .get_cell("top")
+                .expect("top cell should exist")
+                .referenced_cell_names(),
+            vec!["renamed"]
+        );
     }
 
     #[test]
