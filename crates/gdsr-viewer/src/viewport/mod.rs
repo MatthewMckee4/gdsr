@@ -99,7 +99,7 @@ const CELL_LOAD_DENSITY_MIN_ELEMENTS: usize = 128;
 const CELL_LOAD_MIN_AVG_ELEMENT_AREA_PX: f32 = 16.0;
 
 fn should_draw_cell_load(width_px: f32, height_px: f32, element_count: usize) -> bool {
-    if width_px < CELL_LOAD_THRESHOLD_PX && height_px < CELL_LOAD_THRESHOLD_PX {
+    if width_px < CELL_LOAD_THRESHOLD_PX || height_px < CELL_LOAD_THRESHOLD_PX {
         return true;
     }
     if element_count < CELL_LOAD_DENSITY_MIN_ELEMENTS {
@@ -694,6 +694,11 @@ mod tests {
     #[test]
     fn load_cell_for_small_screen_area() {
         assert!(should_draw_cell_load(12.0, 20.0, 1));
+    }
+
+    #[test]
+    fn load_cell_for_skinny_screen_area() {
+        assert!(should_draw_cell_load(4000.0, 4.0, 1));
     }
 
     #[test]
