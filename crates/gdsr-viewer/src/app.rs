@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Element, Point, Unit};
+use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Element, Movable, Point, Unit};
 
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
@@ -31,6 +31,20 @@ fn inverse_delta(delta: Point) -> Point {
         Unit::float(0.0, x_units) - delta.x(),
         Unit::float(0.0, y_units) - delta.y(),
     )
+}
+
+fn move_element_to_cursor(element: Element, wx: f64, wy: f64) -> Element {
+    let target = Point::float(wx, wy, 1.0);
+    if let Some(bbox) = element.world_bbox() {
+        let center = Point::float(
+            (bbox.min_x + bbox.max_x) * 0.5,
+            (bbox.min_y + bbox.max_y) * 0.5,
+            1.0,
+        );
+        return element.move_by(target - center);
+    }
+
+    element.move_to(target)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -169,6 +183,7 @@ pub struct ViewerApp {
     undo_stack: Vec<EditAction>,
     redo_stack: Vec<EditAction>,
     cell_name_dialog: Option<CellNameDialog>,
+    clipboard_element: Option<Element>,
 }
 
 impl Default for ViewerApp {
@@ -200,6 +215,7 @@ impl Default for ViewerApp {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             cell_name_dialog: None,
+            clipboard_element: None,
         }
     }
 }
@@ -247,6 +263,7 @@ impl ViewerApp {
         self.undo_stack.clear();
         self.redo_stack.clear();
         self.cell_name_dialog = None;
+        self.clipboard_element = None;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -616,6 +633,60 @@ impl ViewerApp {
         true
     }
 
+    fn copy_selected_element(&mut self) -> bool {
+        let Some(index) = self.selected_element else {
+            return false;
+        };
+        let Some(element) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.elements.get(index))
+            .cloned()
+        else {
+            return false;
+        };
+
+        self.clipboard_element = Some(element);
+        true
+    }
+
+    fn paste_clipboard_element(&mut self) -> bool {
+        let Some(element) = self.clipboard_element.clone() else {
+            return false;
+        };
+        let Some((wx, wy)) = self.mouse_world_pos else {
+            return false;
+        };
+        let Some(cell_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            return false;
+        };
+
+        let pasted = move_element_to_cursor(element, wx, wy);
+        let Some(cell) = self.cell.as_mut() else {
+            return false;
+        };
+        let index = cell.elements.len();
+        if !cell.insert_element(index, pasted.clone()) {
+            return false;
+        }
+
+        self.selected_element = Some(index);
+        self.hovered_element = Some(index);
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        self.record_edit(EditAction::Add {
+            cell_name,
+            index,
+            element: pasted,
+        });
+        true
+    }
+
     fn delete_selected_element(&mut self) -> bool {
         let Some(index) = self.selected_element else {
             return false;
@@ -790,6 +861,18 @@ impl eframe::App for ViewerApp {
         {
             ctx.request_repaint();
         }
+        let text_input_open = self.cell_name_dialog.is_some()
+            || self.cell_picker.is_open()
+            || self.recent_picker.is_open();
+        if !text_input_open && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::C)) {
+            self.copy_selected_element();
+        }
+        if !text_input_open
+            && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::V))
+            && self.paste_clipboard_element()
+        {
+            ctx.request_repaint();
+        }
         if ctx.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::S)) {
             self.save_file_as_dialog();
         } else if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::S)) {
@@ -886,6 +969,34 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         if self.redo_edit() {
+                            ctx.request_repaint();
+                        }
+                    }
+                    ui.separator();
+                    if ui
+                        .add_enabled(
+                            self.selected_element.is_some(),
+                            egui::Button::new("Copy").shortcut_text(shortcut_text("C")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.copy_selected_element();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.clipboard_element.is_some()
+                                && self
+                                    .cell
+                                    .as_ref()
+                                    .and_then(|cell| cell.selected_cell.as_ref())
+                                    .is_some(),
+                            egui::Button::new("Paste").shortcut_text(shortcut_text("V")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        if self.paste_clipboard_element() {
                             ctx.request_repaint();
                         }
                     }
@@ -1267,10 +1378,14 @@ mod tests {
     }
 
     fn first_element_bbox(app: &ViewerApp) -> crate::drawable::WorldBBox {
+        first_element_bbox_at(app, 0)
+    }
+
+    fn first_element_bbox_at(app: &ViewerApp, index: usize) -> crate::drawable::WorldBBox {
         app.cell
             .as_ref()
             .expect("cell should remain loaded")
-            .elements[0]
+            .elements[index]
             .world_bbox()
             .expect("element has bbox")
     }
@@ -1442,6 +1557,74 @@ mod tests {
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.undo_stack.len(), 1);
         assert!(app.redo_stack.is_empty());
+    }
+
+    #[test]
+    fn copy_selected_element_stores_element() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            ..Default::default()
+        };
+
+        assert!(app.copy_selected_element());
+
+        assert!(app.clipboard_element.is_some());
+    }
+
+    #[test]
+    fn paste_clipboard_element_inserts_at_cursor_and_records_undo() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            mouse_world_pos: Some((20.0, 30.0)),
+            ..Default::default()
+        };
+        assert!(app.copy_selected_element());
+
+        assert!(app.paste_clipboard_element());
+
+        assert_eq!(loaded_element_count(&app), 2);
+        assert_eq!(app.selected_element, Some(1));
+        assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        let pasted_bbox = first_element_bbox_at(&app, 1);
+        assert!((pasted_bbox.min_x - 15.0).abs() < 1e-12);
+        assert!((pasted_bbox.min_y - 25.0).abs() < 1e-12);
+
+        assert!(app.undo_edit());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert!(app.selected_element.is_none());
+        assert_eq!(app.redo_stack.len(), 1);
+    }
+
+    #[test]
+    fn paste_clipboard_element_can_paste_across_cells() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            mouse_world_pos: Some((20.0, 30.0)),
+            ..Default::default()
+        };
+        assert!(app.copy_selected_element());
+        assert!(app.create_cell_named("other").is_ok());
+
+        assert!(app.paste_clipboard_element());
+
+        let cell = app.cell.as_ref().expect("cell should remain loaded");
+        assert_eq!(cell.selected_cell.as_deref(), Some("other"));
+        assert_eq!(
+            cell.library
+                .get_cell("other")
+                .expect("other cell should exist")
+                .elements()
+                .len(),
+            1
+        );
     }
 
     #[test]
