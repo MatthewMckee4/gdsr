@@ -132,7 +132,7 @@ impl Viewport {
         selected_element: Option<usize>,
         render_depth: u32,
         selected_cell: Option<&str>,
-        polygon_preview_points: Option<&[Point]>,
+        drawing_preview_points: Option<&[Point]>,
     ) -> ViewportInteraction {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
@@ -269,7 +269,7 @@ impl Viewport {
             let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
-            draw_polygon_preview(polygon_preview_points, self, &painter, rect);
+            draw_drawing_preview(drawing_preview_points, self, &painter, rect);
             ruler.draw(&painter, self, rect, mouse_world);
             return ViewportInteraction {
                 mouse_world,
@@ -321,7 +321,7 @@ impl Viewport {
             let mouse_world = response
                 .hover_pos()
                 .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
-            draw_polygon_preview(polygon_preview_points, self, &painter, rect);
+            draw_drawing_preview(drawing_preview_points, self, &painter, rect);
             ruler.draw(&painter, self, rect, mouse_world);
             return ViewportInteraction {
                 mouse_world,
@@ -485,7 +485,7 @@ impl Viewport {
         let mouse_world = response
             .hover_pos()
             .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
-        draw_polygon_preview(polygon_preview_points, self, &painter, rect);
+        draw_drawing_preview(drawing_preview_points, self, &painter, rect);
         ruler.draw(&painter, self, rect, mouse_world);
         ViewportInteraction {
             mouse_world,
@@ -496,7 +496,7 @@ impl Viewport {
     }
 }
 
-fn draw_polygon_preview(
+fn draw_drawing_preview(
     points: Option<&[Point]>,
     viewport: &Viewport,
     painter: &egui::Painter,

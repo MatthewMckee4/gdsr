@@ -3,7 +3,7 @@ use std::sync::mpsc;
 
 use gdsr::{
     DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, DataType, Element, HorizontalPresentation, Layer,
-    Movable, Point, Polygon, Radians, Text, Unit, VerticalPresentation,
+    Movable, Path as GdsPath, PathType, Point, Polygon, Radians, Text, Unit, VerticalPresentation,
 };
 
 use crate::drawable::{Drawable, cell_world_bbox};
@@ -26,6 +26,14 @@ fn shortcut_text(key: &str) -> String {
         "Ctrl+"
     };
     format!("{modifier}{key}")
+}
+
+fn path_type_label(path_type: PathType) -> &'static str {
+    match path_type {
+        PathType::Square => "Square",
+        PathType::Round => "Round",
+        PathType::Overlap => "Overlap",
+    }
 }
 
 fn inverse_delta(delta: Point) -> Point {
@@ -177,6 +185,24 @@ struct PolygonTool {
     error: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct PathDialog {
+    layer: u16,
+    data_type: u16,
+    width: f64,
+    path_type: PathType,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct PathTool {
+    layer: u16,
+    data_type: u16,
+    width: f64,
+    path_type: PathType,
+    points: Vec<Point>,
+    error: Option<String>,
+}
+
 pub struct ViewerApp {
     file_load: FileLoadState,
     cell: Option<CellState>,
@@ -211,6 +237,8 @@ pub struct ViewerApp {
     text_dialog: Option<TextDialog>,
     polygon_dialog: Option<PolygonDialog>,
     polygon_tool: Option<PolygonTool>,
+    path_dialog: Option<PathDialog>,
+    path_tool: Option<PathTool>,
 }
 
 impl Default for ViewerApp {
@@ -247,6 +275,8 @@ impl Default for ViewerApp {
             text_dialog: None,
             polygon_dialog: None,
             polygon_tool: None,
+            path_dialog: None,
+            path_tool: None,
         }
     }
 }
@@ -298,6 +328,8 @@ impl ViewerApp {
         self.text_dialog = None;
         self.polygon_dialog = None;
         self.polygon_tool = None;
+        self.path_dialog = None;
+        self.path_tool = None;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -317,6 +349,8 @@ impl ViewerApp {
         self.render_cache.clear();
         self.polygon_dialog = None;
         self.polygon_tool = None;
+        self.path_dialog = None;
+        self.path_tool = None;
     }
 
     /// Adjusts the viewport to fit all currently loaded elements.
@@ -535,6 +569,24 @@ impl ViewerApp {
         });
     }
 
+    fn open_path_dialog(&mut self) {
+        if self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.as_ref())
+            .is_none()
+        {
+            return;
+        }
+
+        self.path_dialog = Some(PathDialog {
+            layer: 0,
+            data_type: 0,
+            width: 1.0,
+            path_type: PathType::default(),
+        });
+    }
+
     fn validate_cell_name(
         &self,
         name: &str,
@@ -714,8 +766,61 @@ impl ViewerApp {
         Ok(())
     }
 
+    fn add_path_element(
+        &mut self,
+        points: Vec<Point>,
+        layer: Layer,
+        data_type: DataType,
+        width: f64,
+        path_type: PathType,
+    ) -> Result<(), String> {
+        if points.len() < 2 {
+            return Err("Path requires at least two points".to_string());
+        }
+        if !width.is_finite() || width <= 0.0 {
+            return Err("Path width must be greater than zero".to_string());
+        }
+        let Some(cell_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            return Err("No cell selected".to_string());
+        };
+
+        let element = Element::Path(GdsPath::new(
+            points,
+            layer,
+            data_type,
+            Some(path_type),
+            Some(Unit::float(width, 1.0)),
+            None,
+            None,
+        ));
+        let Some(cell) = self.cell.as_mut() else {
+            return Err("No GDS library loaded".to_string());
+        };
+        let index = cell.elements.len();
+        if !cell.insert_element(index, element.clone()) {
+            return Err("Could not add path".to_string());
+        }
+
+        self.selected_element = Some(index);
+        self.hovered_element = Some(index);
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        self.record_edit(EditAction::Add {
+            cell_name,
+            index,
+            element,
+        });
+        Ok(())
+    }
+
     fn begin_polygon_tool(&mut self, layer: u16, data_type: u16) {
         self.ruler.cancel();
+        self.path_tool = None;
         self.selected_element = None;
         self.hovered_element = None;
         self.polygon_tool = Some(PolygonTool {
@@ -768,6 +873,67 @@ impl ViewerApp {
 
     fn cancel_polygon_tool(&mut self) {
         self.polygon_tool = None;
+    }
+
+    fn begin_path_tool(&mut self, layer: u16, data_type: u16, width: f64, path_type: PathType) {
+        self.ruler.cancel();
+        self.polygon_tool = None;
+        self.selected_element = None;
+        self.hovered_element = None;
+        self.path_tool = Some(PathTool {
+            layer,
+            data_type,
+            width,
+            path_type,
+            points: Vec::new(),
+            error: None,
+        });
+    }
+
+    fn add_path_vertex(&mut self, wx: f64, wy: f64) -> bool {
+        let (wx, wy) = self.snap_world_position(wx, wy);
+        let point = Point::float(wx, wy, 1.0);
+        let Some(tool) = self.path_tool.as_mut() else {
+            return false;
+        };
+
+        if tool.points.last().is_some_and(|last| *last == point) {
+            return false;
+        }
+
+        tool.points.push(point);
+        tool.error = None;
+        true
+    }
+
+    fn finish_path_tool(&mut self) -> bool {
+        let Some(tool) = self.path_tool.clone() else {
+            return false;
+        };
+
+        let result = self.add_path_element(
+            tool.points,
+            Layer::new(tool.layer),
+            DataType::new(tool.data_type),
+            tool.width,
+            tool.path_type,
+        );
+        match result {
+            Ok(()) => {
+                self.path_tool = None;
+                true
+            }
+            Err(err) => {
+                if let Some(tool) = self.path_tool.as_mut() {
+                    tool.error = Some(err);
+                }
+                false
+            }
+        }
+    }
+
+    fn cancel_path_tool(&mut self) {
+        self.path_tool = None;
     }
 
     fn submit_text_dialog(&mut self) {
@@ -907,6 +1073,67 @@ impl ViewerApp {
             let data_type = dialog.data_type;
             self.polygon_dialog = None;
             self.begin_polygon_tool(layer, data_type);
+        }
+    }
+
+    fn draw_path_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.path_dialog.as_mut() else {
+            return;
+        };
+
+        let mut begin = false;
+        let mut cancel = false;
+        egui::Window::new("Add Path")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Layer");
+                    ui.add(egui::DragValue::new(&mut dialog.layer).range(0..=255));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Datatype");
+                    ui.add(egui::DragValue::new(&mut dialog.data_type).range(0..=255));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Width");
+                    ui.add(
+                        egui::DragValue::new(&mut dialog.width)
+                            .range(0.0..=f64::INFINITY)
+                            .speed(0.1),
+                    );
+                });
+                egui::ComboBox::from_id_salt("path_dialog_type")
+                    .selected_text(path_type_label(dialog.path_type))
+                    .show_ui(ui, |ui| {
+                        for path_type in PathType::values() {
+                            ui.selectable_value(
+                                &mut dialog.path_type,
+                                path_type,
+                                path_type_label(path_type),
+                            );
+                        }
+                    });
+                ui.horizontal(|ui| {
+                    if ui.button("Draw").clicked() {
+                        begin = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+
+        if cancel {
+            self.path_dialog = None;
+        } else if begin {
+            let layer = dialog.layer;
+            let data_type = dialog.data_type;
+            let width = dialog.width;
+            let path_type = dialog.path_type;
+            self.path_dialog = None;
+            self.begin_path_tool(layer, data_type, width, path_type);
         }
     }
 
@@ -1199,6 +1426,8 @@ impl eframe::App for ViewerApp {
             }
         }
         let polygon_tool_active = self.polygon_tool.is_some();
+        let path_tool_active = self.path_tool.is_some();
+        let drawing_tool_active = polygon_tool_active || path_tool_active;
 
         // Global keyboard shortcuts
         if ctx.input(|i| i.key_pressed(egui::Key::F)) {
@@ -1225,12 +1454,20 @@ impl eframe::App for ViewerApp {
         let text_input_open = self.cell_name_dialog.is_some()
             || self.text_dialog.is_some()
             || self.polygon_dialog.is_some()
+            || self.path_dialog.is_some()
             || self.cell_picker.is_open()
             || self.recent_picker.is_open();
         if !text_input_open
             && ctx.input(|i| i.key_pressed(egui::Key::Enter))
             && self.polygon_tool.is_some()
             && self.finish_polygon_tool()
+        {
+            ctx.request_repaint();
+        }
+        if !text_input_open
+            && ctx.input(|i| i.key_pressed(egui::Key::Enter))
+            && self.path_tool.is_some()
+            && self.finish_path_tool()
         {
             ctx.request_repaint();
         }
@@ -1251,10 +1488,10 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::P)) {
             self.cell_picker.toggle();
         }
-        if !polygon_tool_active && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R))
+        if !drawing_tool_active && ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::R))
         {
             self.ruler.clear_all();
-        } else if !polygon_tool_active && ctx.input(|i| i.key_pressed(egui::Key::R)) {
+        } else if !drawing_tool_active && ctx.input(|i| i.key_pressed(egui::Key::R)) {
             self.ruler.toggle();
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape))
@@ -1263,6 +1500,9 @@ impl eframe::App for ViewerApp {
         {
             if self.polygon_tool.is_some() {
                 self.cancel_polygon_tool();
+                ctx.request_repaint();
+            } else if self.path_tool.is_some() {
+                self.cancel_path_tool();
                 ctx.request_repaint();
             } else {
                 self.ruler.cancel();
@@ -1273,7 +1513,7 @@ impl eframe::App for ViewerApp {
         if delete_pressed
             && !self.cell_picker.is_open()
             && !self.recent_picker.is_open()
-            && self.polygon_tool.is_none()
+            && !drawing_tool_active
             && self.delete_selected_element()
         {
             ctx.request_repaint();
@@ -1403,6 +1643,19 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.open_polygon_dialog();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.cell
+                                .as_ref()
+                                .and_then(|cell| cell.selected_cell.as_ref())
+                                .is_some(),
+                            egui::Button::new("Add Path..."),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.open_path_dialog();
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -1572,6 +1825,31 @@ impl eframe::App for ViewerApp {
                             ui.colored_label(egui::Color32::RED, err);
                         }
                     }
+                    if let Some(tool) = &mut self.path_tool {
+                        ui.label(format!("Path: {} points", tool.points.len()));
+                        ui.add(egui::DragValue::new(&mut tool.layer).range(0..=255));
+                        ui.add(egui::DragValue::new(&mut tool.data_type).range(0..=255));
+                        ui.add(
+                            egui::DragValue::new(&mut tool.width)
+                                .range(0.0..=f64::INFINITY)
+                                .speed(0.1),
+                        );
+                        egui::ComboBox::from_id_salt("path_tool_type")
+                            .selected_text(path_type_label(tool.path_type))
+                            .width(84.0)
+                            .show_ui(ui, |ui| {
+                                for path_type in PathType::values() {
+                                    ui.selectable_value(
+                                        &mut tool.path_type,
+                                        path_type,
+                                        path_type_label(path_type),
+                                    );
+                                }
+                            });
+                        if let Some(err) = &tool.error {
+                            ui.colored_label(egui::Color32::RED, err);
+                        }
+                    }
                     if let Some(stats) = self.cell.as_ref().and_then(|c| c.cell_stats.as_ref()) {
                         panels::draw_stats_bar(ui, stats);
                     }
@@ -1683,7 +1961,11 @@ impl eframe::App for ViewerApp {
         let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
         let selected_cell_name: Option<String> =
             cell.as_ref().and_then(|c| c.selected_cell.clone());
-        let polygon_preview_points = self.polygon_tool.as_ref().map(|tool| tool.points.clone());
+        let drawing_preview_points = self
+            .polygon_tool
+            .as_ref()
+            .map(|tool| tool.points.clone())
+            .or_else(|| self.path_tool.as_ref().map(|tool| tool.points.clone()));
         let mut selected_element_drag_delta = None;
         let mut viewport_click_world = None;
         let mut viewport_double_clicked = false;
@@ -1718,7 +2000,7 @@ impl eframe::App for ViewerApp {
                 *selected_element,
                 render_depth,
                 selected_cell_name.as_deref(),
-                polygon_preview_points.as_deref(),
+                drawing_preview_points.as_deref(),
             );
             selected_element_drag_delta = interaction.selected_element_drag_delta;
             *mouse_world_pos = interaction.mouse_world;
@@ -1730,7 +2012,7 @@ impl eframe::App for ViewerApp {
             let prev_hovered = *hovered_element;
             let prev_selected = *selected_element;
             *hovered_element = None;
-            if !polygon_tool_active {
+            if !drawing_tool_active {
                 if let Some((wx, wy)) = *mouse_world_pos {
                     if let Some(grid) = spatial_grid {
                         *hovered_element =
@@ -1754,6 +2036,15 @@ impl eframe::App for ViewerApp {
                     ctx.request_repaint();
                 }
             }
+        } else if path_tool_active {
+            if let Some((wx, wy)) = viewport_click_world {
+                if self.add_path_vertex(wx, wy) {
+                    ctx.request_repaint();
+                }
+                if viewport_double_clicked && self.finish_path_tool() {
+                    ctx.request_repaint();
+                }
+            }
         } else if let Some((dx, dy)) = selected_element_drag_delta {
             if self.move_selected_element(Point::float(dx, dy, 1.0)) {
                 ctx.request_repaint();
@@ -1763,6 +2054,7 @@ impl eframe::App for ViewerApp {
         self.draw_cell_name_dialog(ctx);
         self.draw_text_dialog(ctx);
         self.draw_polygon_dialog(ctx);
+        self.draw_path_dialog(ctx);
         self.draw_unsaved_close_prompt(ctx);
     }
 }
@@ -1770,7 +2062,9 @@ impl eframe::App for ViewerApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gdsr::{Cell, DataType, Element, Layer, Library, Point, Polygon, Reference};
+    use gdsr::{
+        Cell, DataType, Element, Layer, Library, PathType, Point, Polygon, Reference, Unit,
+    };
 
     fn p(x: f64, y: f64) -> Point {
         Point::float(x, y, 1.0)
@@ -2190,6 +2484,165 @@ mod tests {
                 vec![p(1.0, 2.0), p(3.0, 2.0), p(3.0, 4.0)],
                 Layer::new(7),
                 DataType::new(2),
+            )
+            .is_ok()
+        );
+        assert_eq!(loaded_element_count(&app), 2);
+
+        assert!(app.undo_edit());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert!(app.selected_element.is_none());
+        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.redo_stack.len(), 1);
+    }
+
+    #[test]
+    fn add_path_element_adds_selects_and_marks_dirty() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert!(
+            app.add_path_element(
+                vec![p(1.0, 2.0), p(3.0, 4.0)],
+                Layer::new(6),
+                DataType::new(3),
+                2.5,
+                PathType::Round,
+            )
+            .is_ok()
+        );
+
+        assert_eq!(loaded_element_count(&app), 2);
+        assert_eq!(app.selected_element, Some(1));
+        assert_eq!(app.hovered_element, Some(1));
+        assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
+
+        let Some(Element::Path(path)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be path");
+        };
+        assert_eq!(path.layer(), Layer::new(6));
+        assert_eq!(path.data_type(), DataType::new(3));
+        assert_eq!(path.path_type(), &Some(PathType::Round));
+        assert_eq!(path.width(), Some(Unit::float(2.5, 1.0)));
+        assert_eq!(path.points(), &[p(1.0, 2.0), p(3.0, 4.0)]);
+    }
+
+    #[test]
+    fn add_path_element_rejects_less_than_two_points() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            app.add_path_element(
+                vec![p(1.0, 2.0)],
+                Layer::new(6),
+                DataType::new(3),
+                2.5,
+                PathType::Round,
+            ),
+            Err("Path requires at least two points".to_string())
+        );
+        assert_eq!(loaded_element_count(&app), 1);
+    }
+
+    #[test]
+    fn path_tool_snaps_vertices_when_enabled() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            snap_to_grid: true,
+            ..Default::default()
+        };
+        app.viewport.zoom = 10.0;
+        app.begin_path_tool(6, 3, 2.5, PathType::Round);
+
+        assert!(app.add_path_vertex(23.0, 37.0));
+
+        let tool = app.path_tool.expect("path tool should remain active");
+        assert_eq!(tool.points, vec![p(20.0, 40.0)]);
+    }
+
+    #[test]
+    fn finish_path_tool_requires_two_points() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+        app.begin_path_tool(6, 3, 2.5, PathType::Round);
+        assert!(app.add_path_vertex(1.0, 1.0));
+
+        assert!(!app.finish_path_tool());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert_eq!(
+            app.path_tool
+                .as_ref()
+                .and_then(|tool| tool.error.as_deref()),
+            Some("Path requires at least two points")
+        );
+    }
+
+    #[test]
+    fn finish_path_tool_adds_path_with_target_settings() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+        app.begin_path_tool(8, 5, 3.5, PathType::Overlap);
+        assert!(app.add_path_vertex(1.0, 1.0));
+        assert!(app.add_path_vertex(3.0, 3.0));
+
+        assert!(app.finish_path_tool());
+
+        assert!(app.path_tool.is_none());
+        assert_eq!(loaded_element_count(&app), 2);
+        let Some(Element::Path(path)) = app
+            .cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .get(1)
+        else {
+            panic!("added element should be path");
+        };
+        assert_eq!(path.layer(), Layer::new(8));
+        assert_eq!(path.data_type(), DataType::new(5));
+        assert_eq!(path.path_type(), &Some(PathType::Overlap));
+        assert_eq!(path.width(), Some(Unit::float(3.5, 1.0)));
+    }
+
+    #[test]
+    fn undo_add_path_element_removes_it() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            ..Default::default()
+        };
+
+        assert!(
+            app.add_path_element(
+                vec![p(1.0, 2.0), p(3.0, 4.0)],
+                Layer::new(6),
+                DataType::new(3),
+                2.5,
+                PathType::Round,
             )
             .is_ok()
         );
