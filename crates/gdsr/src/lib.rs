@@ -1,5 +1,6 @@
 mod cell;
 mod config;
+mod design_rules;
 mod elements;
 mod error;
 mod geometry;
@@ -16,6 +17,9 @@ mod types;
 mod units;
 
 pub use cell::Cell;
+pub use design_rules::{
+    DesignRuleOptions, DesignRuleReport, DesignRuleViolation, DesignRuleViolationKind,
+};
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
 pub use elements::{Element, GdsBox, Instance, Node, Path, PathType, Polygon, Reference, Text};
 pub use error::GdsError;
