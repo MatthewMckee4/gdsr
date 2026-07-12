@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Point};
+use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Element, Point, Unit};
 
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
@@ -23,6 +23,108 @@ fn shortcut_text(key: &str) -> String {
         "Ctrl+"
     };
     format!("{modifier}{key}")
+}
+
+fn inverse_delta(delta: Point) -> Point {
+    let (x_units, y_units) = delta.units();
+    Point::new(
+        Unit::float(0.0, x_units) - delta.x(),
+        Unit::float(0.0, y_units) - delta.y(),
+    )
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum EditAction {
+    Add {
+        cell_name: String,
+        index: usize,
+        element: Element,
+    },
+    Delete {
+        cell_name: String,
+        index: usize,
+        element: Element,
+    },
+    Move {
+        cell_name: String,
+        index: usize,
+        delta: Point,
+    },
+}
+
+impl EditAction {
+    fn cell_name(&self) -> &str {
+        match self {
+            Self::Add { cell_name, .. }
+            | Self::Delete { cell_name, .. }
+            | Self::Move { cell_name, .. } => cell_name,
+        }
+    }
+
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Add {
+                cell_name,
+                index,
+                element,
+            } => Self::Delete {
+                cell_name: cell_name.clone(),
+                index: *index,
+                element: element.clone(),
+            },
+            Self::Delete {
+                cell_name,
+                index,
+                element,
+            } => Self::Add {
+                cell_name: cell_name.clone(),
+                index: *index,
+                element: element.clone(),
+            },
+            Self::Move {
+                cell_name,
+                index,
+                delta,
+            } => Self::Move {
+                cell_name: cell_name.clone(),
+                index: *index,
+                delta: inverse_delta(*delta),
+            },
+        }
+    }
+
+    fn selected_element_after_apply(&self) -> Option<usize> {
+        match self {
+            Self::Add { index, .. } | Self::Move { index, .. } => Some(*index),
+            Self::Delete { .. } => None,
+        }
+    }
+
+    fn merge_next(&mut self, next: &Self) -> bool {
+        let Self::Move {
+            cell_name,
+            index,
+            delta,
+        } = self
+        else {
+            return false;
+        };
+        let Self::Move {
+            cell_name: next_cell_name,
+            index: next_index,
+            delta: next_delta,
+        } = next
+        else {
+            return false;
+        };
+
+        if cell_name != next_cell_name || index != next_index {
+            return false;
+        }
+
+        *delta = *delta + *next_delta;
+        true
+    }
 }
 
 pub struct ViewerApp {
@@ -51,6 +153,8 @@ pub struct ViewerApp {
     has_unsaved_changes: bool,
     save_error: Option<String>,
     show_unsaved_close_prompt: bool,
+    undo_stack: Vec<EditAction>,
+    redo_stack: Vec<EditAction>,
 }
 
 impl Default for ViewerApp {
@@ -79,6 +183,8 @@ impl Default for ViewerApp {
             has_unsaved_changes: false,
             save_error: None,
             show_unsaved_close_prompt: false,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 }
@@ -123,6 +229,8 @@ impl ViewerApp {
         self.has_unsaved_changes = false;
         self.save_error = None;
         self.show_unsaved_close_prompt = false;
+        self.undo_stack.clear();
+        self.redo_stack.clear();
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -240,8 +348,92 @@ impl ViewerApp {
         true
     }
 
+    fn record_edit(&mut self, action: EditAction) {
+        if let Some(last) = self.undo_stack.last_mut()
+            && last.merge_next(&action)
+        {
+            self.redo_stack.clear();
+            return;
+        }
+
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+    }
+
+    fn apply_edit_action(&mut self, action: &EditAction) -> bool {
+        let cell_name = action.cell_name().to_string();
+        if self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.as_deref())
+            != Some(cell_name.as_str())
+        {
+            self.select_cell(&cell_name);
+        }
+
+        let Some(cell) = self.cell.as_mut() else {
+            self.selected_element = None;
+            return false;
+        };
+
+        let applied = match action {
+            EditAction::Add { index, element, .. } => cell.insert_element(*index, element.clone()),
+            EditAction::Delete { index, .. } => cell.delete_element(*index),
+            EditAction::Move { index, delta, .. } => cell.move_element(*index, *delta),
+        };
+
+        if !applied {
+            self.selected_element = None;
+            return false;
+        }
+
+        self.selected_element = action.selected_element_after_apply();
+        self.hovered_element = self.selected_element;
+        self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
+        true
+    }
+
+    fn undo_edit(&mut self) -> bool {
+        let Some(action) = self.undo_stack.pop() else {
+            return false;
+        };
+
+        let inverse = action.inverse();
+        if !self.apply_edit_action(&inverse) {
+            self.undo_stack.push(action);
+            return false;
+        }
+
+        self.redo_stack.push(action);
+        true
+    }
+
+    fn redo_edit(&mut self) -> bool {
+        let Some(action) = self.redo_stack.pop() else {
+            return false;
+        };
+
+        if !self.apply_edit_action(&action) {
+            self.redo_stack.push(action);
+            return false;
+        }
+
+        self.undo_stack.push(action);
+        true
+    }
+
     fn delete_selected_element(&mut self) -> bool {
         let Some(index) = self.selected_element else {
+            return false;
+        };
+        let Some((cell_name, element)) = self.cell.as_ref().and_then(|cell| {
+            let cell_name = cell.selected_cell.clone()?;
+            let element = cell.elements.get(index)?.clone();
+            Some((cell_name, element))
+        }) else {
+            self.selected_element = None;
             return false;
         };
         let Some(cell) = self.cell.as_mut() else {
@@ -258,11 +450,24 @@ impl ViewerApp {
         self.render_cache.clear();
         self.has_unsaved_changes = true;
         self.save_error = None;
+        self.record_edit(EditAction::Delete {
+            cell_name,
+            index,
+            element,
+        });
         true
     }
 
     fn move_selected_element(&mut self, delta: Point) -> bool {
         let Some(index) = self.selected_element else {
+            return false;
+        };
+        let Some(cell_name) = self
+            .cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.clone())
+        else {
+            self.selected_element = None;
             return false;
         };
         let Some(cell) = self.cell.as_mut() else {
@@ -278,6 +483,11 @@ impl ViewerApp {
         self.render_cache.clear();
         self.has_unsaved_changes = true;
         self.save_error = None;
+        self.record_edit(EditAction::Move {
+            cell_name,
+            index,
+            delta,
+        });
         true
     }
 
@@ -379,6 +589,15 @@ impl eframe::App for ViewerApp {
         if ctx.input(|i| i.modifiers.command && i.modifiers.alt && i.key_pressed(egui::Key::O)) {
             self.recent_picker.toggle();
         }
+        if ctx.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::Z)) {
+            if self.redo_edit() {
+                ctx.request_repaint();
+            }
+        } else if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Z))
+            && self.undo_edit()
+        {
+            ctx.request_repaint();
+        }
         if ctx.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::S)) {
             self.save_file_as_dialog();
         } else if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::S)) {
@@ -451,6 +670,32 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.save_file_as_dialog();
+                    }
+                });
+                ui.menu_button("Edit", |ui| {
+                    if ui
+                        .add_enabled(
+                            !self.undo_stack.is_empty(),
+                            egui::Button::new("Undo").shortcut_text(shortcut_text("Z")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        if self.undo_edit() {
+                            ctx.request_repaint();
+                        }
+                    }
+                    if ui
+                        .add_enabled(
+                            !self.redo_stack.is_empty(),
+                            egui::Button::new("Redo").shortcut_text(shortcut_text("Shift+Z")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        if self.redo_edit() {
+                            ctx.request_repaint();
+                        }
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -814,6 +1059,23 @@ mod tests {
         cell
     }
 
+    fn loaded_element_count(app: &ViewerApp) -> usize {
+        app.cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements
+            .len()
+    }
+
+    fn first_element_bbox(app: &ViewerApp) -> crate::drawable::WorldBBox {
+        app.cell
+            .as_ref()
+            .expect("cell should remain loaded")
+            .elements[0]
+            .world_bbox()
+            .expect("element has bbox")
+    }
+
     #[test]
     fn hit_test_element_returns_matching_index() {
         let elements = test_elements();
@@ -869,6 +1131,8 @@ mod tests {
         assert!(app.selected_element.is_none());
         assert!(app.hovered_element.is_none());
         assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
     }
 
     #[test]
@@ -892,6 +1156,8 @@ mod tests {
         assert_eq!(app.hovered_element, Some(0));
         assert!(cell.spatial_grid.is_some());
         assert!(app.has_unsaved_changes);
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
 
         let library_bbox = cell
             .library
@@ -901,6 +1167,69 @@ mod tests {
             .world_bbox()
             .expect("moved element has bbox");
         assert!((library_bbox.min_x - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn undo_redo_delete_restores_and_removes_element() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            ..Default::default()
+        };
+
+        assert!(app.delete_selected_element());
+        assert_eq!(loaded_element_count(&app), 0);
+
+        assert!(app.undo_edit());
+
+        assert_eq!(loaded_element_count(&app), 1);
+        assert_eq!(app.selected_element, Some(0));
+        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.redo_stack.len(), 1);
+
+        assert!(app.redo_edit());
+
+        assert_eq!(loaded_element_count(&app), 0);
+        assert!(app.selected_element.is_none());
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
+    }
+
+    #[test]
+    fn undo_redo_move_restores_and_reapplies_total_drag() {
+        let cell = cell_state_with_test_elements();
+        let mut app = ViewerApp {
+            cell: Some(cell),
+            selected_element: Some(0),
+            ..Default::default()
+        };
+
+        assert!(app.move_selected_element(Point::float(2.0, 3.0, 1.0)));
+        assert!(app.move_selected_element(Point::float(1.0, 1.0, 1.0)));
+        assert_eq!(app.undo_stack.len(), 1);
+
+        let moved_bbox = first_element_bbox(&app);
+        assert!((moved_bbox.min_x - 3.0).abs() < 1e-12);
+        assert!((moved_bbox.min_y - 4.0).abs() < 1e-12);
+
+        assert!(app.undo_edit());
+
+        let restored_bbox = first_element_bbox(&app);
+        assert!((restored_bbox.min_x - 0.0).abs() < 1e-12);
+        assert!((restored_bbox.min_y - 0.0).abs() < 1e-12);
+        assert_eq!(app.selected_element, Some(0));
+        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.redo_stack.len(), 1);
+
+        assert!(app.redo_edit());
+
+        let redone_bbox = first_element_bbox(&app);
+        assert!((redone_bbox.min_x - 3.0).abs() < 1e-12);
+        assert!((redone_bbox.min_y - 4.0).abs() < 1e-12);
+        assert_eq!(app.selected_element, Some(0));
+        assert_eq!(app.undo_stack.len(), 1);
+        assert!(app.redo_stack.is_empty());
     }
 
     #[test]

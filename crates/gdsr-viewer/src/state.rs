@@ -97,6 +97,19 @@ impl CellState {
         true
     }
 
+    pub fn insert_element(&mut self, index: usize, element: Element) -> bool {
+        let Some(cell_name) = self.selected_cell.clone() else {
+            return false;
+        };
+
+        let inserted = self
+            .library
+            .get_cell_mut(&cell_name)
+            .is_some_and(|cell| cell.insert_element(index, element));
+
+        inserted && self.load_direct_cell_elements(&cell_name)
+    }
+
     pub fn move_element(&mut self, index: usize, delta: Point) -> bool {
         let Some(cell_name) = self.selected_cell.clone() else {
             return false;
@@ -393,6 +406,37 @@ mod tests {
             BTreeSet::from([(Layer::new(1), DataType::new(0))])
         );
         assert!(cell.spatial_grid.is_some());
+    }
+
+    #[test]
+    fn insert_element_rebuilds_render_indexes() {
+        let mut cell =
+            cell_state_with_elements(vec![polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0)]);
+        cell.tessellation_cache.insert(0, vec![0, 1, 2]);
+
+        assert!(cell.insert_element(
+            0,
+            polygon(vec![(1000, 1000), (1100, 1000), (1100, 1100)], 2, 0)
+        ));
+
+        assert_eq!(cell.elements.len(), 2);
+        assert_eq!(
+            cell.library
+                .get_cell("top")
+                .expect("top cell should exist")
+                .elements()
+                .len(),
+            2
+        );
+        assert_eq!(
+            cell.layers,
+            BTreeSet::from([
+                (Layer::new(1), DataType::new(0)),
+                (Layer::new(2), DataType::new(0))
+            ])
+        );
+        assert!(cell.spatial_grid.is_some());
+        assert!(cell.tessellation_cache.is_empty());
     }
 
     #[test]
