@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-use gdsr::Point;
+use gdsr::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, Point};
 
 use crate::drawable::{Drawable, cell_world_bbox};
 use crate::panels;
@@ -48,6 +48,9 @@ pub struct ViewerApp {
     grid_spacing: GridSpacing,
     cell_picker: QuickPick<String>,
     recent_picker: QuickPick<RecentProjectItem>,
+    has_unsaved_changes: bool,
+    save_error: Option<String>,
+    show_unsaved_close_prompt: bool,
 }
 
 impl Default for ViewerApp {
@@ -73,6 +76,9 @@ impl Default for ViewerApp {
             recent_projects: RecentProjects::load(),
             cell_picker: QuickPick::new("Search cells…", true),
             recent_picker: QuickPick::new("Recent projects…", false),
+            has_unsaved_changes: false,
+            save_error: None,
+            show_unsaved_close_prompt: false,
         }
     }
 }
@@ -114,6 +120,9 @@ impl ViewerApp {
         self.selected_element = None;
         self.file_load.file_path = Some(path);
         self.file_load.loading = false;
+        self.has_unsaved_changes = false;
+        self.save_error = None;
+        self.show_unsaved_close_prompt = false;
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -154,6 +163,81 @@ impl ViewerApp {
         self.file_load.load_receiver = Some((path, rx));
         self.file_load.loading = true;
         self.file_load.error_message = None;
+        self.save_error = None;
+    }
+
+    fn save_current_file(&mut self) -> bool {
+        if self.cell.is_none() {
+            self.save_error = Some("No GDS library loaded".to_string());
+            return false;
+        }
+
+        if let Some(path) = self.file_load.file_path.clone() {
+            return self.save_file_to_path(&path);
+        }
+
+        self.save_file_as_dialog()
+    }
+
+    fn save_file_as_dialog(&mut self) -> bool {
+        if self.cell.is_none() {
+            self.save_error = Some("No GDS library loaded".to_string());
+            return false;
+        }
+
+        let mut dialog = rfd::FileDialog::new().add_filter("GDS files", &["gds", "gds2", "gdsii"]);
+
+        if let Some(path) = &self.file_load.file_path {
+            if let Some(parent) = path.parent() {
+                dialog = dialog.set_directory(parent);
+            }
+            if let Some(file_name) = path.file_name().and_then(|name| name.to_str()) {
+                dialog = dialog.set_file_name(file_name);
+            }
+        } else {
+            dialog = dialog.set_file_name("layout.gds");
+        }
+
+        let Some(path) = dialog.save_file() else {
+            return false;
+        };
+
+        self.save_file_to_path(&path)
+    }
+
+    fn save_file_to_path(&mut self, path: &Path) -> bool {
+        let Some(cell) = self.cell.as_ref() else {
+            self.save_error = Some("No GDS library loaded".to_string());
+            return false;
+        };
+
+        match cell
+            .library
+            .write_file(path, DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS)
+        {
+            Ok(()) => {
+                self.file_load.file_path = Some(path.to_path_buf());
+                self.has_unsaved_changes = false;
+                self.save_error = None;
+                self.show_unsaved_close_prompt = false;
+                self.recent_projects.add(path);
+                self.recent_projects.save();
+                true
+            }
+            Err(err) => {
+                self.save_error = Some(err.to_string());
+                false
+            }
+        }
+    }
+
+    fn cancel_close_for_unsaved_changes(&mut self) -> bool {
+        if !self.has_unsaved_changes {
+            return false;
+        }
+
+        self.show_unsaved_close_prompt = true;
+        true
     }
 
     fn delete_selected_element(&mut self) -> bool {
@@ -172,6 +256,8 @@ impl ViewerApp {
         self.selected_element = None;
         self.hovered_element = None;
         self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
         true
     }
 
@@ -190,7 +276,36 @@ impl ViewerApp {
 
         self.hovered_element = Some(index);
         self.render_cache.clear();
+        self.has_unsaved_changes = true;
+        self.save_error = None;
         true
+    }
+
+    fn draw_unsaved_close_prompt(&mut self, ctx: &egui::Context) {
+        if !self.show_unsaved_close_prompt {
+            return;
+        }
+
+        egui::Window::new("Unsaved changes")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.label("Save changes before closing?");
+                ui.horizontal(|ui| {
+                    if ui.button("Save").clicked() && self.save_current_file() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    if ui.button("Discard").clicked() {
+                        self.has_unsaved_changes = false;
+                        self.show_unsaved_close_prompt = false;
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    if ui.button("Cancel").clicked() {
+                        self.show_unsaved_close_prompt = false;
+                    }
+                });
+            });
     }
 }
 
@@ -215,6 +330,11 @@ fn hit_test_element(
 
 impl eframe::App for ViewerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if ctx.input(|i| i.viewport().close_requested()) && self.cancel_close_for_unsaved_changes()
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        }
+
         // Poll background loader
         if let Some((path, rx)) = self.file_load.load_receiver.take() {
             match rx.try_recv() {
@@ -258,6 +378,11 @@ impl eframe::App for ViewerApp {
         }
         if ctx.input(|i| i.modifiers.command && i.modifiers.alt && i.key_pressed(egui::Key::O)) {
             self.recent_picker.toggle();
+        }
+        if ctx.input(|i| i.modifiers.command && i.modifiers.shift && i.key_pressed(egui::Key::S)) {
+            self.save_file_as_dialog();
+        } else if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::S)) {
+            self.save_current_file();
         }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::P)) {
             self.cell_picker.toggle();
@@ -305,6 +430,27 @@ impl eframe::App for ViewerApp {
                     {
                         ui.close_kind(egui::UiKind::Menu);
                         self.recent_picker.open();
+                    }
+                    ui.separator();
+                    if ui
+                        .add_enabled(
+                            self.cell.is_some(),
+                            egui::Button::new("Save").shortcut_text(shortcut_text("S")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.save_current_file();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.cell.is_some(),
+                            egui::Button::new("Save As...").shortcut_text(shortcut_text("Shift+S")),
+                        )
+                        .clicked()
+                    {
+                        ui.close_kind(egui::UiKind::Menu);
+                        self.save_file_as_dialog();
                     }
                 });
                 ui.menu_button("View", |ui| {
@@ -417,12 +563,18 @@ impl eframe::App for ViewerApp {
                     ui.label("Loading...");
                 } else if let Some(err) = &self.file_load.error_message {
                     ui.colored_label(egui::Color32::RED, format!("Error: {err}"));
+                } else if let Some(err) = &self.save_error {
+                    ui.colored_label(egui::Color32::RED, format!("Save error: {err}"));
                 } else if let Some(path) = &self.file_load.file_path {
-                    ui.label(
-                        path.file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("unknown"),
-                    );
+                    let file_name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown");
+                    ui.label(if self.has_unsaved_changes {
+                        format!("{file_name}*")
+                    } else {
+                        file_name.to_string()
+                    });
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -622,6 +774,8 @@ impl eframe::App for ViewerApp {
                 ctx.request_repaint();
             }
         }
+
+        self.draw_unsaved_close_prompt(ctx);
     }
 }
 
@@ -643,6 +797,21 @@ mod tests {
             )
             .into(),
         ]
+    }
+
+    fn cell_state_with_test_elements() -> CellState {
+        let mut source_cell = Cell::new("top");
+        for element in test_elements() {
+            source_cell.add(element);
+        }
+
+        let mut library = Library::new("test");
+        library.add_cell(source_cell);
+
+        let mut cell = CellState::new(library);
+        cell.selected_cell = Some("top".to_string());
+        assert!(cell.load_direct_cell_elements("top"));
+        cell
     }
 
     #[test]
@@ -676,13 +845,8 @@ mod tests {
     }
 
     #[test]
-    fn delete_selected_element_removes_element_and_clears_selection() {
-        let mut cell = CellState::new(gdsr::Library::new("test"));
-        cell.elements = test_elements();
-        let Some(bounds) = crate::viewport::compute_bounds(&cell.elements) else {
-            panic!("test elements should have bounds");
-        };
-        cell.spatial_grid = Some(SpatialGrid::build(&cell.elements, &bounds));
+    fn delete_selected_element_removes_element_marks_dirty_and_clears_selection() {
+        let cell = cell_state_with_test_elements();
         let mut app = ViewerApp {
             cell: Some(cell),
             selected_element: Some(0),
@@ -694,15 +858,22 @@ mod tests {
 
         let cell = app.cell.expect("cell should remain loaded");
         assert!(cell.elements.is_empty());
+        assert!(
+            cell.library
+                .get_cell("top")
+                .expect("top cell should exist")
+                .elements()
+                .is_empty()
+        );
         assert!(cell.spatial_grid.is_none());
         assert!(app.selected_element.is_none());
         assert!(app.hovered_element.is_none());
+        assert!(app.has_unsaved_changes);
     }
 
     #[test]
-    fn move_selected_element_moves_element_and_keeps_selection() {
-        let mut cell = CellState::new(gdsr::Library::new("test"));
-        cell.elements = test_elements();
+    fn move_selected_element_moves_element_marks_dirty_and_keeps_selection() {
+        let cell = cell_state_with_test_elements();
         let mut app = ViewerApp {
             cell: Some(cell),
             selected_element: Some(0),
@@ -720,6 +891,71 @@ mod tests {
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.hovered_element, Some(0));
         assert!(cell.spatial_grid.is_some());
+        assert!(app.has_unsaved_changes);
+
+        let library_bbox = cell
+            .library
+            .get_cell("top")
+            .expect("top cell should exist")
+            .elements()[0]
+            .world_bbox()
+            .expect("moved element has bbox");
+        assert!((library_bbox.min_x - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn save_file_to_path_writes_library_and_clears_dirty_state() {
+        let dir = tempfile::tempdir().expect("temporary directory should be created");
+        let path = dir.path().join("saved.gds");
+        let mut app = ViewerApp {
+            cell: Some(cell_state_with_test_elements()),
+            has_unsaved_changes: true,
+            ..Default::default()
+        };
+
+        assert!(app.save_file_to_path(&path));
+
+        assert!(!app.has_unsaved_changes);
+        assert!(app.save_error.is_none());
+        assert_eq!(app.file_load.file_path.as_deref(), Some(path.as_path()));
+
+        let saved = Library::read_file(&path, Some(DEFAULT_INTEGER_UNITS))
+            .expect("saved GDS should be readable");
+        assert_eq!(
+            saved
+                .get_cell("top")
+                .expect("top cell should exist")
+                .elements()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn save_current_file_without_loaded_library_sets_error() {
+        let mut app = ViewerApp::default();
+
+        assert!(!app.save_current_file());
+        assert_eq!(app.save_error.as_deref(), Some("No GDS library loaded"));
+    }
+
+    #[test]
+    fn dirty_close_request_opens_prompt_and_cancels_close() {
+        let mut app = ViewerApp {
+            has_unsaved_changes: true,
+            ..Default::default()
+        };
+
+        assert!(app.cancel_close_for_unsaved_changes());
+        assert!(app.show_unsaved_close_prompt);
+    }
+
+    #[test]
+    fn clean_close_request_does_not_open_prompt() {
+        let mut app = ViewerApp::default();
+
+        assert!(!app.cancel_close_for_unsaved_changes());
+        assert!(!app.show_unsaved_close_prompt);
     }
 
     #[test]

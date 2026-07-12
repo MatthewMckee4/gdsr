@@ -2073,6 +2073,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rfd",
+ "tempfile",
 ]
 
 [[package]]

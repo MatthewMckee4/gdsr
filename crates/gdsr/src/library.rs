@@ -66,6 +66,11 @@ impl Library {
         self.cells.get(name)
     }
 
+    /// Returns a mutable reference to the cell with the given name, if it exists.
+    pub fn get_cell_mut(&mut self, name: &str) -> Option<&mut Cell> {
+        self.cells.get_mut(name)
+    }
+
     /// Returns `true` if the library contains a cell with the same name.
     pub fn contains_cell(&self, cell: &Cell) -> bool {
         self.cells.contains_key(cell.name())
@@ -435,6 +440,26 @@ mod tests {
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("test_cell"));
         assert_eq!(library.cells.get("test_cell"), Some(&cell));
+    }
+
+    #[test]
+    fn test_library_get_cell_mut() {
+        let mut library: Library = Library::new("test_lib");
+        library.add_cell(Cell::new("test_cell"));
+
+        let Some(cell) = library.get_cell_mut("test_cell") else {
+            panic!("cell should exist");
+        };
+        cell.add(Polygon::default());
+
+        assert_eq!(
+            library
+                .get_cell("test_cell")
+                .expect("cell should exist")
+                .elements()
+                .len(),
+            1
+        );
     }
 
     #[test]

@@ -88,6 +88,20 @@ impl Cell {
         self.elements.push(element.into());
     }
 
+    /// Returns a mutable reference to the element at `index`.
+    pub fn element_mut(&mut self, index: usize) -> Option<&mut Element> {
+        self.elements.get_mut(index)
+    }
+
+    /// Removes and returns the element at `index`.
+    pub fn remove_element(&mut self, index: usize) -> Option<Element> {
+        if index >= self.elements.len() {
+            return None;
+        }
+
+        Some(self.elements.remove(index))
+    }
+
     /// Converts all elements to integer units.
     #[must_use]
     pub fn to_integer_unit(self) -> Self {
@@ -252,6 +266,36 @@ mod tests {
         cell.add(polygon.clone());
         assert_eq!(cell.polygons().count(), 1);
         assert_eq!(cell.polygons().next().unwrap(), &polygon);
+    }
+
+    #[test]
+    fn test_element_mut() {
+        let mut cell = Cell::new("test_cell");
+        cell.add(Polygon::default());
+
+        let Some(element) = cell.element_mut(0) else {
+            panic!("element should exist");
+        };
+        *element = Path::default().into();
+
+        assert_eq!(cell.polygons().count(), 0);
+        assert_eq!(cell.paths().count(), 1);
+    }
+
+    #[test]
+    fn test_remove_element() {
+        let mut cell = Cell::new("test_cell");
+        cell.add(Polygon::default());
+        cell.add(Path::default());
+
+        let Some(removed) = cell.remove_element(0) else {
+            panic!("element should be removed");
+        };
+
+        assert!(matches!(removed, Element::Polygon(_)));
+        assert_eq!(cell.elements().len(), 1);
+        assert!(matches!(cell.elements()[0], Element::Path(_)));
+        assert!(cell.remove_element(1).is_none());
     }
 
     #[test]
