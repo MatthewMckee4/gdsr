@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Write;
 
 use crate::cell::Cell;
+use crate::design_rules::{self, DesignRuleOptions, DesignRuleReport};
 use crate::error::GdsError;
 use crate::io::read::{from_gds, from_gds_filtered};
 use crate::io::write::{GdsFileWriter, GdsWriter};
@@ -447,6 +448,11 @@ impl Library {
         F: Fn(Layer, DataType) -> bool,
     {
         from_gds_filtered(file_name, units, layer_filter)
+    }
+
+    /// Run basic design-rule checks across all cells in the library.
+    pub fn validate_design_rules(&self, options: &DesignRuleOptions) -> DesignRuleReport {
+        design_rules::validate_library(self, options)
     }
 }
 
