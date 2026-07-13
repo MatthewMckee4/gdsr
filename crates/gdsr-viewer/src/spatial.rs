@@ -120,6 +120,7 @@ impl SpatialGrid {
     }
 
     /// Returns an iterator over grid cells that overlap the given visible world-space rectangle.
+    #[cfg(test)]
     pub fn query_visible(&self, visible: &WorldBBox) -> impl Iterator<Item = &GridCell> {
         let col_min = ((visible.min_x - self.world_min_x) / self.cell_width).floor() as isize;
         let col_max = ((visible.max_x - self.world_min_x) / self.cell_width).ceil() as isize;
@@ -143,6 +144,7 @@ impl SpatialGrid {
         })
     }
 
+    #[cfg(test)]
     pub fn query_visible_indices<'a>(
         &self,
         visible: &WorldBBox,
@@ -380,8 +382,18 @@ mod tests {
 
     #[test]
     fn layer_keys_text() {
-        let elem = text("t", 0, 0, 4);
-        assert_eq!(elem.layer_keys(), vec![(Layer::new(4), DataType::new(0))]);
+        let elem = Element::Text(gdsr::Text::new(
+            "t",
+            gdsr::Point::default_integer(0, 0),
+            Layer::new(4),
+            DataType::new(6),
+            1.0,
+            gdsr::Radians::default(),
+            false,
+            gdsr::VerticalPresentation::default(),
+            gdsr::HorizontalPresentation::default(),
+        ));
+        assert_eq!(elem.layer_keys(), vec![(Layer::new(4), DataType::new(6))]);
     }
 
     #[test]

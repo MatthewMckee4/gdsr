@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
+use bevy::prelude::NonSendMut;
+use bevy_egui::EguiContexts;
 use gdsr::{
     DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, DataType, Element, HorizontalPresentation, Layer,
     Movable, Path as GdsPath, PathType, Point, Polygon, Radians, Text, Unit, VerticalPresentation,
@@ -13,8 +15,7 @@ use crate::recent::{RecentProjectItem, RecentProjects};
 use crate::ruler::RulerState;
 use crate::spatial::SpatialGrid;
 use crate::state::{
-    CellState, CellViewMode, DisplayUnit, FileLoadState, GridSpacing, LayerState, RenderCache,
-    SidePanelTab,
+    CellState, CellViewMode, DisplayUnit, FileLoadState, GridSpacing, LayerState, SidePanelTab,
 };
 use crate::viewport::Viewport;
 
@@ -209,7 +210,6 @@ pub struct ViewerApp {
     layer_state: LayerState,
     viewport: Viewport,
     mouse_world_pos: Option<(f64, f64)>,
-    render_cache: RenderCache,
     ruler: RulerState,
     show_grid: bool,
     snap_to_grid: bool,
@@ -217,8 +217,6 @@ pub struct ViewerApp {
     selected_element: Option<usize>,
     /// Reusable scratch buffer for spatial grid point queries.
     query_buf: Vec<u32>,
-    /// Reusable mark buffer for deduplicating elements across visible spatial cells.
-    drawn_element_marks: Vec<bool>,
     side_panel_tab: SidePanelTab,
     cell_view_mode: CellViewMode,
     scroll_to_selected: bool,
@@ -239,6 +237,9 @@ pub struct ViewerApp {
     polygon_tool: Option<PolygonTool>,
     path_dialog: Option<PathDialog>,
     path_tool: Option<PathTool>,
+    viewport_rect: egui::Rect,
+    render_generation: u64,
+    geometry_generation: u64,
 }
 
 impl Default for ViewerApp {
@@ -249,14 +250,12 @@ impl Default for ViewerApp {
             layer_state: LayerState::default(),
             viewport: Viewport::default(),
             mouse_world_pos: None,
-            render_cache: RenderCache::default(),
             ruler: RulerState::default(),
             show_grid: true,
             snap_to_grid: false,
             hovered_element: None,
             selected_element: None,
             query_buf: Vec::new(),
-            drawn_element_marks: Vec::new(),
             side_panel_tab: SidePanelTab::default(),
             cell_view_mode: CellViewMode::default(),
             scroll_to_selected: false,
@@ -277,11 +276,65 @@ impl Default for ViewerApp {
             polygon_tool: None,
             path_dialog: None,
             path_tool: None,
+            viewport_rect: egui::Rect::NOTHING,
+            render_generation: 0,
+            geometry_generation: 0,
         }
     }
 }
 
 impl ViewerApp {
+    fn invalidate_render(&mut self) {
+        self.render_generation = self.render_generation.saturating_add(1);
+    }
+
+    fn invalidate_geometry(&mut self) {
+        self.geometry_generation = self.geometry_generation.saturating_add(1);
+        self.invalidate_render();
+    }
+
+    pub(crate) const fn geometry_generation(&self) -> u64 {
+        self.geometry_generation
+    }
+
+    pub(crate) const fn render_generation(&self) -> u64 {
+        self.render_generation
+    }
+
+    pub(crate) fn library(&self) -> Option<&gdsr::Library> {
+        self.cell.as_ref().map(|cell| &cell.library)
+    }
+
+    pub(crate) fn selected_cell_name(&self) -> Option<&str> {
+        self.cell
+            .as_ref()
+            .and_then(|cell| cell.selected_cell.as_deref())
+    }
+
+    pub(crate) fn render_depth(&self) -> u32 {
+        self.cell.as_ref().map_or(1, |cell| cell.render_depth)
+    }
+
+    pub(crate) const fn viewport_state(&self) -> (f64, f64, f64) {
+        (
+            self.viewport.center_x,
+            self.viewport.center_y,
+            self.viewport.zoom,
+        )
+    }
+
+    pub(crate) const fn viewport_rect(&self) -> egui::Rect {
+        self.viewport_rect
+    }
+
+    pub(crate) fn hidden_layers(&self) -> &std::collections::HashSet<(Layer, DataType)> {
+        &self.layer_state.hidden_layers
+    }
+
+    pub(crate) fn layer_color(&mut self, layer: Layer, data_type: DataType) -> egui::Color32 {
+        self.layer_state.layer_colors.get(layer, data_type)
+    }
+
     pub fn with_path(path: &Path) -> Self {
         let (path, rx) = crate::loader::load_request(path);
         let file_load = FileLoadState {
@@ -330,6 +383,7 @@ impl ViewerApp {
         self.polygon_tool = None;
         self.path_dialog = None;
         self.path_tool = None;
+        self.invalidate_geometry();
     }
 
     /// Switches to a new cell, keeping hierarchy intact for draw-time expansion.
@@ -346,7 +400,7 @@ impl ViewerApp {
                 }
             }
         }
-        self.render_cache.clear();
+        self.invalidate_render();
         self.polygon_dialog = None;
         self.polygon_tool = None;
         self.path_dialog = None;
@@ -610,7 +664,7 @@ impl ViewerApp {
     fn mark_cell_structure_changed(&mut self) {
         self.selected_element = None;
         self.hovered_element = None;
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.undo_stack.clear();
@@ -716,7 +770,7 @@ impl ViewerApp {
 
         self.selected_element = Some(index);
         self.hovered_element = Some(index);
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Add {
@@ -755,7 +809,7 @@ impl ViewerApp {
 
         self.selected_element = Some(index);
         self.hovered_element = Some(index);
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Add {
@@ -807,7 +861,7 @@ impl ViewerApp {
 
         self.selected_element = Some(index);
         self.hovered_element = Some(index);
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Add {
@@ -1178,7 +1232,7 @@ impl ViewerApp {
 
         self.selected_element = action.selected_element_after_apply();
         self.hovered_element = self.selected_element;
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         true
@@ -1257,7 +1311,7 @@ impl ViewerApp {
 
         self.selected_element = Some(index);
         self.hovered_element = Some(index);
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Add {
@@ -1291,7 +1345,7 @@ impl ViewerApp {
 
         self.selected_element = None;
         self.hovered_element = None;
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Delete {
@@ -1330,7 +1384,7 @@ impl ViewerApp {
         }
 
         self.hovered_element = Some(index);
-        self.render_cache.clear();
+        self.invalidate_geometry();
         self.has_unsaved_changes = true;
         self.save_error = None;
         self.record_edit(EditAction::Move {
@@ -1388,8 +1442,8 @@ fn hit_test_element(
     None
 }
 
-impl eframe::App for ViewerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+impl ViewerApp {
+    fn update(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| i.viewport().close_requested()) && self.cancel_close_for_unsaved_changes()
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -1858,10 +1912,13 @@ impl eframe::App for ViewerApp {
         });
 
         if depth_changed {
-            if let Some(name) = self.cell.as_ref().and_then(|c| c.selected_cell.clone()) {
-                self.select_cell(&name);
+            if let Some(cell) = self.cell.as_mut() {
+                cell.refresh_layers();
+                for &(layer, data_type) in &cell.layers {
+                    self.layer_state.layer_colors.get(layer, data_type);
+                }
             }
-            self.render_cache.clear();
+            self.invalidate_render();
         }
 
         // Cell picker (⌘P)
@@ -1941,26 +1998,22 @@ impl eframe::App for ViewerApp {
             }
         }
 
-        // Clearing render cache after changing color fixes the bug when color is not updated until user zooms out and back in.
+        // Layer changes require new Bevy materials and a new visible-scene plan.
         if color_changed {
-            self.render_cache.clear();
+            self.invalidate_render();
         }
 
         let cell = &mut self.cell;
         let viewport = &mut self.viewport;
         let layer_state = &mut self.layer_state;
         let mouse_world_pos = &mut self.mouse_world_pos;
-        let render_cache = &mut self.render_cache;
         let ruler = &mut self.ruler;
         let show_grid = self.show_grid;
         let grid_spacing = self.grid_spacing;
         let hovered_element = &mut self.hovered_element;
         let selected_element = &mut self.selected_element;
         let query_buf = &mut self.query_buf;
-        let drawn_element_marks = &mut self.drawn_element_marks;
-        let render_depth = cell.as_ref().map_or(1, |c| c.render_depth);
-        let selected_cell_name: Option<String> =
-            cell.as_ref().and_then(|c| c.selected_cell.clone());
+        let viewport_rect = &mut self.viewport_rect;
         let drawing_preview_points = self
             .polygon_tool
             .as_ref()
@@ -1969,64 +2022,61 @@ impl eframe::App for ViewerApp {
         let mut selected_element_drag_delta = None;
         let mut viewport_click_world = None;
         let mut viewport_double_clicked = false;
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let mut empty_cache = std::collections::HashMap::new();
-            let (elements, spatial_grid, library, tessellation_cache) =
-                if let Some(cell) = cell.as_mut() {
-                    (
-                        cell.elements.as_slice(),
-                        cell.spatial_grid.as_ref(),
-                        Some(&cell.library),
-                        &mut cell.tessellation_cache,
-                    )
-                } else {
-                    (&[] as &[gdsr::Element], None, None, &mut empty_cache)
-                };
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE)
+            .show(ctx, |ui| {
+                let mut empty_cache = std::collections::HashMap::new();
+                let (elements, spatial_grid, library, tessellation_cache) =
+                    if let Some(cell) = cell.as_mut() {
+                        (
+                            cell.elements.as_slice(),
+                            cell.spatial_grid.as_ref(),
+                            Some(&cell.library),
+                            &mut cell.tessellation_cache,
+                        )
+                    } else {
+                        (&[] as &[gdsr::Element], None, None, &mut empty_cache)
+                    };
 
-            let interaction = viewport.draw(
-                ui,
-                elements,
-                layer_state,
-                spatial_grid,
-                query_buf,
-                drawn_element_marks,
-                library,
-                render_cache,
-                tessellation_cache,
-                ruler,
-                show_grid,
-                grid_spacing,
-                *hovered_element,
-                *selected_element,
-                render_depth,
-                selected_cell_name.as_deref(),
-                drawing_preview_points.as_deref(),
-            );
-            selected_element_drag_delta = interaction.selected_element_drag_delta;
-            *mouse_world_pos = interaction.mouse_world;
-            if interaction.clicked || interaction.double_clicked {
-                viewport_click_world = interaction.mouse_world;
-                viewport_double_clicked = interaction.double_clicked;
-            }
+                let interaction = viewport.draw(
+                    ui,
+                    elements,
+                    layer_state,
+                    library,
+                    tessellation_cache,
+                    ruler,
+                    show_grid,
+                    grid_spacing,
+                    *hovered_element,
+                    *selected_element,
+                    drawing_preview_points.as_deref(),
+                );
+                *viewport_rect = interaction.rect;
+                selected_element_drag_delta = interaction.selected_element_drag_delta;
+                *mouse_world_pos = interaction.mouse_world;
+                if interaction.clicked || interaction.double_clicked {
+                    viewport_click_world = interaction.mouse_world;
+                    viewport_double_clicked = interaction.double_clicked;
+                }
 
-            let prev_hovered = *hovered_element;
-            let prev_selected = *selected_element;
-            *hovered_element = None;
-            if !drawing_tool_active {
-                if let Some((wx, wy)) = *mouse_world_pos {
-                    if let Some(grid) = spatial_grid {
-                        *hovered_element =
-                            hit_test_element(elements, grid, query_buf, wx, wy, viewport.zoom);
+                let prev_hovered = *hovered_element;
+                let prev_selected = *selected_element;
+                *hovered_element = None;
+                if !drawing_tool_active {
+                    if let Some((wx, wy)) = *mouse_world_pos {
+                        if let Some(grid) = spatial_grid {
+                            *hovered_element =
+                                hit_test_element(elements, grid, query_buf, wx, wy, viewport.zoom);
+                        }
+                    }
+                    if interaction.clicked {
+                        *selected_element = *hovered_element;
                     }
                 }
-                if interaction.clicked {
-                    *selected_element = *hovered_element;
+                if *hovered_element != prev_hovered || *selected_element != prev_selected {
+                    ctx.request_repaint();
                 }
-            }
-            if *hovered_element != prev_hovered || *selected_element != prev_selected {
-                ctx.request_repaint();
-            }
-        });
+            });
         if polygon_tool_active {
             if let Some((wx, wy)) = viewport_click_world {
                 if self.add_polygon_vertex(wx, wy) {
@@ -2057,6 +2107,14 @@ impl eframe::App for ViewerApp {
         self.draw_path_dialog(ctx);
         self.draw_unsaved_close_prompt(ctx);
     }
+}
+
+pub fn update_system(
+    mut contexts: EguiContexts,
+    mut viewer: NonSendMut<ViewerApp>,
+) -> bevy::prelude::Result {
+    viewer.update(contexts.ctx_mut()?);
+    Ok(())
 }
 
 #[cfg(test)]

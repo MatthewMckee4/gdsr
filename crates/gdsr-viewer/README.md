@@ -1,6 +1,7 @@
 # gdsr-viewer
 
-An interactive GDS file viewer built with [egui](https://github.com/emilk/egui).
+An interactive GDS file viewer rendered with [Bevy](https://bevyengine.org/) and
+using [egui](https://github.com/emilk/egui) for its interface.
 
 ## Features
 

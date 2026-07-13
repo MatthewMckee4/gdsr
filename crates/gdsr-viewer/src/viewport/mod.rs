@@ -5,13 +5,12 @@ pub use bounds::compute_bounds;
 use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Rect, Sense};
-use gdsr::{DataType, Element, Layer, Library, Point};
+use gdsr::{Element, Library, Point};
 
-use crate::drawable::{DrawContext, Drawable, WorldBBox, cell_world_bbox, draw_highlight};
+use crate::drawable::{WorldBBox, draw_highlight};
 use crate::grid;
 use crate::ruler::RulerState;
-use crate::spatial::SpatialGrid;
-use crate::state::{GridSpacing, LayerState, RenderCache};
+use crate::state::{GridSpacing, LayerState};
 
 /// Camera state for the 2D viewport: center position in world coordinates and zoom level.
 pub struct Viewport {
@@ -22,6 +21,7 @@ pub struct Viewport {
 }
 
 pub struct ViewportInteraction {
+    pub rect: Rect,
     pub mouse_world: Option<(f64, f64)>,
     pub clicked: bool,
     pub double_clicked: bool,
@@ -92,71 +92,44 @@ impl Viewport {
     }
 }
 
-/// Screen-pixel threshold below which a grid cell draws as a single LOAD rectangle
-/// instead of rendering individual elements.
-const CELL_LOAD_THRESHOLD_PX: f32 = 24.0;
-const CELL_LOAD_DENSITY_MIN_ELEMENTS: usize = 128;
-const CELL_LOAD_MIN_AVG_ELEMENT_AREA_PX: f32 = 16.0;
-
-fn should_draw_cell_load(width_px: f32, height_px: f32, element_count: usize) -> bool {
-    if width_px < CELL_LOAD_THRESHOLD_PX || height_px < CELL_LOAD_THRESHOLD_PX {
-        return true;
-    }
-    if element_count < CELL_LOAD_DENSITY_MIN_ELEMENTS {
-        return false;
-    }
-
-    let area_px = width_px * height_px;
-    area_px.is_finite() && area_px / element_count as f32 <= CELL_LOAD_MIN_AVG_ELEMENT_AREA_PX
-}
-
 impl Viewport {
-    /// Draws the viewport and handles pan/zoom interaction.
-    ///
-    /// Returns the mouse position in world coordinates if the pointer is inside the viewport.
+    /// Draws viewport interaction and egui overlays over the Bevy scene.
     pub fn draw(
         &mut self,
         ui: &mut egui::Ui,
         elements: &[Element],
         layer_state: &mut LayerState,
-        spatial_grid: Option<&SpatialGrid>,
-        query_buf: &mut Vec<u32>,
-        drawn_element_marks: &mut Vec<bool>,
         library: Option<&Library>,
-        render_cache: &mut RenderCache,
         tessellation_cache: &mut HashMap<u32, Vec<usize>>,
         ruler: &mut RulerState,
         show_grid: bool,
         grid_spacing: GridSpacing,
         hovered_element: Option<usize>,
         selected_element: Option<usize>,
-        render_depth: u32,
-        selected_cell: Option<&str>,
         drawing_preview_points: Option<&[Point]>,
     ) -> ViewportInteraction {
         let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
         let rect = response.rect;
-
-        painter.rect_filled(rect, 0.0, Color32::from_rgb(30, 30, 30));
 
         if show_grid {
             grid::draw_grid(&painter, self, rect, grid_spacing);
             grid::draw_origin_axes(&painter, self, rect);
         }
 
-        // Handle ruler clicks before drag so ruler gets priority when active.
         let ruler_was_active = ruler.active;
-        if ruler_was_active && response.clicked() {
-            if let Some(pos) = response.interact_pointer_pos() {
-                let (wx, wy) = self.screen_to_world(pos.x, pos.y, rect);
-                ruler.handle_click(wx, wy);
-            }
+        if ruler_was_active
+            && response.clicked()
+            && let Some(pos) = response.interact_pointer_pos()
+        {
+            let (wx, wy) = self.screen_to_world(pos.x, pos.y, rect);
+            ruler.handle_click(wx, wy);
         }
         let clicked = response.clicked() && !ruler_was_active;
         let double_clicked = response.double_clicked() && !ruler_was_active;
 
-        let move_selected_element =
-            selected_element.is_some() && ui.input(|i| i.modifiers.shift) && response.dragged();
+        let move_selected_element = selected_element.is_some()
+            && ui.input(|input| input.modifiers.shift)
+            && response.dragged();
         let selected_element_drag_delta = if move_selected_element {
             let delta = response.drag_delta();
             Some((
@@ -174,290 +147,40 @@ impl Viewport {
         }
 
         if let Some(hover_pos) = response.hover_pos() {
-            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+            let scroll = ui.input(|input| input.smooth_scroll_delta.y);
             if scroll != 0.0 {
                 let (wx, wy) = self.screen_to_world(hover_pos.x, hover_pos.y, rect);
                 let factor = 1.0 + f64::from(scroll) * 0.002;
                 let new_zoom = (self.zoom * factor).clamp(1e-3, 1e15);
-                let cx = f64::from(rect.center().x);
-                let cy = f64::from(rect.center().y);
-                let sx = f64::from(hover_pos.x);
-                let sy = f64::from(hover_pos.y);
-                self.center_x = wx - (sx - cx) / new_zoom;
-                self.center_y = wy + (sy - cy) / new_zoom;
+                let center = rect.center();
+                self.center_x = wx - f64::from(hover_pos.x - center.x) / new_zoom;
+                self.center_y = wy + f64::from(hover_pos.y - center.y) / new_zoom;
                 self.zoom = new_zoom;
             }
         }
 
-        // Keyboard pan: arrow keys move by 10% of the visible viewport.
         let pan_step_x = f64::from(rect.width()) * 0.1 / self.zoom;
         let pan_step_y = f64::from(rect.height()) * 0.1 / self.zoom;
-        ui.input(|i| {
-            if i.key_pressed(egui::Key::ArrowLeft) {
+        ui.input(|input| {
+            if input.key_pressed(egui::Key::ArrowLeft) {
                 self.pan(-pan_step_x, 0.0);
             }
-            if i.key_pressed(egui::Key::ArrowRight) {
+            if input.key_pressed(egui::Key::ArrowRight) {
                 self.pan(pan_step_x, 0.0);
             }
-            if i.key_pressed(egui::Key::ArrowUp) {
+            if input.key_pressed(egui::Key::ArrowUp) {
                 self.pan(0.0, pan_step_y);
             }
-            if i.key_pressed(egui::Key::ArrowDown) {
+            if input.key_pressed(egui::Key::ArrowDown) {
                 self.pan(0.0, -pan_step_y);
             }
-            if i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals) {
+            if input.key_pressed(egui::Key::Plus) || input.key_pressed(egui::Key::Equals) {
                 self.zoom_at_center(1.2);
             }
-            if i.key_pressed(egui::Key::Minus) {
+            if input.key_pressed(egui::Key::Minus) {
                 self.zoom_at_center(1.0 / 1.2);
             }
         });
-
-        let mut hidden_layers: Vec<(Layer, DataType)> =
-            layer_state.hidden_layers.iter().copied().collect();
-        hidden_layers.sort_unstable();
-
-        if !render_cache.needs_full_render(
-            &hidden_layers,
-            elements.len(),
-            render_depth,
-            self.center_x,
-            self.center_y,
-            self.zoom,
-            rect,
-        ) {
-            let tsf = render_cache.delta_transform(
-                self.center_x,
-                self.center_y,
-                self.zoom,
-                rect.center(),
-            );
-            for (_, mesh) in render_cache.layer_meshes() {
-                let mut m = mesh.clone();
-                for v in &mut m.vertices {
-                    v.pos = tsf * v.pos;
-                }
-                painter.add(egui::Shape::mesh(m));
-            }
-            for s in render_cache.extra_shapes() {
-                let mut s = s.clone();
-                s.transform(tsf);
-                painter.add(s);
-            }
-            draw_element_highlight(
-                selected_element,
-                elements,
-                self,
-                &painter,
-                rect,
-                layer_state,
-                library,
-                tessellation_cache,
-            );
-            if hovered_element != selected_element {
-                draw_element_highlight(
-                    hovered_element,
-                    elements,
-                    self,
-                    &painter,
-                    rect,
-                    layer_state,
-                    library,
-                    tessellation_cache,
-                );
-            }
-            let mouse_world = response
-                .hover_pos()
-                .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
-            draw_drawing_preview(drawing_preview_points, self, &painter, rect);
-            ruler.draw(&painter, self, rect, mouse_world);
-            return ViewportInteraction {
-                mouse_world,
-                clicked,
-                double_clicked,
-                selected_element_drag_delta,
-            };
-        }
-
-        // Depth-0: draw just the selected cell's bounding box with its name.
-        if render_depth == 0 {
-            if let Some(cell_name) = selected_cell {
-                if let Some(lib) = library {
-                    if let Some(bbox) = cell_world_bbox(cell_name, lib) {
-                        let min_x = bbox.min_x;
-                        let min_y = bbox.min_y;
-                        let max_x = bbox.max_x;
-                        let max_y = bbox.max_y;
-                        let s_min = self.world_to_screen(min_x, min_y, rect);
-                        let s_max = self.world_to_screen(max_x, max_y, rect);
-                        let screen_rect = Rect::from_two_pos(s_min, s_max);
-                        let stroke_color = Color32::from_rgb(180, 180, 180);
-                        painter.rect_stroke(
-                            screen_rect,
-                            0.0,
-                            egui::Stroke::new(1.0_f32, stroke_color),
-                            egui::StrokeKind::Outside,
-                        );
-                        let sw = (s_max.x - s_min.x).abs();
-                        let sh = (s_min.y - s_max.y).abs();
-                        if sw >= 40.0 && sh >= 20.0 {
-                            let char_count = cell_name.len().max(1) as f32;
-                            let fit_w = sw * 0.9 / (char_count * 0.6);
-                            let fit_h = sh * 0.4;
-                            let font_size = fit_w.min(fit_h).min(48.0);
-                            if font_size >= 8.0 {
-                                painter.text(
-                                    screen_rect.center(),
-                                    egui::Align2::CENTER_CENTER,
-                                    cell_name,
-                                    egui::FontId::monospace(font_size),
-                                    stroke_color,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            let mouse_world = response
-                .hover_pos()
-                .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
-            draw_drawing_preview(drawing_preview_points, self, &painter, rect);
-            ruler.draw(&painter, self, rect, mouse_world);
-            return ViewportInteraction {
-                mouse_world,
-                clicked,
-                double_clicked,
-                selected_element_drag_delta,
-            };
-        }
-
-        // Full render: query a 3× expanded region so the cache has margin for panning.
-        let visible = self.visible_world_rect(rect);
-        let w = visible.max_x - visible.min_x;
-        let h = visible.max_y - visible.min_y;
-        let render_visible = WorldBBox::new(
-            visible.min_x - w,
-            visible.min_y - h,
-            visible.max_x + w,
-            visible.max_y + h,
-        );
-
-        let mut layer_meshes = HashMap::new();
-        let mut extra_shapes = Vec::new();
-        let mut screen_pts_buf = Vec::new();
-        let mut cell_bbox_cache = HashMap::new();
-        let mut cell_complexity_cache = HashMap::new();
-        let mut ctx = DrawContext {
-            painter: &painter,
-            layer_meshes: &mut layer_meshes,
-            extra_shapes: &mut extra_shapes,
-            viewport: self,
-            rect,
-            visible: &render_visible,
-            layer_state,
-            library,
-            current_element_idx: None,
-            tessellation_cache,
-            screen_pts_buf: &mut screen_pts_buf,
-            highlight: false,
-            show_ref_bbox: false,
-            reference_depth: render_depth,
-            reference_stack: selected_cell.map_or_else(Vec::new, |name| vec![name.to_string()]),
-            cell_bbox_cache: &mut cell_bbox_cache,
-            cell_complexity_cache: &mut cell_complexity_cache,
-        };
-
-        if let Some(grid) = spatial_grid {
-            if drawn_element_marks.len() < elements.len() {
-                drawn_element_marks.resize(elements.len(), false);
-            }
-            query_buf.clear();
-
-            for cell in grid.query_visible(&render_visible) {
-                let s_min = ctx
-                    .viewport
-                    .world_to_screen(cell.bbox.min_x, cell.bbox.min_y, rect);
-                let s_max = ctx
-                    .viewport
-                    .world_to_screen(cell.bbox.max_x, cell.bbox.max_y, rect);
-                let sw = (s_max.x - s_min.x).abs();
-                let sh = (s_min.y - s_max.y).abs();
-
-                let has_area =
-                    cell.bbox.min_x < cell.bbox.max_x || cell.bbox.min_y < cell.bbox.max_y;
-
-                if has_area && sw < 1.0 && sh < 1.0 {
-                    continue;
-                }
-
-                if has_area && should_draw_cell_load(sw, sh, cell.indices.len()) {
-                    if !ctx.layer_state.hidden_layers.contains(&cell.dominant_layer) {
-                        let color = ctx
-                            .layer_state
-                            .layer_colors
-                            .get(cell.dominant_layer.0, cell.dominant_layer.1);
-                        let fill =
-                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 80);
-                        let cell_rect = Rect::from_two_pos(s_min, s_max);
-                        ctx.rect_filled(cell_rect, 0.0, fill);
-                    }
-                    continue;
-                }
-
-                for &idx in &cell.indices {
-                    let i = idx as usize;
-                    if drawn_element_marks[i] {
-                        continue;
-                    }
-                    drawn_element_marks[i] = true;
-                    query_buf.push(idx);
-                    if let Some(element) = elements.get(i) {
-                        ctx.current_element_idx = Some(idx);
-                        element.draw(&mut ctx);
-                    }
-                }
-            }
-
-            // Cell references have no direct world bbox, so the spatial grid never
-            // contains them. Draw any unseen references in a second pass.
-            for (i, element) in elements.iter().enumerate() {
-                if matches!(element, Element::Reference(_))
-                    && !drawn_element_marks.get(i).copied().unwrap_or_default()
-                {
-                    ctx.current_element_idx = Some(i as u32);
-                    element.draw(&mut ctx);
-                }
-            }
-
-            for &idx in query_buf.iter() {
-                if let Some(mark) = drawn_element_marks.get_mut(idx as usize) {
-                    *mark = false;
-                }
-            }
-        } else {
-            for (i, element) in elements.iter().enumerate() {
-                ctx.current_element_idx = Some(i as u32);
-                element.draw(&mut ctx);
-            }
-        }
-
-        let batched: Vec<((Layer, DataType), egui::epaint::Mesh)> =
-            layer_meshes.into_iter().collect();
-        for (_, mesh) in &batched {
-            painter.add(egui::Shape::mesh(mesh.clone()));
-        }
-        painter.extend(extra_shapes.iter().cloned());
-        render_cache.update(
-            batched,
-            extra_shapes,
-            self.center_x,
-            self.center_y,
-            self.zoom,
-            rect.center(),
-            hidden_layers,
-            elements.len(),
-            render_depth,
-        );
 
         draw_element_highlight(
             selected_element,
@@ -487,7 +210,9 @@ impl Viewport {
             .map(|pos| self.screen_to_world(pos.x, pos.y, rect));
         draw_drawing_preview(drawing_preview_points, self, &painter, rect);
         ruler.draw(&painter, self, rect, mouse_world);
+
         ViewportInteraction {
+            rect,
             mouse_world,
             clicked,
             double_clicked,
@@ -689,26 +414,6 @@ mod tests {
         vp.pan(10.0, -5.0);
         assert!((vp.center_x - 10.0).abs() < EPSILON);
         assert!((vp.center_y - (-5.0)).abs() < EPSILON);
-    }
-
-    #[test]
-    fn load_cell_for_small_screen_area() {
-        assert!(should_draw_cell_load(12.0, 20.0, 1));
-    }
-
-    #[test]
-    fn load_cell_for_skinny_screen_area() {
-        assert!(should_draw_cell_load(4000.0, 4.0, 1));
-    }
-
-    #[test]
-    fn load_cell_for_dense_screen_area() {
-        assert!(should_draw_cell_load(400.0, 200.0, 10_000));
-    }
-
-    #[test]
-    fn draw_sparse_large_cell_elements() {
-        assert!(!should_draw_cell_load(400.0, 200.0, 100));
     }
 
     #[test]
