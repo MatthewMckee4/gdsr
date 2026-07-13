@@ -1,3 +1,4 @@
+use crate::elements::property::PropertyStore;
 use crate::{
     DataType, Dimensions, Layer, LayerMapping, Movable, Point, Radians, Transformable, Unit,
 };
@@ -30,6 +31,7 @@ pub struct Polygon {
     pub(crate) points: Vec<Point>,
     pub(crate) layer: Layer,
     pub(crate) data_type: DataType,
+    pub(crate) properties: PropertyStore,
 }
 
 impl Polygon {
@@ -40,6 +42,7 @@ impl Polygon {
             points: get_correct_polygon_points_format(points),
             layer,
             data_type,
+            properties: PropertyStore::default(),
         }
     }
 

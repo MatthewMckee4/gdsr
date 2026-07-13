@@ -69,6 +69,7 @@ expression: elements
             data_type: DataType(
                 0,
             ),
+            properties: [],
         },
     ),
     Polygon(
@@ -137,6 +138,7 @@ expression: elements
             data_type: DataType(
                 0,
             ),
+            properties: [],
         },
     ),
 ]

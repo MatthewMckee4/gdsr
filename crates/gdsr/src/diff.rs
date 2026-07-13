@@ -52,8 +52,8 @@ pub enum ElementDiff {
     /// The element at this index changed.
     Modified {
         index: usize,
-        before: Element,
-        after: Element,
+        before: Box<Element>,
+        after: Box<Element>,
     },
 }
 
@@ -117,8 +117,8 @@ fn diff_elements(before: &[Element], after: &[Element], tolerance: f64) -> Vec<E
         .filter(|(_, (before, after))| !elements_equal(before, after, tolerance))
         .map(|(index, (before, after))| ElementDiff::Modified {
             index,
-            before: before.clone(),
-            after: after.clone(),
+            before: Box::new(before.clone()),
+            after: Box::new(after.clone()),
         })
         .collect();
 
@@ -167,12 +167,14 @@ fn paths_equal(left: &Path, right: &Path, tolerance: f64) -> bool {
         && optional_units_equal(left.width(), right.width(), tolerance)
         && optional_units_equal(left.begin_extension(), right.begin_extension(), tolerance)
         && optional_units_equal(left.end_extension(), right.end_extension(), tolerance)
+        && left.properties() == right.properties()
 }
 
 fn polygons_equal(left: &Polygon, right: &Polygon, tolerance: f64) -> bool {
     left.layer() == right.layer()
         && left.data_type() == right.data_type()
         && points_equal(left.points(), right.points(), tolerance)
+        && left.properties() == right.properties()
 }
 
 fn boxes_equal(left: &GdsBox, right: &GdsBox, tolerance: f64) -> bool {
@@ -183,12 +185,14 @@ fn boxes_equal(left: &GdsBox, right: &GdsBox, tolerance: f64) -> bool {
             &[right.bottom_left(), right.top_right()],
             tolerance,
         )
+        && left.properties() == right.properties()
 }
 
 fn nodes_equal(left: &Node, right: &Node, tolerance: f64) -> bool {
     left.layer() == right.layer()
         && left.node_type() == right.node_type()
         && points_equal(left.points(), right.points(), tolerance)
+        && left.properties() == right.properties()
 }
 
 fn texts_equal(left: &Text, right: &Text, tolerance: f64) -> bool {
@@ -201,11 +205,13 @@ fn texts_equal(left: &Text, right: &Text, tolerance: f64) -> bool {
         && left.vertical_presentation() == right.vertical_presentation()
         && left.horizontal_presentation() == right.horizontal_presentation()
         && points_equal(&[*left.origin()], &[*right.origin()], tolerance)
+        && left.properties() == right.properties()
 }
 
 fn references_equal(left: &Reference, right: &Reference, tolerance: f64) -> bool {
     instances_equal(left.instance(), right.instance(), tolerance)
         && grids_equal(left.grid(), right.grid(), tolerance)
+        && left.properties() == right.properties()
 }
 
 fn instances_equal(left: &Instance, right: &Instance, tolerance: f64) -> bool {
@@ -263,7 +269,7 @@ fn units_equal(left: Unit, right: Unit, tolerance: f64) -> bool {
 mod tests {
     use crate::{
         Cell, DataType, GdsBox, Grid, HorizontalPresentation, Layer, Node, Path, Point, Polygon,
-        Radians, Reference, Text, Unit, VerticalPresentation,
+        Property, Radians, Reference, Text, Unit, VerticalPresentation,
     };
 
     use super::*;
@@ -295,6 +301,28 @@ mod tests {
                 .diff(&library, LibraryDiffOptions::default())
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn property_changes_are_reported() {
+        let mut before_cell = Cell::new("top");
+        before_cell.add(polygon(0.0));
+        let before = library_with_cell(before_cell);
+
+        let mut changed = polygon(0.0);
+        changed.properties_mut().push(Property::new(7, "net-a"));
+        let mut after_cell = Cell::new("top");
+        after_cell.add(changed);
+        let after = library_with_cell(after_cell);
+
+        assert!(matches!(
+            before
+                .diff(&after, LibraryDiffOptions::default())
+                .modified_cells[0]
+                .elements
+                .as_slice(),
+            [ElementDiff::Modified { index: 0, .. }]
+        ));
     }
 
     #[test]

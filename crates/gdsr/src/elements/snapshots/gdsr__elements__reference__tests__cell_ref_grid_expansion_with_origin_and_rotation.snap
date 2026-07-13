@@ -69,6 +69,7 @@ expression: flattened
             data_type: DataType(
                 0,
             ),
+            properties: [],
         },
     ),
 ]

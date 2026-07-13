@@ -1,3 +1,4 @@
+use crate::elements::property::PropertyStore;
 use crate::{DataType, Dimensions, Layer, Movable, Point, Radians, Transformable};
 
 // --- Presentation types ---
@@ -162,6 +163,7 @@ pub struct Text {
     pub(crate) x_reflection: bool,
     pub(crate) vertical_presentation: VerticalPresentation,
     pub(crate) horizontal_presentation: HorizontalPresentation,
+    pub(crate) properties: PropertyStore,
 }
 
 impl Default for Text {
@@ -176,6 +178,7 @@ impl Default for Text {
             x_reflection: false,
             vertical_presentation: VerticalPresentation::default(),
             horizontal_presentation: HorizontalPresentation::default(),
+            properties: PropertyStore::default(),
         }
     }
 }
@@ -203,6 +206,7 @@ impl Text {
             x_reflection,
             vertical_presentation,
             horizontal_presentation,
+            properties: PropertyStore::default(),
         }
     }
 
@@ -842,6 +846,7 @@ mod tests {
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
+            properties: [],
         }
         "#);
     }
@@ -939,6 +944,7 @@ mod tests {
             x_reflection: true,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
+            properties: [],
         }
         "#);
     }

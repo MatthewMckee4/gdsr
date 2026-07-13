@@ -26,6 +26,50 @@ fn make_library(cell_name: &str, elements: Vec<Element>) -> Library {
     library
 }
 
+#[test]
+fn element_properties_roundtrip_for_every_variant() {
+    let point = |x, y| Point::integer(x, y, DEFAULT_INTEGER_UNITS);
+    let mut elements: Vec<Element> = vec![
+        Polygon::new(
+            [point(0, 0), point(20, 0), point(0, 20)],
+            Layer::new(1),
+            DataType::new(2),
+        )
+        .into(),
+        Path::new(
+            [point(0, 0), point(20, 20)],
+            Layer::new(3),
+            DataType::new(4),
+            None,
+            Some(Unit::integer(2, DEFAULT_INTEGER_UNITS)),
+            None,
+            None,
+        )
+        .into(),
+        GdsBox::new(point(0, 0), point(20, 20), Layer::new(5), DataType::new(6)).into(),
+        Node::new(
+            vec![point(0, 0), point(20, 20)],
+            Layer::new(7),
+            DataType::new(8),
+        )
+        .into(),
+        Text::default().set_text("label".to_string()).into(),
+        Reference::new("target").into(),
+    ];
+    for element in &mut elements {
+        element.properties_mut().extend([
+            Property::new(17, "net-a"),
+            Property::new(17, "net-b"),
+            Property::new(u16::MAX, "tool-metadata"),
+        ]);
+    }
+
+    let mut library = make_library("top", elements);
+    library.add_cell(Cell::new("target"));
+
+    assert_roundtrip(&library);
+}
+
 #[quickcheck]
 fn polygon_roundtrip(_seed: u8) -> bool {
     let mut g = Gen::new(30);
