@@ -36,8 +36,9 @@ The main crates:
 
 - `gdsr` - the library crate. Contains the GDSII data model, binary reader and
   writer, units, element types, and geometry helpers.
-- `gdsr-viewer` - the `egui`/`eframe` viewer binary. Loads GDSII libraries,
-  renders cells, and provides the interactive inspection workflow.
+- `gdsr-viewer` - the Bevy-rendered viewer binary with an `egui` interface.
+  Loads GDSII libraries, renders cells, and provides the interactive inspection
+  workflow.
 
 Infrastructure and tooling:
 

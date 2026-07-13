@@ -234,7 +234,7 @@ fn write_string_with_record_to_file(
     write_u16_array(buffer, &string_start)?;
 
     buffer.write_all(string.as_bytes())?;
-    if byte_len % 2 != 0 {
+    if !byte_len.is_multiple_of(2) {
         buffer.write_all(&[0])?;
     }
 

@@ -2,8 +2,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc;
 
-use egui::{Mesh, Pos2, Shape};
-use emath::{TSTransform, Vec2};
 use gdsr::{Cell, CellStats, DataType, Element, Layer, Library, Movable, Point};
 
 use crate::colors::LayerColorMap;
@@ -90,16 +88,30 @@ impl CellState {
         self.elements = cell.elements().to_vec();
         self.rebuild_render_indexes();
 
+        self.refresh_layers_for(name);
+        true
+    }
+
+    pub fn refresh_layers(&mut self) {
+        let Some(name) = self.selected_cell.clone() else {
+            self.layers.clear();
+            return;
+        };
+        self.refresh_layers_for(&name);
+    }
+
+    fn refresh_layers_for(&mut self, name: &str) {
         self.layers.clear();
         let mut visiting = HashSet::new();
+        let mut visited_depths = HashMap::new();
         collect_layers_from_cell(
             name,
             &self.library,
             self.render_depth,
             &mut self.layers,
             &mut visiting,
+            &mut visited_depths,
         );
-        true
     }
 
     pub fn insert_element(&mut self, index: usize, element: Element) -> bool {
@@ -180,14 +192,21 @@ fn collect_layers_from_cell(
     depth: u32,
     layers: &mut BTreeSet<(Layer, DataType)>,
     visiting: &mut HashSet<String>,
+    visited_depths: &mut HashMap<String, u32>,
 ) {
-    if depth == 0 || !visiting.insert(cell_name.to_owned()) {
+    if depth == 0
+        || visited_depths
+            .get(cell_name)
+            .is_some_and(|visited_depth| *visited_depth >= depth)
+        || !visiting.insert(cell_name.to_owned())
+    {
         return;
     }
+    visited_depths.insert(cell_name.to_owned(), depth);
 
     if let Some(cell) = library.get_cell(cell_name) {
         for element in cell.iter_elements() {
-            collect_layers_from_element(element, library, depth, layers, visiting);
+            collect_layers_from_element(element, library, depth, layers, visiting, visited_depths);
         }
     }
 
@@ -200,6 +219,7 @@ fn collect_layers_from_element(
     depth: u32,
     layers: &mut BTreeSet<(Layer, DataType)>,
     visiting: &mut HashSet<String>,
+    visited_depths: &mut HashMap<String, u32>,
 ) {
     let Element::Reference(reference) = element else {
         layers.extend(element.layer_keys());
@@ -211,7 +231,14 @@ fn collect_layers_from_element(
     }
 
     if let Some(cell_name) = reference.instance().as_cell() {
-        collect_layers_from_cell(cell_name, library, depth - 1, layers, visiting);
+        collect_layers_from_cell(
+            cell_name,
+            library,
+            depth - 1,
+            layers,
+            visiting,
+            visited_depths,
+        );
     } else if let Some(inner) = reference.instance().as_element() {
         collect_layers_from_element(
             inner.as_ref().as_ref(),
@@ -219,171 +246,17 @@ fn collect_layers_from_element(
             depth - 1,
             layers,
             visiting,
+            visited_depths,
         );
-    }
-}
-
-/// Caches rendered geometry and supports delta-transforms on pan/zoom instead of
-/// full re-renders. A full render queries a 3× viewport so there is margin for
-/// panning before the cache must be rebuilt.
-///
-/// Geometry is split into batched layer meshes (few large meshes, cheap to clone)
-/// and extra shapes (text, rect fallbacks).
-pub struct RenderCache {
-    layer_meshes: Vec<((Layer, DataType), Mesh)>,
-    extra_shapes: Vec<Shape>,
-    /// Viewport state at the time shapes were rendered.
-    render_center_x: f64,
-    render_center_y: f64,
-    render_zoom: f64,
-    render_rect_center: Pos2,
-    /// Invalidation metadata — if any of these change, full re-render.
-    hidden_layers: Vec<(Layer, DataType)>,
-    element_count: usize,
-    render_depth: u32,
-    populated: bool,
-}
-
-impl Default for RenderCache {
-    fn default() -> Self {
-        Self {
-            layer_meshes: Vec::new(),
-            extra_shapes: Vec::new(),
-            render_center_x: 0.0,
-            render_center_y: 0.0,
-            render_zoom: 1.0,
-            render_rect_center: Pos2::ZERO,
-            hidden_layers: Vec::new(),
-            element_count: 0,
-            render_depth: 1,
-            populated: false,
-        }
-    }
-}
-
-impl RenderCache {
-    /// Returns `true` when a full re-render is needed (cannot use delta transform).
-    pub fn needs_full_render(
-        &self,
-        hidden_layers: &[(Layer, DataType)],
-        element_count: usize,
-        render_depth: u32,
-        current_center_x: f64,
-        current_center_y: f64,
-        current_zoom: f64,
-        rect: egui::Rect,
-    ) -> bool {
-        if !self.populated {
-            return true;
-        }
-        if self.hidden_layers != hidden_layers
-            || self.element_count != element_count
-            || self.render_depth != render_depth
-        {
-            return true;
-        }
-
-        // Zoom ratio outside [0.5, 2.0] means LOAD thresholds may have crossed.
-        let zoom_ratio = current_zoom / self.render_zoom;
-        if !(0.5..=2.0).contains(&zoom_ratio) {
-            return true;
-        }
-
-        // Pan distance in screen pixels. The margin budget is one full viewport
-        // width/height (from the 3× query region). Trigger re-render at 80%.
-        let dx_screen = (self.render_center_x - current_center_x) * current_zoom;
-        let dy_screen = (self.render_center_y - current_center_y) * current_zoom;
-        let margin_x = f64::from(rect.width()) * 0.8;
-        let margin_y = f64::from(rect.height()) * 0.8;
-        if dx_screen.abs() > margin_x || dy_screen.abs() > margin_y {
-            return true;
-        }
-
-        false
-    }
-
-    /// Computes the `TSTransform` that maps render-time screen coordinates to
-    /// current screen coordinates.
-    pub fn delta_transform(
-        &self,
-        current_center_x: f64,
-        current_center_y: f64,
-        current_zoom: f64,
-        rect_center: Pos2,
-    ) -> TSTransform {
-        let scale = (current_zoom / self.render_zoom) as f32;
-        let tx = f64::from(rect_center.x) * f64::from(1.0 - scale)
-            + (self.render_center_x - current_center_x) * current_zoom;
-        let ty = f64::from(rect_center.y) * f64::from(1.0 - scale)
-            - (self.render_center_y - current_center_y) * current_zoom;
-        TSTransform::new(Vec2::new(tx as f32, ty as f32), scale)
-    }
-
-    /// Stores batched layer meshes, extra shapes, and the viewport state.
-    pub fn update(
-        &mut self,
-        layer_meshes: Vec<((Layer, DataType), Mesh)>,
-        extra_shapes: Vec<Shape>,
-        center_x: f64,
-        center_y: f64,
-        zoom: f64,
-        rect_center: Pos2,
-        hidden_layers: Vec<(Layer, DataType)>,
-        element_count: usize,
-        render_depth: u32,
-    ) {
-        self.layer_meshes = layer_meshes;
-        self.extra_shapes = extra_shapes;
-        self.render_center_x = center_x;
-        self.render_center_y = center_y;
-        self.render_zoom = zoom;
-        self.render_rect_center = rect_center;
-        self.hidden_layers = hidden_layers;
-        self.element_count = element_count;
-        self.render_depth = render_depth;
-        self.populated = true;
-    }
-
-    pub fn clear(&mut self) {
-        self.populated = false;
-    }
-
-    pub fn layer_meshes(&self) -> &[((Layer, DataType), Mesh)] {
-        &self.layer_meshes
-    }
-
-    pub fn extra_shapes(&self) -> &[Shape] {
-        &self.extra_shapes
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use egui::Rect;
     use gdsr::{Cell, Element, Library, Reference};
 
     use crate::testutil::helpers::polygon;
-
-    fn test_rect() -> Rect {
-        Rect::from_min_size(Pos2::ZERO, egui::Vec2::new(800.0, 600.0))
-    }
-
-    fn populated_cache() -> RenderCache {
-        let mut cache = RenderCache::default();
-        cache.update(
-            vec![],
-            vec![],
-            0.0,
-            0.0,
-            1.0,
-            test_rect().center(),
-            vec![],
-            42,
-            1,
-        );
-        cache
-    }
 
     fn cell_state_with_elements(elements: Vec<Element>) -> CellState {
         let mut source_cell = Cell::new("top");
@@ -439,6 +312,39 @@ mod tests {
         assert_eq!(cell.selected_cell.as_deref(), Some("new_cell"));
         assert!(cell.elements.is_empty());
         assert!(cell.spatial_grid.is_none());
+    }
+
+    #[test]
+    fn refreshing_depth_layers_preserves_direct_render_indexes() {
+        let mut leaf = Cell::new("leaf");
+        leaf.add(polygon(vec![(0, 0), (100, 0), (100, 100)], 2, 0));
+        let mut top = Cell::new("top");
+        top.add(polygon(vec![(0, 0), (100, 0), (100, 100)], 1, 0));
+        top.add(Reference::new("leaf"));
+        let mut library = Library::new("test");
+        library.add_cell(leaf);
+        library.add_cell(top);
+        let mut cell = CellState::new(library);
+        cell.selected_cell = Some("top".to_string());
+        assert!(cell.load_direct_cell_elements("top"));
+        cell.tessellation_cache.insert(0, vec![0, 1, 2]);
+
+        cell.render_depth = 2;
+        cell.refresh_layers();
+
+        assert_eq!(
+            cell.layers,
+            BTreeSet::from([
+                (Layer::new(1), DataType::new(0)),
+                (Layer::new(2), DataType::new(0)),
+            ])
+        );
+        assert_eq!(cell.elements.len(), 2);
+        assert!(cell.spatial_grid.is_some());
+        assert_eq!(
+            cell.tessellation_cache.get(&0).map(Vec::as_slice),
+            Some(&[0, 1, 2][..])
+        );
     }
 
     #[test]
@@ -562,222 +468,6 @@ mod tests {
             .expect("unchanged element has bbox");
         assert!((bbox.min_x - 0.0).abs() < 1e-15);
         assert!(cell.spatial_grid.is_some());
-    }
-
-    #[test]
-    fn no_rerender_on_same_state() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
-    }
-
-    #[test]
-    fn rerender_when_empty() {
-        let cache = RenderCache::default();
-        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, test_rect()));
-    }
-
-    #[test]
-    fn no_rerender_on_small_pan() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 100.0, 0.0, 1.0, rect));
-    }
-
-    #[test]
-    fn rerender_on_large_pan() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        // 800px viewport width, margin budget = 800, 80% = 640px.
-        // dx_screen = (0.0 - 700.0) * 1.0 = -700, |700| > 640 → re-render
-        assert!(cache.needs_full_render(&[], 42, 1, 700.0, 0.0, 1.0, rect));
-    }
-
-    #[test]
-    fn no_rerender_on_small_zoom() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.5, rect));
-    }
-
-    #[test]
-    fn rerender_on_large_zoom() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        // zoom ratio 3.0 / 1.0 = 3.0, outside [0.5, 2.0]
-        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 3.0, rect));
-    }
-
-    #[test]
-    fn rerender_on_hidden_layer_change() {
-        let cache = populated_cache();
-        assert!(cache.needs_full_render(
-            &[(Layer::new(1), DataType::new(0))],
-            42,
-            1,
-            0.0,
-            0.0,
-            1.0,
-            test_rect()
-        ));
-    }
-
-    #[test]
-    fn rerender_on_element_count_change() {
-        let cache = populated_cache();
-        assert!(cache.needs_full_render(&[], 43, 1, 0.0, 0.0, 1.0, test_rect()));
-    }
-
-    #[test]
-    fn rerender_on_render_depth_change() {
-        let cache = populated_cache();
-        assert!(cache.needs_full_render(&[], 42, 2, 0.0, 0.0, 1.0, test_rect()));
-    }
-
-    #[test]
-    fn delta_transform_identity_on_same_state() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        let tsf = cache.delta_transform(0.0, 0.0, 1.0, rect.center());
-        assert!((tsf.scaling - 1.0).abs() < 1e-6);
-        assert!(tsf.translation.x.abs() < 1e-3);
-        assert!(tsf.translation.y.abs() < 1e-3);
-    }
-
-    #[test]
-    fn delta_transform_pure_pan() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        let zoom = 1.0;
-        let pan_x = 50.0;
-        let tsf = cache.delta_transform(pan_x, 0.0, zoom, rect.center());
-
-        // Pure pan: scale=1, tx = (0 - 50) * 1 = -50, ty = 0
-        assert!((tsf.scaling - 1.0).abs() < 1e-6);
-        assert!((tsf.translation.x - (-50.0)).abs() < 1e-3);
-        assert!(tsf.translation.y.abs() < 1e-3);
-    }
-
-    /// Verifies the delta transform maps an old screen point to where it should be
-    /// after a viewport change, matching a fresh `world_to_screen` call.
-    #[test]
-    fn delta_transform_matches_fresh_render() {
-        use crate::viewport::Viewport;
-
-        let rect = test_rect();
-        let old_vp = Viewport {
-            center_x: 10.0,
-            center_y: 20.0,
-            zoom: 100.0,
-        };
-
-        let mut cache = RenderCache::default();
-        cache.update(
-            vec![],
-            vec![],
-            old_vp.center_x,
-            old_vp.center_y,
-            old_vp.zoom,
-            rect.center(),
-            vec![],
-            1,
-            1,
-        );
-
-        let new_vp = Viewport {
-            center_x: 15.0,
-            center_y: 25.0,
-            zoom: 120.0,
-        };
-
-        let tsf =
-            cache.delta_transform(new_vp.center_x, new_vp.center_y, new_vp.zoom, rect.center());
-
-        // Pick a world point, render with old viewport, apply delta, compare to new viewport.
-        let (wx, wy) = (12.0, 22.0);
-        let old_screen = old_vp.world_to_screen(wx, wy, rect);
-        let transformed = tsf * old_screen;
-        let fresh = new_vp.world_to_screen(wx, wy, rect);
-
-        assert!(
-            (transformed.x - fresh.x).abs() < 0.5,
-            "x: {transformed} vs {fresh}"
-        );
-        assert!(
-            (transformed.y - fresh.y).abs() < 0.5,
-            "y: {transformed} vs {fresh}"
-        );
-    }
-
-    #[test]
-    fn no_rerender_at_zoom_ratio_boundary_low() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 0.5, rect));
-    }
-
-    #[test]
-    fn rerender_just_below_zoom_ratio_boundary() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 0.49, rect));
-    }
-
-    #[test]
-    fn no_rerender_at_zoom_ratio_boundary_high() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 2.0, rect));
-    }
-
-    #[test]
-    fn rerender_just_above_zoom_ratio_boundary() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 2.01, rect));
-    }
-
-    #[test]
-    fn no_rerender_at_exact_margin() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        // margin_x = 800 * 0.8 = 640, dx_screen = |0 - 640| = 640, NOT > 640
-        assert!(!cache.needs_full_render(&[], 42, 1, 640.0, 0.0, 1.0, rect));
-    }
-
-    #[test]
-    fn rerender_just_beyond_margin() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        assert!(cache.needs_full_render(&[], 42, 1, 641.0, 0.0, 1.0, rect));
-    }
-
-    #[test]
-    fn delta_transform_extreme_zoom_ratio() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        let tsf = cache.delta_transform(0.0, 0.0, 2.0, rect.center());
-        assert!(tsf.scaling.is_finite());
-        assert!(tsf.translation.x.is_finite());
-        assert!(tsf.translation.y.is_finite());
-    }
-
-    #[test]
-    fn delta_transform_large_pan() {
-        let cache = populated_cache();
-        let rect = test_rect();
-        let tsf = cache.delta_transform(1e6, 1e6, 1.0, rect.center());
-        assert!(tsf.translation.x.is_finite());
-        assert!(tsf.translation.y.is_finite());
-    }
-
-    #[test]
-    fn clear_forces_rerender() {
-        let mut cache = populated_cache();
-        let rect = test_rect();
-        assert!(!cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
-        cache.clear();
-        assert!(cache.needs_full_render(&[], 42, 1, 0.0, 0.0, 1.0, rect));
     }
 
     #[test]

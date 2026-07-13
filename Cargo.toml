@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition.
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 homepage = "https://github.com/MatthewMckee4/gdsr"
 authors = ["Matthew Mckee <matthewmckee04@yahoo.co.uk>"]
 license = "MIT"
@@ -14,16 +14,43 @@ license = "MIT"
 gdsr = { path = "crates/gdsr", version = "0.0.1-alpha.3" }
 
 approx = "0.5"
-bevy_asset = "0.16.1"
-bevy_mesh = "0.16.1"
+bevy = { version = "0.18.1", default-features = false, features = [
+    "async_executor",
+    "bevy_asset",
+    "bevy_color",
+    "bevy_core_pipeline",
+    "bevy_image",
+    "bevy_log",
+    "bevy_mesh",
+    "bevy_render",
+    "bevy_shader",
+    "bevy_sprite",
+    "bevy_sprite_render",
+    "bevy_text",
+    "bevy_window",
+    "bevy_winit",
+    "default_font",
+    "keyboard",
+    "mouse",
+    "multi_threaded",
+    "png",
+    "reflect_auto_register",
+    "std",
+    "touch",
+    "wayland",
+    "x11",
+] }
+bevy_egui = { version = "0.39.1", default-features = false, features = [
+    "default_fonts",
+    "manage_clipboard",
+    "open_url",
+    "render",
+] }
 bytemuck = "1.25.0"
 chrono = "0.4.44"
 clap = "4.5.55"
 earcutr = "0.5"
-eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 egui = "0.33.3"
-emath = "0.33.3"
-env_logger = "0.11"
 insta = "1.46.3"
 log = "0.4"
 quickcheck = "1.1.0"

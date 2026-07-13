@@ -10,14 +10,11 @@ authors = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-bevy_asset = { workspace = true }
-bevy_mesh = { workspace = true }
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 earcutr = { workspace = true }
-eframe = { workspace = true }
 egui = { workspace = true }
-emath = { workspace = true }
-env_logger = { workspace = true }
 gdsr = { workspace = true }
 log = { workspace = true }
 rfd = { workspace = true }

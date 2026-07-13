@@ -49,6 +49,13 @@ pub fn cell_world_bbox(cell_name: &str, library: &Library) -> Option<WorldBBox> 
     named_cell_world_bbox(cell_name, library, &mut visiting, &mut cache)
 }
 
+pub fn cell_world_bboxes(library: &Library, root_cell: &str) -> HashMap<String, Option<WorldBBox>> {
+    let mut visiting = HashSet::new();
+    let mut cache = HashMap::new();
+    named_cell_world_bbox(root_cell, library, &mut visiting, &mut cache);
+    cache
+}
+
 fn named_cell_world_bbox(
     cell_name: &str,
     library: &Library,
@@ -757,7 +764,7 @@ impl Drawable for gdsr::Path {
 
 impl Drawable for gdsr::Text {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
-        vec![(self.layer(), DataType::new(0))]
+        vec![(self.layer(), self.data_type())]
     }
 
     fn world_bbox(&self) -> Option<WorldBBox> {
@@ -778,7 +785,7 @@ impl Drawable for gdsr::Text {
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
-        let key = (self.layer(), DataType::new(0));
+        let key = (self.layer(), self.data_type());
         if ctx.layer_state.hidden_layers.contains(&key) {
             return;
         }
