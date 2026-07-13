@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 use std::fs::File;
 use std::io::Write;
 
@@ -6,6 +7,7 @@ use crate::cell::Cell;
 use crate::design_rules::{self, DesignRuleOptions, DesignRuleReport};
 use crate::error::GdsError;
 use crate::io::read::{from_gds, from_gds_filtered};
+use crate::io::write::validation::MAX_STRUCTURE_NAME_LENGTH;
 use crate::io::write::{GdsFileWriter, GdsWriter};
 use crate::types::LayerMapping;
 use crate::{DataType, Element, Instance, Layer};
@@ -18,6 +20,49 @@ pub struct DanglingCellReference {
     /// The name of the missing target cell.
     pub target_name: String,
 }
+
+/// How [`Library::merge`] handles an incoming cell whose name already exists.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CellConflictStrategy {
+    /// Reject the merge without modifying the primary library.
+    #[default]
+    Error,
+    /// Give the incoming cell a unique numeric suffix and update its library's references.
+    Rename,
+    /// Replace the existing cell with the incoming cell.
+    Overwrite,
+    /// Keep the existing cell and discard the incoming cell.
+    Skip,
+}
+
+/// An error produced while merging GDS libraries.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LibraryMergeError {
+    /// An incoming cell conflicts with an existing cell under
+    /// [`CellConflictStrategy::Error`].
+    CellNameConflict { cell_name: String },
+    /// The merged cell set contains references to cells that do not exist.
+    DanglingCellReferences {
+        references: Vec<DanglingCellReference>,
+    },
+}
+
+impl fmt::Display for LibraryMergeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CellNameConflict { cell_name } => {
+                write!(formatter, "cell name conflict: {cell_name}")
+            }
+            Self::DanglingCellReferences { references } => write!(
+                formatter,
+                "merged library contains {} dangling cell references",
+                references.len()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for LibraryMergeError {}
 
 /// A GDSII library containing named cells. This is the top-level container for a GDSII design.
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +145,116 @@ impl Library {
     /// Returns `true` if the library contains a cell with the same name.
     pub fn contains_cell(&self, cell: &Cell) -> bool {
         self.cells.contains_key(cell.name())
+    }
+
+    /// Merges cells from `libraries` into this primary library.
+    ///
+    /// The primary library's name and metadata are preserved. Incoming libraries are
+    /// applied in iteration order. The primary library is not modified if a conflict or
+    /// dangling reference causes the merge to fail.
+    pub fn merge(
+        &mut self,
+        libraries: impl IntoIterator<Item = Self>,
+        conflict_strategy: CellConflictStrategy,
+    ) -> Result<(), LibraryMergeError> {
+        let mut incoming_cells = HashMap::new();
+        let mut occupied_names: HashSet<String> = self.cells.keys().cloned().collect();
+
+        for library in libraries {
+            let mut cell_names: Vec<String> = library.cells.keys().cloned().collect();
+            cell_names.sort();
+            let conflicting_names: Vec<String> = cell_names
+                .iter()
+                .filter(|name| occupied_names.contains(name.as_str()))
+                .cloned()
+                .collect();
+
+            if conflict_strategy == CellConflictStrategy::Error
+                && let Some(cell_name) = conflicting_names.first()
+            {
+                return Err(LibraryMergeError::CellNameConflict {
+                    cell_name: cell_name.clone(),
+                });
+            }
+
+            let rename_map = if conflict_strategy == CellConflictStrategy::Rename {
+                let mut reserved_names = occupied_names.clone();
+                reserved_names.extend(cell_names);
+                conflicting_names
+                    .into_iter()
+                    .map(|cell_name| {
+                        let renamed = Self::next_merged_cell_name(&cell_name, &mut reserved_names);
+                        (cell_name, renamed)
+                    })
+                    .collect()
+            } else {
+                HashMap::new()
+            };
+
+            for (cell_name, mut cell) in library.cells {
+                if conflict_strategy == CellConflictStrategy::Skip
+                    && occupied_names.contains(&cell_name)
+                {
+                    continue;
+                }
+
+                if !rename_map.is_empty() {
+                    for element in cell.iter_elements_mut() {
+                        Self::update_reference_names(element, &rename_map);
+                    }
+                }
+
+                let merged_name = rename_map.get(&cell_name).cloned().unwrap_or(cell_name);
+                cell.set_name(&merged_name);
+                occupied_names.insert(merged_name.clone());
+                incoming_cells.insert(merged_name, cell);
+            }
+        }
+
+        let mut dangling_references: Vec<DanglingCellReference> = self
+            .cells
+            .iter()
+            .filter(|(cell_name, _)| !incoming_cells.contains_key(cell_name.as_str()))
+            .chain(incoming_cells.iter())
+            .flat_map(|(cell_name, cell)| {
+                cell.referenced_cell_names()
+                    .into_iter()
+                    .filter(|target_name| !occupied_names.contains(*target_name))
+                    .map(|target_name| DanglingCellReference {
+                        cell_name: cell_name.clone(),
+                        target_name: target_name.to_string(),
+                    })
+            })
+            .collect();
+        dangling_references.sort_by(|left, right| {
+            (&left.cell_name, &left.target_name).cmp(&(&right.cell_name, &right.target_name))
+        });
+
+        if !dangling_references.is_empty() {
+            return Err(LibraryMergeError::DanglingCellReferences {
+                references: dangling_references,
+            });
+        }
+
+        self.cells.extend(incoming_cells);
+        Ok(())
+    }
+
+    fn next_merged_cell_name(cell_name: &str, reserved_names: &mut HashSet<String>) -> String {
+        let mut index = 1_u64;
+        loop {
+            let suffix = format!("_{index}");
+            let max_prefix_length = MAX_STRUCTURE_NAME_LENGTH.saturating_sub(suffix.len());
+            let mut prefix_end = cell_name.len().min(max_prefix_length);
+            while !cell_name.is_char_boundary(prefix_end) {
+                prefix_end -= 1;
+            }
+            let candidate = format!("{}{suffix}", &cell_name[..prefix_end]);
+            if reserved_names.insert(candidate.clone()) {
+                return candidate;
+            }
+            index += 1;
+        }
     }
 
     /// Serialize the library using a custom writer, returning the GDS bytes.
@@ -692,6 +847,165 @@ mod tests {
         assert!(!library.rename_cell("missing", "c"));
         assert!(!library.rename_cell("a", "b"));
         assert!(library.rename_cell("a", "a"));
+    }
+
+    #[test]
+    fn merge_error_is_atomic_on_cell_name_conflict() {
+        let mut primary = Library::new("primary");
+        primary.add_cell(Cell::new("shared"));
+
+        let mut incoming = Library::new("incoming");
+        incoming.add_cell(Cell::new("shared"));
+        incoming.add_cell(Cell::new("unique"));
+
+        let error = primary
+            .merge([incoming], CellConflictStrategy::Error)
+            .expect_err("conflicting merge should fail");
+
+        assert_eq!(
+            error,
+            LibraryMergeError::CellNameConflict {
+                cell_name: "shared".to_string(),
+            }
+        );
+        assert_eq!(primary.name(), "primary");
+        assert_eq!(primary.cells().len(), 1);
+        assert!(primary.get_cell("unique").is_none());
+    }
+
+    #[test]
+    fn merge_rename_keeps_conflicting_cells_and_updates_their_references() {
+        let mut primary = Library::new("primary");
+        primary.add_cell(Cell::new("shared"));
+
+        let mut first = Library::new("first");
+        first.add_cell(Cell::new("shared"));
+        let mut first_top = Cell::new("first_top");
+        first_top.add(Reference::new("shared"));
+        first.add_cell(first_top);
+
+        let mut second = Library::new("second");
+        second.add_cell(Cell::new("shared"));
+        let mut second_top = Cell::new("second_top");
+        second_top.add(Reference::new("shared"));
+        second.add_cell(second_top);
+
+        primary
+            .merge([first, second], CellConflictStrategy::Rename)
+            .expect("conflicting cells should be renamed");
+
+        assert!(primary.get_cell("shared").is_some());
+        assert!(primary.get_cell("shared_1").is_some());
+        assert!(primary.get_cell("shared_2").is_some());
+        assert_eq!(
+            primary
+                .get_cell("first_top")
+                .expect("first top cell should exist")
+                .referenced_cell_names(),
+            vec!["shared_1"]
+        );
+        assert_eq!(
+            primary
+                .get_cell("second_top")
+                .expect("second top cell should exist")
+                .referenced_cell_names(),
+            vec!["shared_2"]
+        );
+    }
+
+    #[test]
+    fn merge_overwrite_replaces_conflicts_and_skip_preserves_them() {
+        let mut incoming_cell = Cell::new("shared");
+        incoming_cell.add(Polygon::default());
+        let mut incoming = Library::new("incoming");
+        incoming.add_cell(incoming_cell);
+
+        let mut overwritten = Library::new("primary");
+        overwritten.add_cell(Cell::new("shared"));
+        overwritten
+            .merge([incoming.clone()], CellConflictStrategy::Overwrite)
+            .expect("overwrite merge should succeed");
+
+        let mut skipped = Library::new("primary");
+        skipped.add_cell(Cell::new("shared"));
+        skipped
+            .merge([incoming], CellConflictStrategy::Skip)
+            .expect("skip merge should succeed");
+
+        assert_eq!(
+            overwritten
+                .get_cell("shared")
+                .expect("overwritten cell should exist")
+                .elements()
+                .len(),
+            1
+        );
+        assert!(
+            skipped
+                .get_cell("shared")
+                .expect("preserved cell should exist")
+                .elements()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn merge_resolves_references_across_incoming_libraries() {
+        let mut referencing = Library::new("referencing");
+        let mut top = Cell::new("top");
+        top.add(Reference::new("leaf"));
+        referencing.add_cell(top);
+
+        let mut dependency = Library::new("dependency");
+        dependency.add_cell(Cell::new("leaf"));
+
+        let mut primary = Library::new("primary");
+        primary
+            .merge([referencing, dependency], CellConflictStrategy::Error)
+            .expect("cross-library reference should resolve after the full merge");
+
+        assert!(primary.dangling_cell_references().is_empty());
+    }
+
+    #[test]
+    fn merge_rejects_dangling_references_without_modifying_primary() {
+        let mut incoming = Library::new("incoming");
+        let mut top = Cell::new("top");
+        top.add(Reference::new("missing"));
+        incoming.add_cell(top);
+
+        let mut primary = Library::new("primary");
+        let error = primary
+            .merge([incoming], CellConflictStrategy::Error)
+            .expect_err("dangling reference should fail the merge");
+
+        assert_eq!(
+            error,
+            LibraryMergeError::DanglingCellReferences {
+                references: vec![DanglingCellReference {
+                    cell_name: "top".to_string(),
+                    target_name: "missing".to_string(),
+                }],
+            }
+        );
+        assert!(primary.cells().is_empty());
+    }
+
+    #[test]
+    fn merge_rename_keeps_names_within_the_gds_limit() {
+        let original_name = "a".repeat(MAX_STRUCTURE_NAME_LENGTH);
+        let mut primary = Library::new("primary");
+        primary.add_cell(Cell::new(&original_name));
+
+        let mut incoming = Library::new("incoming");
+        incoming.add_cell(Cell::new(&original_name));
+        primary
+            .merge([incoming], CellConflictStrategy::Rename)
+            .expect("conflicting cell should be renamed");
+
+        let renamed_name = format!("{}_1", "a".repeat(MAX_STRUCTURE_NAME_LENGTH - 2));
+        assert!(primary.get_cell(&renamed_name).is_some());
+        assert_eq!(renamed_name.len(), MAX_STRUCTURE_NAME_LENGTH);
     }
 
     #[test]
