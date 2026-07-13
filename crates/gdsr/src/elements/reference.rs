@@ -3,7 +3,7 @@ use std::sync::mpsc;
 
 use crate::elements::Element;
 use crate::traits::{Movable, Transformable};
-use crate::{Cell, Grid, Library, Point, Radians, Transformation};
+use crate::{Cell, FlattenOptions, Grid, Library, Point, Radians, Transformation};
 
 /// The target of a [`Reference`](crate::Reference): either a cell name or an inline element.
 #[derive(Clone, Debug, PartialEq)]
@@ -256,15 +256,38 @@ impl Reference {
     /// Recursively flattens this reference into concrete elements, resolving cell references
     /// up to the given depth (or fully if `None`).
     pub fn flatten(self, depth: Option<usize>, library: &Library) -> Vec<Element> {
-        let depth = depth.unwrap_or(usize::MAX);
+        self.flatten_filtered(
+            &FlattenOptions {
+                depth,
+                ..FlattenOptions::default()
+            },
+            library,
+        )
+    }
+
+    /// Recursively flattens this reference according to `options`.
+    pub fn flatten_filtered(self, options: &FlattenOptions, library: &Library) -> Vec<Element> {
+        self.flatten_filtered_at_depth(options.depth.unwrap_or(usize::MAX), options, library)
+    }
+
+    pub(crate) fn flatten_filtered_at_depth(
+        self,
+        depth: usize,
+        options: &FlattenOptions,
+        library: &Library,
+    ) -> Vec<Element> {
         let mut elements: Vec<Element> = Vec::new();
         if depth == 0 {
             return [Element::Reference(self)].to_vec();
         }
         match &self.instance {
             Instance::Cell(cell_name) => {
+                if !options.includes_cell(cell_name) {
+                    return vec![Element::Reference(self)];
+                }
                 if let Some(cell) = library.get_cell(cell_name) {
-                    let flattened_cell_elements = cell.get_elements(Some(depth - 1), library);
+                    let flattened_cell_elements =
+                        cell.get_elements_filtered_at_depth(depth - 1, options, library);
                     for cell_element in flattened_cell_elements {
                         elements.extend(self.get_elements_in_grid(&cell_element));
                     }
@@ -276,12 +299,16 @@ impl Reference {
                 | Element::Box(_)
                 | Element::Node(_)
                 | Element::Text(_) => {
-                    elements.extend(self.get_elements_in_grid(element));
+                    if options.includes_element(element) {
+                        elements.extend(self.get_elements_in_grid(element));
+                    }
                 }
 
                 Element::Reference(reference) => {
                     let flattened_reference_elements =
-                        reference.clone().flatten(Some(depth - 1), library);
+                        reference
+                            .clone()
+                            .flatten_filtered_at_depth(depth - 1, options, library);
 
                     for reference_element in flattened_reference_elements {
                         elements.extend(self.get_elements_in_grid(&reference_element));
