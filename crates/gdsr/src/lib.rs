@@ -1,3 +1,4 @@
+mod boolean;
 mod cell;
 mod clip;
 mod config;
