@@ -1,8 +1,8 @@
 use std::sync::mpsc;
 
 use crate::{
-    Dimensions, Element, GdsBox, LayerMapping, Library, Movable, Node, Path, Point, Polygon,
-    Reference, Text, Transformable, Transformation,
+    Dimensions, Element, FlattenOptions, GdsBox, LayerMapping, Library, Movable, Node, Path, Point,
+    Polygon, Reference, Text, Transformable, Transformation,
 };
 
 /// A named cell containing polygons, paths, boxes, nodes, texts, and references to other cells or elements.
@@ -172,13 +172,40 @@ impl Cell {
 
     /// Returns all elements in this cell, recursively flattening references up to the given depth.
     pub fn get_elements(&self, depth: Option<usize>, library: &Library) -> Vec<Element> {
-        let depth = depth.unwrap_or(usize::MAX);
+        self.get_elements_filtered(
+            &FlattenOptions {
+                depth,
+                ..FlattenOptions::default()
+            },
+            library,
+        )
+    }
+
+    /// Returns elements recursively flattened according to `options`.
+    pub fn get_elements_filtered(
+        &self,
+        options: &FlattenOptions,
+        library: &Library,
+    ) -> Vec<Element> {
+        self.get_elements_filtered_at_depth(options.depth.unwrap_or(usize::MAX), options, library)
+    }
+
+    pub(crate) fn get_elements_filtered_at_depth(
+        &self,
+        depth: usize,
+        options: &FlattenOptions,
+        library: &Library,
+    ) -> Vec<Element> {
         let mut result: Vec<Element> = Vec::new();
 
         for element in &self.elements {
             if let Element::Reference(reference) = element {
-                result.extend(reference.clone().flatten(Some(depth), library));
-            } else {
+                result.extend(
+                    reference
+                        .clone()
+                        .flatten_filtered_at_depth(depth, options, library),
+                );
+            } else if options.includes_element(element) {
                 result.push(element.clone());
             }
         }
@@ -246,8 +273,22 @@ impl Movable for Cell {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
-    use crate::{DataType, Layer, Radians};
+    use crate::{DataType, Grid, Layer, Radians};
+
+    fn polygon_on_layer(layer: u16) -> Polygon {
+        Polygon::new(
+            [
+                Point::integer(0, 0, 1e-9),
+                Point::integer(10, 0, 1e-9),
+                Point::integer(10, 10, 1e-9),
+            ],
+            Layer::new(layer),
+            DataType::new(0),
+        )
+    }
 
     #[test]
     fn test_cell_new() {
@@ -438,6 +479,125 @@ mod tests {
         let rotated_elements = rotated_cell.get_elements(None, &library);
 
         insta::assert_debug_snapshot!(rotated_elements);
+    }
+
+    #[test]
+    fn filtered_flatten_preserves_unselected_cells_with_transforms() {
+        let mut library = Library::new("main");
+
+        let mut leaf = Cell::new("leaf");
+        leaf.add(polygon_on_layer(1));
+        library.add_cell(leaf);
+
+        let mut middle = Cell::new("middle");
+        middle.add(
+            Reference::new("leaf")
+                .with_grid(Grid::default().with_origin(Point::integer(5, 0, 1e-9))),
+        );
+        library.add_cell(middle);
+
+        let mut root = Cell::new("root");
+        root.add(
+            Reference::new("middle")
+                .with_grid(Grid::default().with_origin(Point::integer(10, 0, 1e-9))),
+        );
+
+        let elements = root.get_elements_filtered(
+            &FlattenOptions {
+                cells: Some(HashSet::from([String::from("middle")])),
+                ..FlattenOptions::default()
+            },
+            &library,
+        );
+
+        let [Element::Reference(reference)] = elements.as_slice() else {
+            panic!("unselected leaf should remain a reference");
+        };
+        assert_eq!(reference.referenced_cell_name(), Some("leaf"));
+        assert_eq!(reference.grid().origin(), Point::integer(15, 0, 1e-9));
+    }
+
+    #[test]
+    fn filtered_flatten_includes_only_selected_layers() {
+        let mut library = Library::new("main");
+
+        let mut child = Cell::new("child");
+        child.add(polygon_on_layer(1));
+        child.add(polygon_on_layer(2));
+        library.add_cell(child);
+
+        let mut root = Cell::new("root");
+        root.add(polygon_on_layer(1));
+        root.add(polygon_on_layer(2));
+        root.add(Reference::new("child"));
+        root.add(Reference::new(polygon_on_layer(1)));
+        root.add(Reference::new(polygon_on_layer(2)));
+
+        let elements = root.get_elements_filtered(
+            &FlattenOptions {
+                layers: Some(HashSet::from([Layer::new(2)])),
+                ..FlattenOptions::default()
+            },
+            &library,
+        );
+
+        assert_eq!(elements.len(), 3);
+        assert!(elements.iter().all(|element| {
+            element
+                .as_polygon()
+                .is_some_and(|polygon| polygon.layer() == Layer::new(2))
+        }));
+    }
+
+    #[test]
+    fn filtered_flatten_combines_cell_layer_and_depth_filters() {
+        let mut library = Library::new("main");
+
+        let mut leaf = Cell::new("leaf");
+        leaf.add(polygon_on_layer(7));
+        leaf.add(polygon_on_layer(8));
+        library.add_cell(leaf);
+
+        let mut middle = Cell::new("middle");
+        middle.add(Reference::new("leaf"));
+        library.add_cell(middle);
+
+        let mut outer = Cell::new("outer");
+        outer.add(Reference::new("middle"));
+        library.add_cell(outer);
+
+        let mut root = Cell::new("root");
+        root.add(Reference::new("outer"));
+
+        let cells = HashSet::from([
+            String::from("outer"),
+            String::from("middle"),
+            String::from("leaf"),
+        ]);
+        let layers = HashSet::from([Layer::new(7)]);
+
+        let depth_limited = root.get_elements_filtered(
+            &FlattenOptions {
+                depth: Some(2),
+                cells: Some(cells.clone()),
+                layers: Some(layers.clone()),
+            },
+            &library,
+        );
+        assert!(matches!(depth_limited.as_slice(), [Element::Reference(_)]));
+
+        let flattened = root.get_elements_filtered(
+            &FlattenOptions {
+                depth: Some(3),
+                cells: Some(cells),
+                layers: Some(layers),
+            },
+            &library,
+        );
+        let [Element::Polygon(polygon)] = flattened.as_slice() else {
+            panic!("selected layer should be flattened at depth three");
+        };
+        assert_eq!(polygon.layer(), Layer::new(7));
     }
 
     #[test]
