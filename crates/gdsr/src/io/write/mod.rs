@@ -93,6 +93,64 @@ pub struct GdsFileWriter;
 
 impl GdsWriter for GdsFileWriter {}
 
+/// Writes a GDS library incrementally to an output stream.
+///
+/// The library header is written when the stream is created. Each call to
+/// [`Self::write_cell`] serializes and flushes one cell, so the complete
+/// library never needs to be held in memory. Call [`Self::finish`] to write the
+/// library footer and recover the output stream.
+///
+/// # Examples
+///
+/// ```
+/// use gdsr::{Cell, GdsError, GdsStreamWriter};
+///
+/// # fn main() -> Result<(), GdsError> {
+/// let mut writer = GdsStreamWriter::new(Vec::new(), "example", 1e-6, 1e-9)?;
+/// writer.write_cell(&Cell::new("top"))?;
+/// let bytes = writer.finish()?;
+///
+/// assert!(!bytes.is_empty());
+/// # Ok(())
+/// # }
+/// ```
+pub struct GdsStreamWriter<W> {
+    output: W,
+    database_units: f64,
+}
+
+impl<W: Write> GdsStreamWriter<W> {
+    /// Writes a library header to `output` and starts a streaming GDS library.
+    pub fn new(
+        mut output: W,
+        library_name: &str,
+        user_units: f64,
+        database_units: f64,
+    ) -> Result<Self, GdsError> {
+        write_gds_head_to_file(library_name, user_units, database_units, &mut output)?;
+        output.flush()?;
+        Ok(Self {
+            output,
+            database_units,
+        })
+    }
+
+    /// Serializes and flushes one cell to the library.
+    pub fn write_cell(&mut self, cell: &Cell) -> Result<(), GdsError> {
+        let bytes = GdsFileWriter.write_cell(cell, self.database_units)?;
+        self.output.write_all(&bytes)?;
+        self.output.flush()?;
+        Ok(())
+    }
+
+    /// Writes and flushes the library footer, returning the output stream.
+    pub fn finish(mut self) -> Result<W, GdsError> {
+        write_gds_tail_to_file(&mut self.output)?;
+        self.output.flush()?;
+        Ok(self.output)
+    }
+}
+
 pub fn write_u16_array(buffer: &mut impl Write, array: &[u16]) -> Result<(), GdsError> {
     Ok(write_u16_array_as_big_endian(buffer, array)?)
 }
@@ -597,4 +655,64 @@ pub fn write_node(node: &Node, db_units: f64) -> Result<Vec<u8>, GdsError> {
     write_element_tail_to_file(&mut buffer)?;
 
     Ok(buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::io::{self, Write};
+
+    use crate::{DEFAULT_INTEGER_UNITS, Library};
+
+    use super::*;
+
+    #[derive(Default)]
+    struct FlushCountingWriter {
+        bytes: Vec<u8>,
+        flushes: usize,
+    }
+
+    impl Write for FlushCountingWriter {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            self.bytes.extend_from_slice(buffer);
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.flushes += 1;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn stream_writer_flushes_each_cell_and_produces_a_readable_library() {
+        let output = FlushCountingWriter::default();
+        let mut writer = GdsStreamWriter::new(
+            output,
+            "streamed",
+            DEFAULT_INTEGER_UNITS,
+            DEFAULT_INTEGER_UNITS,
+        )
+        .expect("library header should be writable");
+
+        writer
+            .write_cell(&Cell::new("first"))
+            .expect("first cell should be writable");
+        writer
+            .write_cell(&Cell::new("second"))
+            .expect("second cell should be writable");
+        let output = writer.finish().expect("library footer should be writable");
+
+        assert_eq!(output.flushes, 4);
+
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let path = directory.path().join("streamed.gds");
+        fs::write(&path, output.bytes).expect("streamed bytes should be writable");
+        let library = Library::read_file(path, Some(DEFAULT_INTEGER_UNITS))
+            .expect("streamed library should be readable");
+
+        assert_eq!(library.name(), "streamed");
+        assert!(library.get_cell("first").is_some());
+        assert!(library.get_cell("second").is_some());
+    }
 }
