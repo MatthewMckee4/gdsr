@@ -26,7 +26,7 @@ pub use error::GdsError;
 pub use grid::Grid;
 pub use io::write::svg::cell_to_svg;
 pub use io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter};
-pub use library::{DanglingCellReference, Library};
+pub use library::{CellConflictStrategy, DanglingCellReference, Library, LibraryMergeError};
 pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
 pub use traits::{Dimensions, Movable, Transformable};
