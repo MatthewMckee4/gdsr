@@ -12,6 +12,7 @@ expression: rotated_elements
             data_type: DataType(
                 0,
             ),
+            properties: [],
         },
     ),
     Polygon(
@@ -23,6 +24,7 @@ expression: rotated_elements
             data_type: DataType(
                 0,
             ),
+            properties: [],
         },
     ),
     Path(
@@ -38,6 +40,7 @@ expression: rotated_elements
             width: None,
             begin_extension: None,
             end_extension: None,
+            properties: [],
         },
     ),
     Text(
@@ -70,6 +73,7 @@ expression: rotated_elements
             x_reflection: false,
             vertical_presentation: Middle,
             horizontal_presentation: Centre,
+            properties: [],
         },
     ),
 ]

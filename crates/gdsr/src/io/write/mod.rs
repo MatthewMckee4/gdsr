@@ -13,8 +13,8 @@ use crate::config::gds_file_types::{
 use crate::elements::text::get_presentation_value;
 use crate::error::GdsError;
 use crate::{
-    Cell, Element, GdsBox, Instance, Library, Movable, Node, Path, Point, Polygon, Reference, Text,
-    Transformable,
+    Cell, Element, GdsBox, Instance, Library, Movable, Node, Path, Point, Polygon, Property,
+    Reference, Text, Transformable,
 };
 use gds_format::{eight_byte_real, write_u16_array_as_big_endian};
 use validation::{
@@ -268,7 +268,16 @@ fn write_points_to_file(
     Ok(())
 }
 
-fn write_element_tail_to_file(buffer: &mut impl Write) -> Result<(), GdsError> {
+fn write_element_tail_to_file(
+    buffer: &mut impl Write,
+    properties: &[Property],
+) -> Result<(), GdsError> {
+    for property in properties {
+        let [size, head] = record_header(GDSRecord::PropAttr, GDSDataType::TwoByteSignedInteger, 1);
+        write_u16_array(buffer, &[size, head, property.attribute()])?;
+        write_string_with_record_to_file(buffer, GDSRecord::PropValue, property.value())?;
+    }
+
     let tail = [
         GDSDataType::NoData.record_size(1),
         record_head(GDSRecord::EndEl, GDSDataType::NoData),
@@ -282,12 +291,21 @@ fn write_string_with_record_to_file(
     string: &str,
 ) -> Result<(), GdsError> {
     let byte_len = string.len();
-    let padded_len = byte_len + (byte_len % 2);
+    let Some(padded_len) = byte_len.checked_add(byte_len % 2) else {
+        return Err(GdsError::ValidationError {
+            message: "String record length overflow".to_string(),
+        });
+    };
+    let Some(record_size) = 4usize
+        .checked_add(padded_len)
+        .and_then(|size| u16::try_from(size).ok())
+    else {
+        return Err(GdsError::ValidationError {
+            message: format!("String record of {byte_len} bytes exceeds the GDS record limit"),
+        });
+    };
 
-    let string_start = [
-        (4 + padded_len) as u16,
-        record_head(record, GDSDataType::AsciiString),
-    ];
+    let string_start = [record_size, record_head(record, GDSDataType::AsciiString)];
 
     write_u16_array(buffer, &string_start)?;
 
@@ -420,7 +438,7 @@ pub fn write_polygon(polygon: &Polygon, db_units: f64) -> Result<Vec<u8>, GdsErr
     );
     write_u16_array(&mut buffer, &head)?;
     write_points_to_file(&mut buffer, polygon.points(), db_units)?;
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, polygon.properties())?;
 
     Ok(buffer)
 }
@@ -465,7 +483,7 @@ pub fn write_path(path: &Path, db_units: f64) -> Result<Vec<u8>, GdsError> {
     }
 
     write_points_to_file(&mut buffer, path.points(), db_units)?;
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, path.properties())?;
 
     Ok(buffer)
 }
@@ -510,12 +528,14 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
     )?;
     write_points_to_file(&mut buffer, &[*text.origin()], db_units)?;
     write_string_with_record_to_file(&mut buffer, GDSRecord::String, text.text())?;
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, text.properties())?;
 
     Ok(buffer)
 }
 
 /// Serializes a reference to GDS bytes.
+///
+/// Properties on inline references are appended to each expanded element.
 pub fn write_reference(reference: &Reference, db_units: f64) -> Result<Vec<u8>, GdsError> {
     match reference.instance() {
         Instance::Cell(cell_name) => write_reference_cell(reference, db_units, cell_name),
@@ -531,6 +551,7 @@ fn write_reference_element(
     element: &Element,
 ) -> Result<Vec<u8>, GdsError> {
     let grid = reference.grid();
+    let properties = reference.properties();
     let spacing_x = grid.spacing_x().unwrap_or_default();
     let spacing_y = grid.spacing_y().unwrap_or_default();
 
@@ -548,6 +569,9 @@ fn write_reference_element(
             new_element = new_element.rotate(grid.angle(), Point::default());
             new_element = new_element.scale(grid.magnification(), Point::default());
             new_element = new_element.move_by(final_position);
+            if !properties.is_empty() {
+                new_element.properties_mut().extend_from_slice(properties);
+            }
 
             buf.extend_from_slice(&GdsFileWriter.write_element(&new_element, db_units)?);
         }
@@ -611,7 +635,7 @@ fn write_reference_cell(
         }
     }
 
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, reference.properties())?;
 
     Ok(buffer)
 }
@@ -632,7 +656,7 @@ pub fn write_box(gds_box: &GdsBox, db_units: f64) -> Result<Vec<u8>, GdsError> {
     write_u16_array(&mut buffer, &head)?;
     let points = gds_box.points();
     write_points_to_file(&mut buffer, &points, db_units)?;
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, gds_box.properties())?;
 
     Ok(buffer)
 }
@@ -652,7 +676,7 @@ pub fn write_node(node: &Node, db_units: f64) -> Result<Vec<u8>, GdsError> {
     );
     write_u16_array(&mut buffer, &head)?;
     write_points_to_file(&mut buffer, node.points(), db_units)?;
-    write_element_tail_to_file(&mut buffer)?;
+    write_element_tail_to_file(&mut buffer, node.properties())?;
 
     Ok(buffer)
 }
@@ -660,9 +684,11 @@ pub fn write_node(node: &Node, db_units: f64) -> Result<Vec<u8>, GdsError> {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::io::{self, Write};
+    use std::io::{self, BufReader, Write};
 
-    use crate::{DEFAULT_INTEGER_UNITS, Library};
+    use crate::config::gds_file_types::GDSRecordData;
+    use crate::io::read::RecordReader;
+    use crate::{DEFAULT_INTEGER_UNITS, DataType, Layer, Library, Property};
 
     use super::*;
 
@@ -682,6 +708,83 @@ mod tests {
             self.flushes += 1;
             Ok(())
         }
+    }
+
+    fn polygon_with_property(value: impl Into<String>) -> Polygon {
+        let mut polygon = Polygon::new(
+            [
+                Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(1),
+            DataType::new(2),
+        );
+        polygon.properties_mut().push(Property::new(65_535, value));
+        polygon
+    }
+
+    #[test]
+    fn properties_are_written_before_end_element() {
+        let bytes = write_polygon(&polygon_with_property("net-a"), DEFAULT_INTEGER_UNITS)
+            .expect("polygon should be writable");
+        let records: Vec<_> = RecordReader::new(BufReader::new(bytes.as_slice()))
+            .collect::<Result<_, _>>()
+            .expect("element records should be readable");
+        let record_types: Vec<_> = records.iter().map(|(record, _)| *record).collect();
+
+        assert_eq!(
+            record_types,
+            [
+                GDSRecord::Boundary,
+                GDSRecord::Layer,
+                GDSRecord::DataType,
+                GDSRecord::XY,
+                GDSRecord::PropAttr,
+                GDSRecord::PropValue,
+                GDSRecord::EndEl,
+            ]
+        );
+        assert!(matches!(
+            &records[4].1,
+            GDSRecordData::I16(attributes) if attributes == &[-1]
+        ));
+        assert!(matches!(
+            &records[5].1,
+            GDSRecordData::Str(value) if value == "net-a"
+        ));
+    }
+
+    #[test]
+    fn oversized_property_value_is_rejected() {
+        let property_value = "x".repeat(usize::from(u16::MAX));
+
+        let error = write_polygon(
+            &polygon_with_property(property_value),
+            DEFAULT_INTEGER_UNITS,
+        )
+        .expect_err("oversized property value should be rejected");
+
+        assert!(matches!(error, GdsError::ValidationError { .. }));
+    }
+
+    #[test]
+    fn inline_reference_properties_are_written_on_expanded_elements() {
+        let mut reference = Reference::new(polygon_with_property("inner"));
+        reference.properties_mut().push(Property::new(7, "outer"));
+
+        let bytes = write_reference(&reference, DEFAULT_INTEGER_UNITS)
+            .expect("inline reference should be writable");
+        let property_values: Vec<_> = RecordReader::new(BufReader::new(bytes.as_slice()))
+            .filter_map(
+                |record| match record.expect("element records should be readable") {
+                    (GDSRecord::PropValue, GDSRecordData::Str(value)) => Some(value),
+                    _ => None,
+                },
+            )
+            .collect();
+
+        assert_eq!(property_values, ["inner", "outer"]);
     }
 
     #[test]

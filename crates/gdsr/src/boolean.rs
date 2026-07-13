@@ -24,14 +24,20 @@ fn apply(left: &Polygon, right: &Polygon, operation: OpType) -> Vec<Polygon> {
 fn element_polygon(element: &Element) -> Option<Polygon> {
     match element {
         Element::Polygon(polygon) => Some(polygon.clone()),
-        Element::Box(gds_box) => Some(Polygon::new(
-            gds_box.points(),
-            gds_box.layer(),
-            gds_box.box_type(),
-        )),
-        Element::Path(path) => path
-            .to_polygon_points(PATH_ARC_SEGMENTS)
-            .map(|points| Polygon::new(points, path.layer(), path.data_type())),
+        Element::Box(gds_box) => {
+            let mut polygon = Polygon::new(gds_box.points(), gds_box.layer(), gds_box.box_type());
+            polygon
+                .properties_mut()
+                .extend_from_slice(gds_box.properties());
+            Some(polygon)
+        }
+        Element::Path(path) => path.to_polygon_points(PATH_ARC_SEGMENTS).map(|points| {
+            let mut polygon = Polygon::new(points, path.layer(), path.data_type());
+            polygon
+                .properties_mut()
+                .extend_from_slice(path.properties());
+            polygon
+        }),
         Element::Node(_) | Element::Text(_) | Element::Reference(_) => None,
     }
 }
@@ -45,7 +51,7 @@ fn apply_elements(left: &Element, right: &Element, operation: OpType) -> Option<
 impl Polygon {
     /// Returns the filled union of this polygon and `other`.
     ///
-    /// Results use this polygon's layer, data type, and coordinate units.
+    /// Results preserve this polygon's layer, data type, coordinate units, and properties.
     #[must_use]
     pub fn union(&self, other: &Self) -> Vec<Self> {
         apply(self, other, OpType::Union)
@@ -53,7 +59,7 @@ impl Polygon {
 
     /// Returns the regions shared by this polygon and `other`.
     ///
-    /// Results use this polygon's layer, data type, and coordinate units.
+    /// Results preserve this polygon's layer, data type, coordinate units, and properties.
     #[must_use]
     pub fn intersection(&self, other: &Self) -> Vec<Self> {
         apply(self, other, OpType::Intersection)
@@ -61,7 +67,7 @@ impl Polygon {
 
     /// Returns the regions in this polygon that are not in `other`.
     ///
-    /// Results use this polygon's layer, data type, and coordinate units.
+    /// Results preserve this polygon's layer, data type, coordinate units, and properties.
     #[must_use]
     pub fn difference(&self, other: &Self) -> Vec<Self> {
         apply(self, other, OpType::Difference)
@@ -69,7 +75,7 @@ impl Polygon {
 
     /// Returns the regions in either polygon, but not both.
     ///
-    /// Results use this polygon's layer, data type, and coordinate units.
+    /// Results preserve this polygon's layer, data type, coordinate units, and properties.
     #[must_use]
     pub fn xor(&self, other: &Self) -> Vec<Self> {
         apply(self, other, OpType::Xor)
@@ -80,7 +86,8 @@ impl Element {
     /// Returns the filled union of this element and `other`.
     ///
     /// Polygons, boxes, and paths with positive width are supported. Returns `None` when either
-    /// element has no filled-area representation. Results use this element's layer and data type.
+    /// element has no filled-area representation. Results preserve this element's layer, data
+    /// type, coordinate units, and properties.
     #[must_use]
     pub fn union(&self, other: &Self) -> Option<Vec<Polygon>> {
         apply_elements(self, other, OpType::Union)
@@ -89,7 +96,8 @@ impl Element {
     /// Returns the regions shared by this element and `other`.
     ///
     /// Polygons, boxes, and paths with positive width are supported. Returns `None` when either
-    /// element has no filled-area representation. Results use this element's layer and data type.
+    /// element has no filled-area representation. Results preserve this element's layer, data
+    /// type, coordinate units, and properties.
     #[must_use]
     pub fn intersection(&self, other: &Self) -> Option<Vec<Polygon>> {
         apply_elements(self, other, OpType::Intersection)
@@ -98,7 +106,8 @@ impl Element {
     /// Returns the regions in this element that are not in `other`.
     ///
     /// Polygons, boxes, and paths with positive width are supported. Returns `None` when either
-    /// element has no filled-area representation. Results use this element's layer and data type.
+    /// element has no filled-area representation. Results preserve this element's layer, data
+    /// type, coordinate units, and properties.
     #[must_use]
     pub fn difference(&self, other: &Self) -> Option<Vec<Polygon>> {
         apply_elements(self, other, OpType::Difference)
@@ -107,7 +116,8 @@ impl Element {
     /// Returns the regions in either element, but not both.
     ///
     /// Polygons, boxes, and paths with positive width are supported. Returns `None` when either
-    /// element has no filled-area representation. Results use this element's layer and data type.
+    /// element has no filled-area representation. Results preserve this element's layer, data
+    /// type, coordinate units, and properties.
     #[must_use]
     pub fn xor(&self, other: &Self) -> Option<Vec<Polygon>> {
         apply_elements(self, other, OpType::Xor)
@@ -117,7 +127,7 @@ impl Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DataType, GdsBox, Layer, Path, Point, Text, Unit};
+    use crate::{DataType, GdsBox, Layer, Path, Point, Property, Text, Unit};
 
     const NANOMETERS: f64 = 1e-9;
 
@@ -156,7 +166,8 @@ mod tests {
     fn polygon_boolean_operations_return_all_regions() {
         let layer = Layer::new(7);
         let data_type = DataType::new(11);
-        let left = rectangle(0.0, 0.0, 10.0, 10.0, layer, data_type);
+        let mut left = rectangle(0.0, 0.0, 10.0, 10.0, layer, data_type);
+        left.properties_mut().push(Property::new(3, "left"));
         let right = rectangle(5.0, 0.0, 15.0, 10.0, Layer::new(2), DataType::new(3));
 
         assert_area(&left.union(&right), 150.0);
@@ -165,10 +176,9 @@ mod tests {
         let xor = left.xor(&right);
         assert_eq!(xor.len(), 2);
         assert_area(&xor, 100.0);
-        assert!(
-            xor.iter()
-                .all(|polygon| polygon.layer() == layer && polygon.data_type() == data_type)
-        );
+        assert!(xor.iter().all(|polygon| polygon.layer() == layer
+            && polygon.data_type() == data_type
+            && polygon.properties() == left.properties()));
     }
 
     #[test]

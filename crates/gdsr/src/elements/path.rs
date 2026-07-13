@@ -1,3 +1,4 @@
+use crate::elements::property::PropertyStore;
 use crate::{
     DataType, Dimensions, Layer, LayerMapping, Movable, Point, Radians, Transformable, Unit,
 };
@@ -38,6 +39,7 @@ pub struct Path {
     pub(crate) width: Option<Unit>,
     pub(crate) begin_extension: Option<Unit>,
     pub(crate) end_extension: Option<Unit>,
+    pub(crate) properties: PropertyStore,
 }
 
 impl Path {
@@ -59,6 +61,7 @@ impl Path {
             width,
             begin_extension,
             end_extension,
+            properties: PropertyStore::default(),
         }
     }
 

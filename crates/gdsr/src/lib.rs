@@ -26,7 +26,9 @@ pub use design_rules::{
 };
 pub use diff::{CellDiff, ElementDiff, LibraryDiff, LibraryDiffOptions};
 pub use elements::text::{HorizontalPresentation, VerticalPresentation};
-pub use elements::{Element, GdsBox, Instance, Node, Path, PathType, Polygon, Reference, Text};
+pub use elements::{
+    Element, GdsBox, Instance, Node, Path, PathType, Polygon, Property, Reference, Text,
+};
 pub use error::GdsError;
 pub use flatten::FlattenOptions;
 pub use grid::Grid;

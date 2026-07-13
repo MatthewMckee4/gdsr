@@ -153,8 +153,13 @@ fn polygon_from_coordinates(
     {
         points.push(first);
     }
-    (points.len() >= MIN_POLYGON_POINTS)
-        .then(|| Polygon::new(points, source.layer(), source.data_type()))
+    (points.len() >= MIN_POLYGON_POINTS).then(|| {
+        let mut polygon = Polygon::new(points, source.layer(), source.data_type());
+        polygon
+            .properties_mut()
+            .extend_from_slice(source.properties());
+        polygon
+    })
 }
 
 pub fn polygons_from_geo(polygon: &GeoPolygon<f64>, source: &Polygon) -> Vec<Polygon> {
@@ -235,7 +240,7 @@ fn clip_path(path: &Path, region: &ClipRegion) -> Vec<Path> {
                 .collect();
             points.dedup();
             (points.len() >= 2).then(|| {
-                Path::new(
+                let mut clipped_path = Path::new(
                     points,
                     path.layer(),
                     path.data_type(),
@@ -243,7 +248,11 @@ fn clip_path(path: &Path, region: &ClipRegion) -> Vec<Path> {
                     path.width(),
                     None,
                     None,
-                )
+                );
+                clipped_path
+                    .properties_mut()
+                    .extend_from_slice(path.properties());
+                clipped_path
             })
         })
         .collect()
@@ -263,12 +272,16 @@ fn clip_box(gds_box: &GdsBox, region: &ClipRegion) -> Option<GdsBox> {
     }
 
     let units = PointUnits::from_point(&gds_box.bottom_left());
-    Some(GdsBox::new(
+    let mut clipped_box = GdsBox::new(
         units.point(Coord { x: min_x, y: min_y }),
         units.point(Coord { x: max_x, y: max_y }),
         gds_box.layer(),
         gds_box.box_type(),
-    ))
+    );
+    clipped_box
+        .properties_mut()
+        .extend_from_slice(gds_box.properties());
+    Some(clipped_box)
 }
 
 fn clip_node(node: &Node, region: &ClipRegion) -> Option<Node> {
@@ -284,7 +297,11 @@ fn clip_node(node: &Node, region: &ClipRegion) -> Option<Node> {
     if points.len() == node.points().len() {
         return Some(node.clone());
     }
-    Some(Node::new(points, node.layer(), node.node_type()))
+    let mut clipped_node = Node::new(points, node.layer(), node.node_type());
+    clipped_node
+        .properties_mut()
+        .extend_from_slice(node.properties());
+    Some(clipped_node)
 }
 
 fn clip_element(element: &Element, region: &ClipRegion) -> Vec<Element> {
@@ -325,7 +342,8 @@ impl Polygon {
     /// Clips this polygon to an axis-aligned bounding box.
     ///
     /// Multiple polygons are returned when clipping splits a concave polygon into disconnected
-    /// regions. Bounding-box corners may be supplied in either order or in different units.
+    /// regions. Element properties are preserved. Bounding-box corners may be supplied in either
+    /// order or in different units.
     #[must_use]
     pub fn clip_to_bounding_box(&self, bounds: (Point, Point)) -> Vec<Self> {
         clip_polygon(self, &ClipRegion::new(bounds))
@@ -336,7 +354,8 @@ impl Path {
     /// Clips this path's centerline to an axis-aligned bounding box.
     ///
     /// A path can split into multiple paths. Partially clipped paths retain their width and path
-    /// type, but their end extensions are removed because the new endpoints lie on the boundary.
+    /// type and properties, but their end extensions are removed because the new endpoints lie on
+    /// the boundary.
     #[must_use]
     pub fn clip_to_bounding_box(&self, bounds: (Point, Point)) -> Vec<Self> {
         clip_path(self, &ClipRegion::new(bounds))
@@ -346,8 +365,8 @@ impl Path {
 impl Element {
     /// Clips this element to an axis-aligned bounding box.
     ///
-    /// References are preserved because resolving them requires a library and a chosen hierarchy
-    /// coordinate system.
+    /// Element properties are preserved. References are preserved because resolving them requires
+    /// a library and a chosen hierarchy coordinate system.
     #[must_use]
     pub fn clip_to_bounding_box(&self, bounds: (Point, Point)) -> Vec<Self> {
         clip_element(self, &ClipRegion::new(bounds))
@@ -385,7 +404,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use crate::{DataType, Dimensions, Layer, PathType, Reference, Text};
+    use crate::{DataType, Dimensions, Layer, PathType, Property, Reference, Text};
 
     const UNITS: f64 = 1e-9;
 
@@ -410,14 +429,16 @@ mod tests {
 
     #[test]
     fn polygon_clipping_preserves_metadata_and_removes_outside_geometry() {
-        let polygon =
+        let mut polygon =
             Polygon::rectangle(point(-5, -5), point(5, 5), Layer::new(3), DataType::new(4));
+        polygon.properties_mut().push(Property::new(7, "source"));
 
         let clipped = polygon.clip_to_bounding_box(bounds());
 
         assert_eq!(clipped.len(), 1);
         assert_eq!(clipped[0].layer(), Layer::new(3));
         assert_eq!(clipped[0].data_type(), DataType::new(4));
+        assert_eq!(clipped[0].properties(), polygon.properties());
         assert_relative_eq!(clipped[0].area().float_value(), 25.0, epsilon = 1e-6);
         assert_points_in_bounds(clipped[0].points(), &ClipRegion::new(bounds()));
 

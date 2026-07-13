@@ -1,3 +1,4 @@
+use crate::elements::property::PropertyStore;
 use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable};
 
 /// A GDS II Box element defined by two diagonal corners on a specific layer.
@@ -10,6 +11,7 @@ pub struct GdsBox {
     pub(crate) top_right: Point,
     pub(crate) layer: Layer,
     pub(crate) box_type: DataType,
+    pub(crate) properties: PropertyStore,
 }
 
 impl GdsBox {
@@ -23,6 +25,7 @@ impl GdsBox {
             top_right,
             layer,
             box_type,
+            properties: PropertyStore::default(),
         }
     }
 

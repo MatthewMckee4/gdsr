@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 
 use crate::elements::Element;
+use crate::elements::property::PropertyStore;
 use crate::traits::{Movable, Transformable};
 use crate::{Cell, FlattenOptions, Grid, Library, Point, Radians, Transformation};
 
@@ -73,6 +74,7 @@ impl From<&str> for Instance {
 pub struct Reference {
     pub(crate) instance: Instance,
     pub(crate) grid: Grid,
+    pub(crate) properties: PropertyStore,
 }
 
 impl Reference {
@@ -81,6 +83,7 @@ impl Reference {
         Self {
             instance: instance.into(),
             grid: Grid::default(),
+            properties: PropertyStore::default(),
         }
     }
 

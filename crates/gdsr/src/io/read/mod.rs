@@ -4,7 +4,7 @@ use std::io::{self, BufReader, Read};
 use crate::cell::Cell;
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION};
 use crate::elements::text::get_presentations_from_value;
-use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Reference, Text};
+use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Property, Reference, Text};
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
@@ -40,6 +40,7 @@ where
     let mut node: Option<Node> = None;
     let mut text: Option<Text> = None;
     let mut reference: Option<Reference> = None;
+    let mut property_attribute: Option<u16> = None;
 
     let mut scale = 1.0;
     let mut db_units = units.unwrap_or(DEFAULT_INTEGER_UNITS);
@@ -78,21 +79,27 @@ where
                     }
                 }
                 GDSRecord::Boundary => {
+                    property_attribute = None;
                     polygon = Some(Polygon::default());
                 }
                 GDSRecord::Box => {
+                    property_attribute = None;
                     gds_box = Some(GdsBox::default());
                 }
                 GDSRecord::Node => {
+                    property_attribute = None;
                     node = Some(Node::default());
                 }
                 GDSRecord::Path => {
+                    property_attribute = None;
                     path = Some(Path::default());
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {
+                    property_attribute = None;
                     reference = Some(Reference::default());
                 }
                 GDSRecord::Text => {
+                    property_attribute = None;
                     text = Some(Text::default());
                 }
                 GDSRecord::Layer => {
@@ -261,6 +268,7 @@ where
                     path = None;
                     text = None;
                     reference = None;
+                    property_attribute = None;
                 }
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
@@ -348,6 +356,33 @@ where
                         if let Some(path) = &mut path {
                             let value = round_to_decimals(f64::from(extn[0]) * scale, 10);
                             path.end_extension = Some(Unit::float(value, db_units));
+                        }
+                    }
+                }
+                GDSRecord::PropAttr => {
+                    if let GDSRecordData::I16(attributes) = data
+                        && let Some(attribute) = attributes.first()
+                    {
+                        property_attribute = Some(*attribute as u16);
+                    }
+                }
+                GDSRecord::PropValue => {
+                    if let GDSRecordData::Str(value) = data
+                        && let Some(attribute) = property_attribute
+                    {
+                        let property = Property::new(attribute, value);
+                        if let Some(polygon) = &mut polygon {
+                            polygon.properties_mut().push(property);
+                        } else if let Some(gds_box) = &mut gds_box {
+                            gds_box.properties_mut().push(property);
+                        } else if let Some(node) = &mut node {
+                            node.properties_mut().push(property);
+                        } else if let Some(path) = &mut path {
+                            path.properties_mut().push(property);
+                        } else if let Some(reference) = &mut reference {
+                            reference.properties_mut().push(property);
+                        } else if let Some(text) = &mut text {
+                            text.properties_mut().push(property);
                         }
                     }
                 }

@@ -1,3 +1,4 @@
+use crate::elements::property::PropertyStore;
 use crate::{DataType, Dimensions, Layer, LayerMapping, Movable, Point, Transformable};
 
 /// Maximum number of points allowed in a GDS II Node element.
@@ -12,6 +13,7 @@ pub struct Node {
     pub(crate) points: Vec<Point>,
     pub(crate) layer: Layer,
     pub(crate) node_type: DataType,
+    pub(crate) properties: PropertyStore,
 }
 
 impl Node {
@@ -24,6 +26,7 @@ impl Node {
             points,
             layer,
             node_type,
+            properties: PropertyStore::default(),
         }
     }
 
