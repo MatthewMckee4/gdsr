@@ -134,6 +134,10 @@ fn closed_line_string(points: &[Point]) -> Option<LineString<f64>> {
     (coordinates.len() >= MIN_POLYGON_POINTS).then(|| LineString::new(coordinates))
 }
 
+pub fn polygon_to_geo(polygon: &Polygon) -> Option<GeoPolygon<f64>> {
+    closed_line_string(polygon.points()).map(|exterior| GeoPolygon::new(exterior, Vec::new()))
+}
+
 fn polygon_from_coordinates(
     coordinates: impl IntoIterator<Item = Coord<f64>>,
     units: PointUnits,
@@ -153,7 +157,7 @@ fn polygon_from_coordinates(
         .then(|| Polygon::new(points, source.layer(), source.data_type()))
 }
 
-fn polygons_from_geo(polygon: &GeoPolygon<f64>, source: &Polygon) -> Vec<Polygon> {
+pub fn polygons_from_geo(polygon: &GeoPolygon<f64>, source: &Polygon) -> Vec<Polygon> {
     let Some(first_point) = source.points().first() else {
         return Vec::new();
     };
@@ -189,11 +193,11 @@ fn clip_polygon(polygon: &Polygon, region: &ClipRegion) -> Vec<Polygon> {
         BoundsRelation::Inside => return vec![polygon.clone()],
         BoundsRelation::Intersecting => {}
     }
-    let Some(exterior) = closed_line_string(polygon.points()) else {
+    let Some(polygon_geometry) = polygon_to_geo(polygon) else {
         return Vec::new();
     };
 
-    GeoPolygon::new(exterior, Vec::new())
+    polygon_geometry
         .intersection(&region.polygon)
         .0
         .into_iter()
