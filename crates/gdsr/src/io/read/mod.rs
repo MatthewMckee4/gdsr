@@ -8,7 +8,9 @@ use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Property, Reference
 use crate::error::GdsError;
 use crate::geometry::round_to_decimals;
 use crate::library::Library;
-use crate::{DEFAULT_INTEGER_UNITS, DataType, Degrees, Instance, Layer, Point, Unit};
+use crate::{
+    DEFAULT_INTEGER_UNITS, DataType, Degrees, GdsTimestamps, Instance, Layer, Point, Unit,
+};
 
 #[allow(clippy::too_many_lines)]
 pub fn from_gds<P: AsRef<std::path::Path>>(
@@ -48,6 +50,12 @@ where
     for record in reader {
         match record {
             Ok((record_type, data)) => match record_type {
+                GDSRecord::BgnLib => {
+                    let GDSRecordData::I16(values) = data else {
+                        return Err(invalid_timestamp_record("BGNLIB"));
+                    };
+                    library.timestamps = Some(GdsTimestamps::from_record(&values, "BGNLIB")?);
+                }
                 GDSRecord::LibName => {
                     if let GDSRecordData::Str(name) = data {
                         library.name = name;
@@ -64,7 +72,12 @@ where
                     }
                 }
                 GDSRecord::BgnStr => {
-                    cell = Some(Cell::default());
+                    let GDSRecordData::I16(values) = data else {
+                        return Err(invalid_timestamp_record("BGNSTR"));
+                    };
+                    let mut new_cell = Cell::default();
+                    new_cell.set_timestamps(GdsTimestamps::from_record(&values, "BGNSTR")?);
+                    cell = Some(new_cell);
                 }
                 GDSRecord::StrName => {
                     if let GDSRecordData::Str(cell_name) = data {
@@ -393,6 +406,12 @@ where
     }
 
     Ok(library)
+}
+
+fn invalid_timestamp_record(record: &str) -> GdsError {
+    GdsError::InvalidData {
+        message: format!("Invalid {record} timestamp record"),
+    }
 }
 
 fn should_parse_xy<F>(
