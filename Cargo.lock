@@ -2578,13 +2578,21 @@ dependencies = [
  "approx",
  "bytemuck",
  "chrono",
- "codspeed-criterion-compat",
  "geo",
  "insta",
  "quickcheck",
  "quickcheck_macros",
  "rayon",
  "rstest",
+ "tempfile",
+]
+
+[[package]]
+name = "gdsr-benchmark"
+version = "0.0.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "gdsr",
  "tempfile",
 ]
 

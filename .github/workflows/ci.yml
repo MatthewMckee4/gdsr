@@ -238,10 +238,10 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -p gdsr --bench io -m simulation
+        run: cargo codspeed build -p gdsr-benchmark --bench io -m simulation
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@a4a36bb07c0638b0b4ca52bf1f3dad1b4289e52f # v4.18.1
         with:
-          run: cargo codspeed run -p gdsr --bench io -m simulation
+          run: cargo codspeed run -p gdsr-benchmark --bench io -m simulation
           mode: simulation

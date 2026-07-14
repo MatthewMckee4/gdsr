@@ -39,6 +39,8 @@ The main crates:
 - `gdsr-viewer` - the Bevy-rendered viewer binary with an `egui` interface.
   Loads GDSII libraries, renders cells, and provides the interactive inspection
   workflow.
+- `gdsr-benchmark` - the CodSpeed and Criterion benchmark suite for parser and
+  writer performance.
 
 Infrastructure and tooling:
 
@@ -93,14 +95,14 @@ uvx prek run -a
 Run the GDS parser and writer benchmarks locally with Criterion:
 
 ```bash
-cargo bench -p gdsr --bench io
+cargo bench -p gdsr-benchmark --bench io
 ```
 
 Check the CodSpeed integration without uploading benchmark results:
 
 ```bash
-cargo codspeed build -p gdsr --bench io -m simulation
-cargo codspeed run -p gdsr --bench io -m simulation
+cargo codspeed build -p gdsr-benchmark --bench io -m simulation
+cargo codspeed run -p gdsr-benchmark --bench io -m simulation
 ```
 
 ## Documentation

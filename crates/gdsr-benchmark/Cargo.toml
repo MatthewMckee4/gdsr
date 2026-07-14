@@ -1,0 +1,18 @@
+[package]
+name = "gdsr-benchmark"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+gdsr = { workspace = true }
+tempfile = { workspace = true }
+
+[[bench]]
+name = "io"
+harness = false
+
+[lints]
+workspace = true
