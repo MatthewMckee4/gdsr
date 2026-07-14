@@ -395,7 +395,9 @@ impl Library {
             database_units,
             timestamp_policy,
         )?;
-        for cell in self.cells.values() {
+        let mut cells: Vec<&Cell> = self.cells.values().collect();
+        cells.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+        for cell in cells {
             writer.write_cell(cell)?;
         }
         writer.finish().map(|_| ())

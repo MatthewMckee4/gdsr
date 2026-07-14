@@ -485,7 +485,8 @@ pub fn write_library_with_timestamp_policy(
         &mut buffer,
     )?;
 
-    let cells: Vec<&Cell> = library.cells().values().collect();
+    let mut cells: Vec<&Cell> = library.cells().values().collect();
+    cells.sort_unstable_by(|left, right| left.name().cmp(right.name()));
 
     for buf in cells
         .par_iter()
@@ -849,6 +850,7 @@ mod tests {
     use std::io::{self, BufReader, Write};
 
     use chrono::{NaiveDate, NaiveDateTime};
+    use rayon::ThreadPoolBuilder;
 
     use crate::config::gds_file_types::GDSRecordData;
     use crate::io::read::RecordReader;
@@ -920,6 +922,26 @@ mod tests {
         Library::read_file(path, Some(DEFAULT_INTEGER_UNITS))
     }
 
+    fn library_with_cells(cells: &[(String, u16)]) -> Library {
+        let mut library = Library::new("deterministic");
+        for (name, layer) in cells {
+            let mut cell = Cell::new(name);
+            for layer in [*layer, layer + 64] {
+                cell.add(Polygon::new(
+                    [
+                        Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                        Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                        Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+                    ],
+                    Layer::new(layer),
+                    DataType::new(0),
+                ));
+            }
+            library.add_cell(cell);
+        }
+        library
+    }
+
     #[test]
     fn properties_are_written_before_end_element() {
         let bytes = write_polygon(&polygon_with_property("net-a"), DEFAULT_INTEGER_UNITS)
@@ -962,6 +984,98 @@ mod tests {
         .expect_err("oversized property value should be rejected");
 
         assert!(matches!(error, GdsError::ValidationError { .. }));
+    }
+
+    #[test]
+    fn library_cells_are_written_in_name_order() {
+        let cells: Vec<_> = (0..32)
+            .rev()
+            .map(|index| (format!("cell_{index:02}"), index))
+            .collect();
+        let library = library_with_cells(&cells);
+
+        let bytes = library
+            .write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("library should be writable");
+        let names: Vec<_> = RecordReader::new(BufReader::new(bytes.as_slice()))
+            .filter_map(
+                |record| match record.expect("library records should be readable") {
+                    (GDSRecord::StrName, GDSRecordData::Str(name)) => Some(name),
+                    _ => None,
+                },
+            )
+            .collect();
+        let expected: Vec<_> = (0..32).map(|index| format!("cell_{index:02}")).collect();
+
+        assert_eq!(names, expected);
+    }
+
+    #[test]
+    fn serialization_ignores_insertion_order_and_rayon_thread_count() {
+        let cells: Vec<_> = (0..32)
+            .map(|index| (format!("cell_{index:02}"), index))
+            .collect();
+        let shuffled_cells: Vec<_> = (0..32)
+            .map(|index| cells[(index * 17) % cells.len()].clone())
+            .collect();
+        let forward_library = library_with_cells(&cells);
+        let shuffled_library = library_with_cells(&shuffled_cells);
+        let single_threaded = ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .expect("single-threaded pool should be buildable")
+            .install(|| {
+                forward_library.write_with_timestamp_policy(
+                    &GdsFileWriter,
+                    DEFAULT_INTEGER_UNITS,
+                    DEFAULT_INTEGER_UNITS,
+                    GdsTimestampPolicy::Zero,
+                )
+            })
+            .expect("forward library should be writable");
+        let multi_threaded = ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .expect("multi-threaded pool should be buildable")
+            .install(|| {
+                shuffled_library.write_with_timestamp_policy(
+                    &GdsFileWriter,
+                    DEFAULT_INTEGER_UNITS,
+                    DEFAULT_INTEGER_UNITS,
+                    GdsTimestampPolicy::Zero,
+                )
+            })
+            .expect("shuffled library should be writable");
+
+        assert_eq!(single_threaded, multi_threaded);
+
+        let mut streamed = Vec::new();
+        shuffled_library
+            .write_to_with_timestamp_policy(
+                &mut streamed,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("shuffled library should be streamable");
+        assert_eq!(single_threaded, streamed);
+
+        let layers: Vec<_> = RecordReader::new(BufReader::new(single_threaded.as_slice()))
+            .filter_map(
+                |record| match record.expect("library records should be readable") {
+                    (GDSRecord::Layer, GDSRecordData::I16(layer)) => layer.first().copied(),
+                    _ => None,
+                },
+            )
+            .collect();
+        let expected: Vec<_> = (0..32).flat_map(|layer| [layer, layer + 64]).collect();
+
+        assert_eq!(layers, expected);
     }
 
     #[test]
