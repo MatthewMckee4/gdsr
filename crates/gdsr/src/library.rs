@@ -21,6 +21,49 @@ pub struct DanglingCellReference {
     pub target_name: String,
 }
 
+/// Whether unreachable-cell pruning should modify the library.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CellPruneMode {
+    /// Return the report without removing cells.
+    DryRun,
+    /// Remove the cells listed in the report.
+    Apply,
+}
+
+/// The result of unreachable-cell pruning.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CellPruneReport {
+    /// Cell names removed, or that would be removed in dry-run mode, in stable name order.
+    pub removed_cells: Vec<String>,
+    /// Removed cells that were unreachable from every discovered top cell.
+    pub globally_unreachable_cells: Vec<String>,
+    /// Direct elements reclaimed from removed cells, without expanding references.
+    pub reclaimed_element_count: usize,
+}
+
+/// An error produced while analyzing or pruning unreachable cells.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CellPruneError {
+    /// One or more retained roots do not exist in the library.
+    UnknownRoots { cell_names: Vec<String> },
+}
+
+impl fmt::Display for CellPruneError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownRoots { cell_names } => {
+                write!(
+                    formatter,
+                    "unknown retained root cells: {}",
+                    cell_names.join(", ")
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for CellPruneError {}
+
 /// How [`Library::merge`] handles an incoming cell whose name already exists.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CellConflictStrategy {
@@ -398,6 +441,128 @@ impl Library {
             }
         }
         dangling
+    }
+
+    /// Returns cells that are not referenced by any cell, in stable name order.
+    ///
+    /// A component containing only circular references has no top cell.
+    pub fn top_cells(&self) -> Vec<&Cell> {
+        let referenced_cells: HashSet<&str> = self
+            .cells
+            .values()
+            .flat_map(Cell::referenced_cell_names)
+            .collect();
+        let mut top_cells: Vec<&Cell> = self
+            .cells
+            .values()
+            .filter(|cell| !referenced_cells.contains(cell.name()))
+            .collect();
+        top_cells.sort_by_key(|cell| cell.name());
+        top_cells
+    }
+
+    /// Returns cells that cannot be reached from the retained roots, in stable name order.
+    ///
+    /// An empty `retained_roots` slice retains every discovered top cell, so the result then
+    /// contains only components that are globally unreachable from the library's top cells.
+    /// Dangling references are ignored. All explicit roots are validated before analysis.
+    pub fn unreachable_cells(&self, retained_roots: &[&str]) -> Result<Vec<&Cell>, CellPruneError> {
+        let unreachable = self.unreachable_cell_names(retained_roots)?;
+        Ok(unreachable
+            .iter()
+            .filter_map(|name| self.cells.get(name))
+            .collect())
+    }
+
+    /// Removes cells that cannot be reached from the retained roots.
+    ///
+    /// An empty `retained_roots` slice retains every discovered top cell. [`CellPruneMode::DryRun`]
+    /// returns the same report as an applied prune without modifying the library. Unknown roots
+    /// return an error before any mutation occurs.
+    pub fn prune_unreachable(
+        &mut self,
+        retained_roots: &[&str],
+        mode: CellPruneMode,
+    ) -> Result<CellPruneReport, CellPruneError> {
+        let removed_cells = self.unreachable_cell_names(retained_roots)?;
+        let globally_unreachable = self.unreachable_cell_names(&[])?;
+        let globally_unreachable_cells = removed_cells
+            .iter()
+            .filter(|name| globally_unreachable.binary_search(name).is_ok())
+            .cloned()
+            .collect();
+        let reclaimed_element_count = removed_cells
+            .iter()
+            .filter_map(|name| self.cells.get(name))
+            .map(|cell| cell.elements().len())
+            .sum();
+
+        let report = CellPruneReport {
+            removed_cells,
+            globally_unreachable_cells,
+            reclaimed_element_count,
+        };
+        if mode == CellPruneMode::Apply {
+            for cell_name in &report.removed_cells {
+                self.cells.remove(cell_name);
+            }
+        }
+
+        Ok(report)
+    }
+
+    fn unreachable_cell_names(
+        &self,
+        retained_roots: &[&str],
+    ) -> Result<Vec<String>, CellPruneError> {
+        let roots = if retained_roots.is_empty() {
+            self.top_cells()
+                .into_iter()
+                .map(|cell| cell.name().to_string())
+                .collect()
+        } else {
+            let mut roots: Vec<String> = retained_roots
+                .iter()
+                .map(|root| (*root).to_string())
+                .collect();
+            roots.sort();
+            roots.dedup();
+
+            let unknown_roots: Vec<String> = roots
+                .iter()
+                .filter(|root| !self.cells.contains_key(root.as_str()))
+                .cloned()
+                .collect();
+            if !unknown_roots.is_empty() {
+                return Err(CellPruneError::UnknownRoots {
+                    cell_names: unknown_roots,
+                });
+            }
+            roots
+        };
+
+        let mut reachable: HashSet<String> = roots.iter().cloned().collect();
+        let mut queue = VecDeque::from(roots);
+        while let Some(cell_name) = queue.pop_front() {
+            if let Some(cell) = self.cells.get(&cell_name) {
+                for target_name in cell.referenced_cell_names() {
+                    if self.cells.contains_key(target_name)
+                        && reachable.insert(target_name.to_string())
+                    {
+                        queue.push_back(target_name.to_string());
+                    }
+                }
+            }
+        }
+
+        let mut unreachable: Vec<String> = self
+            .cells
+            .keys()
+            .filter(|name| !reachable.contains(name.as_str()))
+            .cloned()
+            .collect();
+        unreachable.sort();
+        Ok(unreachable)
     }
 
     /// Builds an adjacency list of cell dependencies.
@@ -1558,6 +1723,162 @@ mod tests {
         lib.add_cell(b);
         lib.add_cell(c);
         lib
+    }
+
+    fn prunable_library() -> Library {
+        let mut library = Library::new("prunable");
+
+        let mut keep_a = Cell::new("KEEP_A");
+        keep_a.add(Reference::new("SHARED"));
+        let mut keep_b = Cell::new("KEEP_B");
+        keep_b.add(Reference::new("B_ONLY"));
+        let mut drop = Cell::new("DROP");
+        drop.add(Reference::new("SHARED"));
+        drop.add(Reference::new("DROP_ONLY"));
+        let mut drop_only = Cell::new("DROP_ONLY");
+        drop_only.add(Polygon::default());
+
+        library.add_cell(drop_only);
+        library.add_cell(Cell::new("SHARED"));
+        library.add_cell(keep_b);
+        library.add_cell(drop);
+        library.add_cell(Cell::new("B_ONLY"));
+        library.add_cell(keep_a);
+        library
+    }
+
+    #[test]
+    fn top_cells_are_sorted_and_ignore_dangling_targets() {
+        let mut library = Library::new("tops");
+        let mut z_top = Cell::new("Z_TOP");
+        z_top.add(Reference::new("SHARED"));
+        z_top.add(Reference::new("MISSING"));
+        let mut a_top = Cell::new("A_TOP");
+        a_top.add(Reference::new("SHARED"));
+
+        library.add_cell(z_top);
+        library.add_cell(Cell::new("SHARED"));
+        library.add_cell(a_top);
+
+        let names: Vec<&str> = library.top_cells().into_iter().map(Cell::name).collect();
+        assert_eq!(names, ["A_TOP", "Z_TOP"]);
+        assert_eq!(library.dangling_cell_references().len(), 1);
+    }
+
+    #[test]
+    fn unreachable_cells_preserve_multiple_roots_and_shared_descendants() {
+        let library = prunable_library();
+
+        let names: Vec<&str> = library
+            .unreachable_cells(&["KEEP_B", "KEEP_A"])
+            .expect("retained roots should exist")
+            .into_iter()
+            .map(Cell::name)
+            .collect();
+
+        assert_eq!(names, ["DROP", "DROP_ONLY"]);
+    }
+
+    #[test]
+    fn dry_run_reports_sorted_cells_and_direct_element_count_without_mutating() {
+        let mut library = prunable_library();
+        let original = library.clone();
+
+        let report = library
+            .prune_unreachable(&["KEEP_A", "KEEP_B"], CellPruneMode::DryRun)
+            .expect("retained roots should exist");
+
+        assert_eq!(
+            report,
+            CellPruneReport {
+                removed_cells: vec!["DROP".to_string(), "DROP_ONLY".to_string()],
+                globally_unreachable_cells: Vec::new(),
+                reclaimed_element_count: 3,
+            }
+        );
+        assert_eq!(library, original);
+
+        let applied = library
+            .prune_unreachable(&["KEEP_A", "KEEP_B"], CellPruneMode::Apply)
+            .expect("retained roots should exist");
+        assert_eq!(applied, report);
+        assert!(library.get_cell("DROP").is_none());
+        assert!(library.get_cell("DROP_ONLY").is_none());
+        assert!(library.get_cell("SHARED").is_some());
+        assert!(library.get_cell("B_ONLY").is_some());
+    }
+
+    #[test]
+    fn report_distinguishes_globally_unreachable_cycles() {
+        let mut library = prunable_library();
+        let mut cycle_a = Cell::new("CYCLE_A");
+        cycle_a.add(Reference::new("CYCLE_B"));
+        let mut cycle_b = Cell::new("CYCLE_B");
+        cycle_b.add(Reference::new("CYCLE_A"));
+        library.add_cell(cycle_b);
+        library.add_cell(cycle_a);
+
+        let report = library
+            .prune_unreachable(&["KEEP_A", "KEEP_B"], CellPruneMode::DryRun)
+            .expect("retained roots should exist");
+
+        assert_eq!(
+            report.removed_cells,
+            ["CYCLE_A", "CYCLE_B", "DROP", "DROP_ONLY"]
+        );
+        assert_eq!(report.globally_unreachable_cells, ["CYCLE_A", "CYCLE_B"]);
+        assert_eq!(report.reclaimed_element_count, 5);
+    }
+
+    #[test]
+    fn empty_roots_prune_only_globally_unreachable_cycles() {
+        let mut library = Library::new("cycle");
+        let mut cycle_a = Cell::new("A");
+        cycle_a.add(Reference::new("B"));
+        let mut cycle_b = Cell::new("B");
+        cycle_b.add(Reference::new("A"));
+        library.add_cell(cycle_a);
+        library.add_cell(cycle_b);
+
+        let unreachable: Vec<&str> = library
+            .unreachable_cells(&[])
+            .expect("discovered roots are always valid")
+            .into_iter()
+            .map(Cell::name)
+            .collect();
+        assert_eq!(unreachable, ["A", "B"]);
+
+        let explicitly_reachable = library
+            .unreachable_cells(&["A"])
+            .expect("explicit cycle root should exist");
+        assert!(explicitly_reachable.is_empty());
+
+        let report = library
+            .prune_unreachable(&[], CellPruneMode::Apply)
+            .expect("discovered roots are always valid");
+        assert_eq!(report.removed_cells, ["A", "B"]);
+        assert!(library.cells().is_empty());
+    }
+
+    #[test]
+    fn unknown_roots_are_sorted_and_do_not_mutate() {
+        let mut library = prunable_library();
+        let original = library.clone();
+
+        let error = library
+            .prune_unreachable(
+                &["UNKNOWN_Z", "UNKNOWN_A", "UNKNOWN_Z"],
+                CellPruneMode::Apply,
+            )
+            .expect_err("unknown roots should fail");
+
+        assert_eq!(
+            error,
+            CellPruneError::UnknownRoots {
+                cell_names: vec!["UNKNOWN_A".to_string(), "UNKNOWN_Z".to_string()],
+            }
+        );
+        assert_eq!(library, original);
     }
 
     #[test]
