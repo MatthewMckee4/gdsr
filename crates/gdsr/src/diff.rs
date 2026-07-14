@@ -20,7 +20,7 @@ pub struct LibraryDiff {
     pub added_cells: Vec<String>,
     /// Cells present only in the older library.
     pub removed_cells: Vec<String>,
-    /// Cells present in both libraries whose ordered elements differ.
+    /// Cells present in both libraries whose element multisets differ.
     pub modified_cells: Vec<CellDiff>,
 }
 
@@ -38,18 +38,18 @@ impl LibraryDiff {
 pub struct CellDiff {
     /// Name of the modified cell.
     pub cell_name: String,
-    /// Ordered element changes in this cell.
+    /// Deterministic element changes in this cell.
     pub elements: Vec<ElementDiff>,
 }
 
-/// A change at an element index in a cell's ordered element sequence.
+/// A change at an element index in a cell.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElementDiff {
-    /// An element exists only in the newer cell.
+    /// An element exists only in the newer cell, at its newer index.
     Added { index: usize, element: Element },
-    /// An element exists only in the older cell.
+    /// An element exists only in the older cell, at its older index.
     Removed { index: usize, element: Element },
-    /// The element at this index changed.
+    /// An element changed. `index` is its index in the older cell.
     Modified {
         index: usize,
         before: Box<Element>,
@@ -60,6 +60,10 @@ pub enum ElementDiff {
 impl Library {
     /// Compares this library's cells and elements with `other`, treating this value as
     /// the older version. Library names and metadata are not compared.
+    ///
+    /// Elements are compared as multisets. Exact matches are consumed before
+    /// tolerance-based matches, and duplicate candidates are matched by their lowest
+    /// unmatched index.
     pub fn diff(&self, other: &Self, options: LibraryDiffOptions) -> LibraryDiff {
         let coordinate_tolerance = options.coordinate_tolerance.max(0.0);
         let mut added_cells: Vec<String> = other
@@ -109,40 +113,85 @@ impl Library {
 }
 
 fn diff_elements(before: &[Element], after: &[Element], tolerance: f64) -> Vec<ElementDiff> {
-    let common_length = before.len().min(after.len());
-    let mut differences: Vec<ElementDiff> = before
+    let mut matched_before = vec![false; before.len()];
+    let mut matched_after = vec![false; after.len()];
+
+    match_elements(before, after, &mut matched_before, &mut matched_after, 0.0);
+    if tolerance > 0.0 {
+        match_elements(
+            before,
+            after,
+            &mut matched_before,
+            &mut matched_after,
+            tolerance,
+        );
+    }
+
+    let unmatched_before: Vec<_> = before
         .iter()
-        .zip(after)
         .enumerate()
-        .filter(|(_, (before, after))| !elements_equal(before, after, tolerance))
-        .map(|(index, (before, after))| ElementDiff::Modified {
-            index,
-            before: Box::new(before.clone()),
-            after: Box::new(after.clone()),
-        })
+        .filter(|(index, _)| !matched_before[*index])
+        .collect();
+    let unmatched_after: Vec<_> = after
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !matched_after[*index])
+        .collect();
+    let modified_count = unmatched_before.len().min(unmatched_after.len());
+
+    let mut differences: Vec<_> = unmatched_before
+        .iter()
+        .zip(&unmatched_after)
+        .take(modified_count)
+        .map(
+            |((before_index, before), (_, after))| ElementDiff::Modified {
+                index: *before_index,
+                before: Box::new((*before).clone()),
+                after: Box::new((*after).clone()),
+            },
+        )
         .collect();
 
     differences.extend(
-        before
+        unmatched_before
             .iter()
-            .enumerate()
-            .skip(common_length)
+            .skip(modified_count)
             .map(|(index, element)| ElementDiff::Removed {
-                index,
-                element: element.clone(),
+                index: *index,
+                element: (*element).clone(),
             }),
     );
     differences.extend(
-        after
+        unmatched_after
             .iter()
-            .enumerate()
-            .skip(common_length)
+            .skip(modified_count)
             .map(|(index, element)| ElementDiff::Added {
-                index,
-                element: element.clone(),
+                index: *index,
+                element: (*element).clone(),
             }),
     );
     differences
+}
+
+fn match_elements(
+    before: &[Element],
+    after: &[Element],
+    matched_before: &mut [bool],
+    matched_after: &mut [bool],
+    tolerance: f64,
+) {
+    for (before_index, before_element) in before.iter().enumerate() {
+        if matched_before[before_index] {
+            continue;
+        }
+
+        if let Some((after_index, _)) = after.iter().enumerate().find(|(after_index, element)| {
+            !matched_after[*after_index] && elements_equal(before_element, element, tolerance)
+        }) {
+            matched_before[before_index] = true;
+            matched_after[after_index] = true;
+        }
+    }
 }
 
 fn elements_equal(left: &Element, right: &Element, tolerance: f64) -> bool {
@@ -292,6 +341,14 @@ mod tests {
         )
     }
 
+    fn library_with_polygons(xs: impl IntoIterator<Item = f64>) -> Library {
+        let mut cell = Cell::new("top");
+        for x in xs {
+            cell.add(polygon(x));
+        }
+        library_with_cell(cell)
+    }
+
     #[test]
     fn identical_libraries_have_an_empty_diff() {
         let library = library_with_cell(Cell::new("top"));
@@ -301,6 +358,89 @@ mod tests {
                 .diff(&library, LibraryDiffOptions::default())
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn reordered_elements_have_an_empty_diff() {
+        let before = library_with_polygons([0.0, 2.0, 4.0]);
+        let after = library_with_polygons([4.0, 0.0, 2.0]);
+
+        assert!(
+            before
+                .diff(&after, LibraryDiffOptions::default())
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn middle_insertion_is_one_addition() {
+        let before = library_with_polygons([0.0, 2.0]);
+        let after = library_with_polygons([0.0, 1.0, 2.0]);
+
+        let diff = before.diff(&after, LibraryDiffOptions::default());
+
+        assert!(matches!(
+            diff.modified_cells[0].elements.as_slice(),
+            [ElementDiff::Added { index: 1, .. }]
+        ));
+
+        let reverse_diff = after.diff(&before, LibraryDiffOptions::default());
+        assert!(matches!(
+            reverse_diff.modified_cells[0].elements.as_slice(),
+            [ElementDiff::Removed { index: 1, .. }]
+        ));
+    }
+
+    #[test]
+    fn duplicate_elements_are_matched_by_lowest_unmatched_index() {
+        let before = library_with_polygons([0.0, 0.0]);
+        let after = library_with_polygons([0.5, 0.0]);
+
+        let diff = before.diff(&after, LibraryDiffOptions::default());
+
+        assert_eq!(
+            diff.modified_cells[0].elements,
+            [ElementDiff::Modified {
+                index: 1,
+                before: Box::new(Element::Polygon(polygon(0.0))),
+                after: Box::new(Element::Polygon(polygon(0.5))),
+            }]
+        );
+    }
+
+    #[test]
+    fn reordered_elements_match_with_coordinate_tolerance() {
+        let before = library_with_polygons([0.0, 2.0]);
+        let after = library_with_polygons([2.0005, 0.0005]);
+
+        assert!(
+            before
+                .diff(
+                    &after,
+                    LibraryDiffOptions {
+                        coordinate_tolerance: 1e-9,
+                    },
+                )
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn exact_match_precedes_earlier_tolerance_candidate() {
+        let before = library_with_polygons([0.0, 0.0005]);
+        let after = library_with_polygons([0.0005, 0.001]);
+
+        let diff = before.diff(
+            &after,
+            LibraryDiffOptions {
+                coordinate_tolerance: 6e-10,
+            },
+        );
+
+        assert!(matches!(
+            diff.modified_cells[0].elements.as_slice(),
+            [ElementDiff::Modified { index: 0, .. }]
+        ));
     }
 
     #[test]
