@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io::{self, BufReader, Read};
 
 use crate::cell::Cell;
@@ -12,28 +11,23 @@ use crate::{
     DEFAULT_INTEGER_UNITS, DataType, Degrees, GdsTimestamps, Instance, Layer, Point, Unit,
 };
 
-#[allow(clippy::too_many_lines)]
-pub fn from_gds<P: AsRef<std::path::Path>>(
-    file_name: P,
-    units: Option<f64>,
-) -> Result<Library, GdsError> {
-    from_gds_filtered(file_name, units, |_, _| true)
+pub fn from_gds_reader<R: Read>(reader: R, units: Option<f64>) -> Result<Library, GdsError> {
+    from_gds_reader_filtered(reader, units, |_, _| true)
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn from_gds_filtered<P, F>(
-    file_name: P,
+pub fn from_gds_reader_filtered<R, F>(
+    reader: R,
     units: Option<f64>,
     layer_filter: F,
 ) -> Result<Library, GdsError>
 where
-    P: AsRef<std::path::Path>,
+    R: Read,
     F: Fn(Layer, DataType) -> bool,
 {
     let mut library = Library::new("Library");
 
-    let file = File::open(file_name)?;
-    let reader = RecordReader::new(BufReader::new(file));
+    let reader = RecordReader::new(BufReader::new(reader));
 
     let mut cell: Option<Cell> = None;
     let mut path: Option<Path> = None;

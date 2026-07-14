@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 
 use crate::cell::Cell;
 use crate::design_rules::{self, DesignRuleOptions, DesignRuleReport};
 use crate::error::GdsError;
-use crate::io::read::{from_gds, from_gds_filtered};
+use crate::io::read::{from_gds_reader, from_gds_reader_filtered};
 use crate::io::write::validation::MAX_STRUCTURE_NAME_LENGTH;
-use crate::io::write::{GdsFileWriter, GdsWriter};
+use crate::io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter};
 use crate::types::LayerMapping;
 use crate::{DataType, Element, GdsTimestampPolicy, GdsTimestamps, Instance, Layer};
 
@@ -345,6 +345,62 @@ impl Library {
         )
     }
 
+    /// Serialize the library with the default GDS writer, returning the GDS bytes.
+    pub fn to_bytes(&self, user_units: f64, database_units: f64) -> Result<Vec<u8>, GdsError> {
+        self.to_bytes_with_timestamp_policy(user_units, database_units, GdsTimestampPolicy::Current)
+    }
+
+    /// Serialize the library with the default GDS writer and an explicit timestamp policy.
+    pub fn to_bytes_with_timestamp_policy(
+        &self,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Vec<u8>, GdsError> {
+        self.write_with_timestamp_policy(
+            &GdsFileWriter,
+            user_units,
+            database_units,
+            timestamp_policy,
+        )
+    }
+
+    /// Serialize the library with the default GDS writer and write it to `output`.
+    pub fn write_to<W: Write>(
+        &self,
+        output: W,
+        user_units: f64,
+        database_units: f64,
+    ) -> Result<(), GdsError> {
+        self.write_to_with_timestamp_policy(
+            output,
+            user_units,
+            database_units,
+            GdsTimestampPolicy::Current,
+        )
+    }
+
+    /// Serialize the library to `output` using an explicit timestamp policy.
+    pub fn write_to_with_timestamp_policy<W: Write>(
+        &self,
+        output: W,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<(), GdsError> {
+        let mut writer = GdsStreamWriter::from_library_with_timestamp_policy(
+            output,
+            self,
+            user_units,
+            database_units,
+            timestamp_policy,
+        )?;
+        for cell in self.cells.values() {
+            writer.write_cell(cell)?;
+        }
+        writer.finish().map(|_| ())
+    }
+
     /// Write the library to a GDS file.
     ///
     /// The given user units are only used when writing the GDSII header.
@@ -376,12 +432,8 @@ impl Library {
         database_units: f64,
         timestamp_policy: GdsTimestampPolicy,
     ) -> Result<(), GdsError> {
-        let bytes = self.write_with_timestamp_policy(
-            &GdsFileWriter,
-            user_units,
-            database_units,
-            timestamp_policy,
-        )?;
+        let bytes =
+            self.to_bytes_with_timestamp_policy(user_units, database_units, timestamp_policy)?;
         let mut file = File::create(file_name)?;
         file.write_all(&bytes)?;
         Ok(file.flush()?)
@@ -806,7 +858,17 @@ impl Library {
         file_name: P,
         units: Option<f64>,
     ) -> Result<Self, GdsError> {
-        from_gds(file_name, units)
+        Self::read_from(File::open(file_name)?, units)
+    }
+
+    /// Read a library from a sequential byte stream.
+    pub fn read_from<R: Read>(reader: R, units: Option<f64>) -> Result<Self, GdsError> {
+        from_gds_reader(reader, units)
+    }
+
+    /// Read a library from an in-memory GDS byte slice.
+    pub fn from_bytes(bytes: &[u8], units: Option<f64>) -> Result<Self, GdsError> {
+        Self::read_from(bytes, units)
     }
 
     /// Read a library from a GDS file, keeping only elements whose layer/data type
@@ -823,7 +885,21 @@ impl Library {
         P: AsRef<std::path::Path>,
         F: Fn(Layer, DataType) -> bool,
     {
-        from_gds_filtered(file_name, units, layer_filter)
+        Self::read_from_filtered(File::open(file_name)?, units, layer_filter)
+    }
+
+    /// Read a library from a sequential byte stream, keeping only elements whose
+    /// layer/data type pair matches `layer_filter`.
+    pub fn read_from_filtered<R, F>(
+        reader: R,
+        units: Option<f64>,
+        layer_filter: F,
+    ) -> Result<Self, GdsError>
+    where
+        R: Read,
+        F: Fn(Layer, DataType) -> bool,
+    {
+        from_gds_reader_filtered(reader, units, layer_filter)
     }
 
     /// Run basic design-rule checks across all cells in the library.
@@ -840,6 +916,9 @@ impl std::fmt::Display for Library {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error as _;
+    use std::io::{self, Cursor, Read, Write};
+
     use crate::elements::{Path, Polygon, Reference, Text};
     use crate::{
         DEFAULT_INTEGER_UNITS, DataType, HorizontalPresentation, Layer, Point, Radians, Unit,
@@ -847,6 +926,62 @@ mod tests {
     };
 
     use super::*;
+
+    struct NonSeekableReader {
+        inner: Cursor<Vec<u8>>,
+    }
+
+    impl Read for NonSeekableReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            self.inner.read(buffer)
+        }
+    }
+
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "reader failed",
+            ))
+        }
+    }
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "writer failed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn stream_test_library() -> Library {
+        let mut cell = Cell::new("top");
+        cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 10, DEFAULT_INTEGER_UNITS),
+                Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(1),
+            DataType::new(2),
+        ));
+        let mut library = Library::new("stream_test");
+        library.add_cell(cell);
+        library
+    }
+
+    fn stream_test_bytes() -> Vec<u8> {
+        stream_test_library()
+            .to_bytes(DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect("test library should serialize")
+    }
 
     #[test]
     fn test_library_new() {
@@ -867,6 +1002,132 @@ mod tests {
         assert_eq!(library.cells.len(), 1);
         assert!(library.cells.contains_key("test_cell"));
         assert_eq!(library.cells.get("test_cell"), Some(&cell));
+    }
+
+    #[test]
+    fn read_from_slice_matches_read_file() {
+        let bytes = stream_test_bytes();
+        let mut file = tempfile::NamedTempFile::new().expect("temporary file should be created");
+        file.write_all(&bytes)
+            .expect("temporary file should be written");
+        file.flush().expect("temporary file should be flushed");
+
+        let from_file = Library::read_file(file.path(), Some(DEFAULT_INTEGER_UNITS))
+            .expect("file should parse");
+        let from_slice = Library::from_bytes(&bytes, Some(DEFAULT_INTEGER_UNITS))
+            .expect("byte slice should parse");
+
+        assert_eq!(from_slice, from_file);
+    }
+
+    #[test]
+    fn read_from_cursor_matches_byte_slice() {
+        let bytes = stream_test_bytes();
+        let from_slice = Library::from_bytes(&bytes, Some(DEFAULT_INTEGER_UNITS))
+            .expect("byte slice should parse");
+        let from_cursor = Library::read_from(Cursor::new(bytes), Some(DEFAULT_INTEGER_UNITS))
+            .expect("cursor should parse");
+
+        assert_eq!(from_cursor, from_slice);
+    }
+
+    #[test]
+    fn read_from_non_seekable_reader_matches_byte_slice() {
+        let bytes = stream_test_bytes();
+        let from_slice = Library::from_bytes(&bytes, Some(DEFAULT_INTEGER_UNITS))
+            .expect("byte slice should parse");
+        let from_reader = Library::read_from(
+            NonSeekableReader {
+                inner: Cursor::new(bytes),
+            },
+            Some(DEFAULT_INTEGER_UNITS),
+        )
+        .expect("non-seekable reader should parse");
+
+        assert_eq!(from_reader, from_slice);
+    }
+
+    #[test]
+    fn read_from_preserves_io_error_source() {
+        let error = Library::read_from(FailingReader, None).expect_err("reader should fail");
+        let source = error
+            .source()
+            .and_then(|source| source.downcast_ref::<io::Error>())
+            .expect("I/O source should be retained");
+
+        assert_eq!(source.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(source.to_string(), "reader failed");
+    }
+
+    #[test]
+    fn write_to_preserves_io_error_source() {
+        let error = stream_test_library()
+            .write_to(FailingWriter, DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect_err("writer should fail");
+        let source = error
+            .source()
+            .and_then(|source| source.downcast_ref::<io::Error>())
+            .expect("I/O source should be retained");
+
+        assert_eq!(source.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(source.to_string(), "writer failed");
+    }
+
+    #[test]
+    fn byte_stream_and_file_writes_are_equivalent_with_zero_timestamps() {
+        let library = stream_test_library();
+        let expected = library
+            .to_bytes_with_timestamp_policy(
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("library should serialize to bytes");
+
+        let mut stream = Vec::new();
+        library
+            .write_to_with_timestamp_policy(
+                &mut stream,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("library should serialize to a stream");
+
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let path = directory.path().join("equivalent.gds");
+        library
+            .write_file_with_timestamp_policy(
+                &path,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("library should serialize to a file");
+
+        assert_eq!(stream, expected);
+        assert_eq!(
+            std::fs::read(path).expect("written file should be readable"),
+            expected
+        );
+    }
+
+    #[test]
+    fn write_file_validation_error_preserves_existing_file() {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let path = directory.path().join("existing.gds");
+        std::fs::write(&path, b"existing contents").expect("existing file should be written");
+
+        let mut library = Library::new("invalid");
+        library.add_cell(Cell::new(&"x".repeat(33)));
+
+        library
+            .write_file(&path, DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect_err("invalid library should not be written");
+        assert_eq!(
+            std::fs::read(path).expect("existing file should remain readable"),
+            b"existing contents"
+        );
     }
 
     #[test]

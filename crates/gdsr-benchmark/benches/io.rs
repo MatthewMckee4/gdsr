@@ -3,8 +3,8 @@ use std::io::Write;
 
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use gdsr::{
-    Cell, DataType, Element, GdsBox, GdsFileWriter, GdsStreamWriter, Grid, HorizontalPresentation,
-    Layer, Library, Node, Path, PathType, Point, Polygon, Property, Radians, Reference, Text, Unit,
+    Cell, DataType, Element, GdsBox, GdsFileWriter, Grid, HorizontalPresentation, Layer, Library,
+    Node, Path, PathType, Point, Polygon, Property, Radians, Reference, Text, Unit,
     VerticalPresentation,
 };
 use tempfile::NamedTempFile;
@@ -27,6 +27,7 @@ const HORIZONTAL_PRESENTATIONS: [HorizontalPresentation; 3] = [
 struct Fixture {
     name: &'static str,
     library: Library,
+    encoded: Vec<u8>,
     encoded_size: u64,
     input_file: NamedTempFile,
     output_file: NamedTempFile,
@@ -52,6 +53,7 @@ impl Fixture {
         Self {
             name,
             library,
+            encoded,
             encoded_size,
             input_file,
             output_file,
@@ -234,6 +236,26 @@ fn fixtures() -> [Fixture; 3] {
     ]
 }
 
+fn bench_read_bytes(c: &mut Criterion, fixtures: &[Fixture]) {
+    let mut group = c.benchmark_group("read_bytes");
+    for fixture in fixtures {
+        group.throughput(Throughput::Bytes(fixture.encoded_size));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(fixture.name),
+            fixture,
+            |b, fixture| {
+                b.iter(|| {
+                    black_box(
+                        Library::from_bytes(black_box(&fixture.encoded), Some(DATABASE_UNITS))
+                            .expect("benchmark fixture should parse"),
+                    )
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
 fn bench_read_file(c: &mut Criterion, fixtures: &[Fixture]) {
     let mut group = c.benchmark_group("read_file");
     for fixture in fixtures {
@@ -309,24 +331,12 @@ fn bench_write_stream(c: &mut Criterion, fixture: &Fixture) {
         fixture,
         |b, fixture| {
             b.iter(|| {
-                let output = Vec::with_capacity(fixture.encoded_size as usize);
-                let mut writer = GdsStreamWriter::new(
-                    output,
-                    fixture.library.name(),
-                    USER_UNITS,
-                    DATABASE_UNITS,
-                )
-                .expect("stream benchmark should write its header");
-                for cell in fixture.library.cells().values() {
-                    writer
-                        .write_cell(cell)
-                        .expect("stream benchmark should write each cell");
-                }
-                black_box(
-                    writer
-                        .finish()
-                        .expect("stream benchmark should write its footer"),
-                )
+                let mut output = Vec::with_capacity(fixture.encoded_size as usize);
+                fixture
+                    .library
+                    .write_to(&mut output, USER_UNITS, DATABASE_UNITS)
+                    .expect("stream benchmark should serialize");
+                black_box(output)
             });
         },
     );
@@ -360,6 +370,7 @@ fn bench_io(c: &mut Criterion) {
     let mixed_50k = &fixtures[1];
     let hierarchy_10k = &fixtures[2];
 
+    bench_read_bytes(c, &fixtures);
     bench_read_file(c, &fixtures);
     bench_read_file_filtered(c, mixed_50k);
     bench_write_bytes(c, &fixtures);
