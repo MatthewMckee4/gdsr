@@ -207,12 +207,14 @@ jobs:
     name: "benchmarks"
 
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     needs: determine_changes
 
-    # Disabled until benchmarks are stabilized and actively maintained.
-    if: ${{ vars.ENABLE_BENCHMARKS == 'true' }}
+    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+
+    env:
+      RAYON_NUM_THREADS: 1
 
     permissions:
       contents: read
@@ -236,10 +238,10 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime
+        run: cargo codspeed build -p gdsr --bench io -m simulation
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@a4a36bb07c0638b0b4ca52bf1f3dad1b4289e52f # v4.18.1
         with:
-          run: cargo codspeed run
-          mode: walltime
+          run: cargo codspeed run -p gdsr --bench io -m simulation
+          mode: simulation

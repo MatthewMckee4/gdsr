@@ -90,6 +90,19 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 uvx prek run -a
 ```
 
+Run the GDS parser and writer benchmarks locally with Criterion:
+
+```bash
+cargo bench -p gdsr --bench io
+```
+
+Check the CodSpeed integration without uploading benchmark results:
+
+```bash
+cargo codspeed build -p gdsr --bench io -m simulation
+cargo codspeed run -p gdsr --bench io -m simulation
+```
+
 ## Documentation
 
 We use zensical to build the documentation.

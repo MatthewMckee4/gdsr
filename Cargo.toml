@@ -49,6 +49,7 @@ bevy_egui = { version = "0.39.1", default-features = false, features = [
 bytemuck = "1.25.0"
 chrono = "0.4.44"
 clap = "4.5.55"
+criterion = { package = "codspeed-criterion-compat", version = "5" }
 earcutr = "0.5"
 egui = "0.33.3"
 geo = { version = "0.33.1", default-features = false, features = ["earcut"] }

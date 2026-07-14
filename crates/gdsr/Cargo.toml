@@ -19,7 +19,7 @@ rayon = { workspace = true }
 
 [dev-dependencies]
 approx = { workspace = true }
-criterion = { package = "codspeed-criterion-compat-walltime", version = "4" }
+criterion = { workspace = true }
 insta = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
