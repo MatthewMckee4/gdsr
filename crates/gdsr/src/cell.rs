@@ -1,15 +1,24 @@
 use std::sync::mpsc;
 
+use crate::timestamp::GdsTimestamps;
 use crate::{
     Dimensions, Element, FlattenOptions, GdsBox, LayerMapping, Library, Movable, Node, Path, Point,
     Polygon, Reference, Text, Transformable, Transformation,
 };
 
 /// A named cell containing polygons, paths, boxes, nodes, texts, and references to other cells or elements.
-#[derive(Clone, Debug, PartialEq, Default)]
+/// Timestamp metadata is excluded from equality comparisons.
+#[derive(Clone, Debug, Default)]
 pub struct Cell {
     name: String,
     elements: Vec<Element>,
+    timestamps: Option<GdsTimestamps>,
+}
+
+impl PartialEq for Cell {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.elements == other.elements
+    }
 }
 
 impl Cell {
@@ -18,12 +27,23 @@ impl Cell {
         Self {
             name: name.to_string(),
             elements: Vec::new(),
+            timestamps: None,
         }
     }
 
     /// Returns the cell name.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Returns the parsed or explicitly assigned `BGNSTR` timestamps.
+    pub const fn timestamps(&self) -> Option<GdsTimestamps> {
+        self.timestamps
+    }
+
+    /// Assigns the creation and last modification times used by Preserve writes.
+    pub fn set_timestamps(&mut self, timestamps: GdsTimestamps) {
+        self.timestamps = Some(timestamps);
     }
 
     pub(crate) fn set_name(&mut self, name: &str) {
@@ -117,6 +137,7 @@ impl Cell {
     pub fn to_integer_unit(self) -> Self {
         Self {
             name: self.name,
+            timestamps: self.timestamps,
             elements: self
                 .elements
                 .into_iter()
@@ -130,6 +151,7 @@ impl Cell {
     pub fn to_float_unit(self) -> Self {
         Self {
             name: self.name,
+            timestamps: self.timestamps,
             elements: self
                 .elements
                 .into_iter()
@@ -233,6 +255,7 @@ impl Transformable for Cell {
     fn transform_impl(self, transformation: &Transformation) -> Self {
         Self {
             name: self.name,
+            timestamps: self.timestamps,
             elements: self
                 .elements
                 .into_iter()
@@ -262,6 +285,7 @@ impl Movable for Cell {
     fn move_to(self, target: crate::Point) -> Self {
         Self {
             name: self.name,
+            timestamps: self.timestamps,
             elements: self
                 .elements
                 .into_iter()

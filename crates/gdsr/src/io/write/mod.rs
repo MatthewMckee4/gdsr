@@ -4,7 +4,6 @@ pub mod validation;
 
 use std::io::Write;
 
-use chrono::{Datelike, Local, Timelike};
 use rayon::prelude::*;
 
 use crate::config::gds_file_types::{
@@ -13,8 +12,8 @@ use crate::config::gds_file_types::{
 use crate::elements::text::get_presentation_value;
 use crate::error::GdsError;
 use crate::{
-    Cell, Element, GdsBox, Instance, Library, Movable, Node, Path, Point, Polygon, Property,
-    Reference, Text, Transformable,
+    Cell, Element, GdsBox, GdsTimestampPolicy, GdsTimestamps, Instance, Library, Movable, Node,
+    Path, Point, Polygon, Property, Reference, Text, Transformable,
 };
 use gds_format::{eight_byte_real, write_u16_array_as_big_endian};
 use validation::{
@@ -40,9 +39,40 @@ pub trait GdsWriter: Sync {
         write_library(self, library, user_units, db_units)
     }
 
+    /// Serializes a library using an explicit timestamp policy.
+    fn write_library_with_timestamp_policy(
+        &self,
+        library: &Library,
+        user_units: f64,
+        db_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Vec<u8>, GdsError> {
+        write_library_with_timestamp_policy(self, library, user_units, db_units, timestamp_policy)
+    }
+
     /// Serializes a single cell to GDS bytes.
     fn write_cell(&self, cell: &Cell, db_units: f64) -> Result<Vec<u8>, GdsError> {
         write_cell(self, cell, db_units)
+    }
+
+    /// Serializes a single cell using an explicit timestamp policy.
+    fn write_cell_with_timestamp_policy(
+        &self,
+        cell: &Cell,
+        db_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Vec<u8>, GdsError> {
+        write_cell_with_timestamp_policy(self, cell, db_units, timestamp_policy)
+    }
+
+    /// Serializes a single cell with an already resolved `BGNSTR` timestamp pair.
+    fn write_cell_with_timestamps(
+        &self,
+        cell: &Cell,
+        db_units: f64,
+        timestamps: GdsTimestamps,
+    ) -> Result<Vec<u8>, GdsError> {
+        write_cell_with_timestamps(self, cell, db_units, timestamps)
     }
 
     /// Serializes a single element to GDS bytes.
@@ -117,27 +147,93 @@ impl GdsWriter for GdsFileWriter {}
 pub struct GdsStreamWriter<W> {
     output: W,
     database_units: f64,
+    timestamp_policy: GdsTimestampPolicy,
+    current_timestamps: GdsTimestamps,
 }
 
 impl<W: Write> GdsStreamWriter<W> {
     /// Writes a library header to `output` and starts a streaming GDS library.
     pub fn new(
-        mut output: W,
+        output: W,
         library_name: &str,
         user_units: f64,
         database_units: f64,
     ) -> Result<Self, GdsError> {
-        write_gds_head_to_file(library_name, user_units, database_units, &mut output)?;
+        Self::start(
+            output,
+            library_name,
+            None,
+            user_units,
+            database_units,
+            GdsTimestampPolicy::Current,
+        )
+    }
+
+    /// Starts a streaming write from a library using an explicit timestamp policy.
+    ///
+    /// Taking the library provides the `BGNLIB` metadata required by
+    /// [`GdsTimestampPolicy::Preserve`]. Cells passed to [`Self::write_cell`]
+    /// must also contain timestamps when that policy is selected.
+    pub fn from_library_with_timestamp_policy(
+        output: W,
+        library: &Library,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Self, GdsError> {
+        Self::start(
+            output,
+            library.name(),
+            library.timestamps(),
+            user_units,
+            database_units,
+            timestamp_policy,
+        )
+    }
+
+    fn start(
+        mut output: W,
+        library_name: &str,
+        library_timestamps: Option<GdsTimestamps>,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Self, GdsError> {
+        let current_timestamps = GdsTimestamps::current();
+        let timestamps = resolve_timestamps(
+            timestamp_policy,
+            library_timestamps,
+            current_timestamps,
+            "library",
+            library_name,
+        )?;
+        write_gds_head_to_file(
+            library_name,
+            user_units,
+            database_units,
+            timestamps,
+            &mut output,
+        )?;
         output.flush()?;
         Ok(Self {
             output,
             database_units,
+            timestamp_policy,
+            current_timestamps,
         })
     }
 
     /// Serializes and flushes one cell to the library.
     pub fn write_cell(&mut self, cell: &Cell) -> Result<(), GdsError> {
-        let bytes = GdsFileWriter.write_cell(cell, self.database_units)?;
+        let timestamps = resolve_timestamps(
+            self.timestamp_policy,
+            cell.timestamps(),
+            self.current_timestamps,
+            "cell",
+            cell.name(),
+        )?;
+        let bytes =
+            GdsFileWriter.write_cell_with_timestamps(cell, self.database_units, timestamps)?;
         self.output.write_all(&bytes)?;
         self.output.flush()?;
         Ok(())
@@ -163,30 +259,9 @@ fn write_float_to_eight_byte_real_to_file(
     Ok(buffer.write_all(&value)?)
 }
 
-/// Returns the current timestamp as 12 u16 values (creation + modification) for GDS records.
-fn gds_timestamp() -> [u16; 12] {
-    let now = Local::now();
-    let ts = now.naive_utc();
-    [
-        ts.year() as u16,
-        ts.month() as u16,
-        ts.day() as u16,
-        ts.hour() as u16,
-        ts.minute() as u16,
-        ts.second() as u16,
-        ts.year() as u16,
-        ts.month() as u16,
-        ts.day() as u16,
-        ts.hour() as u16,
-        ts.minute() as u16,
-        ts.second() as u16,
-    ]
-}
-
-/// Returns the `BgnStr` record header with the current timestamp.
-fn cell_head_record() -> [u16; 14] {
+fn cell_head_record(timestamps: GdsTimestamps) -> [u16; 14] {
     let [size, head] = record_header(GDSRecord::BgnStr, GDSDataType::TwoByteSignedInteger, 12);
-    let ts = gds_timestamp();
+    let ts = timestamps.to_record();
     [
         size, head, ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6], ts[7], ts[8], ts[9], ts[10],
         ts[11],
@@ -211,11 +286,12 @@ fn write_gds_head_to_file(
     library_name: &str,
     user_units: f64,
     db_units: f64,
+    timestamps: GdsTimestamps,
     buffer: &mut impl Write,
 ) -> Result<(), GdsError> {
     let [s1, h1] = record_header(GDSRecord::Header, GDSDataType::TwoByteSignedInteger, 1);
     let [s2, h2] = record_header(GDSRecord::BgnLib, GDSDataType::TwoByteSignedInteger, 12);
-    let ts = gds_timestamp();
+    let ts = timestamps.to_record();
     let head_start = [
         s1, h1, 0x0258, s2, h2, ts[0], ts[1], ts[2], ts[3], ts[4], ts[5], ts[6], ts[7], ts[8],
         ts[9], ts[10], ts[11],
@@ -375,14 +451,54 @@ pub fn write_library(
     user_units: f64,
     db_units: f64,
 ) -> Result<Vec<u8>, GdsError> {
+    write_library_with_timestamp_policy(
+        writer,
+        library,
+        user_units,
+        db_units,
+        GdsTimestampPolicy::Current,
+    )
+}
+
+/// Serializes an entire library using an explicit timestamp policy.
+pub fn write_library_with_timestamp_policy(
+    writer: &(impl GdsWriter + ?Sized),
+    library: &Library,
+    user_units: f64,
+    db_units: f64,
+    timestamp_policy: GdsTimestampPolicy,
+) -> Result<Vec<u8>, GdsError> {
+    let current_timestamps = GdsTimestamps::current();
+    let library_timestamps = resolve_timestamps(
+        timestamp_policy,
+        library.timestamps(),
+        current_timestamps,
+        "library",
+        library.name(),
+    )?;
     let mut buffer = Vec::new();
-    write_gds_head_to_file(library.name(), user_units, db_units, &mut buffer)?;
+    write_gds_head_to_file(
+        library.name(),
+        user_units,
+        db_units,
+        library_timestamps,
+        &mut buffer,
+    )?;
 
     let cells: Vec<&Cell> = library.cells().values().collect();
 
     for buf in cells
         .par_iter()
-        .map(|cell| writer.write_cell(cell, db_units))
+        .map(|cell| {
+            let timestamps = resolve_timestamps(
+                timestamp_policy,
+                cell.timestamps(),
+                current_timestamps,
+                "cell",
+                cell.name(),
+            )?;
+            writer.write_cell_with_timestamps(cell, db_units, timestamps)
+        })
         .collect::<Result<Vec<_>, GdsError>>()?
     {
         buffer.extend_from_slice(&buf);
@@ -399,10 +515,38 @@ pub fn write_cell(
     cell: &Cell,
     db_units: f64,
 ) -> Result<Vec<u8>, GdsError> {
+    write_cell_with_timestamp_policy(writer, cell, db_units, GdsTimestampPolicy::Current)
+}
+
+/// Serializes a single cell using an explicit timestamp policy.
+pub fn write_cell_with_timestamp_policy(
+    writer: &(impl GdsWriter + ?Sized),
+    cell: &Cell,
+    db_units: f64,
+    timestamp_policy: GdsTimestampPolicy,
+) -> Result<Vec<u8>, GdsError> {
+    let current_timestamps = GdsTimestamps::current();
+    let timestamps = resolve_timestamps(
+        timestamp_policy,
+        cell.timestamps(),
+        current_timestamps,
+        "cell",
+        cell.name(),
+    )?;
+    write_cell_with_timestamps(writer, cell, db_units, timestamps)
+}
+
+/// Serializes a single cell with an already resolved timestamp pair.
+pub fn write_cell_with_timestamps(
+    writer: &(impl GdsWriter + ?Sized),
+    cell: &Cell,
+    db_units: f64,
+    timestamps: GdsTimestamps,
+) -> Result<Vec<u8>, GdsError> {
     validate_structure_name(cell.name())?;
 
     let mut buffer = Vec::new();
-    write_u16_array(&mut buffer, &cell_head_record())?;
+    write_u16_array(&mut buffer, &cell_head_record(timestamps))?;
     write_string_with_record_to_file(&mut buffer, GDSRecord::StrName, cell.name())?;
 
     for buf in cell
@@ -420,6 +564,24 @@ pub fn write_cell(
     )?;
 
     Ok(buffer)
+}
+
+fn resolve_timestamps(
+    policy: GdsTimestampPolicy,
+    preserved: Option<GdsTimestamps>,
+    current: GdsTimestamps,
+    target_kind: &str,
+    target_name: &str,
+) -> Result<GdsTimestamps, GdsError> {
+    match policy {
+        GdsTimestampPolicy::Current => Ok(current),
+        GdsTimestampPolicy::Preserve => preserved.ok_or_else(|| GdsError::ValidationError {
+            message: format!(
+                "Cannot preserve timestamps for {target_kind} '{target_name}': no timestamps are stored"
+            ),
+        }),
+        GdsTimestampPolicy::Zero => Ok(GdsTimestamps::ZERO),
+    }
 }
 
 /// Serializes a polygon to GDS bytes.
@@ -686,9 +848,14 @@ mod tests {
     use std::fs;
     use std::io::{self, BufReader, Write};
 
+    use chrono::{NaiveDate, NaiveDateTime};
+
     use crate::config::gds_file_types::GDSRecordData;
     use crate::io::read::RecordReader;
-    use crate::{DEFAULT_INTEGER_UNITS, DataType, Layer, Library, Property};
+    use crate::{
+        DEFAULT_INTEGER_UNITS, DataType, GdsTimestampPolicy, GdsTimestamps, Layer, Library,
+        Property,
+    };
 
     use super::*;
 
@@ -722,6 +889,35 @@ mod tests {
         );
         polygon.properties_mut().push(Property::new(65_535, value));
         polygon
+    }
+
+    fn datetime(
+        year: i32,
+        month: u32,
+        day: u32,
+        hour: u32,
+        minute: u32,
+        second: u32,
+    ) -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(year, month, day)
+            .expect("test date should be valid")
+            .and_hms_opt(hour, minute, second)
+            .expect("test time should be valid")
+    }
+
+    fn timestamps(first_year: i32, second_year: i32) -> GdsTimestamps {
+        GdsTimestamps::try_new(
+            datetime(first_year, 2, 3, 4, 5, 6),
+            datetime(second_year, 7, 8, 9, 10, 11),
+        )
+        .expect("test timestamps should be valid")
+    }
+
+    fn read_library_bytes(bytes: &[u8]) -> Result<Library, GdsError> {
+        let directory = tempfile::tempdir().expect("temporary directory should be created");
+        let path = directory.path().join("timestamps.gds");
+        fs::write(&path, bytes).expect("test GDS should be writable");
+        Library::read_file(path, Some(DEFAULT_INTEGER_UNITS))
     }
 
     #[test]
@@ -817,5 +1013,173 @@ mod tests {
         assert_eq!(library.name(), "streamed");
         assert!(library.get_cell("first").is_some());
         assert!(library.get_cell("second").is_some());
+    }
+
+    #[test]
+    fn preserve_round_trips_library_and_structure_timestamps() {
+        let library_timestamps = timestamps(2020, 2021);
+        let cell_timestamps = timestamps(2022, 2023);
+        let mut library = Library::new("preserved");
+        library.set_timestamps(library_timestamps);
+        let mut cell = Cell::new("top");
+        cell.set_timestamps(cell_timestamps);
+        library.add_cell(cell);
+
+        let bytes = library
+            .write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Preserve,
+            )
+            .expect("preserved timestamps should be writable");
+        let parsed = read_library_bytes(&bytes).expect("written library should be readable");
+
+        assert_eq!(parsed.timestamps(), Some(library_timestamps));
+        assert_eq!(
+            parsed
+                .get_cell("top")
+                .expect("parsed cell should exist")
+                .timestamps(),
+            Some(cell_timestamps)
+        );
+    }
+
+    #[test]
+    fn zero_policy_is_stable_and_readable() {
+        let mut library = Library::new("stable");
+        library.add_cell(Cell::new("top"));
+
+        let write = || {
+            library.write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+        };
+        let first = write().expect("zero timestamps should be writable");
+        let second = write().expect("zero timestamps should be writable again");
+        let parsed = read_library_bytes(&first).expect("zero timestamps should be readable");
+
+        assert_eq!(first, second);
+        assert_eq!(parsed.timestamps(), Some(GdsTimestamps::ZERO));
+        assert_eq!(
+            parsed
+                .get_cell("top")
+                .expect("parsed cell should exist")
+                .timestamps(),
+            Some(GdsTimestamps::ZERO)
+        );
+    }
+
+    #[test]
+    fn current_policy_uses_one_time_for_the_entire_library() {
+        let mut library = Library::new("current");
+        library.add_cell(Cell::new("first"));
+        library.add_cell(Cell::new("second"));
+        let bytes = library
+            .write(&GdsFileWriter, DEFAULT_INTEGER_UNITS, DEFAULT_INTEGER_UNITS)
+            .expect("current timestamps should be writable");
+
+        let timestamps: Vec<_> = RecordReader::new(BufReader::new(bytes.as_slice()))
+            .filter_map(|record| {
+                let (record, data) = record.expect("written records should be readable");
+                match (record, data) {
+                    (GDSRecord::BgnLib | GDSRecord::BgnStr, GDSRecordData::I16(values)) => {
+                        Some(values)
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+
+        assert_eq!(timestamps.len(), 3);
+        assert!(timestamps.windows(2).all(|pair| pair[0] == pair[1]));
+        assert!(timestamps.iter().all(|values| values[..6] == values[6..]));
+    }
+
+    #[test]
+    fn preserve_requires_library_and_structure_metadata() {
+        let mut library = Library::new("missing");
+        library.add_cell(Cell::new("top"));
+
+        let error = library
+            .write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Preserve,
+            )
+            .expect_err("missing library timestamps should be rejected");
+        assert!(error.to_string().contains("library 'missing'"));
+
+        library.set_timestamps(timestamps(2020, 2021));
+        let error = library
+            .write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Preserve,
+            )
+            .expect_err("missing cell timestamps should be rejected");
+        assert!(error.to_string().contains("cell 'top'"));
+    }
+
+    #[test]
+    fn invalid_preserved_date_reports_the_raw_values() {
+        let library = Library::new("invalid");
+        let mut bytes = library
+            .write_with_timestamp_policy(
+                &GdsFileWriter,
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("zero timestamps should be writable");
+
+        // HEADER is six bytes; the first BGNLIB month occupies bytes 12..14.
+        bytes
+            .get_mut(12..14)
+            .expect("BGNLIB timestamp should exist")
+            .copy_from_slice(&13_i16.to_be_bytes());
+        let error = read_library_bytes(&bytes).expect_err("month 13 should be rejected");
+
+        assert!(error.to_string().contains("BGNLIB"));
+        assert!(error.to_string().contains("13"));
+    }
+
+    #[test]
+    fn stream_writer_preserves_library_and_structure_timestamps() {
+        let library_timestamps = timestamps(2020, 2021);
+        let cell_timestamps = timestamps(2022, 2023);
+        let mut library = Library::new("streamed-preserve");
+        library.set_timestamps(library_timestamps);
+        let mut cell = Cell::new("top");
+        cell.set_timestamps(cell_timestamps);
+        library.add_cell(cell);
+
+        let mut writer = GdsStreamWriter::from_library_with_timestamp_policy(
+            Vec::new(),
+            &library,
+            DEFAULT_INTEGER_UNITS,
+            DEFAULT_INTEGER_UNITS,
+            GdsTimestampPolicy::Preserve,
+        )
+        .expect("stream header should be writable");
+        writer
+            .write_cell(library.get_cell("top").expect("source cell should exist"))
+            .expect("streamed cell should be writable");
+        let bytes = writer.finish().expect("stream should finish");
+        let parsed = read_library_bytes(&bytes).expect("streamed library should be readable");
+
+        assert_eq!(parsed.timestamps(), Some(library_timestamps));
+        assert_eq!(
+            parsed
+                .get_cell("top")
+                .expect("parsed cell should exist")
+                .timestamps(),
+            Some(cell_timestamps)
+        );
     }
 }

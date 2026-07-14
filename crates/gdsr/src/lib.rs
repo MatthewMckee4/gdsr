@@ -15,6 +15,7 @@ mod point;
 #[cfg(test)]
 mod property_tests;
 mod stats;
+mod timestamp;
 mod traits;
 mod transformation;
 mod types;
@@ -40,6 +41,7 @@ pub use library::{
 };
 pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
+pub use timestamp::{GdsTimestampPolicy, GdsTimestamps};
 pub use traits::{Dimensions, Movable, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{DataType, Degrees, Layer, LayerMapping, Radians};

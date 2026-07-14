@@ -10,7 +10,7 @@ use crate::io::read::{from_gds, from_gds_filtered};
 use crate::io::write::validation::MAX_STRUCTURE_NAME_LENGTH;
 use crate::io::write::{GdsFileWriter, GdsWriter};
 use crate::types::LayerMapping;
-use crate::{DataType, Element, Instance, Layer};
+use crate::{DataType, Element, GdsTimestampPolicy, GdsTimestamps, Instance, Layer};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -108,10 +108,18 @@ impl fmt::Display for LibraryMergeError {
 impl std::error::Error for LibraryMergeError {}
 
 /// A GDSII library containing named cells. This is the top-level container for a GDSII design.
-#[derive(Clone, Debug, PartialEq)]
+/// Timestamp metadata is excluded from equality comparisons.
+#[derive(Clone, Debug)]
 pub struct Library {
     pub(crate) name: String,
     pub(crate) cells: HashMap<String, Cell>,
+    pub(crate) timestamps: Option<GdsTimestamps>,
+}
+
+impl PartialEq for Library {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.cells == other.cells
+    }
 }
 
 impl Library {
@@ -120,12 +128,23 @@ impl Library {
         Self {
             name: name.to_string(),
             cells: HashMap::new(),
+            timestamps: None,
         }
     }
 
     /// Returns the library name.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Returns the parsed or explicitly assigned `BGNLIB` timestamps.
+    pub const fn timestamps(&self) -> Option<GdsTimestamps> {
+        self.timestamps
+    }
+
+    /// Assigns the last modification and access times used by Preserve writes.
+    pub fn set_timestamps(&mut self, timestamps: GdsTimestamps) {
+        self.timestamps = Some(timestamps);
     }
 
     /// Returns the map of cell names to cells.
@@ -310,6 +329,22 @@ impl Library {
         writer.write_library(self, user_units, database_units)
     }
 
+    /// Serializes the library with a custom writer and an explicit timestamp policy.
+    pub fn write_with_timestamp_policy(
+        &self,
+        writer: &impl GdsWriter,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<Vec<u8>, GdsError> {
+        writer.write_library_with_timestamp_policy(
+            self,
+            user_units,
+            database_units,
+            timestamp_policy,
+        )
+    }
+
     /// Write the library to a GDS file.
     ///
     /// The given user units are only used when writing the GDSII header.
@@ -325,7 +360,28 @@ impl Library {
         user_units: f64,
         database_units: f64,
     ) -> Result<(), GdsError> {
-        let bytes = self.write(&GdsFileWriter, user_units, database_units)?;
+        self.write_file_with_timestamp_policy(
+            file_name,
+            user_units,
+            database_units,
+            GdsTimestampPolicy::Current,
+        )
+    }
+
+    /// Writes the library to a GDS file using an explicit timestamp policy.
+    pub fn write_file_with_timestamp_policy<P: AsRef<std::path::Path>>(
+        &self,
+        file_name: P,
+        user_units: f64,
+        database_units: f64,
+        timestamp_policy: GdsTimestampPolicy,
+    ) -> Result<(), GdsError> {
+        let bytes = self.write_with_timestamp_policy(
+            &GdsFileWriter,
+            user_units,
+            database_units,
+            timestamp_policy,
+        )?;
         let mut file = File::create(file_name)?;
         file.write_all(&bytes)?;
         Ok(file.flush()?)
@@ -1218,7 +1274,7 @@ mod tests {
     #[test]
     fn test_library_debug() {
         let library: Library = Library::new("debug_lib");
-        insta::assert_snapshot!(format!("{library:?}"), @r#"Library { name: "debug_lib", cells: {} }"#);
+        insta::assert_snapshot!(format!("{library:?}"), @r#"Library { name: "debug_lib", cells: {}, timestamps: None }"#);
     }
 
     #[test]
