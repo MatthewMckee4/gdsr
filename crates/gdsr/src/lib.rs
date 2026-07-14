@@ -34,7 +34,10 @@ pub use flatten::FlattenOptions;
 pub use grid::Grid;
 pub use io::write::svg::cell_to_svg;
 pub use io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter};
-pub use library::{CellConflictStrategy, DanglingCellReference, Library, LibraryMergeError};
+pub use library::{
+    CellConflictStrategy, CellPruneError, CellPruneMode, CellPruneReport, DanglingCellReference,
+    Library, LibraryMergeError,
+};
 pub use point::Point;
 pub use stats::{CellStats, LibraryStats};
 pub use traits::{Dimensions, Movable, Transformable};
