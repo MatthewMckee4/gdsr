@@ -14,7 +14,7 @@ license = "MIT"
 gdsr = { path = "crates/gdsr", version = "0.0.1-alpha.3" }
 
 approx = "0.5"
-bevy = { version = "0.18.1", default-features = false, features = [
+bevy = { version = "0.19.0", default-features = false, features = [
     "async_executor",
     "bevy_asset",
     "bevy_color",
