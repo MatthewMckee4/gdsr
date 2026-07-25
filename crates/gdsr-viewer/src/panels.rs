@@ -193,7 +193,8 @@ fn draw_layer_panel(
     layer_state: &mut LayerState,
     color_changed: &mut bool,
 ) {
-    ui.horizontal(|ui| {
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        let clear = ui.add_enabled(!layer_state.filter.is_empty(), egui::Button::new("Clear"));
         let filter = ui
             .add(
                 egui::TextEdit::singleline(&mut layer_state.filter)
@@ -206,10 +207,7 @@ fn draw_layer_panel(
             filter.request_focus();
         }
 
-        if ui
-            .add_enabled(!layer_state.filter.is_empty(), egui::Button::new("Clear"))
-            .clicked()
-        {
+        if clear.clicked() {
             layer_state.filter.clear();
             filter.request_focus();
         }
