@@ -1442,6 +1442,10 @@ fn hit_test_element(
     None
 }
 
+fn accepts_canvas_shortcut(wants_keyboard_input: bool, modifiers: egui::Modifiers) -> bool {
+    !wants_keyboard_input && modifiers.is_none()
+}
+
 impl ViewerApp {
     fn update(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| i.viewport().close_requested()) && self.cancel_close_for_unsaved_changes()
@@ -1484,10 +1488,17 @@ impl ViewerApp {
         let drawing_tool_active = polygon_tool_active || path_tool_active;
 
         // Global keyboard shortcuts
-        if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+        let wants_keyboard_input = ctx.wants_keyboard_input();
+        if ctx.input(|i| {
+            accepts_canvas_shortcut(wants_keyboard_input, i.modifiers)
+                && i.key_pressed(egui::Key::F)
+        }) {
             self.zoom_to_fit();
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::G)) {
+        if ctx.input(|i| {
+            accepts_canvas_shortcut(wants_keyboard_input, i.modifiers)
+                && i.key_pressed(egui::Key::G)
+        }) {
             self.show_grid = !self.show_grid;
         }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O) && !i.modifiers.alt) {
@@ -2126,6 +2137,13 @@ mod tests {
 
     fn p(x: f64, y: f64) -> Point {
         Point::float(x, y, 1.0)
+    }
+
+    #[test]
+    fn canvas_shortcuts_require_unmodified_non_text_input() {
+        assert!(accepts_canvas_shortcut(false, egui::Modifiers::NONE));
+        assert!(!accepts_canvas_shortcut(true, egui::Modifiers::NONE));
+        assert!(!accepts_canvas_shortcut(false, egui::Modifiers::CTRL));
     }
 
     fn test_elements() -> Vec<Element> {

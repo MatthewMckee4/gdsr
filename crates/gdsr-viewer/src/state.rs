@@ -688,4 +688,5 @@ impl GridSpacing {
 pub struct LayerState {
     pub layer_colors: LayerColorMap,
     pub hidden_layers: HashSet<(Layer, DataType)>,
+    pub filter: String,
 }

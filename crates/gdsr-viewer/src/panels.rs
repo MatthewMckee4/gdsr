@@ -193,10 +193,35 @@ fn draw_layer_panel(
     layer_state: &mut LayerState,
     color_changed: &mut bool,
 ) {
+    ui.horizontal(|ui| {
+        let filter = ui
+            .add(
+                egui::TextEdit::singleline(&mut layer_state.filter)
+                    .hint_text("Filter layers")
+                    .desired_width(f32::INFINITY),
+            )
+            .on_hover_text("Focus with Command/Ctrl+F");
+
+        if ui.input(|input| input.modifiers.command && input.key_pressed(egui::Key::F)) {
+            filter.request_focus();
+        }
+
+        if ui
+            .add_enabled(!layer_state.filter.is_empty(), egui::Button::new("Clear"))
+            .clicked()
+        {
+            layer_state.filter.clear();
+            filter.request_focus();
+        }
+    });
+
     egui::ScrollArea::vertical()
         .id_salt("layers")
         .show(ui, |ui| {
-            for &(layer, dt) in layers {
+            for &(layer, dt) in layers
+                .iter()
+                .filter(|&&(layer, dt)| layer_matches_filter(layer, dt, &layer_state.filter))
+            {
                 let mut color = layer_state.layer_colors.get(layer, dt);
                 let visible = !layer_state.hidden_layers.contains(&(layer, dt));
 
@@ -221,6 +246,14 @@ fn draw_layer_panel(
                 });
             }
         });
+}
+
+fn layer_matches_filter(layer: Layer, data_type: DataType, filter: &str) -> bool {
+    let filter = filter.trim();
+    filter.is_empty()
+        || format!("L{layer} D{data_type}")
+            .to_ascii_lowercase()
+            .contains(&filter.to_ascii_lowercase())
 }
 
 /// Draws the statistics detail panel in the bottom bar.
@@ -317,5 +350,23 @@ fn draw_tree_node(
                 scroll_to_selected,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::layer_matches_filter;
+    use gdsr::{DataType, Layer};
+
+    #[test]
+    fn layer_filter_matches_layer_and_datatype() {
+        let layer = Layer::new(12);
+        let data_type = DataType::new(7);
+
+        assert!(layer_matches_filter(layer, data_type, ""));
+        assert!(layer_matches_filter(layer, data_type, "12"));
+        assert!(layer_matches_filter(layer, data_type, "D7"));
+        assert!(layer_matches_filter(layer, data_type, " l12 d7 "));
+        assert!(!layer_matches_filter(layer, data_type, "L7"));
     }
 }
