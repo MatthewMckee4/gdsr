@@ -168,8 +168,6 @@ jobs:
 
     needs: determine_changes
 
-    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-
     permissions:
       id-token: write
 
@@ -194,14 +192,13 @@ jobs:
         run: cargo llvm-cov nextest --lcov --output-path lcov.info
 
       - name: Upload coverage to Codecov
-        if: ${{ github.event_name != 'pull_request' }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
+          disable_search: true
+          fail_ci_if_error: true
           files: lcov.info
           slug: MatthewMckee4/gdsr
-          use_oidc: true
-          use_pypi: true
-          fail_ci_if_error: true
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
   benchmarks:
     name: "benchmarks"
@@ -245,3 +242,66 @@ jobs:
         with:
           run: cargo codspeed run -p gdsr-benchmark --bench io -m simulation
           mode: simulation
+
+  ci-gate:
+    name: "CI gate"
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    needs:
+      - determine_changes
+      - pre-commit
+      - build-docs
+      - cargo-test
+      - coverage
+      - benchmarks
+    if: ${{ always() }}
+
+    steps:
+      - name: Require successful validation
+        env:
+          BENCHMARKS_RESULT: ${{ needs.benchmarks.result }}
+          BUILD_DOCS_RESULT: ${{ needs.build-docs.result }}
+          CARGO_TEST_RESULT: ${{ needs.cargo-test.result }}
+          CODE_CHANGED: ${{ needs.determine_changes.outputs.code }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          DETERMINE_CHANGES_RESULT: ${{ needs.determine_changes.result }}
+          PRE_COMMIT_RESULT: ${{ needs.pre-commit.result }}
+        run: |
+          require_success() {
+            if [ "$2" != "success" ]; then
+              echo "::error::$1 finished with result '$2'"
+              exit 1
+            fi
+          }
+
+          require_code_validation() {
+            case "$2" in
+              success)
+                ;;
+              skipped)
+                if [ "$CODE_CHANGED" != "false" ] || [ "$GITHUB_REF" = "refs/heads/main" ]; then
+                  echo "::error::$1 was unexpectedly skipped"
+                  exit 1
+                fi
+                ;;
+              *)
+                echo "::error::$1 finished with result '$2'"
+                exit 1
+                ;;
+            esac
+          }
+
+          require_success "determine changes" "$DETERMINE_CHANGES_RESULT"
+          require_success "pre commit" "$PRE_COMMIT_RESULT"
+          require_success "Build docs" "$BUILD_DOCS_RESULT"
+          require_success "coverage" "$COVERAGE_RESULT"
+
+          if [ "$CODE_CHANGED" != "true" ] && [ "$CODE_CHANGED" != "false" ]; then
+            echo "::error::determine changes produced unexpected code output '$CODE_CHANGED'"
+            exit 1
+          fi
+
+          require_code_validation "cargo test" "$CARGO_TEST_RESULT"
+          require_code_validation "benchmarks" "$BENCHMARKS_RESULT"

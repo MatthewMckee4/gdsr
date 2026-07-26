@@ -87,6 +87,9 @@ Always use the pull request template and add labels. Write the description in
 concise prose paragraphs, with code examples only when they help the reviewer.
 Do not use checkboxes. Do not add AI tooling as an author or co-author.
 
+Every pull request must receive independent review from an agent that did not
+author its changes. Resolve all findings before merge.
+
 Never merge a pull request unless every required check for the exact current
 head commit has completed successfully. `main` must also be green. The only
 exception is a narrowly scoped pull request whose sole purpose is restoring
