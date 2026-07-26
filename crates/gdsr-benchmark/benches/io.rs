@@ -3,9 +3,9 @@ use std::io::Write;
 
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use gdsr::{
-    Cell, DataType, Element, GdsBox, GdsFileWriter, Grid, HorizontalPresentation, Layer, Library,
-    Node, Path, PathType, Point, Polygon, Property, Radians, Reference, Text, Unit,
-    VerticalPresentation,
+    Cell, DataType, Element, GdsBox, GdsFileWriter, GdsRoundingPolicy, GdsWriteOptions, Grid,
+    HorizontalPresentation, Layer, Library, Node, Path, PathType, Point, Polygon, Property,
+    Radians, Reference, Text, Unit, VerticalPresentation,
 };
 use tempfile::NamedTempFile;
 
@@ -198,6 +198,35 @@ fn mixed_library(element_count: usize) -> Library {
     library
 }
 
+fn float_library(element_count: usize) -> Library {
+    let mut library = Library::new("bench_float");
+    let mut cell = Cell::new("top");
+    for index in 0..element_count {
+        let coordinate = index as f64 * 100.0 + 0.25;
+        let points = [
+            Point::float(coordinate, 0.25, DATABASE_UNITS),
+            Point::float(coordinate + 10.5, 20.75, DATABASE_UNITS),
+        ];
+        let layer = Layer::new((index % 64) as u16);
+        let data_type = DataType::new((index % 8) as u16);
+        if index % 2 == 0 {
+            cell.add(Node::new(points.to_vec(), layer, data_type));
+        } else {
+            cell.add(Path::new(
+                points,
+                layer,
+                data_type,
+                None,
+                Some(Unit::float(10.25, DATABASE_UNITS)),
+                None,
+                None,
+            ));
+        }
+    }
+    library.add_cell(cell);
+    library
+}
+
 fn hierarchy_library() -> Library {
     const LEAF_CELLS: i32 = 50;
     const SHAPES_PER_LEAF: i32 = 200;
@@ -323,6 +352,29 @@ fn bench_write_bytes(c: &mut Criterion, fixtures: &[Fixture]) {
     group.finish();
 }
 
+fn bench_write_bytes_with_options(c: &mut Criterion) {
+    let library = float_library(10_000);
+    let database_units = DATABASE_UNITS * 2.0;
+    let options = GdsWriteOptions::new(GdsRoundingPolicy::Nearest);
+    let encoded_size = library
+        .to_bytes_with_options(USER_UNITS, database_units, options)
+        .expect("benchmark library should serialize")
+        .0
+        .len() as u64;
+    let mut group = c.benchmark_group("write_bytes_options");
+    group.throughput(Throughput::Bytes(encoded_size));
+    group.bench_function("quantized_float_10k", |b| {
+        b.iter(|| {
+            black_box(
+                library
+                    .to_bytes_with_options(USER_UNITS, database_units, options)
+                    .expect("benchmark library should serialize"),
+            )
+        });
+    });
+    group.finish();
+}
+
 fn bench_write_stream(c: &mut Criterion, fixture: &Fixture) {
     let mut group = c.benchmark_group("write_stream");
     group.throughput(Throughput::Bytes(fixture.encoded_size));
@@ -374,6 +426,7 @@ fn bench_io(c: &mut Criterion) {
     bench_read_file(c, &fixtures);
     bench_read_file_filtered(c, mixed_50k);
     bench_write_bytes(c, &fixtures);
+    bench_write_bytes_with_options(c);
     bench_write_stream(c, hierarchy_10k);
     bench_write_file(c, mixed_50k);
 }

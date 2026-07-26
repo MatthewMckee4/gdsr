@@ -2918,8 +2918,24 @@ mod tests {
     fn save_file_to_path_writes_library_and_clears_dirty_state() {
         let dir = tempfile::tempdir().expect("temporary directory should be created");
         let path = dir.path().join("saved.gds");
+        let mut source_cell = Cell::new("top");
+        source_cell.add(Polygon::new(
+            [
+                Point::integer(0, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 0, DEFAULT_INTEGER_UNITS),
+                Point::integer(10, 10, DEFAULT_INTEGER_UNITS),
+                Point::integer(0, 10, DEFAULT_INTEGER_UNITS),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        ));
+        let mut library = Library::new("test");
+        library.add_cell(source_cell);
+        let mut cell = CellState::new(library);
+        cell.selected_cell = Some("top".to_string());
+        assert!(cell.load_direct_cell_elements("top"));
         let mut app = ViewerApp {
-            cell: Some(cell_state_with_test_elements()),
+            cell: Some(cell),
             has_unsaved_changes: true,
             ..Default::default()
         };
