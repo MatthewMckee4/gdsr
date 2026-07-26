@@ -1488,7 +1488,7 @@ impl ViewerApp {
         let drawing_tool_active = polygon_tool_active || path_tool_active;
 
         // Global keyboard shortcuts
-        let wants_keyboard_input = ctx.wants_keyboard_input();
+        let wants_keyboard_input = ctx.egui_wants_keyboard_input();
         if ctx.input(|i| {
             accepts_canvas_shortcut(wants_keyboard_input, i.modifiers)
                 && i.key_pressed(egui::Key::F)
