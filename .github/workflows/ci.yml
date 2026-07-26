@@ -296,6 +296,7 @@ jobs:
           require_success "determine changes" "$DETERMINE_CHANGES_RESULT"
           require_success "pre commit" "$PRE_COMMIT_RESULT"
           require_success "Build docs" "$BUILD_DOCS_RESULT"
+          require_success "coverage" "$COVERAGE_RESULT"
 
           if [ "$CODE_CHANGED" != "true" ] && [ "$CODE_CHANGED" != "false" ]; then
             echo "::error::determine changes produced unexpected code output '$CODE_CHANGED'"
@@ -303,5 +304,4 @@ jobs:
           fi
 
           require_code_validation "cargo test" "$CARGO_TEST_RESULT"
-          require_code_validation "coverage" "$COVERAGE_RESULT"
           require_code_validation "benchmarks" "$BENCHMARKS_RESULT"
