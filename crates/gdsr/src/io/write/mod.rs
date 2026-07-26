@@ -700,19 +700,6 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
 ///
 /// Properties on inline references are appended to each expanded element.
 pub fn write_reference(reference: &Reference, db_units: f64) -> Result<Vec<u8>, GdsError> {
-    let grid = reference.grid();
-    validate_col_row(grid.columns(), grid.rows())?;
-    if grid.columns() > 1 && grid.spacing_x().is_none() {
-        return Err(GdsError::ValidationError {
-            message: "Array references with multiple columns require column spacing".to_string(),
-        });
-    }
-    if grid.rows() > 1 && grid.spacing_y().is_none() {
-        return Err(GdsError::ValidationError {
-            message: "Array references with multiple rows require row spacing".to_string(),
-        });
-    }
-
     match reference.instance() {
         Instance::Cell(cell_name) => write_reference_cell(reference, db_units, cell_name),
         Instance::Element(element) => {
@@ -762,6 +749,17 @@ fn write_reference_cell(
 ) -> Result<Vec<u8>, GdsError> {
     let grid = reference.grid();
     validate_structure_name(cell_name)?;
+    validate_col_row(grid.columns(), grid.rows())?;
+    if grid.columns() > 1 && grid.spacing_x().is_none() {
+        return Err(GdsError::ValidationError {
+            message: "Array references with multiple columns require column spacing".to_string(),
+        });
+    }
+    if grid.rows() > 1 && grid.spacing_y().is_none() {
+        return Err(GdsError::ValidationError {
+            message: "Array references with multiple rows require row spacing".to_string(),
+        });
+    }
 
     let is_single_instance = grid.columns() == 1 && grid.rows() == 1;
 
@@ -1109,6 +1107,20 @@ mod tests {
             .collect();
 
         assert_eq!(property_values, ["inner", "outer"]);
+    }
+
+    #[test]
+    fn inline_reference_grid_without_spacing_remains_writable() {
+        let reference = Reference::new(polygon_with_property("inner"))
+            .with_grid(Grid::default().with_columns(2).with_rows(2));
+
+        let bytes = write_reference(&reference, DEFAULT_INTEGER_UNITS)
+            .expect("inline grid should use zero spacing");
+        let boundaries = RecordReader::new(BufReader::new(bytes.as_slice()))
+            .filter(|record| matches!(record, Ok((GDSRecord::Boundary, GDSRecordData::None))))
+            .count();
+
+        assert_eq!(boundaries, 4);
     }
 
     #[test]

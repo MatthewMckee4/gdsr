@@ -837,6 +837,13 @@ impl<R: Read> Iterator for RecordReader<R> {
                 "Invalid LibSecure payload length: expected 6 to 192 bytes in six-byte ACL entries, found {payload_len}"
             ))));
         }
+        if record == GDSRecord::UInteger
+            && (!(2..=64).contains(&payload_len) || !payload_len.is_multiple_of(2))
+        {
+            return Some(Err(invalid_data(format!(
+                "Invalid UInteger payload length: expected 2 to 64 bytes in two-byte values, found {payload_len}"
+            ))));
+        }
         if record == GDSRecord::XY && payload_len < 8 {
             return Some(Err(invalid_data(
                 "Invalid XY payload length: expected at least one coordinate pair",
@@ -959,7 +966,11 @@ const RECORD_LAYOUTS: [RecordLayout; 60] = [
     layout(GDSRecord::STrans, BitArray, 2),
     layout(GDSRecord::Mag, EightByteReal, 8),
     layout(GDSRecord::Angle, EightByteReal, 8),
-    layout(GDSRecord::UInteger, FourByteSignedInteger, 4),
+    layout(
+        GDSRecord::UInteger,
+        TwoByteSignedInteger,
+        VARIABLE_PAYLOAD_LEN,
+    ),
     layout(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
     layout(GDSRecord::RefLibs, AsciiString, 88),
     layout(GDSRecord::Fonts, AsciiString, 176),
@@ -1090,8 +1101,6 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
 #[cfg(test)]
 mod tests {
     use std::io::{BufReader, Cursor, Write};
-
-    use quickcheck_macros::quickcheck;
 
     use super::*;
     use crate::GdsTimestampPolicy;
@@ -1327,7 +1336,6 @@ mod tests {
             (GDSRecord::StrType, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeNum, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeCode, GDSDataType::TwoByteSignedInteger, 12),
-            (GDSRecord::UInteger, GDSDataType::FourByteSignedInteger, 4),
         ] {
             let bytes = [record(record_type, data_type, &vec![0; payload_len])].concat();
             assert_record_decodes(bytes);
@@ -1793,6 +1801,24 @@ mod tests {
     }
 
     #[test]
+    fn uinteger_contains_one_to_thirty_two_two_byte_values() {
+        for payload_len in [2, 4, 64] {
+            assert_record_decodes(record(
+                GDSRecord::UInteger,
+                GDSDataType::TwoByteSignedInteger,
+                &vec![0; payload_len],
+            ));
+        }
+        for payload_len in [0, 1, 3, 66] {
+            assert_record_is_invalid(record(
+                GDSRecord::UInteger,
+                GDSDataType::TwoByteSignedInteger,
+                &vec![0; payload_len],
+            ));
+        }
+    }
+
+    #[test]
     fn invalid_structural_sequences_are_rejected() {
         let begin_structure = record(
             GDSRecord::BgnStr,
@@ -1858,52 +1884,42 @@ mod tests {
         assert_invalid(&Library::read_file_filtered(file.path(), None, |_, _| true));
     }
 
-    #[quickcheck]
-    fn mutations_of_schema_valid_records_are_rejected(mutation: u8, selector: usize) -> bool {
+    #[test]
+    fn whole_record_grammar_mutations_are_rejected_without_panicking() {
         let bytes = Library::new("mutation")
             .to_bytes_with_timestamp_policy(1e-3, 1e-9, GdsTimestampPolicy::Zero)
             .expect("minimal library should serialize");
-        let mut ranges = Vec::new();
+        let mut records = Vec::new();
         let mut offset = 0;
         while offset < bytes.len() {
             let size = usize::from(u16::from_be_bytes([bytes[offset], bytes[offset + 1]]));
-            ranges.push(offset..offset + size);
+            records.push(bytes[offset..offset + size].to_vec());
             offset += size;
         }
-
-        let mutated = match mutation % 3 {
-            0 => {
-                let mut mutated = bytes;
-                let range = &ranges[selector % ranges.len()];
-                mutated[range.start..range.start + 2].copy_from_slice(&u16::MAX.to_be_bytes());
-                mutated
-            }
-            1 => {
-                let range = &ranges[[0, 1, 3][selector % 3]];
-                let mut mutated = bytes;
-                let new_size = range.len() - 2;
-                mutated[range.start..range.start + 2]
-                    .copy_from_slice(&(new_size as u16).to_be_bytes());
-                mutated.drain(range.end - 2..range.end);
-                mutated
-            }
-            _ => {
-                let first = selector % (ranges.len() - 1);
-                let left = &ranges[first];
-                let right = &ranges[first + 1];
-                [
-                    &bytes[..left.start],
-                    &bytes[right.clone()],
-                    &bytes[left.clone()],
-                    &bytes[right.end..],
-                ]
-                .concat()
-            }
+        let assert_rejected = |records: &[Vec<u8>]| {
+            let bytes = records.concat();
+            assert!(matches!(
+                std::panic::catch_unwind(|| Library::from_bytes(&bytes, None)),
+                Ok(Err(GdsError::InvalidData { .. }))
+            ));
         };
 
-        matches!(
-            std::panic::catch_unwind(|| Library::from_bytes(&mutated, None)),
-            Ok(Err(GdsError::InvalidData { .. }))
-        )
+        for index in 0..records.len() {
+            let mut mutated = records.clone();
+            mutated.remove(index);
+            assert_rejected(&mutated);
+        }
+
+        for index in 0..records.len() - 1 {
+            let mut mutated = records.clone();
+            mutated.insert(index, records[index].clone());
+            assert_rejected(&mutated);
+        }
+
+        for index in 0..records.len() - 1 {
+            let mut mutated = records.clone();
+            mutated.swap(index, index + 1);
+            assert_rejected(&mutated);
+        }
     }
 }
