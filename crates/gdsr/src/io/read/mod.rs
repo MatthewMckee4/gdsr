@@ -5,6 +5,7 @@ use crate::config::gds_file_types::GDSDataType::{
     AsciiString, BitArray, EightByteReal, FourByteSignedInteger, NoData, TwoByteSignedInteger,
 };
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION};
+use crate::elements::node::MAX_NODE_POINTS;
 use crate::elements::text::get_presentations_from_value;
 use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Property, Reference, Text};
 use crate::error::GdsError;
@@ -253,7 +254,14 @@ impl ElementState {
             ElementKind::Box => pair_count == 5 && closed,
             ElementKind::SRef | ElementKind::Text => pair_count == 1,
             ElementKind::ARef => pair_count == 3,
-            ElementKind::Node => pair_count >= 1,
+            ElementKind::Node => {
+                if !(1..=MAX_NODE_POINTS).contains(&pair_count) {
+                    return Err(invalid_data(format!(
+                        "NODE XY has {pair_count} points; expected 1..={MAX_NODE_POINTS}"
+                    )));
+                }
+                true
+            }
         };
         if valid {
             Ok(())
@@ -1571,6 +1579,43 @@ mod tests {
                 assert_invalid(&Library::from_bytes(&element_stream(&malformed), None));
             }
         }
+    }
+
+    #[test]
+    fn node_xy_point_count_is_limited_to_spec_maximum() {
+        let node = |point_count: usize| {
+            vec![
+                (GDSRecord::Node, GDSDataType::NoData, vec![]),
+                (
+                    GDSRecord::Layer,
+                    GDSDataType::TwoByteSignedInteger,
+                    vec![0, 1],
+                ),
+                (
+                    GDSRecord::NodeType,
+                    GDSDataType::TwoByteSignedInteger,
+                    vec![0, 2],
+                ),
+                (
+                    GDSRecord::XY,
+                    GDSDataType::FourByteSignedInteger,
+                    vec![0; point_count * 8],
+                ),
+            ]
+        };
+
+        Library::from_bytes(&element_stream(&node(MAX_NODE_POINTS)), None)
+            .expect("maximum-length NODE should parse");
+        let error = Library::from_bytes(&element_stream(&node(MAX_NODE_POINTS + 1)), None)
+            .expect_err("oversized NODE should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "Invalid data: NODE XY has {} points; expected 1..={MAX_NODE_POINTS}",
+                MAX_NODE_POINTS + 1
+            )
+        );
     }
 
     #[test]

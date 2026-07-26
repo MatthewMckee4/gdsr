@@ -17,8 +17,9 @@ use crate::{
 };
 use gds_format::{eight_byte_real, write_u16_array_as_big_endian};
 use validation::{
-    MAX_POINTS, validate_col_row, validate_data_type, validate_layer, validate_node_points,
-    validate_path_points, validate_polygon_points, validate_string_length, validate_structure_name,
+    validate_col_row, validate_data_type, validate_layer, validate_node_points,
+    validate_path_points, validate_point_limit, validate_polygon_points, validate_string_length,
+    validate_structure_name,
 };
 
 /// Trait for customizing GDS file serialization.
@@ -319,9 +320,9 @@ fn write_points_to_file(
     points: &[Point],
     database_units: f64,
 ) -> Result<(), GdsError> {
-    let num_points = points.len().min(MAX_POINTS);
+    validate_point_limit(points, "XY record")?;
 
-    let record_size = GDSDataType::FourByteSignedInteger.record_size(num_points as u16 * 2);
+    let record_size = GDSDataType::FourByteSignedInteger.record_size(points.len() as u16 * 2);
     let xy_header_buffer = [
         record_size,
         record_head(GDSRecord::XY, GDSDataType::FourByteSignedInteger),
@@ -329,7 +330,7 @@ fn write_points_to_file(
 
     write_u16_array(buffer, &xy_header_buffer)?;
 
-    for point in points.iter().take(num_points) {
+    for point in points {
         let point = point.to_integer_unit();
         let x_real = point.x().absolute_value();
         let y_real = point.y().absolute_value();
@@ -861,12 +862,14 @@ mod tests {
     use rayon::ThreadPoolBuilder;
 
     use crate::config::gds_file_types::GDSRecordData;
+    use crate::elements::node::MAX_NODE_POINTS;
     use crate::io::read::RecordReader;
     use crate::{
         DEFAULT_INTEGER_UNITS, DataType, GdsTimestampPolicy, GdsTimestamps, Grid, Layer, Library,
         Property,
     };
 
+    use super::validation::MAX_POINTS;
     use super::*;
 
     #[derive(Default)]
@@ -952,6 +955,152 @@ mod tests {
             library.add_cell(cell);
         }
         library
+    }
+
+    fn points_with_count(point_count: usize) -> Vec<Point> {
+        (0..point_count)
+            .map(|index| {
+                let coordinate = i32::try_from(index).expect("test point count should fit i32");
+                Point::integer(coordinate, -coordinate, DEFAULT_INTEGER_UNITS)
+            })
+            .collect()
+    }
+
+    fn path_with_point_count(point_count: usize) -> Path {
+        Path::new(
+            points_with_count(point_count),
+            Layer::new(1),
+            DataType::new(2),
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[test]
+    fn maximum_length_node_roundtrips() {
+        let points = points_with_count(MAX_NODE_POINTS);
+        let node = Node::new(points.clone(), Layer::new(1), DataType::new(2));
+        let element_bytes = write_node(&node, DEFAULT_INTEGER_UNITS)
+            .expect("maximum-length node should be writable");
+        let xy = RecordReader::new(BufReader::new(element_bytes.as_slice()))
+            .find_map(
+                |record| match record.expect("node record should be readable") {
+                    (GDSRecord::XY, GDSRecordData::I32(coordinates)) => Some(coordinates),
+                    _ => None,
+                },
+            )
+            .expect("node should contain an XY record");
+
+        assert_eq!(xy.len(), MAX_NODE_POINTS * 2);
+
+        let mut cell = Cell::new("top");
+        cell.add(node);
+        let mut library = Library::new("node_limit");
+        library.add_cell(cell);
+        let bytes = library
+            .to_bytes_with_timestamp_policy(
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("maximum-length node library should be writable");
+        let roundtripped = Library::from_bytes(&bytes, Some(DEFAULT_INTEGER_UNITS))
+            .expect("maximum-length node library should be readable");
+        let roundtripped_node = roundtripped
+            .get_cell("top")
+            .and_then(|cell| cell.nodes().next())
+            .expect("roundtripped node should exist");
+
+        assert_eq!(roundtripped_node.points(), points);
+    }
+
+    #[test]
+    fn oversized_node_is_rejected_by_writer() {
+        let node = Node {
+            points: points_with_count(MAX_NODE_POINTS + 1),
+            ..Node::default()
+        };
+
+        let error = write_node(&node, DEFAULT_INTEGER_UNITS)
+            .expect_err("oversized node should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "Validation error: Node must have between 1 and {MAX_NODE_POINTS} points, got {}",
+                MAX_NODE_POINTS + 1
+            )
+        );
+    }
+
+    #[test]
+    fn maximum_length_path_preserves_entire_xy_record_and_roundtrips() {
+        let path = path_with_point_count(MAX_POINTS);
+        let element_bytes = write_path(&path, DEFAULT_INTEGER_UNITS)
+            .expect("maximum-length path should be writable");
+        let xy = RecordReader::new(BufReader::new(element_bytes.as_slice()))
+            .find_map(
+                |record| match record.expect("path record should be readable") {
+                    (GDSRecord::XY, GDSRecordData::I32(coordinates)) => Some(coordinates),
+                    _ => None,
+                },
+            )
+            .expect("path should contain an XY record");
+        let last_coordinate =
+            i32::try_from(MAX_POINTS - 1).expect("maximum point index should fit i32");
+
+        assert_eq!(xy.len(), MAX_POINTS * 2);
+        assert_eq!(&xy[xy.len() - 2..], &[last_coordinate, -last_coordinate]);
+
+        let mut cell = Cell::new("top");
+        cell.add(path.clone());
+        let mut library = Library::new("point_limit");
+        library.add_cell(cell);
+        let bytes = library
+            .to_bytes_with_timestamp_policy(
+                DEFAULT_INTEGER_UNITS,
+                DEFAULT_INTEGER_UNITS,
+                GdsTimestampPolicy::Zero,
+            )
+            .expect("maximum-length path library should be writable");
+        let roundtripped = Library::from_bytes(&bytes, Some(DEFAULT_INTEGER_UNITS))
+            .expect("maximum-length path library should be readable");
+        let roundtripped_path = roundtripped
+            .get_cell("top")
+            .and_then(|cell| cell.paths().next())
+            .expect("roundtripped path should exist");
+
+        assert_eq!(roundtripped_path.points(), path.points());
+    }
+
+    #[test]
+    fn oversized_path_is_rejected_before_xy_serialization() {
+        let path = path_with_point_count(MAX_POINTS + 1);
+        let error = write_path(&path, DEFAULT_INTEGER_UNITS)
+            .expect_err("oversized path should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "Validation error: Path has {} points, which exceeds the maximum of {MAX_POINTS}",
+                MAX_POINTS + 1
+            )
+        );
+
+        let mut bytes = Vec::new();
+        let error = write_points_to_file(&mut bytes, path.points(), DEFAULT_INTEGER_UNITS)
+            .expect_err("oversized XY record should be rejected");
+
+        assert!(bytes.is_empty());
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "Validation error: XY record has {} points, which exceeds the maximum of {MAX_POINTS}",
+                MAX_POINTS + 1
+            )
+        );
     }
 
     #[test]
