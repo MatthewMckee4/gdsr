@@ -11,7 +11,10 @@ GDSII manipulation, written in Rust.
 </div>
 
 > [!WARNING]
-> This is a work in progress and is not yet ready for production use.
+> This is a work in progress and is not yet ready for production use.\
+> Most of the work on this project is done by AI.
+
+GDSR is both a GDSII viewer and a Rust crate for reading and writing GDSII files.
 
 ## Installation
 
