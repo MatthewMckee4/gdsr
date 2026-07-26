@@ -497,7 +497,7 @@ mod tests {
         let elems: Vec<Element> = (0..1000)
             .map(|_| polygon(vec![(0, 0), (10, 0), (10, 10)], 1, 0))
             .collect();
-        let bounds = WorldBBox::new(0.0, 0.0, 10.0 * scale, 10.0 * scale);
+        let bounds = WorldBBox::new(0.0, 0.0, 10000.0 * scale, 10000.0 * scale);
         let grid = SpatialGrid::build(&elems, &bounds);
         let all = query_element_indices(&grid, &bounds);
         assert_eq!(all.len(), 1000);
