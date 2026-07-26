@@ -43,7 +43,7 @@ fn main() {
     };
 
     App::new()
-        .insert_non_send_resource(viewer)
+        .insert_non_send(viewer)
         .insert_resource(ClearColor(Color::srgb_u8(30, 30, 30)))
         .insert_resource(winit_settings())
         .add_plugins(DefaultPlugins.set(WindowPlugin {

@@ -1442,6 +1442,10 @@ fn hit_test_element(
     None
 }
 
+fn accepts_canvas_shortcut(wants_keyboard_input: bool, modifiers: egui::Modifiers) -> bool {
+    !wants_keyboard_input && modifiers.is_none()
+}
+
 impl ViewerApp {
     fn update(&mut self, ctx: &egui::Context) {
         if ctx.input(|i| i.viewport().close_requested()) && self.cancel_close_for_unsaved_changes()
@@ -1484,10 +1488,17 @@ impl ViewerApp {
         let drawing_tool_active = polygon_tool_active || path_tool_active;
 
         // Global keyboard shortcuts
-        if ctx.input(|i| i.key_pressed(egui::Key::F)) {
+        let wants_keyboard_input = ctx.wants_keyboard_input();
+        if ctx.input(|i| {
+            accepts_canvas_shortcut(wants_keyboard_input, i.modifiers)
+                && i.key_pressed(egui::Key::F)
+        }) {
             self.zoom_to_fit();
         }
-        if ctx.input(|i| i.key_pressed(egui::Key::G)) {
+        if ctx.input(|i| {
+            accepts_canvas_shortcut(wants_keyboard_input, i.modifiers)
+                && i.key_pressed(egui::Key::G)
+        }) {
             self.show_grid = !self.show_grid;
         }
         if ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O) && !i.modifiers.alt) {
@@ -1576,7 +1587,15 @@ impl ViewerApp {
             ctx.request_repaint();
         }
 
-        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+        let mut viewport_ui = egui::Ui::new(
+            ctx.clone(),
+            "viewport".into(),
+            egui::UiBuilder::new()
+                .layer_id(egui::LayerId::background())
+                .max_rect(ctx.viewport_rect()),
+        );
+
+        egui::Panel::top("menu_bar").show_inside(&mut viewport_ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui
@@ -1772,7 +1791,7 @@ impl ViewerApp {
 
         // Bottom activity bar
         let mut depth_changed = false;
-        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
+        egui::Panel::bottom("status_bar").show_inside(&mut viewport_ui, |ui| {
             ui.horizontal(|ui| {
                 let is_tree = self.side_panel_tab == SidePanelTab::Cells
                     && self.cell_view_mode == CellViewMode::Tree;
@@ -1955,11 +1974,11 @@ impl ViewerApp {
         let scroll_to_selected = &mut self.scroll_to_selected;
         let selected_element_idx = self.selected_element;
         let mut side_panel_actions = panels::SidePanelActions::default();
-        egui::SidePanel::left("side_panel")
-            .default_width(200.0)
-            .width_range(40.0..=800.0)
+        egui::Panel::left("side_panel")
+            .default_size(200.0)
+            .size_range(40.0..=800.0)
             .resizable(true)
-            .show(ctx, |ui| {
+            .show_inside(&mut viewport_ui, |ui| {
                 ui.allocate_at_least(egui::vec2(ui.available_width(), 0.0), egui::Sense::hover());
                 if let Some(cell) = cell.as_mut() {
                     let selected_element =
@@ -2024,7 +2043,7 @@ impl ViewerApp {
         let mut viewport_double_clicked = false;
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
-            .show(ctx, |ui| {
+            .show_inside(&mut viewport_ui, |ui| {
                 let mut empty_cache = std::collections::HashMap::new();
                 let (elements, spatial_grid, library, tessellation_cache) =
                     if let Some(cell) = cell.as_mut() {
@@ -2126,6 +2145,13 @@ mod tests {
 
     fn p(x: f64, y: f64) -> Point {
         Point::float(x, y, 1.0)
+    }
+
+    #[test]
+    fn canvas_shortcuts_require_unmodified_non_text_input() {
+        assert!(accepts_canvas_shortcut(false, egui::Modifiers::NONE));
+        assert!(!accepts_canvas_shortcut(true, egui::Modifiers::NONE));
+        assert!(!accepts_canvas_shortcut(false, egui::Modifiers::CTRL));
     }
 
     fn test_elements() -> Vec<Element> {
