@@ -46,3 +46,12 @@ pub use traits::{Dimensions, Movable, Transformable};
 pub use transformation::{Reflection, Rotation, Scale, Transformation, Translation};
 pub use types::{DataType, Degrees, Layer, LayerMapping, Radians};
 pub use units::{DEFAULT_FLOAT_UNITS, DEFAULT_INTEGER_UNITS, FloatUnit, IntegerUnit, Unit};
+
+#[doc(hidden)]
+#[must_use]
+pub const fn coverage_gate_probe(value: u8) -> &'static str {
+    match value {
+        0 => "zero",
+        _ => "nonzero",
+    }
+}
