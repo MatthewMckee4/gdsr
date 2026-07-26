@@ -1313,7 +1313,13 @@ fn test_reference_col_row_at_max() {
 
     let mut cell = Cell::new("cell");
     cell.add(
-        Reference::new("base").with_grid(Grid::default().with_columns(32767).with_rows(32767)),
+        Reference::new("base").with_grid(
+            Grid::default()
+                .with_columns(32767)
+                .with_rows(32767)
+                .with_spacing_x(Some(Point::integer(1, 0, units)))
+                .with_spacing_y(Some(Point::integer(0, 1, units))),
+        ),
     );
     library.add_cell(cell);
     let temp_dir = tempdir().unwrap();

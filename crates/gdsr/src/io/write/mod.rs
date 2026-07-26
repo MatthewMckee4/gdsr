@@ -17,8 +17,8 @@ use crate::{
 };
 use gds_format::{eight_byte_real, write_u16_array_as_big_endian};
 use validation::{
-    MAX_POINTS, validate_col_row, validate_data_type, validate_layer, validate_path_points,
-    validate_polygon_points, validate_string_length, validate_structure_name,
+    MAX_POINTS, validate_col_row, validate_data_type, validate_layer, validate_node_points,
+    validate_path_points, validate_polygon_points, validate_string_length, validate_structure_name,
 };
 
 /// Trait for customizing GDS file serialization.
@@ -700,6 +700,19 @@ pub fn write_text(text: &Text, db_units: f64) -> Result<Vec<u8>, GdsError> {
 ///
 /// Properties on inline references are appended to each expanded element.
 pub fn write_reference(reference: &Reference, db_units: f64) -> Result<Vec<u8>, GdsError> {
+    let grid = reference.grid();
+    validate_col_row(grid.columns(), grid.rows())?;
+    if grid.columns() > 1 && grid.spacing_x().is_none() {
+        return Err(GdsError::ValidationError {
+            message: "Array references with multiple columns require column spacing".to_string(),
+        });
+    }
+    if grid.rows() > 1 && grid.spacing_y().is_none() {
+        return Err(GdsError::ValidationError {
+            message: "Array references with multiple rows require row spacing".to_string(),
+        });
+    }
+
     match reference.instance() {
         Instance::Cell(cell_name) => write_reference_cell(reference, db_units, cell_name),
         Instance::Element(element) => {
@@ -748,7 +761,7 @@ fn write_reference_cell(
     cell_name: &str,
 ) -> Result<Vec<u8>, GdsError> {
     let grid = reference.grid();
-    validate_col_row(grid.columns(), grid.rows())?;
+    validate_structure_name(cell_name)?;
 
     let is_single_instance = grid.columns() == 1 && grid.rows() == 1;
 
@@ -791,11 +804,7 @@ fn write_reference_cell(
             .map(|sy| (origin + sy * grid.rows()).rotate_around_point(grid.angle(), &origin))
             .unwrap_or(origin);
 
-        if grid.spacing_x().is_some() || grid.spacing_y().is_some() {
-            write_points_to_file(&mut buffer, &[origin, point2, point3], db_units)?;
-        } else {
-            write_points_to_file(&mut buffer, &[origin], db_units)?;
-        }
+        write_points_to_file(&mut buffer, &[origin, point2, point3], db_units)?;
     }
 
     write_element_tail_to_file(&mut buffer, reference.properties())?;
@@ -826,6 +835,7 @@ pub fn write_box(gds_box: &GdsBox, db_units: f64) -> Result<Vec<u8>, GdsError> {
 
 /// Serializes a node to GDS bytes.
 pub fn write_node(node: &Node, db_units: f64) -> Result<Vec<u8>, GdsError> {
+    validate_node_points(node.points())?;
     validate_layer(node.layer())?;
     validate_data_type(node.node_type())?;
 
@@ -855,7 +865,7 @@ mod tests {
     use crate::config::gds_file_types::GDSRecordData;
     use crate::io::read::RecordReader;
     use crate::{
-        DEFAULT_INTEGER_UNITS, DataType, GdsTimestampPolicy, GdsTimestamps, Layer, Library,
+        DEFAULT_INTEGER_UNITS, DataType, GdsTimestampPolicy, GdsTimestamps, Grid, Layer, Library,
         Property,
     };
 
@@ -920,6 +930,10 @@ mod tests {
         let path = directory.path().join("timestamps.gds");
         fs::write(&path, bytes).expect("test GDS should be writable");
         Library::read_file(path, Some(DEFAULT_INTEGER_UNITS))
+    }
+
+    fn assert_validation_error(result: &Result<Vec<u8>, GdsError>) {
+        assert!(matches!(result, Err(GdsError::ValidationError { .. })));
     }
 
     fn library_with_cells(cells: &[(String, u16)]) -> Library {
@@ -1095,6 +1109,89 @@ mod tests {
             .collect();
 
         assert_eq!(property_values, ["inner", "outer"]);
+    }
+
+    #[test]
+    fn invalid_public_writer_states_return_validation_errors() {
+        assert_validation_error(&GdsFileWriter.write_cell(&Cell::new(""), DEFAULT_INTEGER_UNITS));
+        assert_validation_error(&write_reference(&Reference::new(""), DEFAULT_INTEGER_UNITS));
+        assert_validation_error(&write_node(&Node::default(), DEFAULT_INTEGER_UNITS));
+
+        let spacing_x = Point::integer(10, 0, DEFAULT_INTEGER_UNITS);
+        let spacing_y = Point::integer(0, 10, DEFAULT_INTEGER_UNITS);
+        for grid in [
+            Grid::default().with_columns(0),
+            Grid::default().with_rows(0),
+            Grid::default()
+                .with_columns(validation::MAX_COL_ROW + 1)
+                .with_spacing_x(Some(spacing_x)),
+            Grid::default()
+                .with_rows(validation::MAX_COL_ROW + 1)
+                .with_spacing_y(Some(spacing_y)),
+            Grid::default().with_columns(2),
+            Grid::default().with_rows(2),
+        ] {
+            assert_validation_error(&write_reference(
+                &Reference::new("target").with_grid(grid),
+                DEFAULT_INTEGER_UNITS,
+            ));
+        }
+    }
+
+    #[test]
+    fn valid_array_references_always_write_three_points_and_reread() {
+        let spacing_x = Point::integer(10, 0, DEFAULT_INTEGER_UNITS);
+        let spacing_y = Point::integer(0, 10, DEFAULT_INTEGER_UNITS);
+        for grid in [
+            Grid::default()
+                .with_columns(2)
+                .with_spacing_x(Some(spacing_x)),
+            Grid::default().with_rows(2).with_spacing_y(Some(spacing_y)),
+            Grid::default()
+                .with_columns(2)
+                .with_rows(2)
+                .with_spacing_x(Some(spacing_x))
+                .with_spacing_y(Some(spacing_y)),
+        ] {
+            let columns = grid.columns();
+            let rows = grid.rows();
+            let reference = Reference::new("target").with_grid(grid);
+            let element_bytes = write_reference(&reference, DEFAULT_INTEGER_UNITS)
+                .expect("valid AREF should be writable");
+            let records = RecordReader::new(BufReader::new(element_bytes.as_slice()))
+                .collect::<Result<Vec<_>, _>>()
+                .expect("written AREF records should decode");
+            assert!(records.iter().any(|(record, data)| matches!(
+                (record, data),
+                (GDSRecord::XY, GDSRecordData::I32(values)) if values.len() == 6
+            )));
+
+            let mut top = Cell::new("top");
+            top.add(reference);
+            let mut library = Library::new("arrays");
+            library.add_cell(Cell::new("target"));
+            library.add_cell(top);
+            let bytes = library
+                .write_with_timestamp_policy(
+                    &GdsFileWriter,
+                    DEFAULT_INTEGER_UNITS,
+                    DEFAULT_INTEGER_UNITS,
+                    GdsTimestampPolicy::Zero,
+                )
+                .expect("library with valid AREF should be writable");
+            let parsed =
+                Library::from_bytes(&bytes, None).expect("written AREF should be readable");
+            let parsed_reference = parsed
+                .get_cell("top")
+                .and_then(|cell| cell.elements().first())
+                .and_then(|element| match element {
+                    Element::Reference(reference) => Some(reference),
+                    _ => None,
+                })
+                .expect("top element should reread as a reference");
+            assert_eq!(parsed_reference.grid().columns(), columns);
+            assert_eq!(parsed_reference.grid().rows(), rows);
+        }
     }
 
     #[test]

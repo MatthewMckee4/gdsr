@@ -959,7 +959,7 @@ const RECORD_LAYOUTS: [RecordLayout; 60] = [
     layout(GDSRecord::STrans, BitArray, 2),
     layout(GDSRecord::Mag, EightByteReal, 8),
     layout(GDSRecord::Angle, EightByteReal, 8),
-    layout(GDSRecord::UInteger, TwoByteSignedInteger, 2),
+    layout(GDSRecord::UInteger, FourByteSignedInteger, 4),
     layout(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
     layout(GDSRecord::RefLibs, AsciiString, 88),
     layout(GDSRecord::Fonts, AsciiString, 176),
@@ -1327,6 +1327,7 @@ mod tests {
             (GDSRecord::StrType, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeNum, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeCode, GDSDataType::TwoByteSignedInteger, 12),
+            (GDSRecord::UInteger, GDSDataType::FourByteSignedInteger, 4),
         ] {
             let bytes = [record(record_type, data_type, &vec![0; payload_len])].concat();
             assert_record_decodes(bytes);
@@ -1858,19 +1859,51 @@ mod tests {
     }
 
     #[quickcheck]
-    fn generated_record_sequence_never_panics(mut records: Vec<(u8, u8, Vec<u8>)>) -> bool {
-        records.truncate(16);
-        let mut bytes = Vec::new();
-        for (record_type, data_type, mut payload) in records {
-            payload.truncate(256);
-            let size = 4 + payload.len() as u16;
-            bytes.extend_from_slice(&size.to_be_bytes());
-            bytes.push(record_type);
-            bytes.push(data_type);
-            bytes.extend_from_slice(&payload);
+    fn mutations_of_schema_valid_records_are_rejected(mutation: u8, selector: usize) -> bool {
+        let bytes = Library::new("mutation")
+            .to_bytes_with_timestamp_policy(1e-3, 1e-9, GdsTimestampPolicy::Zero)
+            .expect("minimal library should serialize");
+        let mut ranges = Vec::new();
+        let mut offset = 0;
+        while offset < bytes.len() {
+            let size = usize::from(u16::from_be_bytes([bytes[offset], bytes[offset + 1]]));
+            ranges.push(offset..offset + size);
+            offset += size;
         }
-        bytes.extend_from_slice(&[0, 4, GDSRecord::EndLib as u8, GDSDataType::NoData as u8]);
 
-        std::panic::catch_unwind(|| Library::from_bytes(&bytes, None)).is_ok()
+        let mutated = match mutation % 3 {
+            0 => {
+                let mut mutated = bytes;
+                let range = &ranges[selector % ranges.len()];
+                mutated[range.start..range.start + 2].copy_from_slice(&u16::MAX.to_be_bytes());
+                mutated
+            }
+            1 => {
+                let range = &ranges[[0, 1, 3][selector % 3]];
+                let mut mutated = bytes;
+                let new_size = range.len() - 2;
+                mutated[range.start..range.start + 2]
+                    .copy_from_slice(&(new_size as u16).to_be_bytes());
+                mutated.drain(range.end - 2..range.end);
+                mutated
+            }
+            _ => {
+                let first = selector % (ranges.len() - 1);
+                let left = &ranges[first];
+                let right = &ranges[first + 1];
+                [
+                    &bytes[..left.start],
+                    &bytes[right.clone()],
+                    &bytes[left.clone()],
+                    &bytes[right.end..],
+                ]
+                .concat()
+            }
+        };
+
+        matches!(
+            std::panic::catch_unwind(|| Library::from_bytes(&mutated, None)),
+            Ok(Err(GdsError::InvalidData { .. }))
+        )
     }
 }

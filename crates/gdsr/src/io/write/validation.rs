@@ -51,6 +51,11 @@ pub fn validate_string_length(s: &str) -> Result<(), GdsError> {
 /// Returns a validation error if the structure name exceeds 32 characters or contains
 /// invalid characters (only alphanumeric, `_`, `?`, `$` are allowed).
 pub fn validate_structure_name(name: &str) -> Result<(), GdsError> {
+    if name.is_empty() {
+        return Err(GdsError::ValidationError {
+            message: "Structure name cannot be empty".to_string(),
+        });
+    }
     if name.len() > MAX_STRUCTURE_NAME_LENGTH {
         return Err(GdsError::ValidationError {
             message: format!(
@@ -70,16 +75,26 @@ pub fn validate_structure_name(name: &str) -> Result<(), GdsError> {
     Ok(())
 }
 
-/// Returns a validation error if columns or rows exceed 32767.
+/// Returns a validation error if columns or rows are outside 1..=32767.
 pub fn validate_col_row(columns: u32, rows: u32) -> Result<(), GdsError> {
-    if columns > MAX_COL_ROW {
+    if !(1..=MAX_COL_ROW).contains(&columns) {
         return Err(GdsError::ValidationError {
-            message: format!("Column count {columns} exceeds maximum value of {MAX_COL_ROW}"),
+            message: format!("Column count {columns} must be between 1 and {MAX_COL_ROW}"),
         });
     }
-    if rows > MAX_COL_ROW {
+    if !(1..=MAX_COL_ROW).contains(&rows) {
         return Err(GdsError::ValidationError {
-            message: format!("Row count {rows} exceeds maximum value of {MAX_COL_ROW}"),
+            message: format!("Row count {rows} must be between 1 and {MAX_COL_ROW}"),
+        });
+    }
+    Ok(())
+}
+
+/// Returns a validation error if a node has no points.
+pub fn validate_node_points(points: &[Point]) -> Result<(), GdsError> {
+    if points.is_empty() {
+        return Err(GdsError::ValidationError {
+            message: "Node must have at least one point".to_string(),
         });
     }
     Ok(())
