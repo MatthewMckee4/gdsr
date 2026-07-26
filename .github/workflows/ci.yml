@@ -166,10 +166,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    needs: determine_changes
-
-    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-
     permissions:
       id-token: write
 
