@@ -213,13 +213,94 @@ fn draw_layer_panel(
         }
     });
 
+    layer_state.sync_layers(layers);
+
+    let filtered_layers: Vec<_> = layer_state.filtered_layers(layers).collect();
+    let selected_filtered = layer_state
+        .selected_layer
+        .filter(|selected| filtered_layers.contains(selected));
+    let wants_keyboard_input = ui.ctx().egui_wants_keyboard_input();
+    let (show_all_key, hide_all_key, invert_key, toggle_key, solo_key) = ui.input(|input| {
+        let enabled = accepts_layer_shortcut(wants_keyboard_input, input.modifiers);
+        (
+            enabled && input.key_pressed(egui::Key::A),
+            enabled && input.key_pressed(egui::Key::H),
+            enabled && input.key_pressed(egui::Key::I),
+            enabled && input.key_pressed(egui::Key::V),
+            enabled && input.key_pressed(egui::Key::S),
+        )
+    });
+
+    let mut show_all = false;
+    let mut hide_all = false;
+    let mut invert = false;
+    let mut toggle = false;
+    let mut solo = false;
+    ui.horizontal_wrapped(|ui| {
+        show_all = ui
+            .add(egui::Button::new("Show All").shortcut_text("A"))
+            .on_hover_text("Show filtered layers")
+            .clicked();
+        hide_all = ui
+            .add(egui::Button::new("Hide All").shortcut_text("H"))
+            .on_hover_text("Hide filtered layers")
+            .clicked();
+        invert = ui
+            .add(egui::Button::new("Invert").shortcut_text("I"))
+            .on_hover_text("Invert filtered layers")
+            .clicked();
+        toggle = ui
+            .add_enabled(
+                selected_filtered.is_some(),
+                egui::Button::new("Toggle").shortcut_text("V"),
+            )
+            .on_hover_text("Toggle selected layer")
+            .clicked();
+        solo = ui
+            .add_enabled(
+                layer_state.is_solo_active() || selected_filtered.is_some(),
+                egui::Button::new(if layer_state.is_solo_active() {
+                    "Exit Solo"
+                } else {
+                    "Solo"
+                })
+                .shortcut_text("S"),
+            )
+            .on_hover_text("Show only selected layer, or restore previous visibility")
+            .clicked();
+    });
+
+    let mut visibility_follows_selection = layer_state.visibility_follows_selection;
+    if ui
+        .checkbox(
+            &mut visibility_follows_selection,
+            "Visibility follows selection",
+        )
+        .on_hover_text("Show only selected layer")
+        .changed()
+    {
+        layer_state.set_visibility_follows_selection(layers, visibility_follows_selection);
+    }
+
+    if show_all || show_all_key {
+        layer_state.show_layers(&filtered_layers);
+    } else if hide_all || hide_all_key {
+        layer_state.hide_layers(&filtered_layers);
+    } else if invert || invert_key {
+        layer_state.invert_layers(&filtered_layers);
+    } else if (toggle || toggle_key)
+        && let Some(selected) = selected_filtered
+    {
+        layer_state.toggle_layer(selected);
+    } else if solo || solo_key {
+        layer_state.toggle_solo(layers, selected_filtered);
+    }
+
+    ui.separator();
     egui::ScrollArea::vertical()
         .id_salt("layers")
         .show(ui, |ui| {
-            for &(layer, dt) in layers
-                .iter()
-                .filter(|&&(layer, dt)| layer_matches_filter(layer, dt, &layer_state.filter))
-            {
+            for &(layer, dt) in &filtered_layers {
                 let mut color = layer_state.layer_colors.get(layer, dt);
                 let visible = !layer_state.hidden_layers.contains(&(layer, dt));
 
@@ -231,27 +312,29 @@ fn draw_layer_panel(
                     }
 
                     let mut checked = visible;
-                    if ui
-                        .checkbox(&mut checked, format!("L{layer} D{dt}"))
-                        .changed()
-                    {
-                        if checked {
-                            layer_state.hidden_layers.remove(&(layer, dt));
-                        } else {
-                            layer_state.hidden_layers.insert((layer, dt));
-                        }
+                    let checkbox = ui.checkbox(&mut checked, "");
+                    let label = ui.add(
+                        egui::Button::selectable(
+                            layer_state.selected_layer == Some((layer, dt)),
+                            format!("L{layer} D{dt}"),
+                        )
+                        .truncate()
+                        .frame(false),
+                    );
+                    let checkbox = checkbox.labelled_by(label.id);
+                    if checkbox.changed() {
+                        layer_state.set_layer_visible((layer, dt), checked);
+                    }
+                    if label.clicked() {
+                        layer_state.select_layer(layers, Some((layer, dt)));
                     }
                 });
             }
         });
 }
 
-fn layer_matches_filter(layer: Layer, data_type: DataType, filter: &str) -> bool {
-    let filter = filter.trim();
-    filter.is_empty()
-        || format!("L{layer} D{data_type}")
-            .to_ascii_lowercase()
-            .contains(&filter.to_ascii_lowercase())
+fn accepts_layer_shortcut(wants_keyboard_input: bool, modifiers: egui::Modifiers) -> bool {
+    !wants_keyboard_input && modifiers.is_none()
 }
 
 /// Draws the statistics detail panel in the bottom bar.
@@ -353,18 +436,12 @@ fn draw_tree_node(
 
 #[cfg(test)]
 mod tests {
-    use super::layer_matches_filter;
-    use gdsr::{DataType, Layer};
+    use super::accepts_layer_shortcut;
 
     #[test]
-    fn layer_filter_matches_layer_and_datatype() {
-        let layer = Layer::new(12);
-        let data_type = DataType::new(7);
-
-        assert!(layer_matches_filter(layer, data_type, ""));
-        assert!(layer_matches_filter(layer, data_type, "12"));
-        assert!(layer_matches_filter(layer, data_type, "D7"));
-        assert!(layer_matches_filter(layer, data_type, " l12 d7 "));
-        assert!(!layer_matches_filter(layer, data_type, "L7"));
+    fn layer_shortcuts_require_unmodified_non_text_input() {
+        assert!(accepts_layer_shortcut(false, egui::Modifiers::NONE));
+        assert!(!accepts_layer_shortcut(true, egui::Modifiers::NONE));
+        assert!(!accepts_layer_shortcut(false, egui::Modifiers::CTRL));
     }
 }
