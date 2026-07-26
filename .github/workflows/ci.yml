@@ -126,6 +126,9 @@ jobs:
       - name: Build docs
         run: uv run --isolated --with-requirements docs/requirements.txt zensical build
 
+      - name: Check Rust docs
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
+
   cargo-test:
     name: "cargo test (${{ matrix.os }})"
 

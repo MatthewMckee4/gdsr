@@ -589,7 +589,7 @@ impl Library {
     /// Returns all dangling cell references in the library.
     ///
     /// A dangling cell reference is a `Reference` whose resolved cell name
-    /// (via [`Reference::referenced_cell_name`]) does not match any cell in the library.
+    /// (via [`crate::Reference::referenced_cell_name`]) does not match any cell in the library.
     /// This recursively resolves through inline element wrappers.
     pub fn dangling_cell_references(&self) -> Vec<DanglingCellReference> {
         let mut dangling = Vec::new();
