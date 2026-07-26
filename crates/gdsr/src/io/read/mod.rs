@@ -1,6 +1,9 @@
 use std::io::{self, BufReader, Read};
 
 use crate::cell::Cell;
+use crate::config::gds_file_types::GDSDataType::{
+    AsciiString, BitArray, EightByteReal, FourByteSignedInteger, NoData, TwoByteSignedInteger,
+};
 use crate::config::gds_file_types::{GDSDataType, GDSRecord, GDSRecordData, STRANS_X_REFLECTION};
 use crate::elements::text::get_presentations_from_value;
 use crate::elements::{GdsBox, Node, Path, PathType, Polygon, Property, Reference, Text};
@@ -10,6 +13,25 @@ use crate::library::Library;
 use crate::{
     DEFAULT_INTEGER_UNITS, DataType, Degrees, GdsTimestamps, Instance, Layer, Point, Unit,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ParserState {
+    Library,
+    Structure,
+    Element,
+}
+
+impl ParserState {
+    fn require(self, expected: Self, record: GDSRecord) -> Result<(), GdsError> {
+        if self == expected {
+            Ok(())
+        } else {
+            Err(invalid_data(format!(
+                "Unexpected {record:?} record while parsing {self:?}"
+            )))
+        }
+    }
+}
 
 pub fn from_gds_reader<R: Read>(reader: R, units: Option<f64>) -> Result<Library, GdsError> {
     from_gds_reader_filtered(reader, units, |_, _| true)
@@ -37,8 +59,7 @@ where
     let mut text: Option<Text> = None;
     let mut reference: Option<Reference> = None;
     let mut property_attribute: Option<u16> = None;
-    let mut element_open = false;
-    let mut end_library_seen = false;
+    let mut state = ParserState::Library;
 
     let mut scale = 1.0;
     let mut db_units = units.unwrap_or(DEFAULT_INTEGER_UNITS);
@@ -68,12 +89,14 @@ where
                     }
                 }
                 GDSRecord::BgnStr => {
+                    state.require(ParserState::Library, record_type)?;
                     let GDSRecordData::I16(values) = data else {
                         return Err(invalid_timestamp_record("BGNSTR"));
                     };
                     let mut new_cell = Cell::default();
                     new_cell.set_timestamps(GdsTimestamps::from_record(&values, "BGNSTR")?);
                     cell = Some(new_cell);
+                    state = ParserState::Structure;
                 }
                 GDSRecord::StrName => {
                     if let GDSRecordData::Str(cell_name) = data {
@@ -83,42 +106,56 @@ where
                     }
                 }
                 GDSRecord::EndStr => {
+                    state.require(ParserState::Structure, record_type)?;
                     if let Some(cell) = cell.take() {
                         library.cells.insert(cell.name().to_string(), cell);
                     }
+                    state = ParserState::Library;
                 }
-                GDSRecord::EndLib => end_library_seen = true,
+                GDSRecord::EndLib => {
+                    state.require(ParserState::Library, record_type)?;
+                    return Ok(library);
+                }
                 GDSRecord::Boundary => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     polygon = Some(Polygon::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
                 GDSRecord::Box => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     gds_box = Some(GdsBox::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
                 GDSRecord::Node => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     node = Some(Node::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
                 GDSRecord::Path => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     path = Some(Path::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     reference = Some(Reference::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
                 GDSRecord::Text => {
+                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     text = Some(Text::default());
-                    element_open = true;
+                    state = ParserState::Element;
                 }
-                GDSRecord::TextNode => element_open = true,
+                GDSRecord::TextNode => {
+                    state.require(ParserState::Structure, record_type)?;
+                    state = ParserState::Element;
+                }
                 GDSRecord::Layer => {
                     if let GDSRecordData::I16(layer) = data {
                         let layer_value = Layer::new(layer[0] as u16);
@@ -254,6 +291,7 @@ where
                     }
                 }
                 GDSRecord::EndEl => {
+                    state.require(ParserState::Element, record_type)?;
                     if let Some(cell) = &mut cell {
                         if let Some(polygon) = polygon.take() {
                             if layer_filter(polygon.layer, polygon.data_type) {
@@ -286,7 +324,7 @@ where
                     text = None;
                     reference = None;
                     property_attribute = None;
-                    element_open = false;
+                    state = ParserState::Structure;
                 }
                 GDSRecord::SName => {
                     if let GDSRecordData::Str(cell_name) = data {
@@ -410,17 +448,11 @@ where
         }
     }
 
-    if element_open {
-        return Err(invalid_data("Unexpected EOF before ENDEL record"));
+    match state {
+        ParserState::Element => Err(invalid_data("Unexpected EOF before ENDEL record")),
+        ParserState::Structure => Err(invalid_data("Unexpected EOF before ENDSTR record")),
+        ParserState::Library => Err(invalid_data("Unexpected EOF before ENDLIB record")),
     }
-    if cell.is_some() {
-        return Err(invalid_data("Unexpected EOF before ENDSTR record"));
-    }
-    if !end_library_seen {
-        return Err(invalid_data("Unexpected EOF before ENDLIB record"));
-    }
-
-    Ok(library)
 }
 
 fn invalid_data(message: impl Into<String>) -> GdsError {
@@ -481,13 +513,17 @@ impl<R: Read> Iterator for RecordReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut header = [0u8; 4];
-        if let Err(e) = self.reader.read_exact(&mut header[..1]) {
-            if e.kind() == io::ErrorKind::UnexpectedEof {
-                return None;
+        let bytes_read = loop {
+            match self.reader.read(&mut header) {
+                Ok(0) => return None,
+                Ok(bytes_read) => break bytes_read,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Some(Err(GdsError::from(error))),
             }
-            return Some(Err(GdsError::from(e)));
-        }
-        if let Err(error) = self.reader.read_exact(&mut header[1..]) {
+        };
+        if bytes_read < header.len()
+            && let Err(error) = self.reader.read_exact(&mut header[bytes_read..])
+        {
             return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
                 invalid_data("Truncated record header")
             } else {
@@ -502,29 +538,32 @@ impl<R: Read> Iterator for RecordReader<R> {
             ))));
         }
 
-        let Ok(record) = GDSRecord::try_from(header[2]) else {
+        let Some(&schema) = RECORD_SCHEMAS.get(usize::from(header[2])) else {
             return Some(Err(invalid_data(format!(
                 "Invalid record type byte: {:#04x}",
                 header[2]
             ))));
         };
-        let Ok(data_type) = GDSDataType::try_from(header[3]) else {
+        let record = schema.record;
+        if header[3] != schema.data_type as u8 {
             return Some(Err(invalid_data(format!(
-                "Invalid data type byte: {:#04x}",
-                header[3]
+                "Invalid {record:?} data type: expected {:?}, found {:#04x}",
+                schema.data_type, header[3]
             ))));
-        };
+        }
+        let data_type = schema.data_type;
+        let payload_len = size - 4;
+        if let Err(error) = validate_record_layout(schema, payload_len) {
+            return Some(Err(error));
+        }
 
-        let mut buf = vec![0u8; size - 4];
+        let mut buf = vec![0u8; payload_len];
         if let Err(error) = self.reader.read_exact(&mut buf) {
             return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
                 invalid_data(format!("Truncated {record:?} record payload"))
             } else {
                 GdsError::from(error)
             }));
-        }
-        if let Err(error) = validate_record_layout(record, data_type, buf.len()) {
-            return Some(Err(error));
         }
 
         let data = match data_type {
@@ -560,74 +599,123 @@ impl<R: Read> Iterator for RecordReader<R> {
     }
 }
 
-fn validate_record_layout(
+#[derive(Clone, Copy)]
+struct RecordSchema {
     record: GDSRecord,
     data_type: GDSDataType,
-    payload_len: usize,
-) -> Result<(), GdsError> {
-    let value_size = usize::from(data_type.byte_size());
-    if value_size > 0 && !payload_len.is_multiple_of(value_size) {
-        return Err(invalid_data(format!(
-            "{record:?} payload length {payload_len} is not aligned to {value_size} bytes"
-        )));
+    payload_len: u16,
+}
+
+const VARIABLE_PAYLOAD_LEN: u16 = u16::MAX;
+
+const fn schema(record: GDSRecord, data_type: GDSDataType, payload_len: u16) -> RecordSchema {
+    RecordSchema {
+        record,
+        data_type,
+        payload_len,
     }
-    if data_type == GDSDataType::NoData && payload_len != 0 {
-        return Err(invalid_data(format!(
-            "{record:?} NoData record has a non-empty payload"
-        )));
+}
+
+const RECORD_SCHEMAS: [RecordSchema; 60] = [
+    schema(GDSRecord::Header, TwoByteSignedInteger, 2),
+    schema(GDSRecord::BgnLib, TwoByteSignedInteger, 24),
+    schema(GDSRecord::LibName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::Units, EightByteReal, 16),
+    schema(GDSRecord::EndLib, NoData, 0),
+    schema(GDSRecord::BgnStr, TwoByteSignedInteger, 24),
+    schema(GDSRecord::StrName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::EndStr, NoData, 0),
+    schema(GDSRecord::Boundary, NoData, 0),
+    schema(GDSRecord::Path, NoData, 0),
+    schema(GDSRecord::SRef, NoData, 0),
+    schema(GDSRecord::ARef, NoData, 0),
+    schema(GDSRecord::Text, NoData, 0),
+    schema(GDSRecord::Layer, TwoByteSignedInteger, 2),
+    schema(GDSRecord::DataType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::Width, FourByteSignedInteger, 4),
+    schema(GDSRecord::XY, FourByteSignedInteger, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::EndEl, NoData, 0),
+    schema(GDSRecord::SName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::ColRow, TwoByteSignedInteger, 4),
+    schema(GDSRecord::TextNode, NoData, 0),
+    schema(GDSRecord::Node, NoData, 0),
+    schema(GDSRecord::TextType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::Presentation, BitArray, 2),
+    schema(
+        GDSRecord::Spacing,
+        FourByteSignedInteger,
+        VARIABLE_PAYLOAD_LEN,
+    ),
+    schema(GDSRecord::String, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::STrans, BitArray, 2),
+    schema(GDSRecord::Mag, EightByteReal, 8),
+    schema(GDSRecord::Angle, EightByteReal, 8),
+    schema(GDSRecord::UInteger, TwoByteSignedInteger, 2),
+    schema(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::RefLibs, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::Fonts, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::PathType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::Generations, TwoByteSignedInteger, 2),
+    schema(GDSRecord::AttrTable, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::StyTable, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::StrType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::ElFlags, BitArray, 2),
+    schema(GDSRecord::ElKey, FourByteSignedInteger, 4),
+    schema(GDSRecord::LinkType, TwoByteSignedInteger, 2),
+    schema(
+        GDSRecord::LinkKeys,
+        FourByteSignedInteger,
+        VARIABLE_PAYLOAD_LEN,
+    ),
+    schema(GDSRecord::NodeType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::PropAttr, TwoByteSignedInteger, 2),
+    schema(GDSRecord::PropValue, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::Box, NoData, 0),
+    schema(GDSRecord::BoxType, TwoByteSignedInteger, 2),
+    schema(GDSRecord::Plex, FourByteSignedInteger, 4),
+    schema(GDSRecord::BgnExtn, FourByteSignedInteger, 4),
+    schema(GDSRecord::EndExtn, FourByteSignedInteger, 4),
+    schema(GDSRecord::TapeNum, TwoByteSignedInteger, 2),
+    schema(GDSRecord::TapeCode, TwoByteSignedInteger, 12),
+    schema(GDSRecord::StrClass, BitArray, 2),
+    schema(
+        GDSRecord::Reserved,
+        FourByteSignedInteger,
+        VARIABLE_PAYLOAD_LEN,
+    ),
+    schema(GDSRecord::Format, TwoByteSignedInteger, 2),
+    schema(GDSRecord::Mask, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::EndMasks, NoData, 0),
+    schema(GDSRecord::LibDirSize, TwoByteSignedInteger, 2),
+    schema(GDSRecord::SrfName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    schema(GDSRecord::LibSecure, TwoByteSignedInteger, 2),
+];
+
+fn validate_record_layout(schema: RecordSchema, payload_len: usize) -> Result<(), GdsError> {
+    if schema.payload_len != VARIABLE_PAYLOAD_LEN {
+        return if payload_len == usize::from(schema.payload_len) {
+            Ok(())
+        } else {
+            Err(invalid_data(format!(
+                "Invalid {:?} payload length: expected {} bytes, found {payload_len}",
+                schema.record, schema.payload_len
+            )))
+        };
     }
 
-    let expected = match record {
-        GDSRecord::Header => Some((GDSDataType::TwoByteSignedInteger, 1)),
-        GDSRecord::BgnLib | GDSRecord::BgnStr => Some((GDSDataType::TwoByteSignedInteger, 12)),
-        GDSRecord::Units => Some((GDSDataType::EightByteReal, 2)),
-        GDSRecord::Layer
-        | GDSRecord::DataType
-        | GDSRecord::TextType
-        | GDSRecord::NodeType
-        | GDSRecord::PathType
-        | GDSRecord::PropAttr
-        | GDSRecord::BoxType => Some((GDSDataType::TwoByteSignedInteger, 1)),
-        GDSRecord::Presentation | GDSRecord::STrans => Some((GDSDataType::BitArray, 1)),
-        GDSRecord::ColRow => Some((GDSDataType::TwoByteSignedInteger, 2)),
-        GDSRecord::Width | GDSRecord::BgnExtn | GDSRecord::EndExtn => {
-            Some((GDSDataType::FourByteSignedInteger, 1))
-        }
-        GDSRecord::Mag | GDSRecord::Angle => Some((GDSDataType::EightByteReal, 1)),
-        GDSRecord::EndLib
-        | GDSRecord::EndStr
-        | GDSRecord::Boundary
-        | GDSRecord::Path
-        | GDSRecord::SRef
-        | GDSRecord::ARef
-        | GDSRecord::Text
-        | GDSRecord::EndEl
-        | GDSRecord::TextNode
-        | GDSRecord::Node
-        | GDSRecord::Box
-        | GDSRecord::EndMasks => Some((GDSDataType::NoData, 0)),
-        _ => None,
+    let alignment = if schema.record == GDSRecord::XY {
+        8
+    } else {
+        usize::from(schema.data_type.byte_size()).max(2)
     };
-
-    if let Some((expected_type, expected_count)) = expected {
-        let actual_count = payload_len.checked_div(value_size).unwrap_or(0);
-        if data_type != expected_type || actual_count != expected_count {
-            return Err(invalid_data(format!(
-                "Invalid {record:?} payload: expected {expected_count} {expected_type:?} value(s)"
-            )));
-        }
+    if payload_len.is_multiple_of(alignment) {
+        Ok(())
+    } else {
+        Err(invalid_data(format!(
+            "{:?} payload length {payload_len} is not aligned to {alignment} bytes",
+            schema.record
+        )))
     }
-    if record == GDSRecord::XY
-        && (data_type != GDSDataType::FourByteSignedInteger
-            || !(payload_len / usize::from(GDSDataType::FourByteSignedInteger.byte_size()))
-                .is_multiple_of(2))
-    {
-        return Err(invalid_data(
-            "Invalid XY payload: expected coordinate pairs of four-byte integers",
-        ));
-    }
-
-    Ok(())
 }
 
 fn read_i16_be(buf: &[u8]) -> Vec<i16> {
@@ -823,7 +911,12 @@ mod tests {
             GDSDataType::TwoByteSignedInteger,
             &[0; 24],
         );
-        let missing_end_element = record(GDSRecord::Boundary, GDSDataType::NoData, &[]);
+        let mut missing_end_element = missing_end_structure.clone();
+        missing_end_element.extend_from_slice(&record(
+            GDSRecord::Boundary,
+            GDSDataType::NoData,
+            &[],
+        ));
 
         for (terminator, bytes) in [
             ("ENDLIB", missing_end_library),
@@ -838,6 +931,98 @@ mod tests {
                 ),
                 "{terminator}: {error}"
             );
+        }
+    }
+
+    #[test]
+    fn fixed_and_string_record_grammar_is_enforced() {
+        for (record_type, data_type, payload_len) in [
+            (GDSRecord::Generations, GDSDataType::TwoByteSignedInteger, 2),
+            (GDSRecord::ElFlags, GDSDataType::BitArray, 2),
+            (GDSRecord::Plex, GDSDataType::FourByteSignedInteger, 4),
+            (GDSRecord::StrType, GDSDataType::TwoByteSignedInteger, 2),
+            (GDSRecord::TapeNum, GDSDataType::TwoByteSignedInteger, 2),
+            (GDSRecord::TapeCode, GDSDataType::TwoByteSignedInteger, 12),
+        ] {
+            let bytes = record(record_type, data_type, &vec![0; payload_len]);
+            let mut valid = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+            assert!(matches!(valid.next(), Some(Ok(_))), "{record_type:?}");
+
+            let bytes = record(record_type, data_type, &[]);
+            let mut invalid = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+            assert!(
+                matches!(invalid.next(), Some(Err(GdsError::InvalidData { .. }))),
+                "{record_type:?}"
+            );
+        }
+
+        for record_type in [
+            GDSRecord::LibName,
+            GDSRecord::StrName,
+            GDSRecord::SName,
+            GDSRecord::String,
+            GDSRecord::PropValue,
+        ] {
+            let bytes = record(record_type, GDSDataType::TwoByteSignedInteger, &[0, 0]);
+            let mut wrong_type = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+            assert!(
+                matches!(wrong_type.next(), Some(Err(GdsError::InvalidData { .. }))),
+                "{record_type:?}"
+            );
+
+            let bytes = record(record_type, GDSDataType::AsciiString, b"x");
+            let mut odd_length = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+            assert!(
+                matches!(odd_length.next(), Some(Err(GdsError::InvalidData { .. }))),
+                "{record_type:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_structural_sequences_are_rejected() {
+        let begin_structure = record(
+            GDSRecord::BgnStr,
+            GDSDataType::TwoByteSignedInteger,
+            &[0; 24],
+        );
+        let begin_boundary = record(GDSRecord::Boundary, GDSDataType::NoData, &[]);
+        let begin_path = record(GDSRecord::Path, GDSDataType::NoData, &[]);
+
+        for records in [
+            vec![begin_structure.clone(), begin_structure.clone()],
+            vec![begin_structure.clone(), begin_boundary.clone(), begin_path],
+            vec![record(GDSRecord::EndEl, GDSDataType::NoData, &[])],
+            vec![
+                begin_structure,
+                record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
+            ],
+        ] {
+            let bytes = records.concat();
+            assert_invalid(&Library::from_bytes(&bytes, None));
+        }
+    }
+
+    #[test]
+    fn end_library_ignores_trailing_padding_and_records() {
+        let bytes = Library::new("minimal")
+            .to_bytes_with_timestamp_policy(1e-3, 1e-9, GdsTimestampPolicy::Zero)
+            .expect("minimal library should serialize");
+        let expected = Library::from_bytes(&bytes, None).expect("minimal library should parse");
+
+        for suffix in [
+            vec![0],
+            record(
+                GDSRecord::BgnStr,
+                GDSDataType::TwoByteSignedInteger,
+                &[0; 24],
+            ),
+        ] {
+            let mut padded = bytes.clone();
+            padded.extend_from_slice(&suffix);
+            let parsed = Library::from_bytes(&padded, None)
+                .expect("bytes after ENDLIB should not be semantically parsed");
+            assert_eq!(parsed, expected);
         }
     }
 
@@ -861,14 +1046,17 @@ mod tests {
     }
 
     #[quickcheck]
-    fn generated_record_never_panics(record_type: u8, data_type: u8, mut payload: Vec<u8>) -> bool {
-        payload.truncate(256);
-        let size = 4 + payload.len() as u16;
-        let mut bytes = Vec::with_capacity(usize::from(size) + 4);
-        bytes.extend_from_slice(&size.to_be_bytes());
-        bytes.push(record_type);
-        bytes.push(data_type);
-        bytes.extend_from_slice(&payload);
+    fn generated_record_sequence_never_panics(mut records: Vec<(u8, u8, Vec<u8>)>) -> bool {
+        records.truncate(16);
+        let mut bytes = Vec::new();
+        for (record_type, data_type, mut payload) in records {
+            payload.truncate(256);
+            let size = 4 + payload.len() as u16;
+            bytes.extend_from_slice(&size.to_be_bytes());
+            bytes.push(record_type);
+            bytes.push(data_type);
+            bytes.extend_from_slice(&payload);
+        }
         bytes.extend_from_slice(&[0, 4, GDSRecord::EndLib as u8, GDSDataType::NoData as u8]);
 
         std::panic::catch_unwind(|| Library::from_bytes(&bytes, None)).is_ok()
