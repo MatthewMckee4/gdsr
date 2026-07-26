@@ -506,11 +506,27 @@ where
 
 pub struct RecordReader<R: Read> {
     reader: BufReader<R>,
+    payload: Vec<u8>,
 }
 
 impl<R: Read> RecordReader<R> {
     pub const fn new(reader: BufReader<R>) -> Self {
-        Self { reader }
+        Self {
+            reader,
+            payload: Vec::new(),
+        }
+    }
+
+    fn read_payload(&mut self, payload_len: usize, record: GDSRecord) -> Result<&[u8], GdsError> {
+        self.payload.resize(payload_len, 0);
+        self.reader.read_exact(&mut self.payload).map_err(|error| {
+            if error.kind() == io::ErrorKind::UnexpectedEof {
+                invalid_data(format!("Truncated {record:?} record payload"))
+            } else {
+                GdsError::from(error)
+            }
+        })?;
+        Ok(&self.payload)
     }
 }
 
@@ -576,35 +592,18 @@ impl<R: Read> Iterator for RecordReader<R> {
             ))));
         }
 
-        let mut buf = vec![0u8; payload_len];
-        if let Err(error) = self.reader.read_exact(&mut buf) {
-            return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
-                invalid_data(format!("Truncated {record:?} record payload"))
-            } else {
-                GdsError::from(error)
-            }));
-        }
-
-        let data = match data_type {
-            GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
-                GDSRecordData::I16(read_i16_be(&buf))
+        let data = if payload_len == 0 {
+            GDSRecordData::None
+        } else if data_type == GDSDataType::AsciiString {
+            let mut buf = vec![0u8; payload_len];
+            if let Err(error) = self.reader.read_exact(&mut buf) {
+                return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
+                    invalid_data(format!("Truncated {record:?} record payload"))
+                } else {
+                    GdsError::from(error)
+                }));
             }
-            GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
-                if expected_payload_len == VARIABLE_PAYLOAD_LEN {
-                    let alignment = if record == GDSRecord::XY { 8 } else { 4 };
-                    if !buf.len().is_multiple_of(alignment) {
-                        return Some(Err(misaligned_payload(record, buf.len(), alignment)));
-                    }
-                }
-                GDSRecordData::I32(read_i32_be(&buf))
-            }
-            GDSDataType::EightByteReal => GDSRecordData::F64(
-                read_u64_be(&buf)
-                    .into_iter()
-                    .map(eight_byte_real_to_float)
-                    .collect(),
-            ),
-            GDSDataType::AsciiString => match String::from_utf8(buf) {
+            match String::from_utf8(buf) {
                 Ok(mut result) => {
                     if !result.len().is_multiple_of(2) {
                         return Some(Err(misaligned_payload(record, result.len(), 2)));
@@ -619,8 +618,38 @@ impl<R: Read> Iterator for RecordReader<R> {
                         "Invalid UTF-8 in ASCII string record: {error}"
                     ))));
                 }
-            },
-            GDSDataType::NoData => GDSRecordData::None,
+            }
+        } else {
+            let buf = match self.read_payload(payload_len, record) {
+                Ok(buf) => buf,
+                Err(error) => return Some(Err(error)),
+            };
+
+            match data_type {
+                GDSDataType::TwoByteSignedInteger | GDSDataType::BitArray => {
+                    GDSRecordData::I16(read_i16_be(buf))
+                }
+                GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
+                    if expected_payload_len == VARIABLE_PAYLOAD_LEN {
+                        let alignment = if record == GDSRecord::XY { 8 } else { 4 };
+                        if !buf.len().is_multiple_of(alignment) {
+                            return Some(Err(misaligned_payload(record, buf.len(), alignment)));
+                        }
+                    }
+                    GDSRecordData::I32(read_i32_be(buf))
+                }
+                GDSDataType::EightByteReal => GDSRecordData::F64(
+                    read_u64_be(buf)
+                        .into_iter()
+                        .map(eight_byte_real_to_float)
+                        .collect(),
+                ),
+                GDSDataType::NoData | GDSDataType::AsciiString => {
+                    return Some(Err(invalid_data(format!(
+                        "Invalid {record:?} payload state"
+                    ))));
+                }
+            }
         };
 
         Some(Ok((record, data)))
