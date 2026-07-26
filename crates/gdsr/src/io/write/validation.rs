@@ -1,3 +1,4 @@
+use crate::elements::node::MAX_NODE_POINTS;
 use crate::error::GdsError;
 use crate::{DataType, Layer, Point};
 
@@ -90,11 +91,14 @@ pub fn validate_col_row(columns: u32, rows: u32) -> Result<(), GdsError> {
     Ok(())
 }
 
-/// Returns a validation error if a node has no points.
+/// Returns a validation error if a node falls outside the GDS NODE point-count range.
 pub fn validate_node_points(points: &[Point]) -> Result<(), GdsError> {
-    if points.is_empty() {
+    if !(1..=MAX_NODE_POINTS).contains(&points.len()) {
         return Err(GdsError::ValidationError {
-            message: "Node must have at least one point".to_string(),
+            message: format!(
+                "Node must have between 1 and {MAX_NODE_POINTS} points, got {}",
+                points.len()
+            ),
         });
     }
     Ok(())
@@ -102,8 +106,23 @@ pub fn validate_node_points(points: &[Point]) -> Result<(), GdsError> {
 
 pub const MIN_PATH_POINTS: usize = 2;
 
-/// Returns a validation error if a path has fewer than 2 points.
+/// Returns a validation error if `points` cannot fit in one XY record.
+pub(super) fn validate_point_limit(points: &[Point], element: &str) -> Result<(), GdsError> {
+    if points.len() > MAX_POINTS {
+        return Err(GdsError::ValidationError {
+            message: format!(
+                "{element} has {} points, which exceeds the maximum of {MAX_POINTS}",
+                points.len()
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Returns a validation error if a path has fewer than 2 points or cannot fit in one XY record.
 pub fn validate_path_points(points: &[Point]) -> Result<(), GdsError> {
+    validate_point_limit(points, "Path")?;
+
     if points.len() < MIN_PATH_POINTS {
         return Err(GdsError::ValidationError {
             message: format!(
@@ -117,15 +136,7 @@ pub fn validate_path_points(points: &[Point]) -> Result<(), GdsError> {
 
 /// Validates that a polygon has the correct number of points for GDS serialization.
 pub fn validate_polygon_points(points: &[Point]) -> Result<(), GdsError> {
-    if points.len() > MAX_POINTS {
-        return Err(GdsError::ValidationError {
-            message: format!(
-                "Polygon has {} points, which exceeds the maximum of {}",
-                points.len(),
-                MAX_POINTS
-            ),
-        });
-    }
+    validate_point_limit(points, "Polygon")?;
 
     if points.len() < MIN_POLYGON_POINTS {
         return Err(GdsError::ValidationError {
