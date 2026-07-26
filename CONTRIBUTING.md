@@ -147,3 +147,14 @@ If you update GitHub Actions, run `pinact` to pin action versions:
 ```bash
 pinact run
 ```
+
+Audit the active default-branch ruleset with:
+
+```bash
+gh api repos/MatthewMckee4/gdsr/rulesets/1435762 \
+  --jq '{enforcement, bypass_actors, required_status_contexts: [.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]}'
+gh api repos/MatthewMckee4/gdsr/rulesets/1435762 \
+  --jq 'if (.enforcement == "active" and (.bypass_actors | length == 0) and ([.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] == ["CI gate"])) then "ruleset OK" else error("ruleset mismatch") end'
+```
+
+The required status context is `CI gate`.
