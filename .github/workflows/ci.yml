@@ -166,6 +166,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    needs: determine_changes
+
     permissions:
       id-token: write
 
