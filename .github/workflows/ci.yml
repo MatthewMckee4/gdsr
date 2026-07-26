@@ -168,8 +168,6 @@ jobs:
 
     needs: determine_changes
 
-    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-
     permissions:
       id-token: write
 
@@ -194,14 +192,13 @@ jobs:
         run: cargo llvm-cov nextest --lcov --output-path lcov.info
 
       - name: Upload coverage to Codecov
-        if: ${{ github.event_name != 'pull_request' }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
+          disable_search: true
+          fail_ci_if_error: true
           files: lcov.info
           slug: MatthewMckee4/gdsr
-          use_oidc: true
-          use_pypi: true
-          fail_ci_if_error: true
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
   benchmarks:
     name: "benchmarks"
