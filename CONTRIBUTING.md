@@ -160,8 +160,9 @@ Documentation-only pull requests still run coverage so `codecov/project` and
 `codecov/patch` resolve. Rust platform tests and benchmarks may skip only when
 `determine changes` reports `code=false`; `CI gate` validates that combination.
 
-The repository has one code owner, so GitHub code-owner review is disabled.
-The independent-agent review policy in `AGENTS.md` remains mandatory.
+GitHub code-owner review is disabled because the sole code owner cannot approve
+their own pull request. Independent review by a non-author agent remains
+mandatory under `AGENTS.md`.
 
 The required status contexts are `CI gate`, `codecov/project`, and
 `codecov/patch`.
