@@ -273,6 +273,137 @@ mod tests {
         cell
     }
 
+    fn layer(number: u16, data_type: u16) -> (Layer, DataType) {
+        (Layer::new(number), DataType::new(data_type))
+    }
+
+    #[test]
+    fn layer_filter_matches_layer_and_datatype() {
+        let layers = BTreeSet::from([layer(7, 12), layer(12, 7)]);
+        let mut state = LayerState::default();
+
+        assert_eq!(
+            state.filtered_layers(&layers).collect::<Vec<_>>(),
+            vec![layer(7, 12), layer(12, 7)]
+        );
+
+        state.filter = " d7 ".to_string();
+        assert_eq!(
+            state.filtered_layers(&layers).collect::<Vec<_>>(),
+            vec![layer(12, 7)]
+        );
+
+        state.filter = "L7".to_string();
+        assert_eq!(
+            state.filtered_layers(&layers).collect::<Vec<_>>(),
+            vec![layer(7, 12)]
+        );
+
+        state.filter = "missing".to_string();
+        assert!(state.filtered_layers(&layers).next().is_none());
+    }
+
+    #[test]
+    fn bulk_visibility_uses_filtered_layers_only() {
+        let layers = BTreeSet::from([layer(1, 0), layer(2, 1), layer(3, 1)]);
+        let mut state = LayerState {
+            hidden_layers: layers.iter().copied().collect(),
+            filter: "D1".to_string(),
+            ..Default::default()
+        };
+        let filtered: Vec<_> = state.filtered_layers(&layers).collect();
+
+        state.show_layers(&filtered);
+        assert_eq!(state.hidden_layers, HashSet::from([layer(1, 0)]));
+
+        state.hide_layers(&filtered);
+        assert_eq!(
+            state.hidden_layers,
+            HashSet::from([layer(1, 0), layer(2, 1), layer(3, 1)])
+        );
+    }
+
+    #[test]
+    fn invert_visibility_flips_only_scoped_layers() {
+        let mut state = LayerState {
+            hidden_layers: HashSet::from([layer(1, 0), layer(9, 0)]),
+            ..Default::default()
+        };
+
+        state.invert_layers(&[layer(1, 0), layer(2, 0)]);
+
+        assert_eq!(
+            state.hidden_layers,
+            HashSet::from([layer(2, 0), layer(9, 0)])
+        );
+    }
+
+    #[test]
+    fn toggle_layer_flips_selected_visibility() {
+        let mut state = LayerState::default();
+
+        state.toggle_layer(layer(1, 0));
+        assert!(state.hidden_layers.contains(&layer(1, 0)));
+
+        state.toggle_layer(layer(1, 0));
+        assert!(!state.hidden_layers.contains(&layer(1, 0)));
+    }
+
+    #[test]
+    fn solo_restores_exact_previous_visibility() {
+        let layers = BTreeSet::from([layer(1, 0), layer(2, 0), layer(3, 0)]);
+        let previous = HashSet::from([layer(2, 0), layer(9, 0)]);
+        let mut state = LayerState {
+            hidden_layers: previous.clone(),
+            ..Default::default()
+        };
+
+        state.toggle_solo(&layers, Some(layer(2, 0)));
+        assert_eq!(
+            state.hidden_layers,
+            HashSet::from([layer(1, 0), layer(3, 0), layer(9, 0)])
+        );
+
+        state.toggle_solo(&layers, Some(layer(2, 0)));
+        assert_eq!(state.hidden_layers, previous);
+    }
+
+    #[test]
+    fn repeated_solo_cycles_keep_original_visibility() {
+        let layers = BTreeSet::from([layer(1, 0), layer(2, 0), layer(3, 0)]);
+        let previous = HashSet::from([layer(2, 0)]);
+        let mut state = LayerState {
+            hidden_layers: previous.clone(),
+            ..Default::default()
+        };
+
+        for selected in [layer(1, 0), layer(3, 0)] {
+            state.toggle_solo(&layers, Some(selected));
+            assert!(state.is_solo_active());
+            state.toggle_solo(&layers, Some(selected));
+            assert!(!state.is_solo_active());
+            assert_eq!(state.hidden_layers, previous);
+        }
+    }
+
+    #[test]
+    fn empty_layer_actions_leave_visibility_unchanged() {
+        let mut state = LayerState {
+            hidden_layers: HashSet::from([layer(1, 0)]),
+            ..Default::default()
+        };
+        let previous = state.hidden_layers.clone();
+        let layers = BTreeSet::new();
+
+        state.show_layers(&[]);
+        state.hide_layers(&[]);
+        state.invert_layers(&[]);
+        state.toggle_solo(&layers, Some(layer(1, 0)));
+
+        assert_eq!(state.hidden_layers, previous);
+        assert!(!state.is_solo_active());
+    }
+
     #[test]
     fn delete_element_rebuilds_render_indexes() {
         let mut cell = cell_state_with_elements(vec![
@@ -689,4 +820,87 @@ pub struct LayerState {
     pub layer_colors: LayerColorMap,
     pub hidden_layers: HashSet<(Layer, DataType)>,
     pub filter: String,
+    pub selected_layer: Option<(Layer, DataType)>,
+    solo_restore: Option<HashSet<(Layer, DataType)>>,
+}
+
+impl LayerState {
+    pub fn filtered_layers<'a>(
+        &self,
+        layers: &'a BTreeSet<(Layer, DataType)>,
+    ) -> impl Iterator<Item = (Layer, DataType)> + 'a {
+        let filter = self.filter.trim().to_ascii_lowercase();
+        layers.iter().copied().filter(move |(layer, data_type)| {
+            filter.is_empty()
+                || format!("L{layer} D{data_type}")
+                    .to_ascii_lowercase()
+                    .contains(&filter)
+        })
+    }
+
+    pub fn show_layers(&mut self, layers: &[(Layer, DataType)]) {
+        self.exit_solo();
+        for layer in layers {
+            self.hidden_layers.remove(layer);
+        }
+    }
+
+    pub fn hide_layers(&mut self, layers: &[(Layer, DataType)]) {
+        self.exit_solo();
+        self.hidden_layers.extend(layers.iter().copied());
+    }
+
+    pub fn invert_layers(&mut self, layers: &[(Layer, DataType)]) {
+        self.exit_solo();
+        for layer in layers {
+            if !self.hidden_layers.remove(layer) {
+                self.hidden_layers.insert(*layer);
+            }
+        }
+    }
+
+    pub fn set_layer_visible(&mut self, layer: (Layer, DataType), visible: bool) {
+        self.exit_solo();
+        if visible {
+            self.hidden_layers.remove(&layer);
+        } else {
+            self.hidden_layers.insert(layer);
+        }
+    }
+
+    pub fn toggle_layer(&mut self, layer: (Layer, DataType)) {
+        self.exit_solo();
+        if !self.hidden_layers.remove(&layer) {
+            self.hidden_layers.insert(layer);
+        }
+    }
+
+    pub fn toggle_solo(
+        &mut self,
+        layers: &BTreeSet<(Layer, DataType)>,
+        selected: Option<(Layer, DataType)>,
+    ) {
+        if self.exit_solo() {
+            return;
+        }
+
+        let Some(selected) = selected.filter(|selected| layers.contains(selected)) else {
+            return;
+        };
+        self.solo_restore = Some(self.hidden_layers.clone());
+        self.hidden_layers.extend(layers.iter().copied());
+        self.hidden_layers.remove(&selected);
+    }
+
+    pub fn exit_solo(&mut self) -> bool {
+        let Some(hidden_layers) = self.solo_restore.take() else {
+            return false;
+        };
+        self.hidden_layers = hidden_layers;
+        true
+    }
+
+    pub const fn is_solo_active(&self) -> bool {
+        self.solo_restore.is_some()
+    }
 }
