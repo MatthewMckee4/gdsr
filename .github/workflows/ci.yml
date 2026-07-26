@@ -73,7 +73,6 @@ jobs:
             ':!LICENSE' \
             ':!README.md' \
             ':!SECURITY.md' \
-            ':!STYLE.md' \
             ':!rustfmt.toml' \
             ':!rust-toolchain.toml' \
             ':!seal.toml' \
