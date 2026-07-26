@@ -20,7 +20,7 @@ enum ParserState {
     BeginLibrary,
     LibraryName(u8),
     LibraryOptions(u8),
-    Format,
+    Format(FormatKind),
     Masks,
     EndMasks,
     Library,
@@ -33,7 +33,7 @@ enum ParserState {
 
 impl ParserState {
     #[inline]
-    fn accept(&mut self, record: GDSRecord) -> Result<(), GdsError> {
+    fn accept(&mut self, record: GDSRecord, data: &GDSRecordData) -> Result<(), GdsError> {
         *self = match (*self, record) {
             (Self::Header, GDSRecord::Header) => Self::BeginLibrary,
             (Self::BeginLibrary, GDSRecord::BgnLib) => Self::LibraryName(0),
@@ -45,13 +45,14 @@ impl ParserState {
             (Self::LibraryOptions(0 | 1), GDSRecord::Fonts) => Self::LibraryOptions(2),
             (Self::LibraryOptions(0..=2), GDSRecord::AttrTable) => Self::LibraryOptions(3),
             (Self::LibraryOptions(0..=3), GDSRecord::Generations) => Self::LibraryOptions(4),
-            (Self::LibraryOptions(_), GDSRecord::Format) => Self::Format,
-            (Self::Format, GDSRecord::Mask) => Self::Masks,
+            (Self::LibraryOptions(_), GDSRecord::Format) => Self::Format(FormatKind::from(data)?),
+            (Self::Format(FormatKind::Filtered), GDSRecord::Mask) => Self::Masks,
             (Self::Masks, GDSRecord::Mask) => Self::Masks,
             (Self::Masks, GDSRecord::EndMasks) => Self::EndMasks,
-            (Self::LibraryOptions(_) | Self::Format | Self::EndMasks, GDSRecord::Units) => {
-                Self::Library
-            }
+            (
+                Self::LibraryOptions(_) | Self::Format(FormatKind::Archive) | Self::EndMasks,
+                GDSRecord::Units,
+            ) => Self::Library,
             (Self::Library, GDSRecord::PropAttr) => Self::LibraryProperty,
             (Self::LibraryProperty, GDSRecord::PropValue) => Self::Library,
             (Self::Library, GDSRecord::BgnStr) => Self::StructureName,
@@ -90,12 +91,28 @@ impl ParserState {
                 Self::Structure(1)
             }
             (Self::Element(mut element), record) => {
-                element.accept(record)?;
+                element.accept(record, data)?;
                 Self::Element(element)
             }
             (state, record) => return Err(invalid_parser_state(record, state)),
         };
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FormatKind {
+    Archive,
+    Filtered,
+}
+
+impl FormatKind {
+    fn from(data: &GDSRecordData) -> Result<Self, GdsError> {
+        match data {
+            GDSRecordData::I16(values) if values.as_slice() == [0] => Ok(Self::Archive),
+            GDSRecordData::I16(values) if values.as_slice() == [1] => Ok(Self::Filtered),
+            _ => Err(invalid_data("FORMAT must be 0 (archive) or 1 (filtered)")),
+        }
     }
 }
 
@@ -127,7 +144,7 @@ impl ElementState {
     }
 
     #[inline]
-    fn accept(&mut self, record: GDSRecord) -> Result<(), GdsError> {
+    fn accept(&mut self, record: GDSRecord, data: &GDSRecordData) -> Result<(), GdsError> {
         if self.property_pending {
             if record == GDSRecord::PropValue {
                 self.property_pending = false;
@@ -186,6 +203,9 @@ impl ElementState {
             (ElementKind::Text, 11, GDSRecord::String) => 12,
             _ => return self.unexpected(record),
         };
+        if record == GDSRecord::XY {
+            self.validate_xy(data)?;
+        }
         self.phase = next_phase;
         Ok(())
     }
@@ -219,6 +239,30 @@ impl ElementState {
             "Unexpected {record:?} record in {:?} element",
             self.kind
         )))
+    }
+
+    fn validate_xy(self, data: &GDSRecordData) -> Result<(), GdsError> {
+        let GDSRecordData::I32(values) = data else {
+            return Err(invalid_data("Invalid XY record data"));
+        };
+        let pair_count = values.len() / 2;
+        let closed = values.len() >= 4 && values[..2] == values[values.len() - 2..];
+        let valid = match self.kind {
+            ElementKind::Boundary => pair_count >= 4 && closed,
+            ElementKind::Path => pair_count >= 2,
+            ElementKind::Box => pair_count == 5 && closed,
+            ElementKind::SRef | ElementKind::Text => pair_count == 1,
+            ElementKind::ARef => pair_count == 3,
+            ElementKind::Node => pair_count >= 1,
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(invalid_data(format!(
+                "Invalid XY coordinates for {:?} element",
+                self.kind
+            )))
+        }
     }
 }
 
@@ -262,7 +306,7 @@ where
 
     for record in reader {
         let record = record.and_then(|(record_type, data)| {
-            state.accept(record_type)?;
+            state.accept(record_type, &data)?;
             Ok((record_type, data))
         });
         match record {
@@ -522,6 +566,11 @@ where
                 }
                 GDSRecord::ColRow => {
                     if let GDSRecordData::I16(col_row) = data {
+                        if !col_row.iter().all(|value| (1..=i16::MAX).contains(value)) {
+                            return Err(invalid_data(
+                                "COLROW columns and rows must be between 1 and 32767",
+                            ));
+                        }
                         if let Some(reference) = &mut reference {
                             reference.grid.set_columns(col_row[0] as u32);
                             reference.grid.set_rows(col_row[1] as u32);
@@ -638,7 +687,7 @@ where
         ParserState::BeginLibrary => Err(invalid_data("Unexpected EOF before BGNLIB record")),
         ParserState::LibraryName(_) => Err(invalid_data("Unexpected EOF before LIBNAME record")),
         ParserState::LibraryOptions(_)
-        | ParserState::Format
+        | ParserState::Format(_)
         | ParserState::Masks
         | ParserState::EndMasks => Err(invalid_data("Unexpected EOF before UNITS record")),
         ParserState::LibraryProperty | ParserState::StructureProperty => {
@@ -1390,11 +1439,11 @@ mod tests {
     #[test]
     fn every_supported_element_requires_its_mandatory_records() {
         let i16_field = |record_type| (record_type, GDSDataType::TwoByteSignedInteger, vec![0, 1]);
-        let xy = || {
+        let xy = |pair_count: usize| {
             (
                 GDSRecord::XY,
                 GDSDataType::FourByteSignedInteger,
-                vec![0; 8],
+                vec![0; pair_count * 8],
             )
         };
         let cases = [
@@ -1404,7 +1453,7 @@ mod tests {
                     (GDSRecord::Boundary, GDSDataType::NoData, vec![]),
                     i16_field(GDSRecord::Layer),
                     i16_field(GDSRecord::DataType),
-                    xy(),
+                    xy(4),
                 ],
             ),
             (
@@ -1413,7 +1462,7 @@ mod tests {
                     (GDSRecord::Path, GDSDataType::NoData, vec![]),
                     i16_field(GDSRecord::Layer),
                     i16_field(GDSRecord::DataType),
-                    xy(),
+                    xy(2),
                 ],
             ),
             (
@@ -1422,7 +1471,7 @@ mod tests {
                     (GDSRecord::Box, GDSDataType::NoData, vec![]),
                     i16_field(GDSRecord::Layer),
                     i16_field(GDSRecord::BoxType),
-                    xy(),
+                    xy(5),
                 ],
             ),
             (
@@ -1431,7 +1480,7 @@ mod tests {
                     (GDSRecord::Node, GDSDataType::NoData, vec![]),
                     i16_field(GDSRecord::Layer),
                     i16_field(GDSRecord::NodeType),
-                    xy(),
+                    xy(1),
                 ],
             ),
             (
@@ -1439,7 +1488,7 @@ mod tests {
                 vec![
                     (GDSRecord::SRef, GDSDataType::NoData, vec![]),
                     (GDSRecord::SName, GDSDataType::AsciiString, b"c\0".to_vec()),
-                    xy(),
+                    xy(1),
                 ],
             ),
             (
@@ -1465,7 +1514,7 @@ mod tests {
                     (GDSRecord::Text, GDSDataType::NoData, vec![]),
                     i16_field(GDSRecord::Layer),
                     i16_field(GDSRecord::TextType),
-                    xy(),
+                    xy(1),
                     (GDSRecord::String, GDSDataType::AsciiString, b"x\0".to_vec()),
                 ],
             ),
@@ -1487,6 +1536,59 @@ mod tests {
                     records[missing].0
                 );
             }
+
+            let unclosed = |pair_count: usize| {
+                let mut payload = vec![0; pair_count * 8];
+                let last = payload.len() - 1;
+                payload[last] = 1;
+                payload
+            };
+            let invalid_xy_payloads = match name {
+                "BOUNDARY" => vec![vec![0; 24], unclosed(4)],
+                "PATH" => vec![vec![0; 8]],
+                "BOX" => vec![vec![0; 32], vec![0; 48], unclosed(5)],
+                "SREF" | "TEXT" => vec![vec![0; 16]],
+                "AREF" => vec![vec![0; 16], vec![0; 32]],
+                "NODE" => vec![vec![]],
+                _ => Vec::new(),
+            };
+            for payload in invalid_xy_payloads {
+                let mut malformed = records.clone();
+                malformed
+                    .iter_mut()
+                    .find(|(record_type, _, _)| *record_type == GDSRecord::XY)
+                    .expect("element should contain XY")
+                    .2 = payload;
+                assert_invalid(&Library::from_bytes(&element_stream(&malformed), None));
+            }
+        }
+    }
+
+    #[test]
+    fn aref_colrow_values_must_be_positive_i16_values() {
+        let aref = |colrow| {
+            vec![
+                (GDSRecord::ARef, GDSDataType::NoData, vec![]),
+                (GDSRecord::SName, GDSDataType::AsciiString, b"c\0".to_vec()),
+                (GDSRecord::ColRow, GDSDataType::TwoByteSignedInteger, colrow),
+                (
+                    GDSRecord::XY,
+                    GDSDataType::FourByteSignedInteger,
+                    vec![0; 24],
+                ),
+            ]
+        };
+
+        Library::from_bytes(&element_stream(&aref(vec![0x7f, 0xff, 0x7f, 0xff])), None)
+            .expect("maximum positive COLROW values should parse");
+
+        for colrow in [
+            vec![0, 0, 0, 1],
+            vec![0, 1, 0, 0],
+            vec![0xff, 0xff, 0, 1],
+            vec![0, 1, 0xff, 0xff],
+        ] {
+            assert_invalid(&Library::from_bytes(&element_stream(&aref(colrow)), None));
         }
     }
 
@@ -1512,7 +1614,7 @@ mod tests {
             (
                 GDSRecord::XY,
                 GDSDataType::FourByteSignedInteger,
-                vec![0; 8],
+                vec![0; 32],
             ),
         ];
 
@@ -1605,7 +1707,12 @@ mod tests {
 
     #[test]
     fn library_option_and_format_mask_order_is_enforced() {
-        let format = (
+        let archive_format = (
+            GDSRecord::Format,
+            GDSDataType::TwoByteSignedInteger,
+            vec![0, 0],
+        );
+        let filtered_format = (
             GDSRecord::Format,
             GDSDataType::TwoByteSignedInteger,
             vec![0, 1],
@@ -1614,14 +1721,34 @@ mod tests {
         let end_masks = (GDSRecord::EndMasks, GDSDataType::NoData, vec![]);
 
         Library::from_bytes(
-            &library_with_options(&[format.clone(), mask.clone(), end_masks.clone()], &[]),
+            &library_with_options(std::slice::from_ref(&archive_format), &[]),
             None,
         )
-        .expect("complete FORMAT/MASK section should parse");
+        .expect("archive FORMAT should proceed directly to UNITS");
+        Library::from_bytes(
+            &library_with_options(
+                &[
+                    filtered_format.clone(),
+                    mask.clone(),
+                    mask.clone(),
+                    end_masks.clone(),
+                ],
+                &[],
+            ),
+            None,
+        )
+        .expect("filtered FORMAT with complete MASK section should parse");
 
         for options in [
-            vec![format.clone(), mask],
-            vec![format, end_masks],
+            vec![archive_format, mask.clone(), end_masks.clone()],
+            vec![filtered_format.clone()],
+            vec![filtered_format.clone(), mask],
+            vec![filtered_format, end_masks],
+            vec![(
+                GDSRecord::Format,
+                GDSDataType::TwoByteSignedInteger,
+                vec![0, 2],
+            )],
             vec![
                 (GDSRecord::Fonts, GDSDataType::AsciiString, vec![0; 176]),
                 (GDSRecord::RefLibs, GDSDataType::AsciiString, vec![0; 88]),
