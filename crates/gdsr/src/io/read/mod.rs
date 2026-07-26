@@ -1,4 +1,4 @@
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 
 use crate::cell::Cell;
 use crate::config::gds_file_types::GDSDataType::{
@@ -519,12 +519,29 @@ impl<R: Read> Iterator for RecordReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut header = [0u8; 4];
-        if let Err(error) = self.reader.read_exact(&mut header) {
-            return if error.kind() == io::ErrorKind::UnexpectedEof {
-                None
-            } else {
-                Some(Err(GdsError::from(error)))
+        let header_len = header.len();
+        let buffered = self.reader.buffer();
+        if buffered.len() >= header_len {
+            header.copy_from_slice(&buffered[..header_len]);
+            self.reader.consume(header_len);
+        } else {
+            let bytes_read = loop {
+                match self.reader.read(&mut header) {
+                    Ok(0) => return None,
+                    Ok(bytes_read) => break bytes_read,
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                    Err(error) => return Some(Err(GdsError::from(error))),
+                }
             };
+            if bytes_read < header_len
+                && let Err(error) = self.reader.read_exact(&mut header[bytes_read..])
+            {
+                return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
+                    invalid_data("Truncated record header")
+                } else {
+                    GdsError::from(error)
+                }));
+            }
         }
 
         let size = u16::from_be_bytes([header[0], header[1]]) as usize;
@@ -664,8 +681,8 @@ const RECORD_LAYOUTS: [RecordLayout; 60] = [
     layout(GDSRecord::Angle, EightByteReal, 8),
     layout(GDSRecord::UInteger, TwoByteSignedInteger, 2),
     layout(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
-    layout(GDSRecord::RefLibs, AsciiString, VARIABLE_PAYLOAD_LEN),
-    layout(GDSRecord::Fonts, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::RefLibs, AsciiString, 88),
+    layout(GDSRecord::Fonts, AsciiString, 176),
     layout(GDSRecord::PathType, TwoByteSignedInteger, 2),
     layout(GDSRecord::Generations, TwoByteSignedInteger, 2),
     layout(GDSRecord::AttrTable, AsciiString, VARIABLE_PAYLOAD_LEN),
@@ -788,7 +805,7 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Write};
+    use std::io::{BufReader, Cursor, Write};
 
     use quickcheck_macros::quickcheck;
 
@@ -879,6 +896,21 @@ mod tests {
                 ),
                 "{name}"
             );
+        }
+    }
+
+    #[test]
+    fn record_reader_distinguishes_clean_eof_from_partial_header() {
+        let mut clean = RecordReader::new(BufReader::new(Cursor::new(Vec::<u8>::new())));
+        assert!(clean.next().is_none());
+
+        for bytes in [vec![0], vec![0, 4], vec![0, 4, GDSRecord::EndLib as u8]] {
+            let mut reader = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+            assert!(matches!(
+                reader.next(),
+                Some(Err(GdsError::InvalidData { ref message }))
+                    if message == "Truncated record header"
+            ));
         }
     }
 
@@ -979,6 +1011,30 @@ mod tests {
                 ),
                 "{record_type:?}"
             );
+        }
+    }
+
+    #[test]
+    fn fixed_library_string_lengths_are_enforced() {
+        for (record_type, expected_payload_len) in
+            [(GDSRecord::RefLibs, 88), (GDSRecord::Fonts, 176)]
+        {
+            for (payload_len, is_valid) in [
+                (expected_payload_len, true),
+                (expected_payload_len - 2, false),
+                (expected_payload_len + 2, false),
+            ] {
+                let bytes = [
+                    record(record_type, GDSDataType::AsciiString, &vec![0; payload_len]),
+                    record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
+                ]
+                .concat();
+                assert_eq!(
+                    Library::from_bytes(&bytes, None).is_ok(),
+                    is_valid,
+                    "{record_type:?} payload length {payload_len}"
+                );
+            }
         }
     }
 
