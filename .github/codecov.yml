@@ -3,8 +3,12 @@ coverage:
     project:
       default:
         target: auto
-        threshold: "5%"
+        threshold: "1%"
+        if_not_found: failure
 
     patch:
       default:
-        enabled: false
+        target: "90%"
+        threshold: "0%"
+        if_not_found: failure
+        only_pulls: true
