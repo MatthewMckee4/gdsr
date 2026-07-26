@@ -289,8 +289,19 @@ impl ViewerApp {
     }
 
     fn invalidate_geometry(&mut self) {
+        self.sync_layer_state();
         self.geometry_generation = self.geometry_generation.saturating_add(1);
         self.invalidate_render();
+    }
+
+    fn sync_layer_state(&mut self) {
+        let Some(cell) = self.cell.as_ref() else {
+            return;
+        };
+        self.layer_state.sync_layers(&cell.layers);
+        for &(layer, data_type) in &cell.layers {
+            self.layer_state.layer_colors.get(layer, data_type);
+        }
     }
 
     pub(crate) const fn geometry_generation(&self) -> u64 {
@@ -366,6 +377,7 @@ impl ViewerApp {
         self.recent_projects.save();
 
         let cell_state = CellState::new(library);
+        self.layer_state.reset_for_library();
         self.cell = Some(cell_state);
         self.hovered_element = None;
         self.selected_element = None;
@@ -394,12 +406,9 @@ impl ViewerApp {
             self.scroll_to_selected = true;
             self.hovered_element = None;
             self.selected_element = None;
-            if cell.load_direct_cell_elements(name) {
-                for &(layer, data_type) in &cell.layers {
-                    self.layer_state.layer_colors.get(layer, data_type);
-                }
-            }
+            cell.load_direct_cell_elements(name);
         }
+        self.sync_layer_state();
         self.invalidate_render();
         self.polygon_dialog = None;
         self.polygon_tool = None;
@@ -1933,10 +1942,8 @@ impl ViewerApp {
         if depth_changed {
             if let Some(cell) = self.cell.as_mut() {
                 cell.refresh_layers();
-                for &(layer, data_type) in &cell.layers {
-                    self.layer_state.layer_colors.get(layer, data_type);
-                }
             }
+            self.sync_layer_state();
             self.invalidate_render();
         }
 
