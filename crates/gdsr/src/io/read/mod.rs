@@ -22,15 +22,21 @@ enum ParserState {
 }
 
 impl ParserState {
+    #[inline]
     fn require(self, expected: Self, record: GDSRecord) -> Result<(), GdsError> {
         if self == expected {
             Ok(())
         } else {
-            Err(invalid_data(format!(
-                "Unexpected {record:?} record while parsing {self:?}"
-            )))
+            Err(invalid_parser_state(record, self))
         }
     }
+}
+
+#[cold]
+fn invalid_parser_state(record: GDSRecord, state: ParserState) -> GdsError {
+    invalid_data(format!(
+        "Unexpected {record:?} record while parsing {state:?}"
+    ))
 }
 
 pub fn from_gds_reader<R: Read>(reader: R, units: Option<f64>) -> Result<Library, GdsError> {
@@ -513,22 +519,12 @@ impl<R: Read> Iterator for RecordReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut header = [0u8; 4];
-        let bytes_read = loop {
-            match self.reader.read(&mut header) {
-                Ok(0) => return None,
-                Ok(bytes_read) => break bytes_read,
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                Err(error) => return Some(Err(GdsError::from(error))),
-            }
-        };
-        if bytes_read < header.len()
-            && let Err(error) = self.reader.read_exact(&mut header[bytes_read..])
-        {
-            return Some(Err(if error.kind() == io::ErrorKind::UnexpectedEof {
-                invalid_data("Truncated record header")
+        if let Err(error) = self.reader.read_exact(&mut header) {
+            return if error.kind() == io::ErrorKind::UnexpectedEof {
+                None
             } else {
-                GdsError::from(error)
-            }));
+                Some(Err(GdsError::from(error)))
+            };
         }
 
         let size = u16::from_be_bytes([header[0], header[1]]) as usize;
@@ -538,23 +534,29 @@ impl<R: Read> Iterator for RecordReader<R> {
             ))));
         }
 
-        let Some(&schema) = RECORD_SCHEMAS.get(usize::from(header[2])) else {
+        let Some(&layout) = RECORD_LAYOUTS.get(usize::from(header[2])) else {
             return Some(Err(invalid_data(format!(
                 "Invalid record type byte: {:#04x}",
                 header[2]
             ))));
         };
-        let record = schema.record;
-        if header[3] != schema.data_type as u8 {
+        let record = layout.record;
+        let expected_data_type = layout.data_type;
+        if header[3] != expected_data_type as u8 {
             return Some(Err(invalid_data(format!(
-                "Invalid {record:?} data type: expected {:?}, found {:#04x}",
-                schema.data_type, header[3]
+                "Invalid {record:?} data type: expected {expected_data_type:?}, found {:#04x}",
+                header[3]
             ))));
         }
-        let data_type = schema.data_type;
+        let data_type = expected_data_type;
         let payload_len = size - 4;
-        if let Err(error) = validate_record_layout(schema, payload_len) {
-            return Some(Err(error));
+        let expected_payload_len = layout.payload_len;
+        if expected_payload_len != VARIABLE_PAYLOAD_LEN
+            && payload_len != usize::from(expected_payload_len)
+        {
+            return Some(Err(invalid_data(format!(
+                "Invalid {record:?} payload length: expected {expected_payload_len} bytes, found {payload_len}"
+            ))));
         }
 
         let mut buf = vec![0u8; payload_len];
@@ -571,6 +573,12 @@ impl<R: Read> Iterator for RecordReader<R> {
                 GDSRecordData::I16(read_i16_be(&buf))
             }
             GDSDataType::FourByteSignedInteger | GDSDataType::FourByteReal => {
+                if expected_payload_len == VARIABLE_PAYLOAD_LEN {
+                    let alignment = if record == GDSRecord::XY { 8 } else { 4 };
+                    if !buf.len().is_multiple_of(alignment) {
+                        return Some(Err(misaligned_payload(record, buf.len(), alignment)));
+                    }
+                }
                 GDSRecordData::I32(read_i32_be(&buf))
             }
             GDSDataType::EightByteReal => GDSRecordData::F64(
@@ -581,6 +589,9 @@ impl<R: Read> Iterator for RecordReader<R> {
             ),
             GDSDataType::AsciiString => match String::from_utf8(buf) {
                 Ok(mut result) => {
+                    if !result.len().is_multiple_of(2) {
+                        return Some(Err(misaligned_payload(record, result.len(), 2)));
+                    }
                     if result.ends_with('\0') {
                         result.pop();
                     }
@@ -599,123 +610,104 @@ impl<R: Read> Iterator for RecordReader<R> {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy)]
-struct RecordSchema {
+struct RecordLayout {
     record: GDSRecord,
     data_type: GDSDataType,
-    payload_len: u16,
+    payload_len: u8,
 }
 
-const VARIABLE_PAYLOAD_LEN: u16 = u16::MAX;
+const VARIABLE_PAYLOAD_LEN: u8 = u8::MAX;
 
-const fn schema(record: GDSRecord, data_type: GDSDataType, payload_len: u16) -> RecordSchema {
-    RecordSchema {
+const fn layout(record: GDSRecord, data_type: GDSDataType, payload_len: u8) -> RecordLayout {
+    RecordLayout {
         record,
         data_type,
         payload_len,
     }
 }
 
-const RECORD_SCHEMAS: [RecordSchema; 60] = [
-    schema(GDSRecord::Header, TwoByteSignedInteger, 2),
-    schema(GDSRecord::BgnLib, TwoByteSignedInteger, 24),
-    schema(GDSRecord::LibName, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::Units, EightByteReal, 16),
-    schema(GDSRecord::EndLib, NoData, 0),
-    schema(GDSRecord::BgnStr, TwoByteSignedInteger, 24),
-    schema(GDSRecord::StrName, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::EndStr, NoData, 0),
-    schema(GDSRecord::Boundary, NoData, 0),
-    schema(GDSRecord::Path, NoData, 0),
-    schema(GDSRecord::SRef, NoData, 0),
-    schema(GDSRecord::ARef, NoData, 0),
-    schema(GDSRecord::Text, NoData, 0),
-    schema(GDSRecord::Layer, TwoByteSignedInteger, 2),
-    schema(GDSRecord::DataType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::Width, FourByteSignedInteger, 4),
-    schema(GDSRecord::XY, FourByteSignedInteger, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::EndEl, NoData, 0),
-    schema(GDSRecord::SName, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::ColRow, TwoByteSignedInteger, 4),
-    schema(GDSRecord::TextNode, NoData, 0),
-    schema(GDSRecord::Node, NoData, 0),
-    schema(GDSRecord::TextType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::Presentation, BitArray, 2),
-    schema(
+const RECORD_LAYOUTS: [RecordLayout; 60] = [
+    layout(GDSRecord::Header, TwoByteSignedInteger, 2),
+    layout(GDSRecord::BgnLib, TwoByteSignedInteger, 24),
+    layout(GDSRecord::LibName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::Units, EightByteReal, 16),
+    layout(GDSRecord::EndLib, NoData, 0),
+    layout(GDSRecord::BgnStr, TwoByteSignedInteger, 24),
+    layout(GDSRecord::StrName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::EndStr, NoData, 0),
+    layout(GDSRecord::Boundary, NoData, 0),
+    layout(GDSRecord::Path, NoData, 0),
+    layout(GDSRecord::SRef, NoData, 0),
+    layout(GDSRecord::ARef, NoData, 0),
+    layout(GDSRecord::Text, NoData, 0),
+    layout(GDSRecord::Layer, TwoByteSignedInteger, 2),
+    layout(GDSRecord::DataType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Width, FourByteSignedInteger, 4),
+    layout(GDSRecord::XY, FourByteSignedInteger, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::EndEl, NoData, 0),
+    layout(GDSRecord::SName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::ColRow, TwoByteSignedInteger, 4),
+    layout(GDSRecord::TextNode, NoData, 0),
+    layout(GDSRecord::Node, NoData, 0),
+    layout(GDSRecord::TextType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Presentation, BitArray, 2),
+    layout(
         GDSRecord::Spacing,
         FourByteSignedInteger,
         VARIABLE_PAYLOAD_LEN,
     ),
-    schema(GDSRecord::String, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::STrans, BitArray, 2),
-    schema(GDSRecord::Mag, EightByteReal, 8),
-    schema(GDSRecord::Angle, EightByteReal, 8),
-    schema(GDSRecord::UInteger, TwoByteSignedInteger, 2),
-    schema(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::RefLibs, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::Fonts, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::PathType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::Generations, TwoByteSignedInteger, 2),
-    schema(GDSRecord::AttrTable, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::StyTable, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::StrType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::ElFlags, BitArray, 2),
-    schema(GDSRecord::ElKey, FourByteSignedInteger, 4),
-    schema(GDSRecord::LinkType, TwoByteSignedInteger, 2),
-    schema(
+    layout(GDSRecord::String, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::STrans, BitArray, 2),
+    layout(GDSRecord::Mag, EightByteReal, 8),
+    layout(GDSRecord::Angle, EightByteReal, 8),
+    layout(GDSRecord::UInteger, TwoByteSignedInteger, 2),
+    layout(GDSRecord::UString, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::RefLibs, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::Fonts, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::PathType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Generations, TwoByteSignedInteger, 2),
+    layout(GDSRecord::AttrTable, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::StyTable, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::StrType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::ElFlags, BitArray, 2),
+    layout(GDSRecord::ElKey, FourByteSignedInteger, 4),
+    layout(GDSRecord::LinkType, TwoByteSignedInteger, 2),
+    layout(
         GDSRecord::LinkKeys,
         FourByteSignedInteger,
         VARIABLE_PAYLOAD_LEN,
     ),
-    schema(GDSRecord::NodeType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::PropAttr, TwoByteSignedInteger, 2),
-    schema(GDSRecord::PropValue, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::Box, NoData, 0),
-    schema(GDSRecord::BoxType, TwoByteSignedInteger, 2),
-    schema(GDSRecord::Plex, FourByteSignedInteger, 4),
-    schema(GDSRecord::BgnExtn, FourByteSignedInteger, 4),
-    schema(GDSRecord::EndExtn, FourByteSignedInteger, 4),
-    schema(GDSRecord::TapeNum, TwoByteSignedInteger, 2),
-    schema(GDSRecord::TapeCode, TwoByteSignedInteger, 12),
-    schema(GDSRecord::StrClass, BitArray, 2),
-    schema(
+    layout(GDSRecord::NodeType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::PropAttr, TwoByteSignedInteger, 2),
+    layout(GDSRecord::PropValue, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::Box, NoData, 0),
+    layout(GDSRecord::BoxType, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Plex, FourByteSignedInteger, 4),
+    layout(GDSRecord::BgnExtn, FourByteSignedInteger, 4),
+    layout(GDSRecord::EndExtn, FourByteSignedInteger, 4),
+    layout(GDSRecord::TapeNum, TwoByteSignedInteger, 2),
+    layout(GDSRecord::TapeCode, TwoByteSignedInteger, 12),
+    layout(GDSRecord::StrClass, BitArray, 2),
+    layout(
         GDSRecord::Reserved,
         FourByteSignedInteger,
         VARIABLE_PAYLOAD_LEN,
     ),
-    schema(GDSRecord::Format, TwoByteSignedInteger, 2),
-    schema(GDSRecord::Mask, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::EndMasks, NoData, 0),
-    schema(GDSRecord::LibDirSize, TwoByteSignedInteger, 2),
-    schema(GDSRecord::SrfName, AsciiString, VARIABLE_PAYLOAD_LEN),
-    schema(GDSRecord::LibSecure, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Format, TwoByteSignedInteger, 2),
+    layout(GDSRecord::Mask, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::EndMasks, NoData, 0),
+    layout(GDSRecord::LibDirSize, TwoByteSignedInteger, 2),
+    layout(GDSRecord::SrfName, AsciiString, VARIABLE_PAYLOAD_LEN),
+    layout(GDSRecord::LibSecure, TwoByteSignedInteger, 2),
 ];
 
-fn validate_record_layout(schema: RecordSchema, payload_len: usize) -> Result<(), GdsError> {
-    if schema.payload_len != VARIABLE_PAYLOAD_LEN {
-        return if payload_len == usize::from(schema.payload_len) {
-            Ok(())
-        } else {
-            Err(invalid_data(format!(
-                "Invalid {:?} payload length: expected {} bytes, found {payload_len}",
-                schema.record, schema.payload_len
-            )))
-        };
-    }
-
-    let alignment = if schema.record == GDSRecord::XY {
-        8
-    } else {
-        usize::from(schema.data_type.byte_size()).max(2)
-    };
-    if payload_len.is_multiple_of(alignment) {
-        Ok(())
-    } else {
-        Err(invalid_data(format!(
-            "{:?} payload length {payload_len} is not aligned to {alignment} bytes",
-            schema.record
-        )))
-    }
+#[cold]
+fn misaligned_payload(record: GDSRecord, payload_len: usize, alignment: usize) -> GdsError {
+    invalid_data(format!(
+        "{record:?} payload length {payload_len} is not aligned to {alignment} bytes"
+    ))
 }
 
 fn read_i16_be(buf: &[u8]) -> Vec<i16> {
@@ -796,7 +788,7 @@ pub fn get_points_from_i32_vec(vec: &[i32], db_units: f64) -> Vec<Point> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufReader, Cursor, Write};
+    use std::io::{Cursor, Write};
 
     use quickcheck_macros::quickcheck;
 
@@ -880,9 +872,11 @@ mod tests {
         ];
 
         for (name, bytes) in cases {
-            let mut reader = RecordReader::new(BufReader::new(Cursor::new(bytes)));
             assert!(
-                matches!(reader.next(), Some(Err(GdsError::InvalidData { .. }))),
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
                 "{name}"
             );
         }
@@ -944,14 +938,19 @@ mod tests {
             (GDSRecord::TapeNum, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeCode, GDSDataType::TwoByteSignedInteger, 12),
         ] {
-            let bytes = record(record_type, data_type, &vec![0; payload_len]);
-            let mut valid = RecordReader::new(BufReader::new(Cursor::new(bytes)));
-            assert!(matches!(valid.next(), Some(Ok(_))), "{record_type:?}");
+            let bytes = [
+                record(record_type, data_type, &vec![0; payload_len]),
+                record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
+            ]
+            .concat();
+            assert!(Library::from_bytes(&bytes, None).is_ok(), "{record_type:?}");
 
             let bytes = record(record_type, data_type, &[]);
-            let mut invalid = RecordReader::new(BufReader::new(Cursor::new(bytes)));
             assert!(
-                matches!(invalid.next(), Some(Err(GdsError::InvalidData { .. }))),
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
                 "{record_type:?}"
             );
         }
@@ -964,16 +963,20 @@ mod tests {
             GDSRecord::PropValue,
         ] {
             let bytes = record(record_type, GDSDataType::TwoByteSignedInteger, &[0, 0]);
-            let mut wrong_type = RecordReader::new(BufReader::new(Cursor::new(bytes)));
             assert!(
-                matches!(wrong_type.next(), Some(Err(GdsError::InvalidData { .. }))),
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
                 "{record_type:?}"
             );
 
             let bytes = record(record_type, GDSDataType::AsciiString, b"x");
-            let mut odd_length = RecordReader::new(BufReader::new(Cursor::new(bytes)));
             assert!(
-                matches!(odd_length.next(), Some(Err(GdsError::InvalidData { .. }))),
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
                 "{record_type:?}"
             );
         }
@@ -991,7 +994,7 @@ mod tests {
 
         for records in [
             vec![begin_structure.clone(), begin_structure.clone()],
-            vec![begin_structure.clone(), begin_boundary.clone(), begin_path],
+            vec![begin_structure.clone(), begin_boundary, begin_path],
             vec![record(GDSRecord::EndEl, GDSDataType::NoData, &[])],
             vec![
                 begin_structure,
