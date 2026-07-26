@@ -34,7 +34,10 @@ pub use error::GdsError;
 pub use flatten::FlattenOptions;
 pub use grid::Grid;
 pub use io::write::svg::cell_to_svg;
-pub use io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter};
+pub use io::write::{
+    GdsConversionReport, GdsFileWriter, GdsQuantization, GdsRoundingPolicy, GdsStreamWriter,
+    GdsWriteOptions, GdsWriter,
+};
 pub use library::{
     CellConflictStrategy, CellPruneError, CellPruneMode, CellPruneReport, DanglingCellReference,
     Library, LibraryMergeError,

@@ -8,9 +8,12 @@ use crate::design_rules::{self, DesignRuleOptions, DesignRuleReport};
 use crate::error::GdsError;
 use crate::io::read::{from_gds_reader, from_gds_reader_filtered};
 use crate::io::write::validation::MAX_STRUCTURE_NAME_LENGTH;
-use crate::io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter};
+use crate::io::write::{GdsFileWriter, GdsStreamWriter, GdsWriter, write_library_with_options};
 use crate::types::LayerMapping;
-use crate::{DataType, Element, GdsTimestampPolicy, GdsTimestamps, Instance, Layer};
+use crate::{
+    DataType, Element, GdsConversionReport, GdsTimestampPolicy, GdsTimestamps, GdsWriteOptions,
+    Instance, Layer,
+};
 
 /// A dangling reference: a cell contains a reference to a target that doesn't exist.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -350,6 +353,18 @@ impl Library {
         self.to_bytes_with_timestamp_policy(user_units, database_units, GdsTimestampPolicy::Current)
     }
 
+    /// Serializes with explicit coordinate and timestamp options.
+    ///
+    /// Returns the bytes and all nonzero database-grid quantization effects.
+    pub fn to_bytes_with_options(
+        &self,
+        user_units: f64,
+        database_units: f64,
+        options: GdsWriteOptions,
+    ) -> Result<(Vec<u8>, GdsConversionReport), GdsError> {
+        write_library_with_options(self, user_units, database_units, options)
+    }
+
     /// Serialize the library with the default GDS writer and an explicit timestamp policy.
     pub fn to_bytes_with_timestamp_policy(
         &self,
@@ -378,6 +393,29 @@ impl Library {
             database_units,
             GdsTimestampPolicy::Current,
         )
+    }
+
+    /// Serializes to `output` with explicit options and returns the conversion report.
+    pub fn write_to_with_options<W: Write>(
+        &self,
+        output: W,
+        user_units: f64,
+        database_units: f64,
+        options: GdsWriteOptions,
+    ) -> Result<GdsConversionReport, GdsError> {
+        let mut writer = GdsStreamWriter::from_library_with_options(
+            output,
+            self,
+            user_units,
+            database_units,
+            options,
+        )?;
+        let mut cells: Vec<&Cell> = self.cells.values().collect();
+        cells.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+        for cell in cells {
+            writer.write_cell(cell)?;
+        }
+        writer.finish_with_report().map(|(_, report)| report)
     }
 
     /// Serialize the library to `output` using an explicit timestamp policy.
@@ -424,6 +462,21 @@ impl Library {
             database_units,
             GdsTimestampPolicy::Current,
         )
+    }
+
+    /// Writes a GDS file with explicit options and returns the conversion report.
+    pub fn write_file_with_options<P: AsRef<std::path::Path>>(
+        &self,
+        file_name: P,
+        user_units: f64,
+        database_units: f64,
+        options: GdsWriteOptions,
+    ) -> Result<GdsConversionReport, GdsError> {
+        let (bytes, report) = self.to_bytes_with_options(user_units, database_units, options)?;
+        let mut file = File::create(file_name)?;
+        file.write_all(&bytes)?;
+        file.flush()?;
+        Ok(report)
     }
 
     /// Writes the library to a GDS file using an explicit timestamp policy.
