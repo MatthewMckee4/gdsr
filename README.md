@@ -7,7 +7,7 @@
 GDSII manipulation, written in Rust.
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/MatthewMckee4/gdsr/main/scripts/benchmark/results/benchmark.svg" alt="GDS I/O Benchmark" width="100%">
+  <img src="https://raw.githubusercontent.com/MatthewMckee4/gdsr/main/scripts/benchmark/results/benchmark.svg" alt="GDS I/O Benchmark" width="80%">
 </div>
 
 > [!WARNING]
