@@ -153,8 +153,16 @@ Audit the active default-branch ruleset with:
 ```bash
 gh api repos/MatthewMckee4/gdsr/rulesets/1435762
 gh api repos/MatthewMckee4/gdsr/rulesets/1435762 \
-  --jq '.rules as $rules | [$rules[] | select(.type == "required_status_checks")] as $status_rules | [$rules[] | select(.type == "pull_request")] as $pull_request_rules | ($status_rules[0].parameters) as $checks | ($pull_request_rules[0].parameters) as $pull_request | if (.target == "branch" and ($status_rules | length) == 1 and ($pull_request_rules | length) == 1 and .enforcement == "active" and .conditions.ref_name == {"exclude":[],"include":["~DEFAULT_BRANCH"]} and .bypass_actors == [] and $checks.strict_required_status_checks_policy == true and $checks.do_not_enforce_on_create == true and ([$checks.required_status_checks[].context] | sort) == (["CI gate","codecov/patch","codecov/project"] | sort) and $pull_request == {"required_approving_review_count":0,"dismiss_stale_reviews_on_push":true,"require_code_owner_review":true,"require_last_push_approval":false,"required_review_thread_resolution":false,"allowed_merge_methods":["merge","squash","rebase"]}) then {target, enforcement, conditions, bypass_actors, required_status_checks: $checks, pull_request: $pull_request} else error("ruleset mismatch") end'
+  --jq '.rules as $rules | [$rules[] | select(.type == "required_status_checks")] as $status_rules | [$rules[] | select(.type == "pull_request")] as $pull_request_rules | ($status_rules[0].parameters) as $checks | ($pull_request_rules[0].parameters) as $pull_request | if (.target == "branch" and ($status_rules | length) == 1 and ($pull_request_rules | length) == 1 and .enforcement == "active" and .conditions.ref_name == {"exclude":[],"include":["~DEFAULT_BRANCH"]} and .bypass_actors == [] and $checks.strict_required_status_checks_policy == true and $checks.do_not_enforce_on_create == true and ([$checks.required_status_checks[].context] | sort) == (["CI gate","codecov/patch","codecov/project"] | sort) and $pull_request == {"required_approving_review_count":0,"dismiss_stale_reviews_on_push":true,"require_code_owner_review":false,"require_last_push_approval":false,"required_review_thread_resolution":false,"allowed_merge_methods":["merge","squash","rebase"]}) then {target, enforcement, conditions, bypass_actors, required_status_checks: $checks, pull_request: $pull_request} else error("ruleset mismatch") end'
 ```
+
+Documentation-only pull requests still run coverage so `codecov/project` and
+`codecov/patch` resolve. Rust platform tests and benchmarks may skip only when
+`determine changes` reports `code=false`; `CI gate` validates that combination.
+
+GitHub code-owner review is disabled because the sole code owner cannot approve
+their own pull request. Independent review by a non-author agent remains
+mandatory under `AGENTS.md`.
 
 The required status contexts are `CI gate`, `codecov/project`, and
 `codecov/patch`.
