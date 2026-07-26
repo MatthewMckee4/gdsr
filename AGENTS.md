@@ -86,3 +86,13 @@ source content rather than hand-editing the generated file.
 Always use the pull request template and add labels. Write the description in
 concise prose paragraphs, with code examples only when they help the reviewer.
 Do not use checkboxes. Do not add AI tooling as an author or co-author.
+
+Never merge a pull request unless every required check for the exact current
+head commit has completed successfully. `main` must also be green. The only
+exception is a narrowly scoped pull request whose sole purpose is restoring
+`main`; that repair still requires exact-head CI green and independent review.
+The head must include current `main`: after another pull request merges, update
+the next branch with latest `main`, rerun every required check, and inspect the
+exact head SHA and check conclusions immediately before merging. A failing,
+pending, skipped, cancelled, stale, or missing required check blocks merging;
+never bypass, acknowledge, or ignore it.
