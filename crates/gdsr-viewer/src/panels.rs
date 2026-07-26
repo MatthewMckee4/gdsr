@@ -213,13 +213,7 @@ fn draw_layer_panel(
         }
     });
 
-    if layer_state
-        .selected_layer
-        .is_some_and(|selected| !layers.contains(&selected))
-    {
-        layer_state.selected_layer = None;
-        layer_state.exit_solo();
-    }
+    layer_state.sync_layers(layers);
 
     let filtered_layers: Vec<_> = layer_state.filtered_layers(layers).collect();
     let selected_filtered = layer_state
@@ -276,6 +270,18 @@ fn draw_layer_panel(
             .clicked();
     });
 
+    let mut visibility_follows_selection = layer_state.visibility_follows_selection;
+    if ui
+        .checkbox(
+            &mut visibility_follows_selection,
+            "Visibility follows selection",
+        )
+        .on_hover_text("Show only selected layer")
+        .changed()
+    {
+        layer_state.set_visibility_follows_selection(layers, visibility_follows_selection);
+    }
+
     if show_all || show_all_key {
         layer_state.show_layers(&filtered_layers);
     } else if hide_all || hide_all_key {
@@ -306,21 +312,21 @@ fn draw_layer_panel(
                     }
 
                     let mut checked = visible;
-                    if ui.checkbox(&mut checked, "").changed() {
+                    let checkbox = ui.checkbox(&mut checked, "");
+                    let label = ui.add(
+                        egui::Button::selectable(
+                            layer_state.selected_layer == Some((layer, dt)),
+                            format!("L{layer} D{dt}"),
+                        )
+                        .truncate()
+                        .frame(false),
+                    );
+                    let checkbox = checkbox.labelled_by(label.id);
+                    if checkbox.changed() {
                         layer_state.set_layer_visible((layer, dt), checked);
                     }
-                    if ui
-                        .add(
-                            egui::Button::selectable(
-                                layer_state.selected_layer == Some((layer, dt)),
-                                format!("L{layer} D{dt}"),
-                            )
-                            .truncate()
-                            .frame(false),
-                        )
-                        .clicked()
-                    {
-                        layer_state.selected_layer = Some((layer, dt));
+                    if label.clicked() {
+                        layer_state.select_layer(layers, Some((layer, dt)));
                     }
                 });
             }
