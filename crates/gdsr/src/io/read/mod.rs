@@ -16,19 +16,209 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ParserState {
+    Header,
+    BeginLibrary,
+    LibraryName(u8),
+    LibraryOptions(u8),
+    Format,
+    Masks,
+    EndMasks,
     Library,
-    Structure,
-    Element,
+    LibraryProperty,
+    StructureName,
+    Structure(u8),
+    StructureProperty,
+    Element(ElementState),
 }
 
 impl ParserState {
     #[inline]
-    fn require(self, expected: Self, record: GDSRecord) -> Result<(), GdsError> {
-        if self == expected {
+    fn accept(&mut self, record: GDSRecord) -> Result<(), GdsError> {
+        *self = match (*self, record) {
+            (Self::Header, GDSRecord::Header) => Self::BeginLibrary,
+            (Self::BeginLibrary, GDSRecord::BgnLib) => Self::LibraryName(0),
+            (Self::LibraryName(0), GDSRecord::LibDirSize) => Self::LibraryName(1),
+            (Self::LibraryName(0 | 1), GDSRecord::SrfName) => Self::LibraryName(2),
+            (Self::LibraryName(0..=2), GDSRecord::LibSecure) => Self::LibraryName(3),
+            (Self::LibraryName(_), GDSRecord::LibName) => Self::LibraryOptions(0),
+            (Self::LibraryOptions(0), GDSRecord::RefLibs) => Self::LibraryOptions(1),
+            (Self::LibraryOptions(0 | 1), GDSRecord::Fonts) => Self::LibraryOptions(2),
+            (Self::LibraryOptions(0..=2), GDSRecord::AttrTable) => Self::LibraryOptions(3),
+            (Self::LibraryOptions(0..=3), GDSRecord::Generations) => Self::LibraryOptions(4),
+            (Self::LibraryOptions(_), GDSRecord::Format) => Self::Format,
+            (Self::Format, GDSRecord::Mask) => Self::Masks,
+            (Self::Masks, GDSRecord::Mask) => Self::Masks,
+            (Self::Masks, GDSRecord::EndMasks) => Self::EndMasks,
+            (Self::LibraryOptions(_) | Self::Format | Self::EndMasks, GDSRecord::Units) => {
+                Self::Library
+            }
+            (Self::Library, GDSRecord::PropAttr) => Self::LibraryProperty,
+            (Self::LibraryProperty, GDSRecord::PropValue) => Self::Library,
+            (Self::Library, GDSRecord::BgnStr) => Self::StructureName,
+            (Self::Library, GDSRecord::EndLib) => Self::Library,
+            (Self::StructureName, GDSRecord::StrName) => Self::Structure(0),
+            (Self::Structure(0), GDSRecord::StrClass) => Self::Structure(1),
+            (Self::Structure(_), GDSRecord::PropAttr) => Self::StructureProperty,
+            (Self::StructureProperty, GDSRecord::PropValue) => Self::Structure(1),
+            (Self::Structure(_), GDSRecord::Boundary) => {
+                Self::Element(ElementState::new(ElementKind::Boundary))
+            }
+            (Self::Structure(_), GDSRecord::Path) => {
+                Self::Element(ElementState::new(ElementKind::Path))
+            }
+            (Self::Structure(_), GDSRecord::Box) => {
+                Self::Element(ElementState::new(ElementKind::Box))
+            }
+            (Self::Structure(_), GDSRecord::Node) => {
+                Self::Element(ElementState::new(ElementKind::Node))
+            }
+            (Self::Structure(_), GDSRecord::SRef) => {
+                Self::Element(ElementState::new(ElementKind::SRef))
+            }
+            (Self::Structure(_), GDSRecord::ARef) => {
+                Self::Element(ElementState::new(ElementKind::ARef))
+            }
+            (Self::Structure(_), GDSRecord::Text) => {
+                Self::Element(ElementState::new(ElementKind::Text))
+            }
+            (Self::Structure(_), GDSRecord::TextNode) => {
+                return Err(invalid_data("TEXTNODE elements are unsupported"));
+            }
+            (Self::Structure(_), GDSRecord::EndStr) => Self::Library,
+            (Self::Element(element), GDSRecord::EndEl) => {
+                element.finish()?;
+                Self::Structure(1)
+            }
+            (Self::Element(mut element), record) => {
+                element.accept(record)?;
+                Self::Element(element)
+            }
+            (state, record) => return Err(invalid_parser_state(record, state)),
+        };
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ElementKind {
+    Boundary,
+    Path,
+    Box,
+    Node,
+    SRef,
+    ARef,
+    Text,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ElementState {
+    kind: ElementKind,
+    phase: u8,
+    property_pending: bool,
+}
+
+impl ElementState {
+    const fn new(kind: ElementKind) -> Self {
+        Self {
+            kind,
+            phase: 0,
+            property_pending: false,
+        }
+    }
+
+    #[inline]
+    fn accept(&mut self, record: GDSRecord) -> Result<(), GdsError> {
+        if self.property_pending {
+            if record == GDSRecord::PropValue {
+                self.property_pending = false;
+                return Ok(());
+            }
+            return self.unexpected(record);
+        }
+
+        if record == GDSRecord::PropAttr && self.is_complete() {
+            self.property_pending = true;
+            return Ok(());
+        }
+        if record == GDSRecord::ElFlags && self.phase == 0 {
+            self.phase = 1;
+            return Ok(());
+        }
+        if record == GDSRecord::Plex && self.phase <= 1 {
+            self.phase = 2;
+            return Ok(());
+        }
+
+        let next_phase = match (self.kind, self.phase, record) {
+            (
+                ElementKind::Boundary
+                | ElementKind::Path
+                | ElementKind::Box
+                | ElementKind::Node
+                | ElementKind::Text,
+                0..=2,
+                GDSRecord::Layer,
+            ) => 3,
+            (ElementKind::Boundary | ElementKind::Path, 3, GDSRecord::DataType)
+            | (ElementKind::Box, 3, GDSRecord::BoxType)
+            | (ElementKind::Node, 3, GDSRecord::NodeType)
+            | (ElementKind::Text, 3, GDSRecord::TextType) => 4,
+            (ElementKind::Boundary | ElementKind::Box | ElementKind::Node, 4, GDSRecord::XY) => 5,
+            (ElementKind::Path, 4, GDSRecord::PathType) => 5,
+            (ElementKind::Path, 4..=5, GDSRecord::Width) => 6,
+            (ElementKind::Path, 4..=6, GDSRecord::BgnExtn) => 7,
+            (ElementKind::Path, 4..=7, GDSRecord::EndExtn) => 8,
+            (ElementKind::Path, 4..=8, GDSRecord::XY) => 9,
+            (ElementKind::SRef | ElementKind::ARef, 0..=2, GDSRecord::SName) => 3,
+            (ElementKind::SRef | ElementKind::ARef, 3, GDSRecord::STrans) => 4,
+            (ElementKind::SRef | ElementKind::ARef, 4, GDSRecord::Mag) => 5,
+            (ElementKind::SRef | ElementKind::ARef, 4..=5, GDSRecord::Angle) => 6,
+            (ElementKind::SRef, 3..=6, GDSRecord::XY) => 7,
+            (ElementKind::ARef, 3..=6, GDSRecord::ColRow) => 7,
+            (ElementKind::ARef, 7, GDSRecord::XY) => 8,
+            (ElementKind::Text, 4, GDSRecord::Presentation) => 5,
+            (ElementKind::Text, 4..=5, GDSRecord::PathType) => 6,
+            (ElementKind::Text, 4..=6, GDSRecord::Width) => 7,
+            (ElementKind::Text, 4..=7, GDSRecord::STrans) => 8,
+            (ElementKind::Text, 8, GDSRecord::Mag) => 9,
+            (ElementKind::Text, 8..=9, GDSRecord::Angle) => 10,
+            (ElementKind::Text, 4..=10, GDSRecord::XY) => 11,
+            (ElementKind::Text, 11, GDSRecord::String) => 12,
+            _ => return self.unexpected(record),
+        };
+        self.phase = next_phase;
+        Ok(())
+    }
+
+    fn finish(self) -> Result<(), GdsError> {
+        if self.is_complete() && !self.property_pending {
             Ok(())
         } else {
-            Err(invalid_parser_state(record, self))
+            Err(invalid_data(format!(
+                "Incomplete {:?} element before ENDEL",
+                self.kind
+            )))
         }
+    }
+
+    const fn is_complete(self) -> bool {
+        matches!(
+            (self.kind, self.phase),
+            (
+                ElementKind::Boundary | ElementKind::Box | ElementKind::Node,
+                5
+            ) | (ElementKind::Path, 9)
+                | (ElementKind::SRef, 7)
+                | (ElementKind::ARef, 8)
+                | (ElementKind::Text, 12)
+        )
+    }
+
+    fn unexpected<T>(self, record: GDSRecord) -> Result<T, GdsError> {
+        Err(invalid_data(format!(
+            "Unexpected {record:?} record in {:?} element",
+            self.kind
+        )))
     }
 }
 
@@ -65,12 +255,16 @@ where
     let mut text: Option<Text> = None;
     let mut reference: Option<Reference> = None;
     let mut property_attribute: Option<u16> = None;
-    let mut state = ParserState::Library;
+    let mut state = ParserState::Header;
 
     let mut scale = 1.0;
     let mut db_units = units.unwrap_or(DEFAULT_INTEGER_UNITS);
 
     for record in reader {
+        let record = record.and_then(|(record_type, data)| {
+            state.accept(record_type)?;
+            Ok((record_type, data))
+        });
         match record {
             Ok((record_type, data)) => match record_type {
                 GDSRecord::BgnLib => {
@@ -95,72 +289,55 @@ where
                     }
                 }
                 GDSRecord::BgnStr => {
-                    state.require(ParserState::Library, record_type)?;
                     let GDSRecordData::I16(values) = data else {
                         return Err(invalid_timestamp_record("BGNSTR"));
                     };
                     let mut new_cell = Cell::default();
                     new_cell.set_timestamps(GdsTimestamps::from_record(&values, "BGNSTR")?);
                     cell = Some(new_cell);
-                    state = ParserState::Structure;
                 }
                 GDSRecord::StrName => {
-                    if let GDSRecordData::Str(cell_name) = data {
-                        if let Some(cell) = &mut cell {
-                            cell.set_name(&cell_name);
-                        }
+                    let GDSRecordData::Str(cell_name) = data else {
+                        return Err(invalid_data("Empty STRNAME record"));
+                    };
+                    if cell_name.is_empty() {
+                        return Err(invalid_data("Empty STRNAME record"));
+                    }
+                    if let Some(cell) = &mut cell {
+                        cell.set_name(&cell_name);
                     }
                 }
                 GDSRecord::EndStr => {
-                    state.require(ParserState::Structure, record_type)?;
                     if let Some(cell) = cell.take() {
                         library.cells.insert(cell.name().to_string(), cell);
                     }
-                    state = ParserState::Library;
                 }
                 GDSRecord::EndLib => {
-                    state.require(ParserState::Library, record_type)?;
                     return Ok(library);
                 }
                 GDSRecord::Boundary => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     polygon = Some(Polygon::default());
-                    state = ParserState::Element;
                 }
                 GDSRecord::Box => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     gds_box = Some(GdsBox::default());
-                    state = ParserState::Element;
                 }
                 GDSRecord::Node => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     node = Some(Node::default());
-                    state = ParserState::Element;
                 }
                 GDSRecord::Path => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     path = Some(Path::default());
-                    state = ParserState::Element;
                 }
                 GDSRecord::ARef | GDSRecord::SRef => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     reference = Some(Reference::default());
-                    state = ParserState::Element;
                 }
                 GDSRecord::Text => {
-                    state.require(ParserState::Structure, record_type)?;
                     property_attribute = None;
                     text = Some(Text::default());
-                    state = ParserState::Element;
-                }
-                GDSRecord::TextNode => {
-                    state.require(ParserState::Structure, record_type)?;
-                    state = ParserState::Element;
                 }
                 GDSRecord::Layer => {
                     if let GDSRecordData::I16(layer) = data {
@@ -297,7 +474,6 @@ where
                     }
                 }
                 GDSRecord::EndEl => {
-                    state.require(ParserState::Element, record_type)?;
                     if let Some(cell) = &mut cell {
                         if let Some(polygon) = polygon.take() {
                             if layer_filter(polygon.layer, polygon.data_type) {
@@ -330,14 +506,17 @@ where
                     text = None;
                     reference = None;
                     property_attribute = None;
-                    state = ParserState::Structure;
                 }
                 GDSRecord::SName => {
-                    if let GDSRecordData::Str(cell_name) = data {
-                        if let Some(reference) = &mut reference {
-                            if let Instance::Cell(_) = reference.instance {
-                                reference.instance = Instance::Cell(cell_name);
-                            }
+                    let GDSRecordData::Str(cell_name) = data else {
+                        return Err(invalid_data("Empty SNAME record"));
+                    };
+                    if cell_name.is_empty() {
+                        return Err(invalid_data("Empty SNAME record"));
+                    }
+                    if let Some(reference) = &mut reference {
+                        if let Instance::Cell(_) = reference.instance {
+                            reference.instance = Instance::Cell(cell_name);
                         }
                     }
                 }
@@ -450,13 +629,24 @@ where
                 }
                 _ => {}
             },
-            Err(e) => return Err(e),
+            Err(error) => return Err(error),
         }
     }
 
     match state {
-        ParserState::Element => Err(invalid_data("Unexpected EOF before ENDEL record")),
-        ParserState::Structure => Err(invalid_data("Unexpected EOF before ENDSTR record")),
+        ParserState::Header => Err(invalid_data("Unexpected EOF before HEADER record")),
+        ParserState::BeginLibrary => Err(invalid_data("Unexpected EOF before BGNLIB record")),
+        ParserState::LibraryName(_) => Err(invalid_data("Unexpected EOF before LIBNAME record")),
+        ParserState::LibraryOptions(_)
+        | ParserState::Format
+        | ParserState::Masks
+        | ParserState::EndMasks => Err(invalid_data("Unexpected EOF before UNITS record")),
+        ParserState::LibraryProperty | ParserState::StructureProperty => {
+            Err(invalid_data("Unexpected EOF before PROPVALUE record"))
+        }
+        ParserState::Element(_) => Err(invalid_data("Unexpected EOF before ENDEL record")),
+        ParserState::StructureName => Err(invalid_data("Unexpected EOF before STRNAME record")),
+        ParserState::Structure(_) => Err(invalid_data("Unexpected EOF before ENDSTR record")),
         ParserState::Library => Err(invalid_data("Unexpected EOF before ENDLIB record")),
     }
 }
@@ -590,6 +780,18 @@ impl<R: Read> Iterator for RecordReader<R> {
             return Some(Err(invalid_data(format!(
                 "Invalid {record:?} payload length: expected {expected_payload_len} bytes, found {payload_len}"
             ))));
+        }
+        if record == GDSRecord::LibSecure
+            && (!(6..=192).contains(&payload_len) || !payload_len.is_multiple_of(6))
+        {
+            return Some(Err(invalid_data(format!(
+                "Invalid LibSecure payload length: expected 6 to 192 bytes in six-byte ACL entries, found {payload_len}"
+            ))));
+        }
+        if record == GDSRecord::XY && payload_len < 8 {
+            return Some(Err(invalid_data(
+                "Invalid XY payload length: expected at least one coordinate pair",
+            )));
         }
 
         let data = if payload_len == 0 {
@@ -746,7 +948,11 @@ const RECORD_LAYOUTS: [RecordLayout; 60] = [
     layout(GDSRecord::EndMasks, NoData, 0),
     layout(GDSRecord::LibDirSize, TwoByteSignedInteger, 2),
     layout(GDSRecord::SrfName, AsciiString, VARIABLE_PAYLOAD_LEN),
-    layout(GDSRecord::LibSecure, TwoByteSignedInteger, 2),
+    layout(
+        GDSRecord::LibSecure,
+        TwoByteSignedInteger,
+        VARIABLE_PAYLOAD_LEN,
+    ),
 ];
 
 #[cold]
@@ -855,6 +1061,84 @@ mod tests {
         assert!(matches!(result, Err(GdsError::InvalidData { .. })));
     }
 
+    fn assert_record_decodes(bytes: Vec<u8>) {
+        let mut reader = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+        assert!(matches!(reader.next(), Some(Ok(_))));
+    }
+
+    fn assert_record_is_invalid(bytes: Vec<u8>) {
+        let mut reader = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+        assert!(matches!(
+            reader.next(),
+            Some(Err(GdsError::InvalidData { .. }))
+        ));
+    }
+
+    fn library_prefix() -> Vec<u8> {
+        let mut bytes = Library::new("minimal")
+            .to_bytes_with_timestamp_policy(1e-3, 1e-9, GdsTimestampPolicy::Zero)
+            .expect("minimal library should serialize");
+        bytes.truncate(bytes.len() - 4);
+        bytes
+    }
+
+    fn structure_prefix() -> Vec<u8> {
+        [
+            library_prefix(),
+            record(
+                GDSRecord::BgnStr,
+                GDSDataType::TwoByteSignedInteger,
+                &[0; 24],
+            ),
+            record(GDSRecord::StrName, GDSDataType::AsciiString, b"s\0"),
+        ]
+        .concat()
+    }
+
+    fn library_with_options(
+        before_units: &[(GDSRecord, GDSDataType, Vec<u8>)],
+        after_units: &[(GDSRecord, GDSDataType, Vec<u8>)],
+    ) -> Vec<u8> {
+        let mut bytes = [
+            record(
+                GDSRecord::Header,
+                GDSDataType::TwoByteSignedInteger,
+                &[0, 7],
+            ),
+            record(
+                GDSRecord::BgnLib,
+                GDSDataType::TwoByteSignedInteger,
+                &[0; 24],
+            ),
+            record(GDSRecord::LibName, GDSDataType::AsciiString, b"l\0"),
+        ]
+        .concat();
+        for (record_type, data_type, payload) in before_units {
+            bytes.extend_from_slice(&record(*record_type, *data_type, payload));
+        }
+        bytes.extend_from_slice(&record(
+            GDSRecord::Units,
+            GDSDataType::EightByteReal,
+            &[0; 16],
+        ));
+        for (record_type, data_type, payload) in after_units {
+            bytes.extend_from_slice(&record(*record_type, *data_type, payload));
+        }
+        bytes.extend_from_slice(&record(GDSRecord::EndLib, GDSDataType::NoData, &[]));
+        bytes
+    }
+
+    fn element_stream(records: &[(GDSRecord, GDSDataType, Vec<u8>)]) -> Vec<u8> {
+        let mut bytes = structure_prefix();
+        for (record_type, data_type, payload) in records {
+            bytes.extend_from_slice(&record(*record_type, *data_type, payload));
+        }
+        bytes.extend_from_slice(&record(GDSRecord::EndEl, GDSDataType::NoData, &[]));
+        bytes.extend_from_slice(&record(GDSRecord::EndStr, GDSDataType::NoData, &[]));
+        bytes.extend_from_slice(&record(GDSRecord::EndLib, GDSDataType::NoData, &[]));
+        bytes
+    }
+
     #[test]
     fn malformed_record_layouts_return_invalid_data() {
         let cases = [
@@ -961,11 +1245,7 @@ mod tests {
             .to_bytes_with_timestamp_policy(1e-3, 1e-9, GdsTimestampPolicy::Zero)
             .expect("minimal library should serialize");
         let missing_end_library = &minimal[..minimal.len() - 4];
-        let missing_end_structure = record(
-            GDSRecord::BgnStr,
-            GDSDataType::TwoByteSignedInteger,
-            &[0; 24],
-        );
+        let missing_end_structure = structure_prefix();
         let mut missing_end_element = missing_end_structure.clone();
         missing_end_element.extend_from_slice(&record(
             GDSRecord::Boundary,
@@ -999,21 +1279,11 @@ mod tests {
             (GDSRecord::TapeNum, GDSDataType::TwoByteSignedInteger, 2),
             (GDSRecord::TapeCode, GDSDataType::TwoByteSignedInteger, 12),
         ] {
-            let bytes = [
-                record(record_type, data_type, &vec![0; payload_len]),
-                record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
-            ]
-            .concat();
-            assert!(Library::from_bytes(&bytes, None).is_ok(), "{record_type:?}");
+            let bytes = [record(record_type, data_type, &vec![0; payload_len])].concat();
+            assert_record_decodes(bytes);
 
             let bytes = record(record_type, data_type, &[]);
-            assert!(
-                matches!(
-                    Library::from_bytes(&bytes, None),
-                    Err(GdsError::InvalidData { .. })
-                ),
-                "{record_type:?}"
-            );
+            assert_record_is_invalid(bytes);
         }
 
         for record_type in [
@@ -1024,22 +1294,10 @@ mod tests {
             GDSRecord::PropValue,
         ] {
             let bytes = record(record_type, GDSDataType::TwoByteSignedInteger, &[0, 0]);
-            assert!(
-                matches!(
-                    Library::from_bytes(&bytes, None),
-                    Err(GdsError::InvalidData { .. })
-                ),
-                "{record_type:?}"
-            );
+            assert_record_is_invalid(bytes);
 
             let bytes = record(record_type, GDSDataType::AsciiString, b"x");
-            assert!(
-                matches!(
-                    Library::from_bytes(&bytes, None),
-                    Err(GdsError::InvalidData { .. })
-                ),
-                "{record_type:?}"
-            );
+            assert_record_is_invalid(bytes);
         }
     }
 
@@ -1053,17 +1311,356 @@ mod tests {
                 (expected_payload_len - 2, false),
                 (expected_payload_len + 2, false),
             ] {
-                let bytes = [
-                    record(record_type, GDSDataType::AsciiString, &vec![0; payload_len]),
-                    record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
-                ]
-                .concat();
-                assert_eq!(
-                    Library::from_bytes(&bytes, None).is_ok(),
-                    is_valid,
-                    "{record_type:?} payload length {payload_len}"
+                let bytes = record(record_type, GDSDataType::AsciiString, &vec![0; payload_len]);
+                let mut reader = RecordReader::new(BufReader::new(Cursor::new(bytes)));
+                assert_eq!(matches!(reader.next(), Some(Ok(_))), is_valid);
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_library_structure_and_element_phases_are_rejected() {
+        let mut missing_structure_name = library_prefix();
+        missing_structure_name.extend_from_slice(&record(
+            GDSRecord::BgnStr,
+            GDSDataType::TwoByteSignedInteger,
+            &[0; 24],
+        ));
+        missing_structure_name.extend_from_slice(&record(
+            GDSRecord::EndStr,
+            GDSDataType::NoData,
+            &[],
+        ));
+
+        let mut empty_structure_name = library_prefix();
+        empty_structure_name.extend_from_slice(&record(
+            GDSRecord::BgnStr,
+            GDSDataType::TwoByteSignedInteger,
+            &[0; 24],
+        ));
+        empty_structure_name.extend_from_slice(&record(
+            GDSRecord::StrName,
+            GDSDataType::AsciiString,
+            &[],
+        ));
+
+        let mut incomplete_boundary = structure_prefix();
+        incomplete_boundary.extend_from_slice(&record(
+            GDSRecord::Boundary,
+            GDSDataType::NoData,
+            &[],
+        ));
+        incomplete_boundary.extend_from_slice(&record(GDSRecord::EndEl, GDSDataType::NoData, &[]));
+
+        let mut library_record_in_element = structure_prefix();
+        library_record_in_element.extend_from_slice(&record(
+            GDSRecord::Boundary,
+            GDSDataType::NoData,
+            &[],
+        ));
+        library_record_in_element.extend_from_slice(&record(
+            GDSRecord::BgnLib,
+            GDSDataType::TwoByteSignedInteger,
+            &[0; 24],
+        ));
+
+        for (name, bytes) in [
+            (
+                "ENDLIB without a library preamble",
+                record(GDSRecord::EndLib, GDSDataType::NoData, &[]),
+            ),
+            ("ENDSTR without STRNAME", missing_structure_name),
+            ("empty STRNAME", empty_structure_name),
+            ("BOUNDARY without mandatory fields", incomplete_boundary),
+            (
+                "library record inside an element",
+                library_record_in_element,
+            ),
+        ] {
+            assert!(
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_supported_element_requires_its_mandatory_records() {
+        let i16_field = |record_type| (record_type, GDSDataType::TwoByteSignedInteger, vec![0, 1]);
+        let xy = || {
+            (
+                GDSRecord::XY,
+                GDSDataType::FourByteSignedInteger,
+                vec![0; 8],
+            )
+        };
+        let cases = [
+            (
+                "BOUNDARY",
+                vec![
+                    (GDSRecord::Boundary, GDSDataType::NoData, vec![]),
+                    i16_field(GDSRecord::Layer),
+                    i16_field(GDSRecord::DataType),
+                    xy(),
+                ],
+            ),
+            (
+                "PATH",
+                vec![
+                    (GDSRecord::Path, GDSDataType::NoData, vec![]),
+                    i16_field(GDSRecord::Layer),
+                    i16_field(GDSRecord::DataType),
+                    xy(),
+                ],
+            ),
+            (
+                "BOX",
+                vec![
+                    (GDSRecord::Box, GDSDataType::NoData, vec![]),
+                    i16_field(GDSRecord::Layer),
+                    i16_field(GDSRecord::BoxType),
+                    xy(),
+                ],
+            ),
+            (
+                "NODE",
+                vec![
+                    (GDSRecord::Node, GDSDataType::NoData, vec![]),
+                    i16_field(GDSRecord::Layer),
+                    i16_field(GDSRecord::NodeType),
+                    xy(),
+                ],
+            ),
+            (
+                "SREF",
+                vec![
+                    (GDSRecord::SRef, GDSDataType::NoData, vec![]),
+                    (GDSRecord::SName, GDSDataType::AsciiString, b"c\0".to_vec()),
+                    xy(),
+                ],
+            ),
+            (
+                "AREF",
+                vec![
+                    (GDSRecord::ARef, GDSDataType::NoData, vec![]),
+                    (GDSRecord::SName, GDSDataType::AsciiString, b"c\0".to_vec()),
+                    (
+                        GDSRecord::ColRow,
+                        GDSDataType::TwoByteSignedInteger,
+                        vec![0, 1, 0, 1],
+                    ),
+                    (
+                        GDSRecord::XY,
+                        GDSDataType::FourByteSignedInteger,
+                        vec![0; 24],
+                    ),
+                ],
+            ),
+            (
+                "TEXT",
+                vec![
+                    (GDSRecord::Text, GDSDataType::NoData, vec![]),
+                    i16_field(GDSRecord::Layer),
+                    i16_field(GDSRecord::TextType),
+                    xy(),
+                    (GDSRecord::String, GDSDataType::AsciiString, b"x\0".to_vec()),
+                ],
+            ),
+        ];
+
+        for (name, records) in cases {
+            Library::from_bytes(&element_stream(&records), None)
+                .unwrap_or_else(|error| panic!("{name} should parse: {error}"));
+
+            for missing in 1..records.len() {
+                let mut incomplete = records.clone();
+                incomplete.remove(missing);
+                assert!(
+                    matches!(
+                        Library::from_bytes(&element_stream(&incomplete), None),
+                        Err(GdsError::InvalidData { .. })
+                    ),
+                    "{name} accepted input missing {:?}",
+                    records[missing].0
                 );
             }
+        }
+    }
+
+    #[test]
+    fn textnode_elements_are_explicitly_rejected() {
+        let mut bytes = structure_prefix();
+        bytes.extend_from_slice(&record(GDSRecord::TextNode, GDSDataType::NoData, &[]));
+
+        let error = Library::from_bytes(&bytes, None).expect_err("TEXTNODE is unsupported");
+        assert!(matches!(
+            error,
+            GdsError::InvalidData { ref message } if message.contains("TEXTNODE")
+        ));
+    }
+
+    #[test]
+    fn record_order_uniqueness_and_property_pairing_are_enforced() {
+        let i16_field = |record_type| (record_type, GDSDataType::TwoByteSignedInteger, vec![0, 1]);
+        let valid_boundary = vec![
+            (GDSRecord::Boundary, GDSDataType::NoData, vec![]),
+            i16_field(GDSRecord::Layer),
+            i16_field(GDSRecord::DataType),
+            (
+                GDSRecord::XY,
+                GDSDataType::FourByteSignedInteger,
+                vec![0; 8],
+            ),
+        ];
+
+        let mut wrong_element_order = valid_boundary.clone();
+        wrong_element_order.swap(1, 2);
+        let mut duplicate_element_field = valid_boundary.clone();
+        duplicate_element_field.insert(2, i16_field(GDSRecord::Layer));
+        let property_before_body = vec![
+            (GDSRecord::Boundary, GDSDataType::NoData, vec![]),
+            i16_field(GDSRecord::PropAttr),
+        ];
+        let transform_without_strans = vec![
+            (GDSRecord::SRef, GDSDataType::NoData, vec![]),
+            (GDSRecord::SName, GDSDataType::AsciiString, b"c\0".to_vec()),
+            (GDSRecord::Mag, GDSDataType::EightByteReal, vec![0; 8]),
+        ];
+
+        for (name, bytes) in [
+            ("element field order", element_stream(&wrong_element_order)),
+            (
+                "duplicate element field",
+                element_stream(&duplicate_element_field),
+            ),
+            (
+                "property before body",
+                element_stream(&property_before_body),
+            ),
+            (
+                "transform without STRANS",
+                element_stream(&transform_without_strans),
+            ),
+            (
+                "unpaired file property",
+                library_with_options(
+                    &[],
+                    &[(
+                        GDSRecord::PropAttr,
+                        GDSDataType::TwoByteSignedInteger,
+                        vec![0, 1],
+                    )],
+                ),
+            ),
+        ] {
+            assert!(
+                matches!(
+                    Library::from_bytes(&bytes, None),
+                    Err(GdsError::InvalidData { .. })
+                ),
+                "{name}"
+            );
+        }
+
+        let properties = [
+            (
+                GDSRecord::PropAttr,
+                GDSDataType::TwoByteSignedInteger,
+                vec![0, 1],
+            ),
+            (
+                GDSRecord::PropValue,
+                GDSDataType::AsciiString,
+                b"v\0".to_vec(),
+            ),
+        ];
+        Library::from_bytes(&library_with_options(&[], &properties), None)
+            .expect("paired file property should parse");
+
+        let mut structure_with_property = structure_prefix();
+        for (record_type, data_type, payload) in &properties {
+            structure_with_property.extend_from_slice(&record(*record_type, *data_type, payload));
+        }
+        structure_with_property.extend_from_slice(&record(
+            GDSRecord::EndStr,
+            GDSDataType::NoData,
+            &[],
+        ));
+        structure_with_property.extend_from_slice(&record(
+            GDSRecord::EndLib,
+            GDSDataType::NoData,
+            &[],
+        ));
+        Library::from_bytes(&structure_with_property, None)
+            .expect("paired structure property should parse");
+
+        let mut element_with_property = valid_boundary;
+        element_with_property.extend(properties);
+        Library::from_bytes(&element_stream(&element_with_property), None)
+            .expect("paired element property after its body should parse");
+    }
+
+    #[test]
+    fn library_option_and_format_mask_order_is_enforced() {
+        let format = (
+            GDSRecord::Format,
+            GDSDataType::TwoByteSignedInteger,
+            vec![0, 1],
+        );
+        let mask = (GDSRecord::Mask, GDSDataType::AsciiString, b"m\0".to_vec());
+        let end_masks = (GDSRecord::EndMasks, GDSDataType::NoData, vec![]);
+
+        Library::from_bytes(
+            &library_with_options(&[format.clone(), mask.clone(), end_masks.clone()], &[]),
+            None,
+        )
+        .expect("complete FORMAT/MASK section should parse");
+
+        for options in [
+            vec![format.clone(), mask],
+            vec![format, end_masks],
+            vec![
+                (GDSRecord::Fonts, GDSDataType::AsciiString, vec![0; 176]),
+                (GDSRecord::RefLibs, GDSDataType::AsciiString, vec![0; 88]),
+            ],
+            vec![
+                (
+                    GDSRecord::Generations,
+                    GDSDataType::TwoByteSignedInteger,
+                    vec![0, 1],
+                ),
+                (
+                    GDSRecord::Generations,
+                    GDSDataType::TwoByteSignedInteger,
+                    vec![0, 1],
+                ),
+            ],
+        ] {
+            assert_invalid(&Library::from_bytes(
+                &library_with_options(&options, &[]),
+                None,
+            ));
+        }
+    }
+
+    #[test]
+    fn libsecure_contains_one_to_thirty_two_acl_entries() {
+        for payload_len in [6, 12, 192] {
+            assert_record_decodes(record(
+                GDSRecord::LibSecure,
+                GDSDataType::TwoByteSignedInteger,
+                &vec![0; payload_len],
+            ));
+        }
+        for payload_len in [0, 2, 7, 198] {
+            assert_record_is_invalid(record(
+                GDSRecord::LibSecure,
+                GDSDataType::TwoByteSignedInteger,
+                &vec![0; payload_len],
+            ));
         }
     }
 
