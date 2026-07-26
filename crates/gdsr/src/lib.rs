@@ -9,6 +9,7 @@ mod error;
 mod flatten;
 mod geometry;
 mod grid;
+mod hierarchy_bounds;
 pub(crate) mod io;
 mod library;
 mod point;
@@ -33,6 +34,10 @@ pub use elements::{
 pub use error::GdsError;
 pub use flatten::FlattenOptions;
 pub use grid::Grid;
+pub use hierarchy_bounds::{
+    HierarchyBoundsDiagnostic, HierarchyBoundsError, HierarchyBoundsReport, ReferenceLocation,
+    WorldBounds,
+};
 pub use io::write::svg::cell_to_svg;
 pub use io::write::{
     GdsConversionReport, GdsFileWriter, GdsQuantization, GdsRoundingPolicy, GdsStreamWriter,

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use bevy::math::{DAffine2, DMat2, DVec2};
-use gdsr::{DataType, Element, Grid, Layer, Library, Point};
+use gdsr::{DataType, Element, Grid, Instance, Layer, Library, Point};
 
 use crate::drawable::{Drawable, WorldBBox, cell_world_bboxes, should_collapse_reference};
 
@@ -56,14 +56,63 @@ enum PreparedSource {
     Geometry(usize),
     Text(PreparedText),
     Node(PreparedNode),
-    Reference(Box<PreparedReference>),
 }
 
 struct PreparedReference {
-    grid: Grid,
+    grids: Vec<Grid>,
     source: PreparedSource,
     source_bbox: Option<WorldBBox>,
+    suffix_bounds: Vec<Option<WorldBBox>>,
+    suffix_grid_counts: Vec<u64>,
     label: Option<Arc<str>>,
+}
+
+struct GridTraversalFrame {
+    grid_index: usize,
+    transform: DAffine2,
+    column: u32,
+    row: u32,
+    entered: bool,
+}
+
+struct ReferenceTraversal<'a> {
+    reference: &'a PreparedReference,
+    parent_transform: DAffine2,
+    depth: u32,
+    stack: Vec<GridTraversalFrame>,
+}
+
+enum PlanAction<'a> {
+    Cell {
+        cell_name: String,
+        transform: DAffine2,
+        depth: u32,
+    },
+    CellReferences {
+        cell_name: String,
+        transform: DAffine2,
+        depth: u32,
+        next_reference: usize,
+        world_bbox: Option<WorldBBox>,
+    },
+    Reference(ReferenceTraversal<'a>),
+}
+
+struct CellComplexityFrame {
+    cell_name: String,
+    depth: u32,
+    next_reference: usize,
+    count: u64,
+    pending_multiplier: Option<u64>,
+}
+
+enum ReferenceDrawUnits<'a> {
+    Ready(u64),
+    Cell {
+        cell_name: &'a str,
+        depth: u32,
+        multiplier: u64,
+    },
 }
 
 struct PreparedCell {
@@ -288,55 +337,65 @@ impl PreparedLibrary {
         reference: &gdsr::Reference,
         cell_bboxes: &HashMap<String, Option<WorldBBox>>,
     ) -> Result<PreparedReference, SceneBuildError> {
-        let (source, source_bbox, label) = if let Some(cell_name) = reference.instance().as_cell() {
-            (
-                PreparedSource::Cell(cell_name.clone()),
-                cell_bboxes.get(cell_name).copied().flatten(),
-                Some(Arc::<str>::from(cell_name.as_str())),
-            )
-        } else if let Some(element) = reference.instance().as_element() {
-            let element = element.as_ref().as_ref();
-            match element {
-                Element::Reference(inner) => {
-                    let inner = self.prepare_reference(inner, cell_bboxes)?;
-                    let bbox = inner
-                        .source_bbox
-                        .and_then(|bbox| reference_bbox(&inner.grid, bbox));
-                    (PreparedSource::Reference(Box::new(inner)), bbox, None)
+        let mut current = reference;
+        let mut grids = Vec::new();
+        let (source, source_bbox, cell_label) = loop {
+            grids.push(current.grid().clone());
+            match current.instance() {
+                Instance::Cell(cell_name) => {
+                    break (
+                        PreparedSource::Cell(cell_name.clone()),
+                        cell_bboxes.get(cell_name).copied().flatten(),
+                        Some(Arc::<str>::from(cell_name.as_str())),
+                    );
                 }
-                Element::Text(text) => (
-                    PreparedSource::Text(prepare_text(text)),
-                    element.world_bbox(),
-                    None,
-                ),
-                Element::Node(node) => (
-                    PreparedSource::Node(prepare_node(node)),
-                    element.world_bbox(),
-                    None,
-                ),
-                _ => {
-                    let layer = element_layer(element);
-                    let geometry_id = self.prepare_inline_geometry(element, layer)?;
-                    (
-                        PreparedSource::Geometry(geometry_id),
-                        element.world_bbox(),
-                        None,
-                    )
+                Instance::Element(element) => {
+                    let element = element.as_ref().as_ref();
+                    match element {
+                        Element::Reference(reference) => current = reference,
+                        Element::Text(text) => {
+                            break (
+                                PreparedSource::Text(prepare_text(text)),
+                                element.world_bbox(),
+                                None,
+                            );
+                        }
+                        Element::Node(node) => {
+                            break (
+                                PreparedSource::Node(prepare_node(node)),
+                                element.world_bbox(),
+                                None,
+                            );
+                        }
+                        _ => {
+                            let layer = element_layer(element);
+                            let geometry_id = self.prepare_inline_geometry(element, layer)?;
+                            break (
+                                PreparedSource::Geometry(geometry_id),
+                                element.world_bbox(),
+                                None,
+                            );
+                        }
+                    }
                 }
             }
-        } else {
-            return Ok(PreparedReference {
-                grid: reference.grid().clone(),
-                source: PreparedSource::Cell(String::new()),
-                source_bbox: None,
-                label: None,
-            });
         };
+        let label = (grids.len() == 1).then_some(cell_label).flatten();
+        let mut suffix_bounds = vec![source_bbox; grids.len() + 1];
+        let mut suffix_grid_counts = vec![1_u64; grids.len() + 1];
+        for grid_index in (0..grids.len()).rev() {
+            suffix_bounds[grid_index] = suffix_bounds[grid_index + 1]
+                .and_then(|bounds| reference_bbox(&grids[grid_index], bounds));
+            suffix_grid_counts[grid_index] =
+                grid_count(&grids[grid_index]).saturating_mul(suffix_grid_counts[grid_index + 1]);
+        }
 
         Ok(PreparedReference {
-            grid: reference.grid().clone(),
+            grids,
             source,
             source_bbox,
+            suffix_bounds,
+            suffix_grid_counts,
             label,
         })
     }
@@ -392,7 +451,7 @@ impl PreparedLibrary {
                 planner.add_load(bbox, Some(Arc::<str>::from(cell_name)));
             }
         } else {
-            planner.visit_cell(cell_name, DAffine2::IDENTITY, options.depth);
+            planner.visit_iteratively(cell_name, options.depth);
         }
         planner.plan
     }
@@ -421,8 +480,48 @@ struct Planner<'a> {
     cell_stack: HashSet<String>,
 }
 
-impl Planner<'_> {
-    fn visit_cell(&mut self, cell_name: &str, transform: DAffine2, depth: u32) {
+impl<'a> Planner<'a> {
+    fn visit_iteratively(&mut self, cell_name: &str, depth: u32) {
+        let mut actions = vec![PlanAction::Cell {
+            cell_name: cell_name.to_string(),
+            transform: DAffine2::IDENTITY,
+            depth,
+        }];
+        while let Some(action) = actions.pop() {
+            match action {
+                PlanAction::Cell {
+                    cell_name,
+                    transform,
+                    depth,
+                } => self.visit_cell(&cell_name, transform, depth, &mut actions),
+                PlanAction::CellReferences {
+                    cell_name,
+                    transform,
+                    depth,
+                    next_reference,
+                    world_bbox,
+                } => self.visit_cell_references(
+                    &cell_name,
+                    transform,
+                    depth,
+                    next_reference,
+                    world_bbox,
+                    &mut actions,
+                ),
+                PlanAction::Reference(traversal) => {
+                    self.visit_reference(traversal, &mut actions);
+                }
+            }
+        }
+    }
+
+    fn visit_cell(
+        &mut self,
+        cell_name: &str,
+        transform: DAffine2,
+        depth: u32,
+        actions: &mut Vec<PlanAction<'a>>,
+    ) {
         let Some(cell) = self.library.cells.get(cell_name) else {
             return;
         };
@@ -479,121 +578,203 @@ impl Planner<'_> {
                 return;
             }
         }
-        for reference in &cell.references {
-            if self.detail_budget_exhausted() {
-                if let Some(bbox) = world_bbox {
-                    self.add_load(bbox, Some(Arc::<str>::from(cell_name)));
-                }
-                self.cell_stack.remove(cell_name);
-                return;
+        actions.push(PlanAction::CellReferences {
+            cell_name: cell_name.to_string(),
+            transform,
+            depth,
+            next_reference: 0,
+            world_bbox,
+        });
+    }
+
+    fn visit_cell_references(
+        &mut self,
+        cell_name: &str,
+        transform: DAffine2,
+        depth: u32,
+        next_reference: usize,
+        world_bbox: Option<WorldBBox>,
+        actions: &mut Vec<PlanAction<'a>>,
+    ) {
+        let Some(cell) = self.library.cells.get(cell_name) else {
+            self.cell_stack.remove(cell_name);
+            return;
+        };
+        let Some(reference) = cell.references.get(next_reference) else {
+            self.cell_stack.remove(cell_name);
+            return;
+        };
+        if self.detail_budget_exhausted() {
+            if let Some(bbox) = world_bbox {
+                self.add_load(bbox, Some(Arc::<str>::from(cell_name)));
             }
-            self.visit_reference(reference, transform, depth);
+            self.cell_stack.remove(cell_name);
+            return;
         }
 
-        self.cell_stack.remove(cell_name);
+        actions.push(PlanAction::CellReferences {
+            cell_name: cell_name.to_string(),
+            transform,
+            depth,
+            next_reference: next_reference + 1,
+            world_bbox,
+        });
+        actions.push(PlanAction::Reference(ReferenceTraversal {
+            reference,
+            parent_transform: transform,
+            depth,
+            stack: vec![GridTraversalFrame {
+                grid_index: 0,
+                transform,
+                column: 0,
+                row: 0,
+                entered: false,
+            }],
+        }));
     }
 
     fn visit_reference(
         &mut self,
-        reference: &PreparedReference,
-        parent_transform: DAffine2,
-        depth: u32,
+        mut traversal: ReferenceTraversal<'a>,
+        actions: &mut Vec<PlanAction<'a>>,
     ) {
-        let Some(source_bbox) = reference.source_bbox else {
-            return;
-        };
-        let Some(local_bbox) = reference_bbox(&reference.grid, source_bbox) else {
-            return;
-        };
-        let world_bbox = transform_bbox(parent_transform, local_bbox);
-        if !world_bbox.overlaps(self.options.visible) {
-            self.plan.stats.culled_references += 1;
-            return;
-        }
-        if self.plan.stats.detail_cells >= MAX_DETAIL_CELLS {
-            self.add_load(world_bbox, reference.label.clone());
-            return;
-        }
-        if self.detail_budget_exhausted() {
-            self.add_load(world_bbox, reference.label.clone());
+        let reference = traversal.reference;
+        if reference.source_bbox.is_none() {
             return;
         }
 
-        let grid_count = grid_count(&reference.grid);
-        let draw_units = self.reference_draw_units(reference, depth);
-        let source_is_degenerate =
-            source_bbox.min_x == source_bbox.max_x || source_bbox.min_y == source_bbox.max_y;
-        let (width_px, height_px) =
-            reference_screen_size(world_bbox, self.options.zoom, source_is_degenerate);
-        if should_collapse_reference(width_px, height_px, grid_count, draw_units, depth, false) {
-            self.add_load(world_bbox, reference.label.clone());
-            return;
-        }
-
-        let source_units = draw_units.checked_div(grid_count).unwrap_or(1).max(1);
-        for column in 0..reference.grid.columns() {
-            for row in 0..reference.grid.rows() {
-                if self.detail_budget_exhausted() {
-                    self.add_load(world_bbox, reference.label.clone());
-                    return;
+        while let Some(frame) = traversal.stack.last_mut() {
+            let Some(grid) = reference.grids.get(frame.grid_index) else {
+                traversal.stack.pop();
+                continue;
+            };
+            let level_depth = u32::try_from(frame.grid_index)
+                .map_or(0, |grid_index| traversal.depth.saturating_sub(grid_index));
+            let Some(source_bbox) = reference.suffix_bounds[frame.grid_index + 1] else {
+                traversal.stack.pop();
+                continue;
+            };
+            let Some(local_bbox) = reference.suffix_bounds[frame.grid_index] else {
+                traversal.stack.pop();
+                continue;
+            };
+            let world_bbox = transform_bbox(frame.transform, local_bbox);
+            if self.detail_budget_exhausted() {
+                if let Some(top_bbox) = reference.suffix_bounds[0] {
+                    self.add_load(
+                        transform_bbox(traversal.parent_transform, top_bbox),
+                        reference.label.clone(),
+                    );
                 }
-                let member_transform =
-                    parent_transform * grid_member_transform(&reference.grid, column, row);
-                let member_bbox = transform_bbox(member_transform, source_bbox);
-                if !member_bbox.overlaps(self.options.visible) {
+                return;
+            }
+            if !frame.entered {
+                if !world_bbox.overlaps(self.options.visible) {
                     self.plan.stats.culled_references += 1;
+                    traversal.stack.pop();
                     continue;
                 }
-                let (member_width, member_height) =
-                    reference_screen_size(member_bbox, self.options.zoom, source_is_degenerate);
-                if !member_width.is_finite()
-                    || !member_height.is_finite()
-                    || (member_width < 1.0 && member_height < 1.0)
-                {
-                    self.plan.stats.skipped_subpixel_references += 1;
+                if self.plan.stats.detail_cells >= MAX_DETAIL_CELLS {
+                    self.add_load(world_bbox, reference.label.clone());
+                    traversal.stack.pop();
                     continue;
                 }
+
+                let grid_count = grid_count(grid);
+                let draw_units =
+                    self.reference_draw_units_from(reference, frame.grid_index, level_depth);
+                let source_is_degenerate = source_bbox.min_x == source_bbox.max_x
+                    || source_bbox.min_y == source_bbox.max_y;
+                let (width_px, height_px) =
+                    reference_screen_size(world_bbox, self.options.zoom, source_is_degenerate);
                 if should_collapse_reference(
-                    member_width,
-                    member_height,
-                    1,
-                    source_units,
-                    depth,
+                    width_px,
+                    height_px,
+                    grid_count,
+                    draw_units,
+                    level_depth,
                     false,
                 ) {
-                    self.add_load(member_bbox, reference.label.clone());
-                } else {
-                    if !self.visit_source(
-                        &reference.source,
-                        member_transform,
-                        depth.saturating_sub(1),
-                    ) {
-                        self.add_load(member_bbox, reference.label.clone());
+                    self.add_load(world_bbox, reference.label.clone());
+                    traversal.stack.pop();
+                    continue;
+                }
+                frame.entered = true;
+            }
+            if grid.columns() == 0 || grid.rows() == 0 || frame.column >= grid.columns() {
+                traversal.stack.pop();
+                continue;
+            }
+
+            let column = frame.column;
+            let row = frame.row;
+            if frame.row + 1 < grid.rows() {
+                frame.row += 1;
+            } else {
+                frame.row = 0;
+                frame.column += 1;
+            }
+            let next_grid_index = frame.grid_index + 1;
+            let member_transform = frame.transform * grid_member_transform(grid, column, row);
+            let member_bbox = transform_bbox(member_transform, source_bbox);
+            if !member_bbox.overlaps(self.options.visible) {
+                self.plan.stats.culled_references += 1;
+                continue;
+            }
+            let source_is_degenerate =
+                source_bbox.min_x == source_bbox.max_x || source_bbox.min_y == source_bbox.max_y;
+            let (member_width, member_height) =
+                reference_screen_size(member_bbox, self.options.zoom, source_is_degenerate);
+            if !member_width.is_finite()
+                || !member_height.is_finite()
+                || (member_width < 1.0 && member_height < 1.0)
+            {
+                self.plan.stats.skipped_subpixel_references += 1;
+                continue;
+            }
+            let grid_count = grid_count(grid);
+            let draw_units =
+                self.reference_draw_units_from(reference, frame.grid_index, level_depth);
+            let source_units = draw_units.checked_div(grid_count).unwrap_or(1).max(1);
+            if should_collapse_reference(
+                member_width,
+                member_height,
+                1,
+                source_units,
+                level_depth,
+                false,
+            ) {
+                self.add_load(member_bbox, reference.label.clone());
+            } else if next_grid_index < reference.grids.len() {
+                traversal.stack.push(GridTraversalFrame {
+                    grid_index: next_grid_index,
+                    transform: member_transform,
+                    column: 0,
+                    row: 0,
+                    entered: false,
+                });
+            } else {
+                match &reference.source {
+                    PreparedSource::Cell(cell_name) => {
+                        actions.push(PlanAction::Reference(traversal));
+                        actions.push(PlanAction::Cell {
+                            cell_name: cell_name.clone(),
+                            transform: member_transform,
+                            depth: level_depth.saturating_sub(1),
+                        });
                         return;
                     }
+                    PreparedSource::Geometry(geometry_id) => {
+                        self.push_geometry(*geometry_id, member_transform);
+                    }
+                    PreparedSource::Text(text) => self.push_text(text, member_transform),
+                    PreparedSource::Node(node) => {
+                        if !self.push_node(node, member_transform) {
+                            self.add_load(member_bbox, reference.label.clone());
+                            return;
+                        }
+                    }
                 }
-            }
-        }
-    }
-
-    fn visit_source(&mut self, source: &PreparedSource, transform: DAffine2, depth: u32) -> bool {
-        match source {
-            PreparedSource::Cell(cell_name) => {
-                self.visit_cell(cell_name, transform, depth);
-                true
-            }
-            PreparedSource::Geometry(geometry_id) => {
-                self.push_geometry(*geometry_id, transform);
-                true
-            }
-            PreparedSource::Text(text) => {
-                self.push_text(text, transform);
-                true
-            }
-            PreparedSource::Node(node) => self.push_node(node, transform),
-            PreparedSource::Reference(reference) => {
-                self.visit_reference(reference, transform, depth);
-                true
             }
         }
     }
@@ -682,24 +863,62 @@ impl Planner<'_> {
         }
     }
 
-    fn reference_draw_units(&mut self, reference: &PreparedReference, depth: u32) -> u64 {
-        let count = grid_count(&reference.grid);
-        if count == 0 {
-            return 0;
+    fn reference_draw_units_from(
+        &mut self,
+        reference: &PreparedReference,
+        start_grid: usize,
+        depth: u32,
+    ) -> u64 {
+        match Self::reference_draw_units_parts(reference, start_grid, depth) {
+            ReferenceDrawUnits::Ready(count) => count,
+            ReferenceDrawUnits::Cell {
+                cell_name,
+                depth,
+                multiplier,
+            } => multiplier.saturating_mul(self.cell_draw_units(cell_name, depth).max(1)),
         }
-        let source_count = if depth <= 1 {
-            1
-        } else {
-            self.source_draw_units(&reference.source, depth - 1)
-        };
-        count.saturating_mul(source_count.max(1))
     }
 
-    fn source_draw_units(&mut self, source: &PreparedSource, depth: u32) -> u64 {
-        match source {
-            PreparedSource::Cell(cell_name) => self.cell_draw_units(cell_name, depth),
-            PreparedSource::Reference(reference) => self.reference_draw_units(reference, depth),
-            PreparedSource::Geometry(_) | PreparedSource::Text(_) | PreparedSource::Node(_) => 1,
+    fn reference_draw_units_parts(
+        reference: &PreparedReference,
+        start_grid: usize,
+        depth: u32,
+    ) -> ReferenceDrawUnits<'_> {
+        let remaining_grids = reference.grids.len().saturating_sub(start_grid);
+        if let Ok(grid_depth) = u32::try_from(remaining_grids)
+            && depth > grid_depth
+        {
+            let multiplier = reference.suffix_grid_counts[start_grid];
+            return match &reference.source {
+                PreparedSource::Cell(cell_name) => ReferenceDrawUnits::Cell {
+                    cell_name,
+                    depth: depth.saturating_sub(grid_depth),
+                    multiplier,
+                },
+                PreparedSource::Geometry(_) | PreparedSource::Text(_) | PreparedSource::Node(_) => {
+                    ReferenceDrawUnits::Ready(multiplier)
+                }
+            };
+        }
+
+        let mut count = 1_u64;
+        let mut remaining_depth = depth;
+        for grid in reference.grids.iter().skip(start_grid) {
+            count = count.saturating_mul(grid_count(grid));
+            if count == 0 || remaining_depth <= 1 {
+                return ReferenceDrawUnits::Ready(count);
+            }
+            remaining_depth -= 1;
+        }
+        match &reference.source {
+            PreparedSource::Cell(cell_name) => ReferenceDrawUnits::Cell {
+                cell_name,
+                depth: remaining_depth,
+                multiplier: count,
+            },
+            PreparedSource::Geometry(_) | PreparedSource::Text(_) | PreparedSource::Node(_) => {
+                ReferenceDrawUnits::Ready(count)
+            }
         }
     }
 
@@ -708,18 +927,90 @@ impl Planner<'_> {
         if let Some(&count) = self.complexity_cache.get(&key) {
             return count;
         }
-        if depth == 0 || !self.complexity_stack.insert(cell_name.to_string()) {
+        if depth == 0 || self.complexity_stack.contains(cell_name) {
             return 1;
         }
-        let count = self.library.cells.get(cell_name).map_or(1, |cell| {
-            let direct = cell.direct_draw_units;
-            cell.references.iter().fold(direct, |count, reference| {
-                count.saturating_add(self.reference_draw_units(reference, depth))
-            })
-        });
-        self.complexity_stack.remove(cell_name);
-        self.complexity_cache.insert(key, count);
-        count
+        self.complexity_stack.insert(cell_name.to_string());
+        let mut frames = vec![CellComplexityFrame {
+            cell_name: cell_name.to_string(),
+            depth,
+            next_reference: 0,
+            count: self
+                .library
+                .cells
+                .get(cell_name)
+                .map_or(1, |cell| cell.direct_draw_units),
+            pending_multiplier: None,
+        }];
+        let mut completed: Option<u64> = None;
+
+        loop {
+            if let Some(child_count) = completed.take()
+                && let Some(frame) = frames.last_mut()
+                && let Some(multiplier) = frame.pending_multiplier.take()
+            {
+                frame.count = frame
+                    .count
+                    .saturating_add(multiplier.saturating_mul(child_count.max(1)));
+            }
+
+            let Some(frame) = frames.last_mut() else {
+                return 1;
+            };
+            let reference = self
+                .library
+                .cells
+                .get(&frame.cell_name)
+                .and_then(|cell| cell.references.get(frame.next_reference));
+            let Some(reference) = reference else {
+                let Some(frame) = frames.pop() else {
+                    return 1;
+                };
+                self.complexity_stack.remove(&frame.cell_name);
+                self.complexity_cache
+                    .insert((frame.cell_name, frame.depth), frame.count);
+                if frames.is_empty() {
+                    return frame.count;
+                }
+                completed = Some(frame.count);
+                continue;
+            };
+            frame.next_reference += 1;
+
+            match Self::reference_draw_units_parts(reference, 0, frame.depth) {
+                ReferenceDrawUnits::Ready(count) => {
+                    frame.count = frame.count.saturating_add(count);
+                }
+                ReferenceDrawUnits::Cell {
+                    cell_name,
+                    depth,
+                    multiplier,
+                } => {
+                    let child_key = (cell_name.to_string(), depth);
+                    if let Some(&count) = self.complexity_cache.get(&child_key) {
+                        frame.count = frame
+                            .count
+                            .saturating_add(multiplier.saturating_mul(count.max(1)));
+                    } else if depth == 0 || self.complexity_stack.contains(cell_name) {
+                        frame.count = frame.count.saturating_add(multiplier);
+                    } else {
+                        frame.pending_multiplier = Some(multiplier);
+                        self.complexity_stack.insert(cell_name.to_string());
+                        frames.push(CellComplexityFrame {
+                            cell_name: cell_name.to_string(),
+                            depth,
+                            next_reference: 0,
+                            count: self
+                                .library
+                                .cells
+                                .get(cell_name)
+                                .map_or(1, |cell| cell.direct_draw_units),
+                            pending_multiplier: None,
+                        });
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -840,8 +1131,8 @@ fn point_in_bbox(point: DVec2, bbox: &WorldBBox) -> bool {
 mod tests {
     use super::*;
     use gdsr::{
-        Cell, DataType, HorizontalPresentation, Layer, Polygon, Radians, Reference, Text,
-        VerticalPresentation,
+        Cell, DataType, HorizontalPresentation, Layer, Path, Polygon, Radians, Reference, Text,
+        Unit, VerticalPresentation,
     };
 
     fn point(x: i32, y: i32) -> Point {
@@ -1088,6 +1379,69 @@ mod tests {
     }
 
     #[test]
+    fn cyclic_parent_bounds_do_not_cull_reachable_geometry() {
+        let mut a = Cell::new("a");
+        a.add(square_at(0, 0, 1, 1));
+        a.add(Reference::new("b"));
+        let mut b = Cell::new("b");
+        b.add(square_at(100, 0, 1, 2));
+        b.add(Reference::new("a"));
+        let mut top = Cell::new("top");
+        top.add(Reference::new("a"));
+        let mut library = Library::new("test");
+        library.add_cell(top);
+        library.add_cell(b);
+        library.add_cell(a);
+        let prepared = PreparedLibrary::build(&library, "top").expect("scene should prepare");
+        let visible = WorldBBox::new(99.0e-9, -1.0e-9, 102.0e-9, 2.0e-9);
+
+        let plan = prepared.plan(
+            "top",
+            &SceneOptions {
+                visible: &visible,
+                zoom: 1.0e12,
+                depth: 4,
+                hidden_layers: &HashSet::new(),
+            },
+        );
+
+        assert_eq!(plan.geometry_instances.len(), 1);
+        let geometry = &prepared.geometries[plan.geometry_instances[0].geometry_id];
+        assert_eq!(geometry.layer, (Layer::new(2), DataType::new(0)));
+    }
+
+    #[test]
+    fn signed_inline_path_bounds_do_not_cull_visible_geometry() {
+        let path = Path::new(
+            [Point::float(0.0, 0.0, 1.0), Point::float(10.0, 0.0, 1.0)],
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            Some(Unit::float(-4.0, 1.0)),
+            Some(Unit::float(-100.0, 1.0)),
+            Some(Unit::float(-100.0, 1.0)),
+        );
+        let mut top = Cell::new("top");
+        top.add(Reference::new(Element::Path(path)));
+        let mut library = Library::new("test");
+        library.add_cell(top);
+        let prepared = PreparedLibrary::build(&library, "top").expect("scene should prepare");
+        let visible = WorldBBox::new(4.0, 1.0, 6.0, 2.0);
+
+        let plan = prepared.plan(
+            "top",
+            &SceneOptions {
+                visible: &visible,
+                zoom: 100.0,
+                depth: 2,
+                hidden_layers: &HashSet::new(),
+            },
+        );
+
+        assert_eq!(plan.geometry_instances.len(), 1);
+    }
+
+    #[test]
     fn dense_subpixel_geometry_uses_one_proxy() {
         let mut cell = Cell::new("top");
         for _ in 0..DENSE_BATCH_MIN_ELEMENTS {
@@ -1165,6 +1519,63 @@ mod tests {
 
         assert_eq!(plan.geometry_instances.len(), MAX_SCENE_OBJECTS);
         assert_eq!(plan.load_proxies.len(), 1);
+    }
+
+    #[test]
+    fn ten_thousand_inline_references_prepare_and_plan_iteratively() {
+        let mut reference = Reference::new(Element::Polygon(square(100, 1)));
+        for _ in 1..10_000 {
+            reference = Reference::new(Element::Reference(reference));
+        }
+        let mut top = Cell::new("top");
+        top.add(reference);
+        let mut library = Library::new("test");
+        library.add_cell(top);
+
+        let prepared = PreparedLibrary::build(&library, "top").expect("scene should prepare");
+        let top = prepared.cells.get("top").expect("top should be prepared");
+        assert_eq!(top.references[0].grids.len(), 10_000);
+        let plan = prepared.plan(
+            "top",
+            &SceneOptions {
+                visible: &visible(),
+                zoom: 1.0e12,
+                depth: 10_001,
+                hidden_layers: &HashSet::new(),
+            },
+        );
+        assert_eq!(plan.geometry_instances.len(), 1);
+    }
+
+    #[test]
+    fn ten_thousand_named_cells_prepare_and_plan_iteratively() {
+        const DEPTH: usize = 10_000;
+        let mut library = Library::new("test");
+        let leaf_name = format!("cell_{:05}", DEPTH - 1);
+        let mut leaf = Cell::new(&leaf_name);
+        leaf.add(square(100, 1));
+        library.add_cell(leaf);
+        for index in (0..DEPTH - 1).rev() {
+            let cell_name = format!("cell_{index:05}");
+            let mut cell = Cell::new(&cell_name);
+            cell.add(Reference::new(format!("cell_{:05}", index + 1)));
+            library.add_cell(cell);
+        }
+
+        let prepared =
+            PreparedLibrary::build(&library, "cell_00000").expect("scene should prepare");
+        let plan = prepared.plan(
+            "cell_00000",
+            &SceneOptions {
+                visible: &visible(),
+                zoom: 1.0e12,
+                depth: u32::try_from(DEPTH + 1).expect("depth should fit"),
+                hidden_layers: &HashSet::new(),
+            },
+        );
+
+        assert_eq!(plan.geometry_instances.len(), 1);
+        assert_eq!(plan.stats.detail_cells, DEPTH);
     }
 
     #[test]

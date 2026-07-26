@@ -2,155 +2,34 @@ use std::collections::{HashMap, HashSet};
 
 use egui::epaint;
 use egui::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind};
-use gdsr::{DataType, Dimensions, Element, Layer, Library, Point};
+use gdsr::{DataType, Dimensions, Element, Layer, Library};
 
 use crate::state::LayerState;
 use crate::viewport::Viewport;
 
 /// World-space axis-aligned bounding box with named fields.
-#[derive(Clone, Copy, Debug)]
-pub struct WorldBBox {
-    pub min_x: f64,
-    pub min_y: f64,
-    pub max_x: f64,
-    pub max_y: f64,
-}
-
-impl WorldBBox {
-    pub fn new(min_x: f64, min_y: f64, max_x: f64, max_y: f64) -> Self {
-        Self {
-            min_x,
-            min_y,
-            max_x,
-            max_y,
-        }
-    }
-
-    pub fn overlaps(&self, other: &Self) -> bool {
-        self.max_x >= other.min_x
-            && self.min_x <= other.max_x
-            && self.max_y >= other.min_y
-            && self.min_y <= other.max_y
-    }
-
-    pub fn merge(&self, other: &Self) -> Self {
-        Self {
-            min_x: self.min_x.min(other.min_x),
-            min_y: self.min_y.min(other.min_y),
-            max_x: self.max_x.max(other.max_x),
-            max_y: self.max_y.max(other.max_y),
-        }
-    }
-}
+pub type WorldBBox = gdsr::WorldBounds;
 
 pub fn cell_world_bbox(cell_name: &str, library: &Library) -> Option<WorldBBox> {
-    let mut visiting = HashSet::new();
-    let mut cache = HashMap::new();
-    named_cell_world_bbox(cell_name, library, &mut visiting, &mut cache)
+    library.hierarchy_bounds(cell_name).ok()?.root_bounds()
 }
 
 pub fn cell_world_bboxes(library: &Library, root_cell: &str) -> HashMap<String, Option<WorldBBox>> {
-    let mut visiting = HashSet::new();
-    let mut cache = HashMap::new();
-    named_cell_world_bbox(root_cell, library, &mut visiting, &mut cache);
-    cache
-}
-
-fn named_cell_world_bbox(
-    cell_name: &str,
-    library: &Library,
-    visiting: &mut HashSet<String>,
-    cache: &mut HashMap<String, Option<WorldBBox>>,
-) -> Option<WorldBBox> {
-    if let Some(bbox) = cache.get(cell_name) {
-        return *bbox;
-    }
-    if !visiting.insert(cell_name.to_owned()) {
-        return None;
-    }
-
-    let Some(cell) = library.get_cell(cell_name) else {
-        visiting.remove(cell_name);
-        cache.insert(cell_name.to_owned(), None);
-        return None;
+    let Ok(report) = library.hierarchy_bounds(root_cell) else {
+        return HashMap::new();
     };
-    let mut result = None;
-    for element in cell.iter_elements() {
-        if let Some(bbox) = element_world_bbox(element, library, visiting, cache) {
-            merge_bbox(&mut result, bbox);
-        }
-    }
-
-    visiting.remove(cell_name);
-    cache.insert(cell_name.to_owned(), result);
-    result
-}
-
-fn element_world_bbox(
-    element: &Element,
-    library: &Library,
-    visiting: &mut HashSet<String>,
-    cache: &mut HashMap<String, Option<WorldBBox>>,
-) -> Option<WorldBBox> {
-    match element {
-        Element::Reference(reference) => reference_world_bbox(reference, library, visiting, cache),
-        _ => element.world_bbox(),
-    }
-}
-
-fn reference_world_bbox(
-    reference: &gdsr::Reference,
-    library: &Library,
-    visiting: &mut HashSet<String>,
-    cache: &mut HashMap<String, Option<WorldBBox>>,
-) -> Option<WorldBBox> {
-    let source_bbox = if let Some(cell_name) = reference.instance().as_cell() {
-        named_cell_world_bbox(cell_name, library, visiting, cache)?
-    } else {
-        let element = reference.instance().as_element()?;
-        element_world_bbox(element.as_ref().as_ref(), library, visiting, cache)?
-    };
-
-    reference_bbox_from_source_bbox(reference, source_bbox)
+    report
+        .cell_bounds()
+        .iter()
+        .map(|(cell_name, bounds)| (cell_name.clone(), *bounds))
+        .collect()
 }
 
 fn reference_bbox_from_source_bbox(
     reference: &gdsr::Reference,
     source_bbox: WorldBBox,
 ) -> Option<WorldBBox> {
-    let grid = reference.grid();
-    if grid.columns() == 0 || grid.rows() == 0 {
-        return None;
-    }
-
-    let mut result = None;
-    let bbox_element = Element::Polygon(bbox_polygon(source_bbox));
-    let spacing_x = grid.spacing_x().unwrap_or_default();
-    let spacing_y = grid.spacing_y().unwrap_or_default();
-
-    for column_index in [0, grid.columns() - 1] {
-        for row_index in [0, grid.rows() - 1] {
-            let offset = (spacing_x * column_index) + (spacing_y * row_index);
-            let rotated_offset = offset.rotate_around_point(grid.angle(), &Point::default());
-            let final_position = grid.origin() + rotated_offset;
-            let single_grid = grid
-                .clone()
-                .with_columns(1)
-                .with_rows(1)
-                .with_spacing_x(None)
-                .with_spacing_y(None)
-                .with_origin(final_position);
-            let single_reference = reference.clone().with_grid(single_grid);
-
-            for element in single_reference.get_elements_in_grid(&bbox_element) {
-                if let Some(bbox) = element.world_bbox() {
-                    merge_bbox(&mut result, bbox);
-                }
-            }
-        }
-    }
-
-    result
+    source_bbox.transformed_by_grid(reference.grid())
 }
 
 pub fn reference_grid_count(reference: &gdsr::Reference) -> u64 {
@@ -175,37 +54,62 @@ pub fn reference_instance_bbox(
     library: Option<&Library>,
     cell_bbox_cache: &mut HashMap<String, Option<WorldBBox>>,
 ) -> Option<WorldBBox> {
-    if reference.instance().as_cell().is_some() {
-        let lib = library?;
-        let mut visiting = HashSet::new();
-        reference_world_bbox(reference, lib, &mut visiting, cell_bbox_cache)
-    } else if let Some(element) = reference.instance().as_element() {
-        let source_bbox = element.as_ref().as_ref().world_bbox()?;
-        reference_bbox_from_source_bbox(reference, source_bbox)
-    } else {
-        None
+    if let Some(cell_name) = reference.instance().as_cell() {
+        let source_bbox = named_cell_bbox(cell_name, library?, cell_bbox_cache)?;
+        return reference_bbox_from_source_bbox(reference, source_bbox);
     }
+    let element = reference.instance().as_element()?;
+    if let Element::Reference(nested) = element.as_ref().as_ref() {
+        return inline_reference_instance_bbox(reference.grid(), nested, library, cell_bbox_cache);
+    }
+    reference_bbox_from_source_bbox(reference, element.as_ref().as_ref().world_bbox()?)
 }
 
-fn bbox_polygon(bbox: WorldBBox) -> gdsr::Polygon {
-    gdsr::Polygon::new(
-        [
-            gdsr::Point::float(bbox.min_x, bbox.min_y, 1.0),
-            gdsr::Point::float(bbox.max_x, bbox.min_y, 1.0),
-            gdsr::Point::float(bbox.max_x, bbox.max_y, 1.0),
-            gdsr::Point::float(bbox.min_x, bbox.max_y, 1.0),
-            gdsr::Point::float(bbox.min_x, bbox.min_y, 1.0),
-        ],
-        Layer::new(0),
-        DataType::new(0),
-    )
+fn named_cell_bbox(
+    cell_name: &str,
+    library: &Library,
+    cell_bbox_cache: &mut HashMap<String, Option<WorldBBox>>,
+) -> Option<WorldBBox> {
+    if let Some(cached) = cell_bbox_cache.get(cell_name) {
+        return *cached;
+    }
+    let report = library.hierarchy_bounds(cell_name).ok()?;
+    let root_bounds = report.root_bounds();
+    cell_bbox_cache.extend(
+        report
+            .cell_bounds()
+            .iter()
+            .map(|(name, bounds)| (name.clone(), *bounds)),
+    );
+    root_bounds
 }
 
-fn merge_bbox(result: &mut Option<WorldBBox>, bbox: WorldBBox) {
-    *result = Some(match result {
-        Some(acc) => acc.merge(&bbox),
-        None => bbox,
-    });
+fn inline_reference_instance_bbox(
+    outer_grid: &gdsr::Grid,
+    reference: &gdsr::Reference,
+    library: Option<&Library>,
+    cell_bbox_cache: &mut HashMap<String, Option<WorldBBox>>,
+) -> Option<WorldBBox> {
+    let mut current = reference;
+    let mut grids = vec![outer_grid];
+    let source_bbox = loop {
+        grids.push(current.grid());
+        if let Some(cell_name) = current.instance().as_cell() {
+            break named_cell_bbox(cell_name, library?, cell_bbox_cache)?;
+        }
+        let element = current.instance().as_element()?;
+        if let Element::Reference(reference) = element.as_ref().as_ref() {
+            current = reference;
+        } else {
+            break element.as_ref().as_ref().world_bbox()?;
+        }
+    };
+
+    let mut bounds = Some(source_bbox);
+    for grid in grids.into_iter().rev() {
+        bounds = bounds.and_then(|bounds| bounds.transformed_by_grid(grid));
+    }
+    bounds
 }
 
 /// Bundles the rendering context passed to every `Drawable::draw` call.
@@ -579,19 +483,32 @@ impl Drawable for gdsr::Path {
     }
 
     fn world_bbox(&self) -> Option<WorldBBox> {
-        let (min_pt, max_pt) = self.bounding_box();
+        let mut points = self.points().iter();
+        let first = points.next()?;
+        let first_x = first.x().absolute_value();
+        let first_y = first.y().absolute_value();
+        let mut bounds = WorldBBox::new(first_x, first_y, first_x, first_y);
+        for point in points {
+            let x = point.x().absolute_value();
+            let y = point.y().absolute_value();
+            bounds = bounds.merge(&WorldBBox::new(x, y, x, y));
+        }
         let half_width = self
             .width()
-            .map(|w| w.absolute_value() / 2.0)
+            .map(|w| w.absolute_value().abs() / 2.0)
             .unwrap_or(0.0);
-        let begin_ext = self.begin_extension().map_or(0.0, |u| u.absolute_value());
-        let end_ext = self.end_extension().map_or(0.0, |u| u.absolute_value());
+        let begin_ext = self
+            .begin_extension()
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
+        let end_ext = self
+            .end_extension()
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
         let pad = half_width + begin_ext.max(end_ext);
         Some(WorldBBox::new(
-            min_pt.x().absolute_value() - pad,
-            min_pt.y().absolute_value() - pad,
-            max_pt.x().absolute_value() + pad,
-            max_pt.y().absolute_value() + pad,
+            bounds.min_x - pad,
+            bounds.min_y - pad,
+            bounds.max_x + pad,
+            bounds.max_y + pad,
         ))
     }
 
@@ -602,15 +519,19 @@ impl Drawable for gdsr::Path {
         }
         let half_width = self
             .width()
-            .map(|w| w.absolute_value() / 2.0)
+            .map(|w| w.absolute_value().abs() / 2.0)
             .unwrap_or(0.0);
         let min_tolerance = 3.0 / zoom;
         let tolerance = half_width.max(min_tolerance);
         let tol_sq = tolerance * tolerance;
 
         let path_type = self.path_type().unwrap_or_default();
-        let begin_ext = self.begin_extension().map_or(0.0, |u| u.absolute_value());
-        let end_ext = self.end_extension().map_or(0.0, |u| u.absolute_value());
+        let begin_ext = self
+            .begin_extension()
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
+        let end_ext = self
+            .end_extension()
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
 
         let mut segments: Vec<(f64, f64, f64, f64)> = pts
             .windows(2)
@@ -1024,6 +945,23 @@ fn reference_draw_units(reference: &gdsr::Reference, ctx: &mut DrawContext) -> u
     )
 }
 
+struct CellDrawUnitsFrame {
+    cell_name: String,
+    depth: u32,
+    next_element: usize,
+    count: u64,
+    pending_multiplier: Option<u64>,
+}
+
+enum ReferenceDrawUnits<'a> {
+    Ready(u64),
+    Cell {
+        cell_name: &'a str,
+        depth: u32,
+        multiplier: u64,
+    },
+}
+
 pub fn reference_draw_units_for_depth(
     reference: &gdsr::Reference,
     library: Option<&Library>,
@@ -1031,30 +969,52 @@ pub fn reference_draw_units_for_depth(
     cache: &mut HashMap<(String, u32), u64>,
     visiting: &mut HashSet<String>,
 ) -> u64 {
-    let grid_count = reference_grid_count(reference);
-    if grid_count == 0 {
-        return 0;
+    match reference_draw_units_parts(reference, depth) {
+        ReferenceDrawUnits::Ready(count) => count,
+        ReferenceDrawUnits::Cell {
+            cell_name,
+            depth,
+            multiplier,
+        } => multiplier.saturating_mul(
+            library
+                .and_then(|lib| cell_draw_units(cell_name, lib, depth, cache, visiting))
+                .unwrap_or(1),
+        ),
     }
+}
 
-    let source_count = if depth <= 1 {
-        1
-    } else if let Some(cell_name) = reference.instance().as_cell() {
-        library
-            .and_then(|lib| cell_draw_units(cell_name, lib, depth - 1, cache, visiting))
-            .unwrap_or(1)
-    } else if let Some(element) = reference.instance().as_element() {
-        element_draw_units(
-            element.as_ref().as_ref(),
-            library,
-            depth - 1,
-            cache,
-            visiting,
-        )
-    } else {
-        1
-    };
+fn reference_draw_units_parts(
+    reference: &gdsr::Reference,
+    mut depth: u32,
+) -> ReferenceDrawUnits<'_> {
+    let mut reference = reference;
+    let mut count = 1_u64;
+    loop {
+        let grid_count = reference_grid_count(reference);
+        if grid_count == 0 {
+            return ReferenceDrawUnits::Ready(0);
+        }
+        count = count.saturating_mul(grid_count);
+        if depth <= 1 {
+            return ReferenceDrawUnits::Ready(count);
+        }
+        depth -= 1;
 
-    grid_count.saturating_mul(source_count)
+        if let Some(cell_name) = reference.instance().as_cell() {
+            return ReferenceDrawUnits::Cell {
+                cell_name,
+                depth,
+                multiplier: count,
+            };
+        }
+        let Some(element) = reference.instance().as_element() else {
+            return ReferenceDrawUnits::Ready(count);
+        };
+        let Element::Reference(inner) = element.as_ref().as_ref() else {
+            return ReferenceDrawUnits::Ready(count);
+        };
+        reference = inner;
+    }
 }
 
 fn cell_draw_units(
@@ -1068,40 +1028,77 @@ fn cell_draw_units(
     if let Some(count) = cache.get(&key) {
         return Some(*count);
     }
-    let cell = library.get_cell(cell_name)?;
+    library.get_cell(cell_name)?;
     if !visiting.insert(cell_name.to_owned()) {
         return Some(1);
     }
 
-    let mut count = 0_u64;
-    for element in cell.iter_elements() {
-        count = count.saturating_add(element_draw_units(
-            element,
-            Some(library),
-            depth,
-            cache,
-            visiting,
-        ));
-    }
-    visiting.remove(cell_name);
-
-    let count = count.max(1);
-    cache.insert(key, count);
-    Some(count)
-}
-
-fn element_draw_units(
-    element: &Element,
-    library: Option<&Library>,
-    depth: u32,
-    cache: &mut HashMap<(String, u32), u64>,
-    visiting: &mut HashSet<String>,
-) -> u64 {
-    match element {
-        Element::Reference(reference) => {
-            reference_draw_units_for_depth(reference, library, depth, cache, visiting)
+    let mut frames = vec![CellDrawUnitsFrame {
+        cell_name: cell_name.to_string(),
+        depth,
+        next_element: 0,
+        count: 0,
+        pending_multiplier: None,
+    }];
+    let mut completed: Option<u64> = None;
+    loop {
+        if let Some(child_count) = completed.take()
+            && let Some(frame) = frames.last_mut()
+            && let Some(multiplier) = frame.pending_multiplier.take()
+        {
+            frame.count = frame
+                .count
+                .saturating_add(multiplier.saturating_mul(child_count));
         }
-        _ => 1,
+
+        let frame = frames.last_mut()?;
+        let element = library
+            .get_cell(&frame.cell_name)
+            .and_then(|cell| cell.elements().get(frame.next_element));
+        let Some(element) = element else {
+            let frame = frames.pop()?;
+            let count = frame.count.max(1);
+            visiting.remove(&frame.cell_name);
+            cache.insert((frame.cell_name, frame.depth), count);
+            if frames.is_empty() {
+                return Some(count);
+            }
+            completed = Some(count);
+            continue;
+        };
+        frame.next_element += 1;
+
+        let Element::Reference(reference) = element else {
+            frame.count = frame.count.saturating_add(1);
+            continue;
+        };
+        match reference_draw_units_parts(reference, frame.depth) {
+            ReferenceDrawUnits::Ready(count) => {
+                frame.count = frame.count.saturating_add(count);
+            }
+            ReferenceDrawUnits::Cell {
+                cell_name,
+                depth,
+                multiplier,
+            } => {
+                let child_key = (cell_name.to_string(), depth);
+                if let Some(&count) = cache.get(&child_key) {
+                    frame.count = frame.count.saturating_add(multiplier.saturating_mul(count));
+                } else if visiting.contains(cell_name) || library.get_cell(cell_name).is_none() {
+                    frame.count = frame.count.saturating_add(multiplier);
+                } else {
+                    frame.pending_multiplier = Some(multiplier);
+                    visiting.insert(cell_name.to_string());
+                    frames.push(CellDrawUnitsFrame {
+                        cell_name: cell_name.to_string(),
+                        depth,
+                        next_element: 0,
+                        count: 0,
+                        pending_multiplier: None,
+                    });
+                }
+            }
+        }
     }
 }
 
@@ -1188,69 +1185,118 @@ fn draw_ref_bbox(reference: &gdsr::Reference, bbox: WorldBBox, ctx: &mut DrawCon
     }
 }
 
+enum ReferenceDrawAction {
+    Element(Element, u32),
+    LeaveCell(String),
+}
+
+fn draw_reference_iteratively(reference: &gdsr::Reference, ctx: &mut DrawContext) {
+    let previous_depth = ctx.reference_depth;
+    let previous_stack_len = ctx.reference_stack.len();
+    let mut active_cells: HashSet<String> = ctx.reference_stack.iter().cloned().collect();
+    let mut pending = vec![ReferenceDrawAction::Element(
+        Element::Reference(reference.clone()),
+        previous_depth,
+    )];
+
+    while let Some(action) = pending.pop() {
+        let (element, depth) = match action {
+            ReferenceDrawAction::Element(element, depth) => (element, depth),
+            ReferenceDrawAction::LeaveCell(cell_name) => {
+                active_cells.remove(&cell_name);
+                ctx.reference_stack.pop();
+                continue;
+            }
+        };
+        ctx.reference_depth = depth;
+        let Element::Reference(reference) = element else {
+            element.draw(ctx);
+            continue;
+        };
+        let Some(bbox) = reference_instance_bbox(&reference, ctx.library, ctx.cell_bbox_cache)
+        else {
+            continue;
+        };
+        if !bbox.overlaps(ctx.visible) {
+            continue;
+        }
+        if should_draw_reference_bbox(&reference, bbox, ctx) {
+            draw_ref_bbox(&reference, bbox, ctx);
+            continue;
+        }
+
+        let child_depth = depth.saturating_sub(1);
+        if let Some(element) = reference.instance().as_element() {
+            pending.extend(
+                reference
+                    .get_elements_in_grid(element)
+                    .into_iter()
+                    .rev()
+                    .map(|element| ReferenceDrawAction::Element(element, child_depth)),
+            );
+        } else if let Some(cell_name) = reference.instance().as_cell() {
+            if !active_cells.insert(cell_name.clone()) {
+                draw_ref_bbox(&reference, bbox, ctx);
+                continue;
+            }
+            ctx.reference_stack.push(cell_name.clone());
+            pending.push(ReferenceDrawAction::LeaveCell(cell_name.clone()));
+            if let Some(cell) = ctx.library.and_then(|library| library.get_cell(cell_name)) {
+                let mut elements = Vec::new();
+                for element in cell.iter_elements() {
+                    elements.extend(reference.get_elements_in_grid(element));
+                }
+                pending.extend(
+                    elements
+                        .into_iter()
+                        .rev()
+                        .map(|element| ReferenceDrawAction::Element(element, child_depth)),
+                );
+            }
+        }
+    }
+
+    ctx.reference_stack.truncate(previous_stack_len);
+    ctx.reference_depth = previous_depth;
+}
+
 impl Drawable for gdsr::Reference {
     fn layer_keys(&self) -> Vec<(Layer, DataType)> {
-        match self.instance().as_element() {
-            Some(element) => element.layer_keys(),
-            None => vec![],
+        let mut reference = self;
+        loop {
+            let Some(element) = reference.instance().as_element() else {
+                return Vec::new();
+            };
+            match element.as_ref().as_ref() {
+                Element::Reference(inner) => reference = inner,
+                element => return element.layer_keys(),
+            }
         }
     }
 
     fn world_bbox(&self) -> Option<WorldBBox> {
-        let element = self.instance().as_element()?;
-        reference_bbox_from_source_bbox(self, element.as_ref().as_ref().world_bbox()?)
+        reference_instance_bbox(self, None, &mut HashMap::new())
     }
 
     fn hit_test(&self, wx: f64, wy: f64, zoom: f64) -> bool {
-        if let Some(element) = self.instance().as_element() {
-            for el in self.get_elements_in_grid(element) {
-                if el.hit_test(wx, wy, zoom) {
-                    return true;
+        let Some(element) = self.instance().as_element() else {
+            return false;
+        };
+        let mut pending = self.get_elements_in_grid(element);
+        while let Some(element) = pending.pop() {
+            if let Element::Reference(reference) = element {
+                if let Some(inner) = reference.instance().as_element() {
+                    pending.extend(reference.get_elements_in_grid(inner));
                 }
+            } else if element.hit_test(wx, wy, zoom) {
+                return true;
             }
         }
         false
     }
 
     fn draw(&self, ctx: &mut DrawContext) {
-        let Some(bbox) = reference_instance_bbox(self, ctx.library, ctx.cell_bbox_cache) else {
-            return;
-        };
-        if !bbox.overlaps(ctx.visible) {
-            return;
-        }
-        if should_draw_reference_bbox(self, bbox, ctx) {
-            draw_ref_bbox(self, bbox, ctx);
-            return;
-        }
-
-        let previous_depth = ctx.reference_depth;
-        ctx.reference_depth = ctx.reference_depth.saturating_sub(1);
-
-        if let Some(element) = self.instance().as_element() {
-            for el in self.get_elements_in_grid(element) {
-                el.draw(ctx);
-            }
-        } else if let Some(cell_name) = self.instance().as_cell() {
-            if ctx.reference_stack.iter().any(|name| name == cell_name) {
-                draw_ref_bbox(self, bbox, ctx);
-                ctx.reference_depth = previous_depth;
-                return;
-            }
-            ctx.reference_stack.push(cell_name.clone());
-            if let Some(lib) = ctx.library {
-                if let Some(cell) = lib.get_cell(cell_name) {
-                    for element in cell.iter_elements() {
-                        for el in self.get_elements_in_grid(element) {
-                            el.draw(ctx);
-                        }
-                    }
-                }
-            }
-            ctx.reference_stack.pop();
-        }
-
-        ctx.reference_depth = previous_depth;
+        draw_reference_iteratively(self, ctx);
     }
 }
 
@@ -1350,6 +1396,21 @@ mod tests {
 
     const SCALE: f64 = 1e-9;
     const ZOOM: f64 = 1e9;
+
+    fn deeply_named_library(depth: usize) -> Library {
+        let mut library = Library::new("deep");
+        let leaf_name = format!("cell_{:05}", depth - 1);
+        let mut leaf = gdsr::Cell::new(&leaf_name);
+        leaf.add(polygon(vec![(0, 0), (100, 0), (100, 100)], 3, 1));
+        library.add_cell(leaf);
+        for index in (0..depth - 1).rev() {
+            let cell_name = format!("cell_{index:05}");
+            let mut cell = gdsr::Cell::new(&cell_name);
+            cell.add(gdsr::Reference::new(format!("cell_{:05}", index + 1)));
+            library.add_cell(cell);
+        }
+        library
+    }
 
     #[test]
     fn polygon_hit_inside() {
@@ -1691,6 +1752,184 @@ mod tests {
         library.add_cell(b);
 
         assert!(cell_world_bbox("a", &library).is_none());
+    }
+
+    #[test]
+    fn cyclic_cell_world_bbox_matches_conservative_core_report() {
+        let mut a = gdsr::Cell::new("a");
+        a.add(polygon(vec![(0, 0), (1, 0), (1, 1), (0, 1)], 1, 0));
+        a.add(gdsr::Reference::new("b"));
+        let mut b = gdsr::Cell::new("b");
+        b.add(polygon(vec![(100, 0), (101, 0), (101, 1), (100, 1)], 2, 0));
+        b.add(gdsr::Reference::new("a"));
+        let mut top = gdsr::Cell::new("top");
+        top.add(gdsr::Reference::new("a"));
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(top);
+        library.add_cell(b);
+        library.add_cell(a);
+
+        let viewer_bounds =
+            cell_world_bbox("top", &library).expect("viewer should retain geometry");
+        let core_bounds = library
+            .hierarchy_bounds("top")
+            .expect("core should report cyclic bounds")
+            .root_bounds();
+
+        assert_eq!(Some(viewer_bounds), core_bounds);
+        assert_eq!(
+            viewer_bounds,
+            WorldBBox::new(0.0, 0.0, 101.0 * SCALE, SCALE)
+        );
+    }
+
+    #[test]
+    fn signed_path_world_bbox_matches_core_conservative_bounds() {
+        let path = gdsr::Path::new(
+            [
+                gdsr::Point::float(0.0, 0.0, 1.0),
+                gdsr::Point::float(10.0, 0.0, 1.0),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+            None,
+            Some(gdsr::Unit::float(-4.0, 1.0)),
+            Some(gdsr::Unit::float(-100.0, 1.0)),
+            Some(gdsr::Unit::float(-100.0, 1.0)),
+        );
+        let viewer_bounds = path.world_bbox().expect("path should have bounds");
+        let mut top = gdsr::Cell::new("top");
+        top.add(path);
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(top);
+        let core_bounds = library
+            .hierarchy_bounds("top")
+            .expect("core should report path bounds")
+            .root_bounds();
+
+        assert_eq!(Some(viewer_bounds), core_bounds);
+        assert_eq!(viewer_bounds, WorldBBox::new(-2.0, -2.0, 12.0, 2.0));
+    }
+
+    #[test]
+    fn cell_world_bbox_matches_partial_core_report() {
+        let mut top = gdsr::Cell::new("top");
+        top.add(polygon(vec![(10, 20), (110, 20), (110, 220)], 1, 0));
+        top.add(gdsr::Reference::new("missing"));
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(top);
+
+        let viewer_bounds = cell_world_bbox("top", &library).expect("valid geometry should remain");
+        let core_report = library
+            .hierarchy_bounds("top")
+            .expect("known root should produce a report");
+        assert_eq!(Some(viewer_bounds), core_report.root_bounds());
+        assert_eq!(core_report.diagnostics().len(), 1);
+    }
+
+    #[test]
+    fn reference_instance_bbox_resolves_inline_named_reference_chain() {
+        let mut leaf = gdsr::Cell::new("leaf");
+        leaf.add(polygon(vec![(10, 20), (110, 20), (110, 220)], 1, 0));
+        let nested = gdsr::Reference::new("leaf")
+            .with_grid(gdsr::Grid::default().with_origin(gdsr::Point::default_integer(100, 200)));
+        let reference = gdsr::Reference::new(nested)
+            .with_grid(gdsr::Grid::default().with_origin(gdsr::Point::default_integer(300, 400)));
+        let mut library = gdsr::Library::new("lib");
+        library.add_cell(leaf);
+
+        let bbox = reference_instance_bbox(&reference, Some(&library), &mut HashMap::new())
+            .expect("inline named hierarchy should resolve");
+        assert!((bbox.min_x - 410.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.min_y - 620.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_x - 510.0 * SCALE).abs() < 1e-15);
+        assert!((bbox.max_y - 820.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn reference_world_bbox_handles_ten_thousand_inline_references() {
+        let polygon = gdsr::Polygon::new(
+            [
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 0),
+                gdsr::Point::default_integer(100, 100),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut reference = gdsr::Reference::new(polygon);
+        for _ in 1..10_000 {
+            reference = gdsr::Reference::new(reference);
+        }
+
+        let bbox = reference
+            .world_bbox()
+            .expect("inline bounds should resolve");
+        assert!((bbox.min_x - 0.0).abs() < 1e-15);
+        assert!((bbox.max_x - 100.0 * SCALE).abs() < 1e-15);
+    }
+
+    #[test]
+    fn deep_inline_layer_keys_and_hit_test_are_iterative() {
+        let polygon = gdsr::Polygon::new(
+            [
+                gdsr::Point::default_integer(0, 0),
+                gdsr::Point::default_integer(100, 0),
+                gdsr::Point::default_integer(100, 100),
+            ],
+            Layer::new(3),
+            DataType::new(1),
+        );
+        let mut reference = gdsr::Reference::new(polygon);
+        for _ in 1..10_000 {
+            reference = gdsr::Reference::new(reference);
+        }
+
+        assert_eq!(
+            reference.layer_keys(),
+            vec![(Layer::new(3), DataType::new(1))]
+        );
+        assert!(reference.hit_test(50.0 * SCALE, 50.0 * SCALE, ZOOM));
+    }
+
+    #[test]
+    fn deep_named_world_bbox_complexity_and_draw_are_iterative() {
+        const DEPTH: usize = 10_000;
+        let library = deeply_named_library(DEPTH);
+        let bbox =
+            cell_world_bbox("cell_00000", &library).expect("named hierarchy should have bounds");
+        assert!((bbox.max_x - 100.0 * SCALE).abs() < 1e-15);
+
+        let reference = gdsr::Reference::new("cell_00000");
+        let mut cache = HashMap::new();
+        let mut visiting = HashSet::new();
+        assert_eq!(
+            reference_draw_units_for_depth(
+                &reference,
+                Some(&library),
+                u32::try_from(DEPTH + 1).expect("depth should fit"),
+                &mut cache,
+                &mut visiting,
+            ),
+            1,
+        );
+
+        let egui_context = egui::Context::default();
+        let painter = egui_context.layer_painter(egui::LayerId::background());
+        let viewport = Viewport {
+            zoom: 1.0e12,
+            ..Viewport::default()
+        };
+        let rect = Rect::from_min_size(Pos2::ZERO, egui::Vec2::splat(1_000.0));
+        draw_highlight(
+            &Element::Reference(reference),
+            &viewport,
+            &painter,
+            rect,
+            &mut LayerState::default(),
+            Some(&library),
+            &mut HashMap::new(),
+        );
     }
 
     #[test]
