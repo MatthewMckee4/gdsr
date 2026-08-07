@@ -58,7 +58,7 @@ log = "0.4"
 quickcheck = "1.1.0"
 quickcheck_macros = "1"
 rayon = "1"
-rfd = "0.15"
+rfd = "0.17"
 rstest = "0.26.1"
 tempfile = "3.26"
 
