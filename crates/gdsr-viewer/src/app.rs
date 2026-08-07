@@ -1604,7 +1604,7 @@ impl ViewerApp {
                 .max_rect(ctx.viewport_rect()),
         );
 
-        egui::Panel::top("menu_bar").show_inside(&mut viewport_ui, |ui| {
+        egui::Panel::top("menu_bar").show(&mut viewport_ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui
@@ -1800,7 +1800,7 @@ impl ViewerApp {
 
         // Bottom activity bar
         let mut depth_changed = false;
-        egui::Panel::bottom("status_bar").show_inside(&mut viewport_ui, |ui| {
+        egui::Panel::bottom("status_bar").show(&mut viewport_ui, |ui| {
             ui.horizontal(|ui| {
                 let is_tree = self.side_panel_tab == SidePanelTab::Cells
                     && self.cell_view_mode == CellViewMode::Tree;
@@ -1985,7 +1985,7 @@ impl ViewerApp {
             .default_size(200.0)
             .size_range(40.0..=800.0)
             .resizable(true)
-            .show_inside(&mut viewport_ui, |ui| {
+            .show(&mut viewport_ui, |ui| {
                 ui.allocate_at_least(egui::vec2(ui.available_width(), 0.0), egui::Sense::hover());
                 if let Some(cell) = cell.as_mut() {
                     let selected_element =
@@ -2050,7 +2050,7 @@ impl ViewerApp {
         let mut viewport_double_clicked = false;
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
-            .show_inside(&mut viewport_ui, |ui| {
+            .show(&mut viewport_ui, |ui| {
                 let mut empty_cache = std::collections::HashMap::new();
                 let (elements, spatial_grid, library, tessellation_cache) =
                     if let Some(cell) = cell.as_mut() {
@@ -2159,6 +2159,16 @@ mod tests {
         assert!(accepts_canvas_shortcut(false, egui::Modifiers::NONE));
         assert!(!accepts_canvas_shortcut(true, egui::Modifiers::NONE));
         assert!(!accepts_canvas_shortcut(false, egui::Modifiers::CTRL));
+    }
+
+    #[test]
+    fn update_draws_main_panels() {
+        let context = egui::Context::default();
+        let mut app = ViewerApp::default();
+
+        let output = context.run_ui(egui::RawInput::default(), |ui| app.update(ui.ctx()));
+
+        assert!(!output.shapes.is_empty());
     }
 
     fn test_elements() -> Vec<Element> {
