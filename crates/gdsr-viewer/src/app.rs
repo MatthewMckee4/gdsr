@@ -2161,6 +2161,16 @@ mod tests {
         assert!(!accepts_canvas_shortcut(false, egui::Modifiers::CTRL));
     }
 
+    #[test]
+    fn update_draws_main_panels() {
+        let context = egui::Context::default();
+        let mut app = ViewerApp::default();
+
+        let output = context.run_ui(egui::RawInput::default(), |ui| app.update(ui.ctx()));
+
+        assert!(!output.shapes.is_empty());
+    }
+
     fn test_elements() -> Vec<Element> {
         vec![
             Polygon::new(
