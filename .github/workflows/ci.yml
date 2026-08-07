@@ -128,6 +128,33 @@ jobs:
       - name: Check Rust docs
         run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
 
+  msrv:
+    name: "MSRV"
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: determine_changes
+    if: ${{ (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read declared MSRV
+        id: msrv
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - name: Check MSRV
+        run: cargo check --workspace --all-targets --all-features
+
   cargo-test:
     name: "cargo test (${{ matrix.os }})"
 
@@ -257,6 +284,7 @@ jobs:
       - determine_changes
       - pre-commit
       - build-docs
+      - msrv
       - cargo-test
       - coverage
       - benchmarks
@@ -272,6 +300,7 @@ jobs:
           COVERAGE_RESULT: ${{ needs.coverage.result }}
           DETERMINE_CHANGES_RESULT: ${{ needs.determine_changes.result }}
           PRE_COMMIT_RESULT: ${{ needs.pre-commit.result }}
+          MSRV_RESULT: ${{ needs.msrv.result }}
         run: |
           require_success() {
             if [ "$2" != "success" ]; then
@@ -309,3 +338,4 @@ jobs:
           require_code_validation "coverage" "$COVERAGE_RESULT"
           require_code_validation "cargo test" "$CARGO_TEST_RESULT"
           require_code_validation "benchmarks" "$BENCHMARKS_RESULT"
+          require_code_validation "MSRV" "$MSRV_RESULT"
