@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition.
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.95"
 homepage = "https://github.com/MatthewMckee4/gdsr"
 authors = ["Matthew Mckee <matthewmckee04@yahoo.co.uk>"]
 license = "MIT"
