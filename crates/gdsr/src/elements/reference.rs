@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::{Arc, OnceLock};
 
 use crate::elements::Element;
 use crate::elements::property::PropertyStore;
@@ -41,6 +41,44 @@ impl Default for Instance {
     }
 }
 
+impl Drop for Instance {
+    fn drop(&mut self) {
+        let Self::Element(element) = self else {
+            return;
+        };
+        if !matches!(element.as_ref().as_ref(), Element::Reference(_)) {
+            return;
+        }
+
+        let mut pending = Some(std::mem::replace(element, instance_drop_sentinel()));
+        while let Some(element) = pending {
+            let Ok(mut element) = Arc::try_unwrap(element) else {
+                break;
+            };
+            let Element::Reference(reference) = element.as_mut() else {
+                break;
+            };
+            pending = match &mut reference.instance {
+                Self::Element(inner)
+                    if matches!(inner.as_ref().as_ref(), Element::Reference(_)) =>
+                {
+                    Some(std::mem::replace(inner, instance_drop_sentinel()))
+                }
+                Self::Cell(_) | Self::Element(_) => None,
+            };
+        }
+    }
+}
+
+#[expect(
+    clippy::redundant_allocation,
+    reason = "sentinel must match Instance::Element's existing Arc<Box<Element>> representation"
+)]
+fn instance_drop_sentinel() -> Arc<Box<Element>> {
+    static SENTINEL: OnceLock<Arc<Box<Element>>> = OnceLock::new();
+    Arc::clone(SENTINEL.get_or_init(|| Arc::new(Box::new(Element::Node(crate::Node::default())))))
+}
+
 impl std::fmt::Display for Instance {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -77,6 +115,11 @@ pub struct Reference {
     pub(crate) properties: PropertyStore,
 }
 
+enum FlattenAction {
+    Reference(Reference, usize),
+    Emit(Element),
+}
+
 impl Reference {
     /// Creates a new reference to the given instance with a default grid.
     pub fn new(instance: impl Into<Instance>) -> Self {
@@ -97,16 +140,18 @@ impl Reference {
         &self.grid
     }
 
-    /// Returns the name of the referenced cell, recursively resolving through inline element
-    /// wrappers. Returns `None` if the reference chain ends at a non-reference element.
+    /// Returns the name of the referenced cell after resolving nested inline element wrappers.
+    /// Returns `None` if the reference chain ends at a non-reference element.
     pub fn referenced_cell_name(&self) -> Option<&str> {
-        match &self.instance {
-            Instance::Cell(name) => Some(name),
-            Instance::Element(element) => {
-                if let Element::Reference(inner) = element.as_ref().as_ref() {
-                    inner.referenced_cell_name()
-                } else {
-                    None
+        let mut reference = self;
+        loop {
+            match &reference.instance {
+                Instance::Cell(name) => return Some(name),
+                Instance::Element(element) => {
+                    let Element::Reference(inner) = element.as_ref().as_ref() else {
+                        return None;
+                    };
+                    reference = inner;
                 }
             }
         }
@@ -115,9 +160,19 @@ impl Reference {
     /// Remaps layers on the inline element, if this reference holds one.
     /// Cell references are unaffected.
     pub fn remap_layers(&mut self, mapping: &crate::LayerMapping) {
-        if let Instance::Element(arc_elem) = &mut self.instance {
-            let elem = Arc::make_mut(arc_elem);
-            elem.remap_layers(mapping);
+        let mut reference = self;
+        loop {
+            let Instance::Element(element) = &mut reference.instance else {
+                return;
+            };
+            let element = Arc::make_mut(element);
+            match element.as_mut() {
+                Element::Reference(inner) => reference = inner,
+                element => {
+                    element.remap_layers(mapping);
+                    return;
+                }
+            }
         }
     }
 
@@ -187,19 +242,6 @@ impl Reference {
         elements
     }
 
-    /// Sends each element in the grid through the channel. Returns `Err(())` if the receiver
-    /// has been dropped.
-    fn send_elements_in_grid(
-        &self,
-        element: &Element,
-        tx: &mpsc::Sender<Element>,
-    ) -> Result<(), ()> {
-        for el in self.get_elements_in_grid(element) {
-            tx.send(el).map_err(|_| ())?;
-        }
-        Ok(())
-    }
-
     /// Like [`flatten`](Self::flatten) but sends elements through a channel as they're produced,
     /// enabling progressive rendering. Returns `Err(())` if the receiver is dropped.
     #[expect(
@@ -212,48 +254,12 @@ impl Reference {
         library: &Library,
         tx: &mpsc::Sender<Element>,
     ) -> Result<(), ()> {
-        let depth = depth.unwrap_or(usize::MAX);
-        if depth == 0 {
-            tx.send(Element::Reference(self)).map_err(|_| ())?;
-            return Ok(());
-        }
-        match &self.instance {
-            Instance::Cell(cell_name) => {
-                if let Some(cell) = library.get_cell(cell_name) {
-                    for element in cell.iter_elements() {
-                        if let Element::Reference(reference) = element {
-                            for grid_el in
-                                self.get_elements_in_grid(&Element::Reference(reference.clone()))
-                            {
-                                if let Element::Reference(grid_ref) = grid_el {
-                                    grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
-                                }
-                            }
-                        } else {
-                            self.send_elements_in_grid(element, tx)?;
-                        }
-                    }
-                }
-            }
-            Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_)
-                | Element::Polygon(_)
-                | Element::Box(_)
-                | Element::Node(_)
-                | Element::Text(_) => {
-                    self.send_elements_in_grid(element, tx)?;
-                }
-                Element::Reference(reference) => {
-                    for grid_el in self.get_elements_in_grid(&Element::Reference(reference.clone()))
-                    {
-                        if let Element::Reference(grid_ref) = grid_el {
-                            grid_ref.stream_flatten(Some(depth - 1), library, tx)?;
-                        }
-                    }
-                }
-            },
-        }
-        Ok(())
+        self.traverse_filtered_at_depth(
+            depth.unwrap_or(usize::MAX),
+            &FlattenOptions::default(),
+            library,
+            &mut |element| tx.send(element).map_err(|_| ()),
+        )
     }
 
     /// Recursively flattens this reference into concrete elements, resolving cell references
@@ -280,53 +286,112 @@ impl Reference {
         library: &Library,
     ) -> Vec<Element> {
         let mut elements: Vec<Element> = Vec::new();
-        if depth == 0 {
-            return [Element::Reference(self)].to_vec();
-        }
-        match &self.instance {
-            Instance::Cell(cell_name) => {
-                if !options.includes_cell(cell_name) {
-                    return vec![Element::Reference(self)];
-                }
-                if let Some(cell) = library.get_cell(cell_name) {
-                    let flattened_cell_elements =
-                        cell.get_elements_filtered_at_depth(depth - 1, options, library);
-                    for cell_element in flattened_cell_elements {
-                        elements.extend(self.get_elements_in_grid(&cell_element));
-                    }
-                }
-            }
-            Instance::Element(element) => match element.as_ref().as_ref() {
-                Element::Path(_)
-                | Element::Polygon(_)
-                | Element::Box(_)
-                | Element::Node(_)
-                | Element::Text(_) => {
-                    if options.includes_element(element) {
-                        elements.extend(self.get_elements_in_grid(element));
-                    }
-                }
-
-                Element::Reference(reference) => {
-                    let flattened_reference_elements =
-                        reference
-                            .clone()
-                            .flatten_filtered_at_depth(depth - 1, options, library);
-
-                    for reference_element in flattened_reference_elements {
-                        elements.extend(self.get_elements_in_grid(&reference_element));
-                    }
-                }
-            },
-        }
-
+        let result = self.traverse_filtered_at_depth(depth, options, library, &mut |element| {
+            elements.push(element);
+            Ok(())
+        });
+        debug_assert!(result.is_ok(), "vector emitter cannot fail");
         elements
+    }
+
+    fn traverse_filtered_at_depth(
+        self,
+        depth: usize,
+        options: &FlattenOptions,
+        library: &Library,
+        emit: &mut impl FnMut(Element) -> Result<(), ()>,
+    ) -> Result<(), ()> {
+        let mut pending = vec![FlattenAction::Reference(self, depth)];
+        while let Some(action) = pending.pop() {
+            let (reference, depth) = match action {
+                FlattenAction::Reference(reference, depth) => (reference, depth),
+                FlattenAction::Emit(element) => {
+                    emit(element)?;
+                    continue;
+                }
+            };
+            if depth == 0 {
+                emit(Element::Reference(reference))?;
+                continue;
+            }
+
+            let mut next = Vec::new();
+            match reference.instance() {
+                Instance::Cell(cell_name) => {
+                    if !options.includes_cell(cell_name) {
+                        emit(Element::Reference(reference))?;
+                        continue;
+                    }
+                    if let Some(cell) = library.get_cell(cell_name) {
+                        for element in cell.iter_elements() {
+                            for element in reference.get_elements_in_grid(element) {
+                                if let Element::Reference(reference) = element {
+                                    next.push(FlattenAction::Reference(reference, depth - 1));
+                                } else if options.includes_element(&element) {
+                                    next.push(FlattenAction::Emit(element));
+                                }
+                            }
+                        }
+                    }
+                }
+                Instance::Element(element) => match element.as_ref().as_ref() {
+                    Element::Reference(inner) => {
+                        for element in
+                            reference.get_elements_in_grid(&Element::Reference(inner.clone()))
+                        {
+                            if let Element::Reference(reference) = element {
+                                next.push(FlattenAction::Reference(reference, depth - 1));
+                            }
+                        }
+                    }
+                    element if options.includes_element(element) => {
+                        next.extend(
+                            reference
+                                .get_elements_in_grid(element)
+                                .into_iter()
+                                .map(FlattenAction::Emit),
+                        );
+                    }
+                    Element::Path(_)
+                    | Element::Polygon(_)
+                    | Element::Box(_)
+                    | Element::Node(_)
+                    | Element::Text(_) => {}
+                },
+            }
+            pending.extend(next.into_iter().rev());
+        }
+        Ok(())
     }
 }
 
 impl std::fmt::Display for Reference {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Reference to {} with grid {}", self.instance, self.grid)
+        let mut reference = self;
+        let mut grids = Vec::new();
+        loop {
+            grids.push(reference.grid());
+            write!(f, "Reference to ")?;
+            match reference.instance() {
+                Instance::Cell(cell_name) => {
+                    write!(f, "Cell instance: {cell_name}")?;
+                    break;
+                }
+                Instance::Element(element) => {
+                    write!(f, "Element instance: ")?;
+                    if let Element::Reference(inner) = element.as_ref().as_ref() {
+                        reference = inner;
+                    } else {
+                        write!(f, "{element}")?;
+                        break;
+                    }
+                }
+            }
+        }
+        for grid in grids.into_iter().rev() {
+            write!(f, " with grid {grid}")?;
+        }
+        Ok(())
     }
 }
 
@@ -349,6 +414,79 @@ mod tests {
     use super::*;
     use crate::elements::Polygon;
     use crate::{DataType, Layer};
+    use std::sync::Weak;
+
+    fn deeply_nested_reference(depth: usize) -> Reference {
+        let mut reference = Reference::new("leaf");
+        for _ in 1..depth {
+            reference = Reference::new(reference);
+        }
+        reference
+    }
+
+    #[test]
+    fn deep_unique_inline_chain_drops_iteratively() {
+        let reference = deeply_nested_reference(10_000);
+        assert_eq!(reference.referenced_cell_name(), Some("leaf"));
+        drop(reference);
+    }
+
+    #[test]
+    fn deep_shared_inline_chain_drops_iteratively_for_final_owner() {
+        let reference = deeply_nested_reference(10_000);
+        let shared = reference.clone();
+        drop(reference);
+        drop(shared);
+    }
+
+    #[test]
+    fn deep_inline_chain_with_weak_handles_drops_iteratively() {
+        let reference = deeply_nested_reference(10_000);
+        let mut weak_elements: Vec<Weak<Box<Element>>> = Vec::new();
+        let mut current = &reference;
+        while let Instance::Element(element) = current.instance() {
+            weak_elements.push(Arc::downgrade(element));
+            let Element::Reference(inner) = element.as_ref().as_ref() else {
+                break;
+            };
+            current = inner;
+        }
+        assert!(
+            weak_elements
+                .iter()
+                .all(|element| element.upgrade().is_some())
+        );
+
+        drop(reference);
+
+        assert!(
+            weak_elements
+                .iter()
+                .all(|element| element.upgrade().is_none())
+        );
+    }
+
+    #[test]
+    fn deep_inline_chain_flattens_iteratively() {
+        let polygon = Polygon::new(
+            [
+                Point::default_integer(0, 0),
+                Point::default_integer(10, 0),
+                Point::default_integer(10, 10),
+            ],
+            Layer::new(1),
+            DataType::new(0),
+        );
+        let mut reference = Reference::new(polygon);
+        for _ in 1..10_000 {
+            reference = Reference::new(reference);
+        }
+
+        let flattened = reference.flatten(None, &Library::new("test"));
+
+        assert_eq!(flattened.len(), 1);
+        assert!(matches!(flattened[0], Element::Polygon(_)));
+    }
 
     mod instance {
         use super::*;

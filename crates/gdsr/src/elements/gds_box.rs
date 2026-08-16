@@ -158,6 +158,7 @@ impl Dimensions for GdsBox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Transformation, Unit};
 
     fn p(x: i32, y: i32) -> Point {
         Point::integer(x, y, 1e-9)
@@ -170,6 +171,42 @@ mod tests {
         assert_eq!(gds_box.top_right(), p(10, 10));
         assert_eq!(gds_box.layer(), Layer::new(1));
         assert_eq!(gds_box.box_type(), DataType::new(0));
+    }
+
+    #[test]
+    fn heterogeneous_axis_units_survive_creation_transform_and_round_trip() {
+        let first = Point::new(Unit::float(4.0, 1e-9), Unit::float(-2.0, 1e-6));
+        let second = Point::new(Unit::float(-1.0, 1e-9), Unit::float(3.0, 1e-6));
+        let expected_min = Point::new(Unit::float(-1.0, 1e-9), Unit::float(-2.0, 1e-6));
+        let expected_max = Point::new(Unit::float(4.0, 1e-9), Unit::float(3.0, 1e-6));
+
+        let gds_box = GdsBox::new(first, second, Layer::new(1), DataType::new(0));
+        assert_eq!(gds_box.bottom_left(), expected_min);
+        assert_eq!(gds_box.top_right(), expected_max);
+
+        let transformed = gds_box.clone().transform(Transformation::default());
+        assert_eq!(transformed.bottom_left(), expected_min);
+        assert_eq!(transformed.top_right(), expected_max);
+
+        let round_trip = gds_box.to_integer_unit().to_float_unit();
+        assert_eq!(round_trip.bottom_left(), expected_min);
+        assert_eq!(round_trip.top_right(), expected_max);
+    }
+
+    #[test]
+    fn mixed_resolution_integer_units_survive_creation_and_transform() {
+        let coarse = Point::new(Unit::integer(1, 1.0), Unit::integer(1, 1.0));
+        let fine = Point::new(Unit::integer(1, 0.1), Unit::integer(2, 0.1));
+        let expected_min = Point::new(Unit::float(0.1, 1.0), Unit::float(0.2, 1.0));
+        let expected_max = Point::new(Unit::float(1.0, 1.0), Unit::float(1.0, 1.0));
+
+        let gds_box = GdsBox::new(coarse, fine, Layer::new(1), DataType::new(0));
+        assert_eq!(gds_box.bottom_left(), expected_min);
+        assert_eq!(gds_box.top_right(), expected_max);
+
+        let transformed = gds_box.transform(Transformation::default());
+        assert_eq!(transformed.bottom_left(), expected_min);
+        assert_eq!(transformed.top_right(), expected_max);
     }
 
     #[test]
