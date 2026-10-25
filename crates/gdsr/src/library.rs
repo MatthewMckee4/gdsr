@@ -1477,12 +1477,12 @@ mod tests {
                 .len(),
             1
         );
-        assert!(
+        assert_eq!(
             skipped
                 .get_cell("shared")
                 .expect("preserved cell should exist")
-                .elements()
-                .is_empty()
+                .elements(),
+            []
         );
     }
 
@@ -1501,7 +1501,7 @@ mod tests {
             .merge([referencing, dependency], CellConflictStrategy::Error)
             .expect("cross-library reference should resolve after the full merge");
 
-        assert!(primary.dangling_cell_references().is_empty());
+        assert_eq!(primary.dangling_cell_references(), []);
     }
 
     #[test]
@@ -1773,7 +1773,7 @@ mod tests {
         top.add(Reference::new("base".to_string()));
         library.add_cell(top);
 
-        assert!(library.dangling_cell_references().is_empty());
+        assert_eq!(library.dangling_cell_references(), []);
     }
 
     #[test]
@@ -1846,7 +1846,7 @@ mod tests {
         )));
         library.add_cell(cell);
 
-        assert!(library.dangling_cell_references().is_empty());
+        assert_eq!(library.dangling_cell_references(), []);
     }
 
     #[test]
@@ -2223,7 +2223,7 @@ mod tests {
         let explicitly_reachable = library
             .unreachable_cells(&["A"])
             .expect("explicit cycle root should exist");
-        assert!(explicitly_reachable.is_empty());
+        assert_eq!(explicitly_reachable, Vec::<&Cell>::new());
 
         let report = library
             .prune_unreachable(&[], CellPruneMode::Apply)

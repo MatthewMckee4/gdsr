@@ -380,15 +380,19 @@ mod tests {
 
     #[test]
     fn too_few_points_returns_empty() {
-        assert!(
-            expand_path_to_polygon(&[(0.0, 0.0)], 1.0, PathType::Square, 0.0, 0.0, 8).is_empty()
+        assert_eq!(
+            expand_path_to_polygon(&[(0.0, 0.0)], 1.0, PathType::Square, 0.0, 0.0, 8),
+            []
         );
-        assert!(expand_path_to_polygon(&[], 1.0, PathType::Square, 0.0, 0.0, 8).is_empty());
+        assert_eq!(
+            expand_path_to_polygon(&[], 1.0, PathType::Square, 0.0, 0.0, 8),
+            []
+        );
     }
 
     #[test]
     fn zero_width_returns_empty() {
-        assert!(
+        assert_eq!(
             expand_path_to_polygon(
                 &[(0.0, 0.0), (10.0, 0.0)],
                 0.0,
@@ -396,8 +400,8 @@ mod tests {
                 0.0,
                 0.0,
                 8
-            )
-            .is_empty()
+            ),
+            []
         );
     }
 

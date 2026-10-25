@@ -364,8 +364,8 @@ mod tests {
         let grid = SpatialGrid::build(&[poly], &bounds);
 
         let mut buf = Vec::new();
-        assert!(grid.query_point(-1.0, -1.0, &mut buf).is_empty());
-        assert!(grid.query_point(2.0, 2.0, &mut buf).is_empty());
+        assert_eq!(grid.query_point(-1.0, -1.0, &mut buf), []);
+        assert_eq!(grid.query_point(2.0, 2.0, &mut buf), []);
     }
 
     #[test]
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn layer_keys_reference_empty() {
         let elem = reference();
-        assert!(elem.layer_keys().is_empty());
+        assert_eq!(elem.layer_keys(), []);
     }
 
     #[test]

@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn default_is_empty() {
         let node = Node::default();
-        assert!(node.points().is_empty());
+        assert_eq!(node.points(), []);
         assert_eq!(node.layer(), Layer::default());
         assert_eq!(node.node_type(), DataType::default());
     }

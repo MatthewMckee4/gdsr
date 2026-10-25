@@ -1694,7 +1694,7 @@ mod tests {
         let error = write_points_to_file(&mut bytes, path.points(), &mut converter, "point", false)
             .expect_err("oversized XY record should be rejected");
 
-        assert!(bytes.is_empty());
+        assert_eq!(bytes, []);
         assert_eq!(
             error.to_string(),
             format!(
@@ -1761,7 +1761,7 @@ mod tests {
             .expect("coordinate should be writable");
 
         assert_eq!(record_i32(&bytes, GDSRecord::XY), [4, -4]);
-        assert!(report.affected_locations().is_empty());
+        assert_eq!(report.affected_locations(), []);
     }
 
     #[test]
@@ -1863,7 +1863,7 @@ mod tests {
                 .to_bytes_with_options(1.0, 1.0, zero_timestamp_options(policy))
                 .expect("near-grid value should be writable");
             assert_eq!(record_i32(&bytes, GDSRecord::XY), [3, -3]);
-            assert!(report.affected_locations().is_empty());
+            assert_eq!(report.affected_locations(), []);
         }
     }
 
@@ -2043,7 +2043,7 @@ mod tests {
             )
             .expect("exact i32 boundaries should be writable");
         assert_eq!(record_i32(&bytes, GDSRecord::XY), [i32::MIN, i32::MAX]);
-        assert!(report.affected_locations().is_empty());
+        assert_eq!(report.affected_locations(), []);
     }
 
     #[test]
@@ -2339,7 +2339,7 @@ mod tests {
                 .to_string()
                 .contains("physical value inf is not finite")
         );
-        assert!(converter.finish().affected_locations().is_empty());
+        assert_eq!(converter.finish().affected_locations(), []);
     }
 
     #[test]
@@ -2408,7 +2408,7 @@ mod tests {
             )
             .expect("off-grid inputs that cancel to an exact emitted point should be writable");
         assert_eq!(record_i32(&bytes, GDSRecord::XY), [1, 0]);
-        assert!(report.affected_locations().is_empty());
+        assert_eq!(report.affected_locations(), []);
     }
 
     #[test]
@@ -2440,7 +2440,7 @@ mod tests {
             records_i32(&bytes, GDSRecord::XY),
             [vec![0, 0], vec![-1, 1]]
         );
-        assert!(report.affected_locations().is_empty());
+        assert_eq!(report.affected_locations(), []);
     }
 
     #[test]
@@ -2952,7 +2952,7 @@ mod tests {
         .expect("oversized library name should be rejected");
 
         assert!(matches!(error, GdsError::ValidationError { .. }));
-        assert!(output.is_empty());
+        assert_eq!(output, []);
     }
 
     #[test]

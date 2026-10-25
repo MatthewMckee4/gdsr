@@ -2264,20 +2264,20 @@ mod tests {
         assert!(app.delete_selected_element());
 
         let cell = app.cell.expect("cell should remain loaded");
-        assert!(cell.elements.is_empty());
-        assert!(
+        assert_eq!(cell.elements, []);
+        assert_eq!(
             cell.library
                 .get_cell("top")
                 .expect("top cell should exist")
-                .elements()
-                .is_empty()
+                .elements(),
+            []
         );
         assert!(cell.spatial_grid.is_none());
         assert!(app.selected_element.is_none());
         assert!(app.hovered_element.is_none());
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2302,7 +2302,7 @@ mod tests {
         assert!(cell.spatial_grid.is_some());
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let library_bbox = cell
             .library
@@ -2330,7 +2330,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert_eq!(app.selected_element, Some(0));
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
 
         assert!(app.redo_edit());
@@ -2338,7 +2338,7 @@ mod tests {
         assert_eq!(loaded_element_count(&app), 0);
         assert!(app.selected_element.is_none());
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2364,7 +2364,7 @@ mod tests {
         assert!((restored_bbox.min_x - 0.0).abs() < 1e-12);
         assert!((restored_bbox.min_y - 0.0).abs() < 1e-12);
         assert_eq!(app.selected_element, Some(0));
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
 
         assert!(app.redo_edit());
@@ -2374,7 +2374,7 @@ mod tests {
         assert!((redone_bbox.min_y - 4.0).abs() < 1e-12);
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2393,7 +2393,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Text(text)) = app
             .cell
@@ -2451,7 +2451,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2477,7 +2477,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Polygon(polygon)) = app
             .cell
@@ -2584,7 +2584,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2612,7 +2612,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Path(path)) = app
             .cell
@@ -2743,7 +2743,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2869,10 +2869,10 @@ mod tests {
         assert!(cell.library.get_cell("created").is_some());
         assert_eq!(cell.selected_cell.as_deref(), Some("created"));
         assert!(cell.cell_names.contains(&"created".to_string()));
-        assert!(cell.elements.is_empty());
+        assert_eq!(cell.elements, []);
         assert!(app.has_unsaved_changes);
-        assert!(app.undo_stack.is_empty());
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
