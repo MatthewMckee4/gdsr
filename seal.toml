@@ -26,7 +26,7 @@ confirm = true
 "Performance" = ["performance"]
 
 [changelog]
-ignore-contributors = ["dependabot[bot]"]
+ignore-contributors = ["dependabot[bot]", "renovate[bot]"]
 ignore-labels = ["Internal", "ci", "release", "wontfix", "good first issue", "help wanted", "duplicate", "needs-decision", "breaking-change", "dependencies", "testing"]
 include-contributors = true
 changelog-heading = "{version}"

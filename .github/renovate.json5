@@ -1,0 +1,78 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Cargo\\.toml$/",
+        "/^\\.github/workflows/release\\.yml$/"
+      ],
+      "matchStrings": [
+        "cargo-dist-version\\s*=\\s*\"(?<currentValue>[^\"]+)\"",
+        "tool:\\s*cargo-dist@(?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "axodotdev/cargo-dist",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "enabledManagers": [
+    "cargo",
+    "custom.regex",
+    "github-actions",
+    "pep723",
+    "pip_requirements",
+    "pre-commit",
+    "rust-toolchain"
+  ],
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "schedule:weekly",
+    ":enablePreCommit"
+  ],
+  "minimumReleaseAge": "7 days",
+  "pep723": {
+    "managerFilePatterns": ["scripts/**/*.py"]
+  },
+  "packageRules": [
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "minor", "patch", "pin", "pinDigest"]
+    },
+    {
+      "labels": ["ci"],
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "labels": ["internal"],
+      "matchManagers": [
+        "cargo",
+        "custom.regex",
+        "pep723",
+        "pip_requirements",
+        "pre-commit",
+        "rust-toolchain"
+      ]
+    },
+    {
+      "groupName": "docs Python dependencies",
+      "matchManagers": ["pip_requirements"]
+    },
+    {
+      "groupName": "benchmark Python dependencies",
+      "matchManagers": ["pep723"]
+    },
+    {
+      "groupName": "pre-commit hooks",
+      "matchManagers": ["pre-commit"]
+    },
+    {
+      "groupName": "egui integration",
+      "matchDepNames": ["egui", "bevy_egui"],
+      "matchManagers": ["cargo"]
+    }
+  ]
+}
