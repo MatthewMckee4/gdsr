@@ -49,8 +49,8 @@ fn move_element_to_cursor(element: Element, wx: f64, wy: f64) -> Element {
     let target = Point::float(wx, wy, 1.0);
     if let Some(bbox) = element.world_bbox() {
         let center = Point::float(
-            (bbox.min_x + bbox.max_x) * 0.5,
-            (bbox.min_y + bbox.max_y) * 0.5,
+            bbox.min_x.midpoint(bbox.max_x),
+            bbox.min_y.midpoint(bbox.max_y),
             1.0,
         );
         return element.move_by(target - center);
@@ -558,8 +558,8 @@ impl ViewerApp {
             .as_ref()
             .and_then(|cell| cell.elements.get(index))
             .and_then(Element::world_bbox)?;
-        let center_x = (bbox.min_x + bbox.max_x) * 0.5;
-        let center_y = (bbox.min_y + bbox.max_y) * 0.5;
+        let center_x = bbox.min_x.midpoint(bbox.max_x);
+        let center_y = bbox.min_y.midpoint(bbox.max_y);
         let target_x = center_x + delta.x().absolute_value();
         let target_y = center_y + delta.y().absolute_value();
         let (snapped_x, snapped_y) = self.snap_world_position(target_x, target_y);
