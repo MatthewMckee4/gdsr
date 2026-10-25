@@ -12,7 +12,8 @@ dev_addr = "localhost:3000"
 
 nav = [
     { "Home" = "index.md" },
-    { "Units" = "units.md" }
+    { "Units" = "units.md" },
+    { "Hierarchy bounds" = "hierarchy-bounds.md" }
 ]
 
 [project.theme]

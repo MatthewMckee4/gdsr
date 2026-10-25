@@ -169,14 +169,18 @@ impl Path {
             return None;
         }
 
-        let half_width = width.absolute_value() / 2.0;
+        let half_width = width.absolute_value().abs() / 2.0;
         if half_width <= 0.0 {
             return None;
         }
 
         let path_type = self.r#type.unwrap_or_default();
-        let begin_ext = self.begin_extension.map_or(0.0, |u| u.absolute_value());
-        let end_ext = self.end_extension.map_or(0.0, |u| u.absolute_value());
+        let begin_ext = self
+            .begin_extension
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
+        let end_ext = self
+            .end_extension
+            .map_or(0.0, |u| u.absolute_value().max(0.0));
 
         let units = self.points[0].units().0;
         let centerline: Vec<(f64, f64)> = self

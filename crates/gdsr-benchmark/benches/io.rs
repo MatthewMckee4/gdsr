@@ -257,6 +257,52 @@ fn hierarchy_library() -> Library {
     library
 }
 
+fn shared_reference_bounds_library(reference_count: i32) -> Library {
+    let mut library = Library::new("bench_shared_bounds");
+    let mut leaf = Cell::new("leaf");
+    leaf.add(Polygon::new(
+        [point(0, 0), point(100, 0), point(100, 100), point(0, 100)],
+        Layer::new(1),
+        DataType::new(0),
+    ));
+    library.add_cell(leaf);
+
+    let mut top = Cell::new("top");
+    for index in 0..reference_count {
+        top.add(
+            Reference::new("leaf").with_grid(
+                Grid::default()
+                    .with_origin(point(index * 10, index % 100))
+                    .with_columns(1_024)
+                    .with_rows(1_024)
+                    .with_spacing_x(Some(point(200, 25)))
+                    .with_spacing_y(Some(point(-50, 175))),
+            ),
+        );
+    }
+    library.add_cell(top);
+    library
+}
+
+fn deep_hierarchy_bounds_library(depth: usize) -> Library {
+    let mut library = Library::new("bench_deep_bounds");
+    let leaf_name = format!("cell_{depth:05}");
+    let mut leaf = Cell::new(&leaf_name);
+    leaf.add(Polygon::new(
+        [point(0, 0), point(100, 0), point(100, 100), point(0, 100)],
+        Layer::new(1),
+        DataType::new(0),
+    ));
+    library.add_cell(leaf);
+
+    for index in (0..depth).rev() {
+        let mut cell = Cell::new(&format!("cell_{index:05}"));
+        cell.add(Reference::new(format!("cell_{:05}", index + 1)));
+        library.add_cell(cell);
+    }
+    library
+}
+
 fn fixtures() -> [Fixture; 3] {
     [
         Fixture::new("mixed_10k", mixed_library(10_000)),
@@ -417,6 +463,30 @@ fn bench_write_file(c: &mut Criterion, fixture: &Fixture) {
     group.finish();
 }
 
+fn bench_hierarchy_bounds(c: &mut Criterion) {
+    let shared = shared_reference_bounds_library(50_000);
+    let deep = deep_hierarchy_bounds_library(10_000);
+    let mut group = c.benchmark_group("hierarchy_bounds");
+    group.bench_function("shared_child_50k_arefs", |bencher| {
+        bencher.iter(|| {
+            black_box(
+                shared
+                    .hierarchy_bounds(black_box("top"))
+                    .expect("benchmark hierarchy should resolve"),
+            )
+        });
+    });
+    group.bench_function("deep_chain_10k", |bencher| {
+        bencher.iter(|| {
+            black_box(
+                deep.hierarchy_bounds(black_box("cell_00000"))
+                    .expect("benchmark hierarchy should resolve"),
+            )
+        });
+    });
+    group.finish();
+}
+
 fn bench_io(c: &mut Criterion) {
     let fixtures = fixtures();
     let mixed_50k = &fixtures[1];
@@ -429,6 +499,7 @@ fn bench_io(c: &mut Criterion) {
     bench_write_bytes_with_options(c);
     bench_write_stream(c, hierarchy_10k);
     bench_write_file(c, mixed_50k);
+    bench_hierarchy_bounds(c);
 }
 
 criterion_group!(benches, bench_io);

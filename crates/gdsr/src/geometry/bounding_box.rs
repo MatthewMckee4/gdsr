@@ -1,4 +1,4 @@
-use crate::Point;
+use crate::{Point, Unit};
 
 /// Calculate the bounding box of a collection of points.
 ///
@@ -18,16 +18,16 @@ pub fn bounding_box(points: &[Point]) -> (Point, Point) {
     let mut max_y = f64::NEG_INFINITY;
 
     for p in points {
-        let x = p.x().float_value();
-        let y = p.y().float_value();
+        let x = p.x().to_float_unit().scale_to(x_units).float_value();
+        let y = p.y().to_float_unit().scale_to(y_units).float_value();
         min_x = min_x.min(x);
         min_y = min_y.min(y);
         max_x = max_x.max(x);
         max_y = max_y.max(y);
     }
 
-    let min_point = Point::float(min_x, min_y, x_units);
-    let max_point = Point::float(max_x, max_y, y_units);
+    let min_point = Point::new(Unit::float(min_x, x_units), Unit::float(min_y, y_units));
+    let max_point = Point::new(Unit::float(max_x, x_units), Unit::float(max_y, y_units));
     (min_point, max_point)
 }
 
@@ -63,6 +63,44 @@ mod tests {
         let (min, max) = bounding_box(&points);
         assert_eq!(min, Point::integer(5, 3, 1e-9));
         assert_eq!(max, Point::integer(5, 3, 1e-9));
+    }
+
+    #[test]
+    fn bounding_box_preserves_axis_specific_units() {
+        let points = [
+            Point::new(Unit::float(4.0, 1e-9), Unit::float(-2.0, 1e-6)),
+            Point::new(Unit::float(-1.0, 1e-9), Unit::float(3.0, 1e-6)),
+        ];
+
+        let (min, max) = bounding_box(&points);
+
+        assert_eq!(
+            min,
+            Point::new(Unit::float(-1.0, 1e-9), Unit::float(-2.0, 1e-6))
+        );
+        assert_eq!(
+            max,
+            Point::new(Unit::float(4.0, 1e-9), Unit::float(3.0, 1e-6))
+        );
+    }
+
+    #[test]
+    fn bounding_box_preserves_mixed_resolution_integer_coordinates() {
+        let points = [
+            Point::new(Unit::integer(1, 1.0), Unit::integer(1, 1.0)),
+            Point::new(Unit::integer(1, 0.1), Unit::integer(2, 0.1)),
+        ];
+
+        let (min, max) = bounding_box(&points);
+
+        assert_eq!(
+            min,
+            Point::new(Unit::float(0.1, 1.0), Unit::float(0.2, 1.0))
+        );
+        assert_eq!(
+            max,
+            Point::new(Unit::float(1.0, 1.0), Unit::float(1.0, 1.0))
+        );
     }
 
     #[test]
