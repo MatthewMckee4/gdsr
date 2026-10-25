@@ -28,10 +28,12 @@
   ],
   "extends": [
     "config:recommended",
+    "customManagers:githubActionsVersions",
     "helpers:pinGitHubActionDigests",
     "schedule:weekly",
     ":enablePreCommit"
   ],
+  "labels": ["dependencies"],
   "minimumReleaseAge": "7 days",
   "pep723": {
     "managerFilePatterns": ["scripts/**/*.py"]
@@ -41,21 +43,6 @@
       "groupName": "GitHub Actions",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["digest", "minor", "patch", "pin", "pinDigest"]
-    },
-    {
-      "labels": ["ci"],
-      "matchManagers": ["github-actions"]
-    },
-    {
-      "labels": ["internal"],
-      "matchManagers": [
-        "cargo",
-        "custom.regex",
-        "pep723",
-        "pip_requirements",
-        "pre-commit",
-        "rust-toolchain"
-      ]
     },
     {
       "groupName": "docs Python dependencies",
