@@ -2168,7 +2168,7 @@ mod tests {
 
         let output = context.run_ui(egui::RawInput::default(), |ui| app.update(ui.ctx()));
 
-        assert!(!output.shapes.is_empty());
+        assert_ne!(output.shapes, []);
     }
 
     fn test_elements() -> Vec<Element> {
