@@ -40,6 +40,11 @@
   },
   "packageRules": [
     {
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["dtolnay/rust-toolchain"],
+      "pinDigests": false
+    },
+    {
       "groupName": "GitHub Actions",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["digest", "minor", "patch", "pin", "pinDigest"]
