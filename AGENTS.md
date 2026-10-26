@@ -12,30 +12,37 @@ code, unnecessary complexity, and meaningful consistency issues. Order
 findings by severity, cite files and lines, distinguish blockers from
 non-blocking improvements, and number each finding for follow-up discussion.
 
-## Running Tests
+## Design And Documentation
 
-Run the test suite with nextest:
+Understand the problem before building. Prefer the simplest solution that
+provides the required behavior and performance; reuse existing utilities and
+avoid speculative abstractions.
+
+Measure before adding capacity limits or timeouts. Explain the measurement
+behind a limit, and report its name, requested value, and allowed value when
+it is exceeded.
+
+Keep public documentation concise and readable. Lead with what readers need
+to do, and explain contracts, units, invariants, and failure behavior where
+names and types do not make them clear. Update stale comments with the code.
+
+## Verification
+
+Run the narrowest check that covers the change. For Rust behavior, use
+`cargo nextest run -p <crate> [test_name]`; use `cargo test` if nextest is
+unavailable. Run the full `cargo nextest run` suite for cross-cutting changes
+or when focused coverage is insufficient. CI runs the full platform matrix.
+
+Batch related edits before testing. Do not repeat successful checks unless
+relevant inputs changed. Start long-running checks once the code is coherent
+and continue independent work while they run. Run at most one Cargo command
+per target directory at a time.
+
+CI runs strict workspace Clippy through prek. Use focused Clippy checks when
+needed during development:
 
 ```sh
-cargo nextest run
-```
-
-Run `cargo nextest run` for code changes before finishing. Prefer focused
-tests during iteration, then run the full suite when behavior changed.
-
-Pass package or test filters directly when a narrower run is enough during
-iteration:
-
-```sh
-cargo nextest run -p gdsr
-```
-
-If `cargo-nextest` is not installed, use `cargo test`.
-
-Run Clippy with the same strictness as CI:
-
-```sh
-cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo clippy -p <crate> --all-targets --all-features -- -D warnings
 ```
 
 Run docs locally with:
@@ -103,13 +110,14 @@ source content rather than hand-editing the generated file.
 
 Keep pull requests minimal and focused. Use the pull request template and add
 labels based on user-facing impact. If a pull request has no user-facing
-change, add only the `internal` label. CI performance changes use only the `ci`
+change, add only the `internal` label. Automated dependency PRs use `dependencies`. CI performance changes use only the `ci`
 label; reserve `performance` for user-facing performance improvements.
 
 Keep the summary and test plan concise. Write descriptions as prose, not bullet
 lists or checklists. Explain what changed and why; include implementation
 details only when reviewers need them.
 
+Use plain descriptive PR titles without Conventional Commit prefixes.
 Use a descriptive one-line commit subject by default. Do not add AI tooling as
 an author or co-author.
 

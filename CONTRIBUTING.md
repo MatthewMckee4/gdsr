@@ -84,13 +84,23 @@ Pass test arguments directly for focused iteration:
 cargo nextest run -p gdsr
 ```
 
-Before opening a pull request, run the relevant tests plus the full validation
-sweep:
+Use focused package or test filters during development. Run the full suite for
+cross-cutting changes or when focused coverage is insufficient. CI runs the
+full platform matrix and strict workspace Clippy checks.
+
+Before opening a pull request, run the relevant tests and validation hooks:
 
 ```bash
-cargo clippy --workspace --all-targets --all-features -- -D warnings
 uvx prek run -a
 ```
+
+Keep PRs focused, with plain descriptive titles and concise prose in the
+summary and test plan. Use `ci` when CI is the only test plan. Do not add AI
+tools as authors or co-authors. Use only `internal` when nothing changes for
+users, and reserve `ci` for CI performance changes and `performance` for
+user-facing performance improvements.
+
+## Benchmarks
 
 Run the GDS parser and writer benchmarks locally with Criterion:
 
@@ -104,6 +114,16 @@ Check the CodSpeed integration without uploading benchmark results:
 cargo codspeed build -p gdsr-benchmark --bench io -m simulation
 cargo codspeed run -p gdsr-benchmark --bench io -m simulation
 ```
+
+## Dependency Updates
+
+Renovate manages Rust crates and toolchains, GitHub Actions, pre-commit hooks,
+docs requirements, benchmark script dependencies, and cargo-dist versions.
+Updates run weekly after a seven-day release delay. Keep egui and bevy_egui
+updates together so the viewer uses compatible versions. Automated dependency
+PRs use the `dependencies` label. Review the Dependency
+Dashboard for pending updates; Dependabot version updates are disabled by
+removing its repository configuration.
 
 ## Documentation
 

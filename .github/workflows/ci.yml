@@ -61,7 +61,7 @@ jobs:
             ':!.github/PULL_REQUEST_TEMPLATE.md' \
             ':!.github/actionlint.yaml' \
             ':!.github/codecov.yml' \
-            ':!.github/dependabot.yml' \
+            ':!.github/renovate.json5' \
             ':!.github/zizmor.yml' \
             ':!docs/' \
             ':!.markdownlint.yaml' \
