@@ -516,7 +516,7 @@ mod tests {
         assert!(cell.library.get_cell("new_cell").is_some());
         assert_eq!(cell.cell_names, vec!["new_cell"]);
         assert_eq!(cell.selected_cell.as_deref(), Some("new_cell"));
-        assert!(cell.elements.is_empty());
+        assert_eq!(cell.elements, []);
         assert!(cell.spatial_grid.is_none());
     }
 
@@ -692,7 +692,7 @@ mod tests {
             .clone();
 
         assert_eq!(first, second);
-        assert!(!first.is_empty());
+        assert_ne!(first, []);
     }
 
     #[test]

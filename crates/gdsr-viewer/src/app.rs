@@ -49,8 +49,8 @@ fn move_element_to_cursor(element: Element, wx: f64, wy: f64) -> Element {
     let target = Point::float(wx, wy, 1.0);
     if let Some(bbox) = element.world_bbox() {
         let center = Point::float(
-            (bbox.min_x + bbox.max_x) * 0.5,
-            (bbox.min_y + bbox.max_y) * 0.5,
+            bbox.min_x.midpoint(bbox.max_x),
+            bbox.min_y.midpoint(bbox.max_y),
             1.0,
         );
         return element.move_by(target - center);
@@ -558,8 +558,8 @@ impl ViewerApp {
             .as_ref()
             .and_then(|cell| cell.elements.get(index))
             .and_then(Element::world_bbox)?;
-        let center_x = (bbox.min_x + bbox.max_x) * 0.5;
-        let center_y = (bbox.min_y + bbox.max_y) * 0.5;
+        let center_x = bbox.min_x.midpoint(bbox.max_x);
+        let center_y = bbox.min_y.midpoint(bbox.max_y);
         let target_x = center_x + delta.x().absolute_value();
         let target_y = center_y + delta.y().absolute_value();
         let (snapped_x, snapped_y) = self.snap_world_position(target_x, target_y);
@@ -2274,20 +2274,20 @@ mod tests {
         assert!(app.delete_selected_element());
 
         let cell = app.cell.expect("cell should remain loaded");
-        assert!(cell.elements.is_empty());
-        assert!(
+        assert_eq!(cell.elements, []);
+        assert_eq!(
             cell.library
                 .get_cell("top")
                 .expect("top cell should exist")
-                .elements()
-                .is_empty()
+                .elements(),
+            []
         );
         assert!(cell.spatial_grid.is_none());
         assert!(app.selected_element.is_none());
         assert!(app.hovered_element.is_none());
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2312,7 +2312,7 @@ mod tests {
         assert!(cell.spatial_grid.is_some());
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let library_bbox = cell
             .library
@@ -2340,7 +2340,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert_eq!(app.selected_element, Some(0));
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
 
         assert!(app.redo_edit());
@@ -2348,7 +2348,7 @@ mod tests {
         assert_eq!(loaded_element_count(&app), 0);
         assert!(app.selected_element.is_none());
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2374,7 +2374,7 @@ mod tests {
         assert!((restored_bbox.min_x - 0.0).abs() < 1e-12);
         assert!((restored_bbox.min_y - 0.0).abs() < 1e-12);
         assert_eq!(app.selected_element, Some(0));
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
 
         assert!(app.redo_edit());
@@ -2384,7 +2384,7 @@ mod tests {
         assert!((redone_bbox.min_y - 4.0).abs() < 1e-12);
         assert_eq!(app.selected_element, Some(0));
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]
@@ -2403,7 +2403,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Text(text)) = app
             .cell
@@ -2461,7 +2461,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2487,7 +2487,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Polygon(polygon)) = app
             .cell
@@ -2594,7 +2594,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2622,7 +2622,7 @@ mod tests {
         assert_eq!(app.hovered_element, Some(1));
         assert!(app.has_unsaved_changes);
         assert_eq!(app.undo_stack.len(), 1);
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.redo_stack, []);
 
         let Some(Element::Path(path)) = app
             .cell
@@ -2753,7 +2753,7 @@ mod tests {
 
         assert_eq!(loaded_element_count(&app), 1);
         assert!(app.selected_element.is_none());
-        assert!(app.undo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
         assert_eq!(app.redo_stack.len(), 1);
     }
 
@@ -2879,10 +2879,10 @@ mod tests {
         assert!(cell.library.get_cell("created").is_some());
         assert_eq!(cell.selected_cell.as_deref(), Some("created"));
         assert!(cell.cell_names.contains(&"created".to_string()));
-        assert!(cell.elements.is_empty());
+        assert_eq!(cell.elements, []);
         assert!(app.has_unsaved_changes);
-        assert!(app.undo_stack.is_empty());
-        assert!(app.redo_stack.is_empty());
+        assert_eq!(app.undo_stack, []);
+        assert_eq!(app.redo_stack, []);
     }
 
     #[test]

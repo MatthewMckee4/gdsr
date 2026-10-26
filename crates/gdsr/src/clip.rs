@@ -448,7 +448,7 @@ mod tests {
             Layer::new(1),
             DataType::new(0),
         );
-        assert!(outside.clip_to_bounding_box(bounds()).is_empty());
+        assert_eq!(outside.clip_to_bounding_box(bounds()), []);
 
         let inside = Polygon::rectangle(point(1, 1), point(2, 2), Layer::new(1), DataType::new(0));
         assert_eq!(inside.clip_to_bounding_box(bounds()), vec![inside]);
