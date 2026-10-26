@@ -356,7 +356,7 @@ mod tests {
     fn test_path_default() {
         let path = Path::default();
 
-        assert!(path.points().is_empty());
+        assert_eq!(path.points(), []);
         assert_eq!(path.layer(), Layer::new(0));
         assert_eq!(path.data_type(), DataType::new(0));
         assert_eq!(path.path_type(), &None);

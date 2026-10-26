@@ -231,7 +231,7 @@ mod tests {
     fn empty_library_produces_empty_tree() {
         let library = Library::new("empty");
         let tree = build_cell_tree(&library);
-        assert!(tree.is_empty());
+        assert_eq!(tree, []);
     }
 
     #[test]
@@ -608,7 +608,7 @@ mod tests {
     fn visible_names_empty_tree() {
         let tree: Vec<CellTreeNode> = vec![];
         let state = ExpandState::default();
-        assert!(visible_names(&tree, &state).is_empty());
+        assert_eq!(visible_names(&tree, &state), Vec::<String>::new());
     }
 
     #[test]
@@ -658,7 +658,7 @@ mod tests {
         let library = make_library(vec![("top", vec!["child"]), ("child", vec![])]);
         let tree = build_cell_tree(&library);
         let filtered = filter_tree(&tree, "xyz");
-        assert!(filtered.is_empty());
+        assert_eq!(filtered, []);
     }
 
     #[test]
@@ -728,7 +728,7 @@ mod tests {
             "top",
         ]
         "#);
-        assert!(flat[0].children.is_empty());
+        assert_eq!(flat[0].children, []);
         assert_eq!(flat[1].children.len(), 1);
         assert_eq!(flat[2].children.len(), 1);
     }

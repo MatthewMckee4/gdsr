@@ -1534,7 +1534,7 @@ mod tests {
     #[test]
     fn reference_empty_layer_keys() {
         let r = gdsr::Reference::default();
-        assert!(r.layer_keys().is_empty());
+        assert_eq!(r.layer_keys(), []);
     }
 
     #[test]
@@ -1958,16 +1958,16 @@ mod tests {
     fn stroke_polyline_empty() {
         let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let mesh = stroke_polyline_to_mesh(&[], stroke, false);
-        assert!(mesh.vertices.is_empty());
-        assert!(mesh.indices.is_empty());
+        assert_eq!(mesh.vertices, []);
+        assert_eq!(mesh.indices, []);
     }
 
     #[test]
     fn stroke_polyline_single_point() {
         let stroke = Stroke::new(2.0_f32, Color32::WHITE);
         let mesh = stroke_polyline_to_mesh(&[Pos2::new(5.0, 5.0)], stroke, false);
-        assert!(mesh.vertices.is_empty());
-        assert!(mesh.indices.is_empty());
+        assert_eq!(mesh.vertices, []);
+        assert_eq!(mesh.indices, []);
     }
 
     #[test]

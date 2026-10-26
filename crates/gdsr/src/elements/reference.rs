@@ -1035,7 +1035,7 @@ mod tests {
         let reference = Reference::new("nonexistent_cell");
 
         let flattened = reference.flatten(None, &library);
-        assert!(flattened.is_empty());
+        assert_eq!(flattened, []);
     }
 
     #[test]
@@ -1050,7 +1050,7 @@ mod tests {
         let reference = Reference::new("missing_cell").with_grid(grid);
 
         let flattened = reference.flatten(None, &library);
-        assert!(flattened.is_empty());
+        assert_eq!(flattened, []);
     }
 
     #[test]
@@ -1062,7 +1062,7 @@ mod tests {
         let reference = Reference::new("empty_cell");
 
         let flattened = reference.flatten(None, &library);
-        assert!(flattened.is_empty());
+        assert_eq!(flattened, []);
     }
 
     #[test]
@@ -1080,7 +1080,7 @@ mod tests {
         let reference = Reference::new("empty_cell").with_grid(grid);
 
         let flattened = reference.flatten(None, &library);
-        assert!(flattened.is_empty());
+        assert_eq!(flattened, []);
     }
 
     #[test]
@@ -1188,7 +1188,7 @@ mod tests {
         let element = Element::Polygon(polygon);
         let elements = reference.get_elements_in_grid(&element);
 
-        assert!(elements.is_empty());
+        assert_eq!(elements, []);
     }
 
     #[test]
@@ -1213,7 +1213,7 @@ mod tests {
         let element = Element::Polygon(polygon);
         let elements = reference.get_elements_in_grid(&element);
 
-        assert!(elements.is_empty());
+        assert_eq!(elements, []);
     }
 
     #[test]
@@ -1237,7 +1237,7 @@ mod tests {
         let reference = Reference::new(polygon).with_grid(grid);
 
         let flattened = reference.flatten(None, &library);
-        assert!(flattened.is_empty());
+        assert_eq!(flattened, []);
     }
 
     #[test]
